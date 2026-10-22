@@ -28,17 +28,22 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 | lint-staged            | 17.6.0  | Requires Node ≥ 22.22.1                                                                                                                         |
 | vitest                 | 5.0.5   |                                                                                                                                                 |
 
+## API (installed in T-002, `apps/api`)
+
+| Package                                         | Version                | Notes                                        |
+| ----------------------------------------------- | ---------------------- | -------------------------------------------- |
+| cors                                            | 2.8.6                  | Added; not in the spec's stack list          |
+| zod                                             | 4.6.7                  | Env config now; API schemas from T-007       |
+| pino-pretty                                     | 13.2.0                 | dev; pretty logs when `NODE_ENV=development` |
+| @types/express / @types/cors / @types/supertest | 5.0.6 / 2.8.19 / 7.2.1 | dev                                          |
+
+`tsx` is no longer planned: Node 24 runs the TypeScript source directly (see PROGRESS decisions).
+
 ## Stack (planned)
 
 | Package                        | Version                                    | Ticket                                                                                                                     |
 | ------------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| express                        | 5.3.0                                      | T-002                                                                                                                      |
-| pino / pino-http               | 10.4.0 / 11.0.0                            | T-002                                                                                                                      |
-| helmet                         | 8.3.0                                      | T-002                                                                                                                      |
-| supertest                      | 7.3.1                                      | T-002                                                                                                                      |
-| tsx                            | 4.23.15                                    | T-002 (dev runner)                                                                                                         |
 | prisma / @prisma/client        | 7.10.1 / 7.10.1                            | T-003. **Note:** npm's `latest` tag for `prisma` points at `8.0.0-rc.25`, a release candidate. 7.10.1 is the latest stable |
-| zod                            | 4.6.7                                      | T-007                                                                                                                      |
 | @asteasolutions/zod-to-openapi | 9.1.0                                      | T-007                                                                                                                      |
 | react                          | 19.3.1                                     | T-006                                                                                                                      |
 | react-router                   | 8.5.0                                      | T-006                                                                                                                      |

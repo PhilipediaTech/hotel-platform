@@ -21,21 +21,28 @@ Production hotel PMS SaaS built from "Hotel Management Platform — Master Speci
 - PostgreSQL 18 installed natively (service `postgresql-x64-18`), binaries in `C:\Program Files\PostgreSQL\18\bin` (not on PATH yet). Databases: `hotel_dev`, `hotel_test`, `hotel_e2e`, `hotel_restore`.
 - Node: repo pins 24.22.1 (`.nvmrc`); machine had 22.15.0 on 2026-10-22.
 
-## Repo layout (as of T-001)
+## Repo layout (as of T-002)
 
 ```text
-apps/api        @hotel/api     placeholder src/index.ts (T-002 builds it)
+apps/api        @hotel/api     Express 5 app
+  src/server.ts                 HTTP entry (config → logger → app.listen, graceful shutdown)
+  src/app.ts                    createApp({ config, logger, routes }) — middleware order per tab 2
+  src/core/config.ts            env → Config (Zod)
+  src/core/request-id.ts        X-Request-Id (req_<uuid>, or a safe incoming id)
+  src/core/logger.ts            pino + pino-http (redaction, slim req/res serializers)
+  src/core/errors.ts            AppError, notFoundHandler, errorHandler → error envelope
+  src/test/helpers.ts           buildTestApp() with captured log lines, errorOf()
 apps/web        @hotel/web     placeholder (T-006)
 apps/site       @hotel/site    placeholder (V1.2)
-packages/shared @hotel/shared  placeholder (T-002/T-007)
+packages/shared @hotel/shared  src/errors.ts: ERROR_HTTP_STATUS, ErrorCode, ErrorEnvelope
 scripts/        commit-msg.mjs (+ test)
 docs/           PROGRESS, HANDOFF, VERSIONS, adr/000–022
 ```
 
-Root scripts: `npm run lint | typecheck | format | format:check | test | check`. Hooks: pre-commit runs lint-staged (ESLint + Prettier); commit-msg checks the subject format.
+Root scripts: `npm run dev | build | lint | typecheck | format | format:check | test | check`. Hooks: pre-commit runs lint-staged (ESLint + Prettier); commit-msg checks the subject format.
+
+**TypeScript conventions:** relative imports end in `.ts`; no enums, namespaces or constructor parameter properties (`erasableSyntaxOnly`) because Node runs the source directly. Use `as const` objects instead of enums. Tests use Vitest + Supertest against `createApp()`; pass extra routes via the `routes` option.
 
 ## Next step
 
-T-002: Express app skeleton — requestId, Pino, helmet, CORS, error envelope (tab 4), `/health`. Middleware order is in tab 2 "Request lifecycle". Decide the API build/run approach (tsx in dev; tsc build to `apps/api/dist/server.js` per the Render blueprint).
-
-Before T-003, get Philip's answer on spec issues 1–8 in `docs/PROGRESS.md` (schema additions).
+T-003: Prisma 7.10.1 setup, first migration (tenancy + identity, including approved additions 1–8 from `docs/PROGRESS.md`), seed script. Needs PostgreSQL on PATH and `DATABASE_URL` for `hotel_dev` / `hotel_test`.

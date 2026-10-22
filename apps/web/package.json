@@ -1,0 +1,13 @@
+{
+  "name": "@hotel/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Staff and owner React + Vite PWA",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@hotel/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Express 5 modular-monolith API (HTTP + pg-boss worker)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

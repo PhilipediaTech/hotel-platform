@@ -1,0 +1,13 @@
+{
+  "name": "@hotel/site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Astro booking engine and marketing site",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

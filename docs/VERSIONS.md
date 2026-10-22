@@ -32,6 +32,10 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 
 | Package                                         | Version                | Notes                                        |
 | ----------------------------------------------- | ---------------------- | -------------------------------------------- |
+| express                                         | 5.3.0                  |                                              |
+| helmet                                          | 8.3.0                  |                                              |
+| pino / pino-http                                | 10.4.0 / 11.0.0        |                                              |
+| supertest                                       | 7.3.1                  | dev                                          |
 | cors                                            | 2.8.6                  | Added; not in the spec's stack list          |
 | zod                                             | 4.6.7                  | Env config now; API schemas from T-007       |
 | pino-pretty                                     | 13.2.0                 | dev; pretty logs when `NODE_ENV=development` |

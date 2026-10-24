@@ -6,5 +6,5 @@
     "checkJs": true,
     "types": ["node"]
   },
-  "include": ["*.ts", "*.js", "*.mjs", "scripts/**/*", "prisma/**/*.ts"]
+  "include": ["*.ts", "*.js", "*.mjs", "scripts/**/*", "prisma/**/*.ts", "apps/*/scripts/**/*"]
 }

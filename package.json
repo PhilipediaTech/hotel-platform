@@ -15,7 +15,7 @@
   },
   "scripts": {
     "prepare": "husky",
-    "dev": "npm run dev -w apps/api",
+    "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspaces --if-present",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
@@ -29,7 +29,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset",
     "seed": "prisma db seed",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "check:size": "npm run build -w apps/web && npm run size -w apps/web"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
@@ -43,6 +44,7 @@
     "@types/node": "24.19.2",
     "eslint": "10.13.0",
     "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.13.0",
     "husky": "9.1.7",
     "lint-staged": "17.6.0",

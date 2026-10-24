@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens (tab 5, design rule 9): one neutral palette, one brand accent,
+ * status colours (success, warning, critical), 8-px spacing grid, system font.
+ * Use the semantic tokens below in components, not raw Tailwind palette colours.
+ * Spacing: Tailwind's scale is 4 px per step; keep to even steps (2, 4, 6 …) for the 8-px grid.
+ */
+@theme {
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+
+  /* Neutral */
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f5f4;
+  --color-surface-sunken: #e7e5e4;
+  --color-border: #d6d3d1;
+  --color-text: #1c1917;
+  --color-text-muted: #57534e;
+
+  /* Brand accent (placeholder) */
+  --color-brand: #0f766e;
+  --color-brand-strong: #115e59;
+  --color-brand-subtle: #ccfbf1;
+  --color-on-brand: #ffffff;
+
+  /* Status: always paired with text and an icon, never colour alone (rule 3) */
+  --color-success: #15803d;
+  --color-success-subtle: #dcfce7;
+  --color-warning: #b45309;
+  --color-warning-subtle: #fef3c7;
+  --color-critical: #b91c1c;
+  --color-critical-subtle: #fee2e2;
+
+  /* Large touch targets for housekeeping and POS (rule 6) */
+  --spacing-touch: 2.75rem;
+}
+
+@layer base {
+  html {
+    color: var(--color-text);
+    background: var(--color-surface-muted);
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Focus always visible (rule 10) */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}

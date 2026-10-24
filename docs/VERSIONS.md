@@ -52,23 +52,35 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 | @prisma/adapter-pg | 7.10.1          | Prisma 7 driver adapter                                                                   |
 | pg / @types/pg     | 8.23.1 / 8.23.1 |                                                                                           |
 
+## Web (installed in T-006, `apps/web`)
+
+| Package                                              | Version                                    | Notes                                                                             |
+| ---------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------- |
+| react / react-dom                                    | 19.3.1                                     |                                                                                   |
+| react-router                                         | 8.5.0                                      | v8: `RouterProvider` from `react-router/dom`, everything else from `react-router` |
+| vite                                                 | 8.3.5                                      | dev; Rolldown bundler (native binding per platform)                               |
+| @vitejs/plugin-react                                 | 6.1.2                                      | dev                                                                               |
+| tailwindcss / @tailwindcss/vite                      | 4.3.3                                      | dev; CSS-first config (`@theme` in `src/index.css`)                               |
+| shadcn/ui                                            | CLI-copied components (no package version) | `components.json`; Button and DropdownMenu so far                                 |
+| @radix-ui/react-dropdown-menu                        | 2.2.1                                      | shadcn/ui primitive                                                               |
+| class-variance-authority / clsx / tailwind-merge     | 0.7.1 / 2.1.1 / 3.7.0                      | shadcn/ui helpers                                                                 |
+| lucide-react                                         | 1.61.0                                     | Icons                                                                             |
+| @tanstack/react-query                                | 5.104.5                                    |                                                                                   |
+| i18next / react-i18next                              | 26.5.5 / 17.1.7                            |                                                                                   |
+| vite-plugin-pwa / workbox-window / workbox-build     | 2.0.0 / 7.4.1 / 7.4.1                      |                                                                                   |
+| @types/react / @types/react-dom                      | 19.3.0 / 19.3.0                            | dev                                                                               |
+| @testing-library/react / dom / user-event / jest-dom | 16.3.3 / 10.4.2 / 14.6.8 / 7.0.1           | dev                                                                               |
+| jsdom                                                | 30.1.3                                     | dev; Vitest `web` project                                                         |
+| eslint-plugin-react-hooks                            | 7.1.1                                      | root dev                                                                          |
+
 ## Stack (planned)
 
-| Package                        | Version                                    | Ticket              |
-| ------------------------------ | ------------------------------------------ | ------------------- |
-| @asteasolutions/zod-to-openapi | 9.1.0                                      | T-007               |
-| react                          | 19.3.1                                     | T-006               |
-| react-router                   | 8.5.0                                      | T-006               |
-| vite                           | 8.3.5                                      | T-006               |
-| @vitejs/plugin-react           | 6.1.2                                      | T-006               |
-| tailwindcss                    | 4.3.3                                      | T-006               |
-| shadcn/ui                      | CLI-copied components (no package version) | T-006               |
-| @tanstack/react-query          | 5.104.5                                    | T-006               |
-| react-hook-form                | 7.90.0                                     | T-006               |
-| i18next                        | 26.5.5                                     | T-006               |
-| vite-plugin-pwa                | 2.0.0                                      | T-006               |
-| dexie                          | 4.4.6                                      | T-093               |
-| otplib                         | 13.5.0                                     | T-011               |
-| pg-boss                        | 12.38.0                                    | T-021               |
-| @playwright/test               | 1.64.1                                     | First E2E journey   |
-| astro                          | 7.4.2                                      | V1.2 booking engine |
+| Package                        | Version | Ticket              |
+| ------------------------------ | ------- | ------------------- |
+| @asteasolutions/zod-to-openapi | 9.1.0   | T-007               |
+| react-hook-form                | 7.90.0  | T-010 (first form)  |
+| dexie                          | 4.4.6   | T-093               |
+| otplib                         | 13.5.0  | T-011               |
+| pg-boss                        | 12.38.0 | T-021               |
+| @playwright/test               | 1.64.1  | First E2E journey   |
+| astro                          | 7.4.2   | V1.2 booking engine |

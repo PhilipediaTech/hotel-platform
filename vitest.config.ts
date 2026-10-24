@@ -9,7 +9,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['{apps,packages,scripts,prisma}/**/*.test.{ts,mjs}'],
-          exclude: [...ignored, '**/*.int.test.ts'],
+          exclude: [...ignored, '**/*.int.test.ts', 'apps/web/**'],
         },
       },
       {
@@ -25,6 +25,8 @@ export default defineConfig({
           hookTimeout: 60_000,
         },
       },
+      // React components: config lives with the app, beside @vitejs/plugin-react.
+      'apps/web/vitest.config.ts',
     ],
   },
 });

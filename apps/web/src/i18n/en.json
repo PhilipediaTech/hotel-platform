@@ -1,0 +1,79 @@
+{
+  "app": {
+    "name": "Hotel Platform"
+  },
+  "shell": {
+    "skipToContent": "Skip to content",
+    "property": "Property",
+    "businessDate": "Business date",
+    "businessDateNotSet": "Business date not set",
+    "propertyContext": "Business date, currency and time zone",
+    "search": "Search guests, confirmation numbers or rooms",
+    "searchUnavailable": "Search arrives with reservations",
+    "approvals": "Approvals",
+    "approvalsCount": "Approvals, {{count}} pending",
+    "alerts": "Alerts",
+    "alertsCount": "Alerts, {{count}} open",
+    "accountMenu": "Account menu",
+    "signOut": "Sign out",
+    "signOutUnavailable": "Sign-in arrives with T-010",
+    "mainNav": "Main navigation",
+    "quickNav": "Quick navigation",
+    "devPreview": "Preview data: sign-in and real properties arrive with T-010 and T-013."
+  },
+  "navGroup": {
+    "operations": "Operations",
+    "revenue": "Rates and money",
+    "admin": "Settings"
+  },
+  "nav": {
+    "owner-home": "Home",
+    "dashboard": "Dashboard",
+    "front-desk": "Front desk",
+    "arrivals": "Arrivals",
+    "in-house": "In-house",
+    "calendar": "Calendar",
+    "new-booking": "New booking",
+    "folios": "Folios",
+    "shift": "Cashier shift",
+    "night-audit": "Night audit",
+    "audit-exceptions": "Exceptions",
+    "housekeeping": "Room board",
+    "hk-assign": "Assign",
+    "my-rooms": "My rooms",
+    "tasks": "Tasks",
+    "my-jobs": "My jobs",
+    "report-fault": "Report fault",
+    "handovers": "Handovers",
+    "approvals": "Approvals",
+    "leakage": "Alerts",
+    "rates": "Rates",
+    "reports": "Reports",
+    "messages": "Messages",
+    "settings-rooms": "Rooms",
+    "settings-finance": "Tax and FX",
+    "settings-access": "Users and roles",
+    "settings-imports": "Imports",
+    "settings-billing": "Billing",
+    "audit-log": "Audit log",
+    "platform": "Platform admin"
+  },
+  "offline": {
+    "banner": "You're offline. Lists show the last saved copy. Payments, check-in, check-out, postings and night audit are paused until you reconnect."
+  },
+  "update": {
+    "available": "A new version is available.",
+    "reload": "Reload"
+  },
+  "placeholder": {
+    "arrives": "Screen {{screen}} arrives with {{ticket}}."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "home": "Go to your home screen"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "reload": "Reload the page"
+  }
+}

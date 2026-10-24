@@ -4,24 +4,24 @@ Source of truth: [Master Specification v3.0](https://claude.ai/artifact/1RvubmsU
 
 ## Status
 
-| Item             | Value                                                                        |
-| ---------------- | ---------------------------------------------------------------------------- |
-| Current sprint   | S0 (V0 Engineering foundation)                                               |
-| Last ticket done | T-003                                                                        |
-| Next ticket      | T-006 PWA shell (T-004 waits for the GitHub remote; T-005 for paid accounts) |
-| Tests passing    | 105 (58 unit, 47 integration on `hotel_test`; 8 files)                       |
+| Item             | Value                                                                            |
+| ---------------- | -------------------------------------------------------------------------------- |
+| Current sprint   | S0 (V0 Engineering foundation)                                                   |
+| Last ticket done | T-006                                                                            |
+| Next ticket      | T-007 Zod → OpenAPI (T-004 waits for the GitHub remote; T-005 for paid accounts) |
+| Tests passing    | 154 (65 unit, 49 web, 40 integration on `hotel_test`; 11 files)                  |
 
 ## Tickets
 
-| Ticket                                                            | Status                                  | Tests                                                        | Commit       |
-| ----------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------ | ------------ |
-| T-001 Monorepo, TypeScript strict, ESLint, Prettier, commit hooks | Done                                    | 15 (commit-message rule)                                     | `T-001: ...` |
-| T-002 Express skeleton                                            | Done                                    | 41 (app, config, shared error codes)                         | `T-002: ...` |
-| T-003 Prisma setup, first migration (tenancy + identity), seed    | Done                                    | 49 (schema constraints, counters, seed, pgErrorInfo, config) | `T-003: ...` |
-| T-004 GitHub Actions                                              | Needs a GitHub remote (Philip)          |                                                              |              |
-| T-005 Staging on Render + Cloudflare                              | **Stop — needs paid accounts (Philip)** |                                                              |              |
-| T-006 React + Vite PWA shell                                      | Pending                                 |                                                              |              |
-| T-007 Zod → OpenAPI                                               | Pending                                 |                                                              |              |
+| Ticket                                                            | Status                                  | Tests                                                                                                            | Commit       |
+| ----------------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------ |
+| T-001 Monorepo, TypeScript strict, ESLint, Prettier, commit hooks | Done                                    | 15 (commit-message rule)                                                                                         | `T-001: ...` |
+| T-002 Express skeleton                                            | Done                                    | 41 (app, config, shared error codes)                                                                             | `T-002: ...` |
+| T-003 Prisma setup, first migration (tenancy + identity), seed    | Done                                    | 49 (schema constraints, counters, seed, pgErrorInfo, config)                                                     | `T-003: ...` |
+| T-004 GitHub Actions                                              | Needs a GitHub remote (Philip)          |                                                                                                                  |              |
+| T-005 Staging on Render + Cloudflare                              | **Stop — needs paid accounts (Philip)** |                                                                                                                  |              |
+| T-006 React + Vite PWA shell                                      | Done                                    | 49 (navigation model, role homes and bottom bars, shell landmarks, top bar, offline/update banners, Query retry) | `T-006: ...` |
+| T-007 Zod → OpenAPI                                               | Pending                                 |                                                                                                                  |              |
 
 ## Decisions taken in the build
 
@@ -47,6 +47,17 @@ Source of truth: [Master Specification v3.0](https://claude.ai/artifact/1RvubmsU
 | 2026-10-24 | Test helpers and factories live in `apps/api/test/` (moved from `src/test/`)                                                                                                                                                                                                                                                        | Matches the tab 2 repository layout                                                                                    |
 | 2026-10-24 | package-lock.json regenerated from scratch (Philip approved) after npm/cli#4828 dropped rolldown platform packages; all direct pins unchanged                                                                                                                                                                                       | CI on Linux needs `@rolldown/binding-linux-x64-gnu`                                                                    |
 | 2026-10-24 | Seed users are ACTIVE with no password                                                                                                                                                                                                                                                                                              | Sign-in arrives with T-010, which will set a dev password                                                              |
+| 2026-10-24 | Earlier "105 = 58 unit + 47 integration" split was miscounted; the same 105 tests are 65 unit + 40 integration                                                                                                                                                                                                                      | Recounted per Vitest project at T-006                                                                                  |
+| 2026-10-24 | Role home screen and phone bottom bar are chosen from the user's **permissions** in a fixed priority order (owner → manager → night audit → front desk → finance → housekeeping → attendant → maintenance → staff), not from the role name                                                                                          | Roles are hotel-editable permission bundles. Spec issue 30                                                             |
+| 2026-10-24 | Shell reads a `ShellSession` from React context; until T-010/T-013 it is `PREVIEW_SESSION` (demo property, all shell permissions) and a "Preview data" strip is shown                                                                                                                                                               | Lets the shell be built and tested before sign-in exists                                                               |
+| 2026-10-24 | Property context chip shows business date (from `business_days`, never the device clock), base currency and time zone, formatted in `properties.locale`                                                                                                                                                                             | Tab 5 rule 8                                                                                                           |
+| 2026-10-24 | PWA: `registerType: prompt` (an "update available" banner; the user chooses when to reload). The service worker precaches the app shell only, never `/api`                                                                                                                                                                          | Never reload under a user mid-transaction; offline API data goes to IndexedDB in T-093                                 |
+| 2026-10-24 | TanStack Query defaults: no retry on 4xx, up to 2 retries on 5xx/network, mutations never retried, `staleTime` 30 s                                                                                                                                                                                                                 | Money and room writes use idempotency keys; the user decides whether to resend                                         |
+| 2026-10-24 | 300 KB initial-load budget enforced by `npm run check:size` (gzipped entry JS + CSS + HTML). 171 KB at T-006                                                                                                                                                                                                                        | NFR performance; add to CI in T-004                                                                                    |
+| 2026-10-24 | Web component tests run as Vitest project `web` (jsdom) from `apps/web/vitest.config.ts`                                                                                                                                                                                                                                            | Keeps `@vitejs/plugin-react` inside the web workspace                                                                  |
+| 2026-10-24 | Added beyond the spec stack list: `react-i18next`, `workbox-window`, `lucide-react`, `@radix-ui/react-dropdown-menu`, `class-variance-authority`, `clsx`, `tailwind-merge`; dev: Testing Library, `jsdom`, `workbox-build`, `eslint-plugin-react-hooks`                                                                             | Standard companions of the chosen stack (shadcn/ui needs the Radix/cva/clsx/tailwind-merge set)                        |
+| 2026-10-24 | `react-hook-form` deferred from T-006 to T-010                                                                                                                                                                                                                                                                                      | The shell has no forms; sign-in is the first                                                                           |
+| 2026-10-24 | Lockfile regeneration procedure: set `node_modules` aside, delete `package-lock.json`, run `npm install --package-lock-only --ignore-scripts`, restore `node_modules`                                                                                                                                                               | Any lock built with an existing tree or old lock drops other-platform rolldown/lightningcss bindings (npm/cli#4828)    |
 
 ## Deviations from the spec
 
@@ -92,11 +103,15 @@ Source of truth: [Master Specification v3.0](https://claude.ai/artifact/1RvubmsU
 27. **Inventory horizon** undefined → build 730 days ahead, extend nightly.
 28. **Idempotency keys are keyed on `userId`**; system-run night audit and V1.2 public endpoints have no user → synthetic principals (`system:<propertyId>`); purge expired keys in the cleanup job.
 29. **New (T-003): CHECK violations carry the full failing row** in the Postgres error detail (e.g. a user's email). When services map DB errors to responses/logs (T-010 onward), log only `pgErrorInfo()` (SQLSTATE + constraint), never the raw error.
+30. **New (T-006): Role home screens.** Tab 5 maps homes to role _names_, but roles are editable permission bundles, and "Finance home" has no screen. Proposed: pick the home by permission priority (as built in `apps/web/src/app/navigation.ts`) and use the folio list as the finance home until a finance screen exists.
+31. **New (T-006): Global search** is in the tab 5 top bar, but the API tab has no search endpoint. Proposed: `GET /properties/{id}/search?q=` over guests, confirmation numbers and rooms, added with reservations. The box is shown disabled until then.
 
 ## Known gaps
 
 - No schema-drift check in CI yet (manually verified in T-003: `prisma migrate dev --create-only` produced an empty migration). Add to T-004.
 - No GitHub remote yet (needed for T-004).
-- `apps/web` and `apps/site` contain placeholder `src/index.ts` files only.
+- `apps/site` contains a placeholder `src/index.ts` only (V1.2).
 - Middleware steps 5–8 (session, CSRF Origin check, tenancy, rate limiter) are marked in `apps/api/src/app.ts` for T-010/T-012.
 - `/health` does not check the database (liveness only). A readiness check is not in the spec.
+- Web shell uses `PREVIEW_SESSION`; the property switcher, sign-out, approvals/alerts counts and search are inert until T-010/T-013/T-022/T-090.
+- On this machine the Windows rolldown/lightningcss bindings were installed with `npm install --no-save` after the lock regeneration. If `vite build` reports a missing native binding, run `npm ci`.

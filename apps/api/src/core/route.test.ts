@@ -6,6 +6,7 @@ import type { Session, User } from '../generated/prisma/client.ts';
 import { APP_ORIGIN, buildTestApp, errorOf } from '../../test/helpers.ts';
 import { markSignedIn } from './auth.ts';
 import { mountRoute, toExpressPath } from './route.ts';
+import { markTenant, type TenantContext } from './tenancy.ts';
 
 const FOLIO_ID = '3f2b8a4e-7d9a-4b1c-8d3e-4f5a6b7c8d9e';
 const PROPERTY_ID = '0d0d0d0d-0000-4000-8000-000000000002';
@@ -18,14 +19,25 @@ const SIGNED_IN = {
   session: { id: '22222222-2222-4222-8222-222222222222', mfaPassed: true } as Session,
 };
 
+// …and works in this property with these permissions (middleware step 7 is tested elsewhere).
+const TENANT: TenantContext = {
+  userId: SIGNED_IN.user.id,
+  organisationId: '0d0d0d0d-0000-4000-8000-000000000001',
+  propertyId: PROPERTY_ID,
+  roles: [],
+  permissions: new Set(['folio.read', 'folio.post']),
+};
+
 function appWith(
   mount: (router: express.Router) => void,
   signedIn: false | typeof SIGNED_IN = SIGNED_IN,
+  tenant: TenantContext | null = TENANT,
 ) {
   const router = express.Router();
   if (signedIn) {
     router.use((req, _res, next) => {
       markSignedIn(req, signedIn);
+      if (tenant && req.get('X-Property-Id') === tenant.propertyId) markTenant(req, tenant);
       next();
     });
   }
@@ -157,6 +169,61 @@ describe('mountRoute: sign-in', () => {
     );
     await request(app).delete(`/api/v1/notes/${FOLIO_ID}`).set('Origin', APP_ORIGIN).expect(204);
     expect(seen).toBe(SIGNED_IN.user.id);
+  });
+});
+
+describe('mountRoute: tenancy and permissions', () => {
+  const folio = () => ({ id: FOLIO_ID, number: 'F-1001', balance: NGN('0') });
+
+  it('gives property-scoped handlers the tenant', async () => {
+    let seen: unknown;
+    const app = appWith((r) =>
+      mountRoute(r, EXAMPLE_ROUTES.getFolio, (_input, { tenant }) => {
+        seen = tenant?.propertyId;
+        return folio();
+      }),
+    );
+    await request(app)
+      .get(`/api/v1/folios/${FOLIO_ID}`)
+      .set('X-Property-Id', PROPERTY_ID)
+      .expect(200);
+    expect(seen).toBe(PROPERTY_ID);
+  });
+
+  it('answers 404 when no tenant was resolved for a property-scoped route', async () => {
+    const handler = vi.fn(folio);
+    const app = appWith((r) => mountRoute(r, EXAMPLE_ROUTES.getFolio, handler), SIGNED_IN, null);
+    const res = await request(app)
+      .get(`/api/v1/folios/${FOLIO_ID}`)
+      .set('X-Property-Id', PROPERTY_ID);
+    expect(res.status).toBe(404);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('answers 403 when the user’s roles here lack the route’s permission', async () => {
+    const handler = vi.fn(folio);
+    const readOnly = { ...TENANT, permissions: new Set(['frontdesk.read']) };
+    const app = appWith(
+      (r) => mountRoute(r, EXAMPLE_ROUTES.getFolio, handler),
+      SIGNED_IN,
+      readOnly,
+    );
+    const res = await request(app)
+      .get(`/api/v1/folios/${FOLIO_ID}`)
+      .set('X-Property-Id', PROPERTY_ID);
+    expect(res.status).toBe(403);
+    expect(errorOf(res)).toMatchObject({
+      code: 'FORBIDDEN',
+      details: { permission: 'folio.read' },
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('refuses at start-up a permission on a route without a property', () => {
+    const { getFolio } = EXAMPLE_ROUTES;
+    expect(() =>
+      mountRoute(express.Router(), { ...getFolio, propertyScoped: false }, folio),
+    ).toThrow('getFolio: a permission needs a propertyScoped route');
   });
 });
 

@@ -3,12 +3,15 @@ import type { Request, Response, Router } from 'express';
 import type { z } from 'zod';
 import { getAuth, requireAuth, type AuthContext } from './auth.ts';
 import { AppError } from './errors.ts';
+import { tenantOf, type TenantContext } from './tenancy.ts';
 
 export interface RouteContext {
   req: Request;
   res: Response;
   /** Always set on `auth: 'session'` routes (default); may be null on public ones. */
   auth: AuthContext | null;
+  /** Always set on `propertyScoped` routes (middleware step 7). */
+  tenant: TenantContext | null;
 }
 
 /** Returns the response body before schema parsing (the schema strips unknown fields). */
@@ -74,6 +77,11 @@ export function mountRoute<R extends RouteContract>(
   route: R,
   handler: RouteHandler<R>,
 ): void {
+  // Permissions are checked against the property's roles; organisation-level checks arrive
+  // with the routes that need them (T-013).
+  if (route.permission && !route.propertyScoped) {
+    throw new Error(`${route.operationId}: a permission needs a propertyScoped route`);
+  }
   router[route.method](toExpressPath(route.path), async (req: Request, res: Response) => {
     // Sign-in first, so anonymous callers learn nothing from validation messages.
     const auth =
@@ -89,10 +97,22 @@ export function mountRoute<R extends RouteContract>(
       throw new AppError('VALIDATION_ERROR', 'Request validation failed.', { issues });
     }
 
+    // Middleware step 7 has already answered 404 for a property the user can't see.
+    const tenant = tenantOf(req);
+    if (route.propertyScoped && !tenant) {
+      throw new AppError('NOT_FOUND', 'Property not found.');
+    }
+    if (route.permission && !tenant?.permissions.has(route.permission)) {
+      throw new AppError('FORBIDDEN', 'Your role does not allow this.', {
+        permission: route.permission,
+      });
+    }
+
     const result = await handler({ params, query, body } as ParsedRouteInput<R>, {
       req,
       res,
       auth,
+      tenant,
     });
     const status = route.status ?? 200;
     if (status === 204) {

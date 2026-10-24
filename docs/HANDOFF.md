@@ -22,7 +22,7 @@ Production hotel PMS SaaS built from "Hotel Management Platform — Master Speci
 - PostgreSQL 18 native (service `postgresql-x64-18`, binaries in `C:\Program Files\PostgreSQL\18\bin`). Databases `hotel_dev` (migrated + seeded), `hotel_test` (tests), `hotel_e2e`, `hotel_restore`.
 - `.env` holds `DATABASE_URL`, `TEST_DATABASE_URL`, `E2E_DATABASE_URL` with Philip's password — never print it.
 
-## Repo layout (as of T-011)
+## Repo layout (as of T-012)
 
 ```text
 prisma/
@@ -40,6 +40,8 @@ apps/api        @hotel/api      Express 5 app
   src/core/auth.ts              sessions: SESSION_POLICY, createSession, sessionLoader (step 5), requireAuth/getAuth, cookies
   src/core/csrf.ts              originCheck (step 6)
   src/core/rate-limit.ts        rateLimiter (step 8), RATE_LIMITS
+  src/core/tenancy.ts           tenancyContext (step 7), resolveTenant, currentTenant/requireTenant, runAsTenant
+  src/core/tenant-db.ts         createTenantDb(db): Prisma extension scoping TENANT_MODELS by tenant
   src/core/passwords.ts         scrypt hashPassword/verifyPassword/burnPasswordCheck
   src/core/tokens.ts            newToken, hashToken (HMAC with SESSION_SECRET)
   src/core/mfa.ts               AES-GCM secret encryption, TOTP verify (replay-safe), recovery codes
@@ -56,6 +58,9 @@ apps/api        @hotel/api      Express 5 app
   test/db.ts                    testDb(), resetDb(), expectViolation(), SQLSTATE
   test/factories.ts             makeOrganisation/Property/Role/User/Tenant
   test/global-setup.ts          prisma migrate deploy on TEST_DATABASE_URL
+  test/auth.ts                  authApi, cookies, verifiedUser, signIn (sign-in, MFA and PIN tests)
+  test/tenancy.ts               makeTenantWorld, sessionCookie, expectCrossTenantSafe (cross-tenant harness)
+  test/cross-tenant-cases.ts    one case per property-scoped route (the suite fails without it)
 apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/main.tsx                  QueryClientProvider → SessionContext → RouterProvider
   src/app/navigation.ts         NAV_ITEMS (screen + ticket per item), HOMES, homeFor/railItems/bottomBarItems
@@ -95,10 +100,11 @@ Root scripts (`dev` runs api :4000 and web :5173 via `scripts/dev.mjs`; `check:s
 - **Web:** every UI string goes in `src/i18n/en.json`; use the design tokens (`bg-surface`, `text-brand`, `text-critical`…), not raw palette colours; status is always text + icon, never colour alone. A new screen replaces its placeholder by adding a route at its `NAV_ITEMS` path. Component tests: `*.test.tsx` under `apps/web/src`.
 - **New endpoint:** define it with `defineRoute` in `packages/shared/src/api/routes.ts` (wire formats from `primitives.ts`; money as `Money`, dates `IsoDate`, no transforms in responses), add it to `API_ROUTES`, implement with `mountRoute` in the module’s `routes.ts`, run `npm run openapi`, and call it from the web app with `api.call('<operationId>', …)`.
 - **Signed-in routes:** contracts default to `auth: 'session'`, so `mountRoute` answers 401 before your handler runs; read the user with `requireAuth(req)` (or `ctx.auth`). Non-GET requests in tests need `.set('Origin', APP_ORIGIN)`. Integration tests that sign in use `buildTestApp(undefined, { db: testDb(), clock })` and read links from the returned fake `email`.
+- **Tenant data:** property-scoped contracts (`propertyScoped: true`, plus `permission`) get `ctx.tenant`. Read and write tenant tables only through `createTenantDb(db)`; add every new tenant table to `TENANT_MODELS` in `core/tenant-db.ts`; add a case for every property-scoped route to `test/cross-tenant-cases.ts`. Raw SQL must filter by `requireTenant()` IDs itself.
 - **Local sign-in:** `npm run seed`, then any `<role-slug>@demo.hotel.test` (e.g. `owner@`, `front-desk@`) with `SEED_USER_PASSWORD` from `.env`. Verification and reset links are printed in the API log.
 - **MFA and PINs locally:** Owner, GM and Finance demo users must set up MFA at first sign-in; generate codes from the shown key with `node --input-type=module -e "import { generate } from 'otplib'; console.log(await generate({ secret: '<key>' }))"` (run in `apps/api`). For PIN switching: set a PIN at `/account/pin` (e.g. as `front-desk@`), sign in as `dept-manager@` with "shared device" ticked, then Account menu → Switch user. Integration tests for these flows use `test/auth.ts`.
 - **Lockfile:** never regenerate it with `node_modules` or the old lock present (npm/cli#4828 drops platform bindings); follow the procedure in PROGRESS decisions. After any dependency change, `grep -c "node_modules/@rolldown/binding-" package-lock.json` must print 15.
 
 ## Next step
 
-T-012 Tenancy context (middleware step 7): resolve `X-Property-Id`, verify membership (404 for other tenants, PRD M1 acceptance), `{ orgId, propertyId, userId, roles }` in AsyncLocalStorage, a Prisma client extension that scopes queries by tenant, and a cross-tenant test harness. Then T-013 (roles, permissions catalogue replacing the provisional lists, memberships, invitations, MFA reset — issues 34, 35, 37) and T-014 (audit). Open calls: issues 34 and 38. T-004 is still blocked on a GitHub remote; T-005 needs paid accounts (stop).
+T-013 Roles, permissions, memberships, invitations, property switcher (M1-04, M1-05, M1-08): the permission catalogue in `@hotel/shared` replacing the provisional template lists; role editing; invitations by email or phone; membership removal revoking that property’s sessions (issue 35); MFA reset (issue 37); manager password reset for phone-only staff if chosen (issue 34). The first property-scoped routes need cross-tenant cases. Then T-014 (audit). Open calls: issues 34 and 38. T-004 is still blocked on a GitHub remote; T-005 needs paid accounts (stop).

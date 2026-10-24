@@ -13,6 +13,7 @@ import { errorHandler, notFoundHandler } from './core/errors.ts';
 import { httpLogger } from './core/logger.ts';
 import { openApiDocument } from './core/openapi.ts';
 import { rateLimiter } from './core/rate-limit.ts';
+import { tenancyContext } from './core/tenancy.ts';
 import { requestId } from './core/request-id.ts';
 import { mountRoute } from './core/route.ts';
 import { identityRoutes } from './modules/identity/routes.ts';
@@ -63,7 +64,8 @@ export function createApp({
   app.use(sessionLoader({ db, config, clock }));
   // 6. CSRF: Origin must be allow-listed on every non-GET
   app.use(originCheck(config));
-  // 7. Tenancy context (T-012)
+  // 7. Tenancy context: X-Property-Id → membership → AsyncLocalStorage
+  app.use(tenancyContext({ db }));
   // 8. Rate limiter (per IP on auth routes, per user)
   app.use(rateLimiter({ db, clock, logger }));
 

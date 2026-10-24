@@ -1,7 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { pino, type DestinationStream, type Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
+import type { Request } from 'express';
+import { getAuth } from './auth.ts';
 import type { Config } from './config.ts';
+import { tenantOf } from './tenancy.ts';
 
 export const REDACTED_PATHS = [
   'req.headers.authorization',
@@ -27,6 +30,16 @@ export function createLogger(config: Config, destination?: DestinationStream): L
   return pino(options);
 }
 
+/** Who and where, for request logs; empty until sign-in (step 5) and tenancy (step 7) ran. */
+function requestBindings(req: Request): Record<string, string> {
+  const auth = getAuth(req);
+  const tenant = tenantOf(req);
+  return {
+    ...(auth ? { userId: auth.user.id } : {}),
+    ...(tenant ? { orgId: tenant.organisationId, propertyId: tenant.propertyId } : {}),
+  };
+}
+
 export function httpLogger(logger: Logger) {
   return pinoHttp({
     logger,
@@ -43,6 +56,8 @@ export function httpLogger(logger: Logger) {
       }),
       res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
     },
+    // Tab 2: request logs carry orgId, propertyId and userId once they are known.
+    customProps: (req: IncomingMessage) => requestBindings(req as Request),
     customLogLevel: (_req: IncomingMessage, res: ServerResponse, err?: Error) => {
       if (err !== undefined || res.statusCode >= 500) return 'error';
       if (res.statusCode >= 400) return 'warn';

@@ -3,7 +3,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { AppError } from './core/errors.ts';
-import { buildTestApp, errorOf, TEST_CONFIG } from './test/helpers.ts';
+import { buildTestApp, errorOf, TEST_CONFIG } from '../test/helpers.ts';
 
 function routesThatFail() {
   const router = express.Router();

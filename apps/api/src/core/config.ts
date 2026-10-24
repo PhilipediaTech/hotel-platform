@@ -13,6 +13,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   APP_ORIGIN: origin,
   SITE_ORIGIN: origin,
+  DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
 });
 
 export interface Config {
@@ -22,6 +23,7 @@ export interface Config {
   /** Browser origins allowed by CORS (and, from T-010, the Origin check). */
   appOrigin: string;
   siteOrigin: string;
+  databaseUrl: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
@@ -36,5 +38,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     logLevel: e.LOG_LEVEL,
     appOrigin: e.APP_ORIGIN,
     siteOrigin: e.SITE_ORIGIN,
+    databaseUrl: e.DATABASE_URL,
   };
 }

@@ -43,24 +43,32 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 
 `tsx` is no longer planned: Node 24 runs the TypeScript source directly (see PROGRESS decisions).
 
+## Database (installed in T-003)
+
+| Package            | Version         | Notes                                                                                     |
+| ------------------ | --------------- | ----------------------------------------------------------------------------------------- |
+| prisma (root, dev) | 7.10.1          | npm `latest` tag points at `8.0.0-rc.25` (release candidate); 7.10.1 is the latest stable |
+| @prisma/client     | 7.10.1          | `apps/api`                                                                                |
+| @prisma/adapter-pg | 7.10.1          | Prisma 7 driver adapter                                                                   |
+| pg / @types/pg     | 8.23.1 / 8.23.1 |                                                                                           |
+
 ## Stack (planned)
 
-| Package                        | Version                                    | Ticket                                                                                                                     |
-| ------------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| prisma / @prisma/client        | 7.10.1 / 7.10.1                            | T-003. **Note:** npm's `latest` tag for `prisma` points at `8.0.0-rc.25`, a release candidate. 7.10.1 is the latest stable |
-| @asteasolutions/zod-to-openapi | 9.1.0                                      | T-007                                                                                                                      |
-| react                          | 19.3.1                                     | T-006                                                                                                                      |
-| react-router                   | 8.5.0                                      | T-006                                                                                                                      |
-| vite                           | 8.3.5                                      | T-006                                                                                                                      |
-| @vitejs/plugin-react           | 6.1.2                                      | T-006                                                                                                                      |
-| tailwindcss                    | 4.3.3                                      | T-006                                                                                                                      |
-| shadcn/ui                      | CLI-copied components (no package version) | T-006                                                                                                                      |
-| @tanstack/react-query          | 5.104.5                                    | T-006                                                                                                                      |
-| react-hook-form                | 7.90.0                                     | T-006                                                                                                                      |
-| i18next                        | 26.5.5                                     | T-006                                                                                                                      |
-| vite-plugin-pwa                | 2.0.0                                      | T-006                                                                                                                      |
-| dexie                          | 4.4.6                                      | T-093                                                                                                                      |
-| otplib                         | 13.5.0                                     | T-011                                                                                                                      |
-| pg-boss                        | 12.38.0                                    | T-021                                                                                                                      |
-| @playwright/test               | 1.64.1                                     | First E2E journey                                                                                                          |
-| astro                          | 7.4.2                                      | V1.2 booking engine                                                                                                        |
+| Package                        | Version                                    | Ticket              |
+| ------------------------------ | ------------------------------------------ | ------------------- |
+| @asteasolutions/zod-to-openapi | 9.1.0                                      | T-007               |
+| react                          | 19.3.1                                     | T-006               |
+| react-router                   | 8.5.0                                      | T-006               |
+| vite                           | 8.3.5                                      | T-006               |
+| @vitejs/plugin-react           | 6.1.2                                      | T-006               |
+| tailwindcss                    | 4.3.3                                      | T-006               |
+| shadcn/ui                      | CLI-copied components (no package version) | T-006               |
+| @tanstack/react-query          | 5.104.5                                    | T-006               |
+| react-hook-form                | 7.90.0                                     | T-006               |
+| i18next                        | 26.5.5                                     | T-006               |
+| vite-plugin-pwa                | 2.0.0                                      | T-006               |
+| dexie                          | 4.4.6                                      | T-093               |
+| otplib                         | 13.5.0                                     | T-011               |
+| pg-boss                        | 12.38.0                                    | T-021               |
+| @playwright/test               | 1.64.1                                     | First E2E journey   |
+| astro                          | 7.4.2                                      | V1.2 booking engine |

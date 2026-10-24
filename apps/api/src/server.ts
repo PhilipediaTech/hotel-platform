@@ -1,5 +1,6 @@
 import { createApp } from './app.ts';
 import { loadConfig } from './core/config.ts';
+import { createDb } from './core/db.ts';
 import { createLogger } from './core/logger.ts';
 
 let config;
@@ -11,6 +12,7 @@ try {
 }
 
 const logger = createLogger(config);
+const db = createDb(config.databaseUrl);
 const app = createApp({ config, logger });
 
 const server = app.listen(config.port, (err?: Error) => {
@@ -23,7 +25,9 @@ const server = app.listen(config.port, (err?: Error) => {
 
 function shutdown(signal: NodeJS.Signals): void {
   logger.info({ signal }, 'Shutting down');
-  server.close(() => process.exit(0));
+  server.close(() => {
+    void db.$disconnect().finally(() => process.exit(0));
+  });
   // Force exit if open connections keep the server alive.
   setTimeout(() => process.exit(1), 10_000).unref();
 }

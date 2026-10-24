@@ -1,0 +1,286 @@
+// Hotel platform database schema. Source: spec tab 3 (Database Schema).
+// Conventions: UUID ids; snake_case tables (plural) and columns via @@map/@map;
+// money as BigInt minor units (*Minor); percentages as Int basis points (*Bps);
+// DATE for business dates, TIMESTAMPTZ(6) for instants.
+// Constraints Prisma can't express live in the migration SQL (see prisma/migrations).
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../apps/api/src/generated/prisma"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────── Tenancy ─────────────────────────
+
+enum PropertyStatus {
+  SETUP
+  LIVE
+  SUSPENDED
+  ARCHIVED
+
+  @@map("property_status")
+}
+
+model Organisation {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  legalName String?  @map("legal_name")
+  country   String   @db.Char(2)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  properties   Property[]
+  roles        Role[]
+  memberships  Membership[]
+  departments  Department[]
+  invitations  Invitation[]
+  featureFlags FeatureFlag[]
+
+  @@map("organisations")
+}
+
+model Property {
+  id              String         @id @default(uuid()) @db.Uuid
+  organisationId  String         @map("organisation_id") @db.Uuid
+  code            String
+  name            String
+  status          PropertyStatus @default(SETUP)
+  timeZone        String         @default("Africa/Lagos") @map("time_zone")
+  baseCurrency    String         @default("NGN") @map("base_currency") @db.Char(3)
+  locale          String         @default("en-NG")
+  address         Json
+  phone           String?
+  email           String?
+  taxRegistration Json           @default("{}") @map("tax_registration")
+  checkInTime     String         @default("14:00") @map("check_in_time")
+  checkOutTime    String         @default("12:00") @map("check_out_time")
+  nightAuditTime  String         @default("03:00") @map("night_audit_time")
+  settings        Json           @default("{}")
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organisation Organisation      @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  departments  Department[]
+  memberships  Membership[]
+  invitations  Invitation[]
+  counters     PropertyCounter[]
+
+  @@unique([organisationId, code])
+  // Target of composite foreign keys: a child row can only point at a property of its own organisation.
+  @@unique([organisationId, id])
+  @@map("properties")
+}
+
+model Department {
+  id             String @id @default(uuid()) @db.Uuid
+  organisationId String @map("organisation_id") @db.Uuid
+  propertyId     String @map("property_id") @db.Uuid
+  code           String
+  name           String
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property     Property     @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  memberships  Membership[]
+
+  @@unique([propertyId, code])
+  @@unique([propertyId, id])
+  @@map("departments")
+}
+
+model FeatureFlag {
+  organisationId String  @map("organisation_id") @db.Uuid
+  module         String
+  enabled        Boolean @default(false)
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  @@id([organisationId, module])
+  @@map("feature_flags")
+}
+
+/// Per-property sequences (confirmation numbers, folio numbers, task numbers).
+/// Incremented with UPDATE … RETURNING inside the caller's transaction. Spec issue 6.
+model PropertyCounter {
+  propertyId String @map("property_id") @db.Uuid
+  name       String
+  value      Int    @default(0)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@id([propertyId, name])
+  @@map("property_counters")
+}
+
+// ───────────────────────── Identity ─────────────────────────
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+
+  @@map("user_status")
+}
+
+enum AuthTokenPurpose {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+
+  @@map("auth_token_purpose")
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  /// Stored lower-case (CHECK in SQL).
+  email        String?    @unique
+  /// E.164, e.g. +2348000000000 (CHECK in SQL).
+  phone        String?    @unique
+  name         String
+  passwordHash String?    @map("password_hash")
+  pinHash      String?    @map("pin_hash")
+  mfaSecretEnc Bytes?     @map("mfa_secret_enc")
+  mfaEnabled   Boolean    @default(false) @map("mfa_enabled")
+  status       UserStatus @default(INVITED)
+  failedLogins Int        @default(0) @map("failed_logins")
+  lockedUntil  DateTime?  @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sessions           Session[]
+  memberships        Membership[]
+  authTokens         AuthToken[]
+  invitationsSent    Invitation[] @relation("InvitedBy")
+  invitationsClaimed Invitation[] @relation("AcceptedBy")
+
+  @@map("users")
+}
+
+model Session {
+  id              String    @id @default(uuid()) @db.Uuid
+  /// HMAC of the cookie token; the raw token is never stored.
+  tokenHash       String    @unique @map("token_hash")
+  userId          String    @map("user_id") @db.Uuid
+  /// Set on a user's PIN session; points at the shared-device session a manager opened. Spec issue 4.
+  parentSessionId String?   @map("parent_session_id") @db.Uuid
+  mfaPassed       Boolean   @default(false) @map("mfa_passed")
+  sharedDevice    Boolean   @default(false) @map("shared_device")
+  deviceLabel     String?   @map("device_label")
+  ip              String?
+  userAgent       String?   @map("user_agent")
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  lastSeenAt      DateTime  @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  parentSession Session?  @relation("DeviceSession", fields: [parentSessionId], references: [id], onDelete: Cascade)
+  childSessions Session[] @relation("DeviceSession")
+
+  @@index([userId])
+  @@index([parentSessionId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Role {
+  id             String   @id @default(uuid()) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  name           String
+  isSystem       Boolean  @default(false) @map("is_system")
+  permissions    String[] @default([])
+  /// e.g. {"folio.discount":{"maxBps":1500}}
+  limits         Json     @default("{}")
+  requiresMfa    Boolean  @default(false) @map("requires_mfa")
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  memberships  Membership[]
+  invitations  Invitation[]
+
+  @@unique([organisationId, name])
+  @@unique([organisationId, id])
+  @@map("roles")
+}
+
+model Membership {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  /// null = organisation-wide
+  propertyId     String?  @map("property_id") @db.Uuid
+  roleId         String   @map("role_id") @db.Uuid
+  departmentId   String?  @map("department_id") @db.Uuid
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property     Property?    @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  role         Role         @relation(fields: [organisationId, roleId], references: [organisationId, id], onDelete: Restrict)
+  department   Department?  @relation(fields: [propertyId, departmentId], references: [propertyId, id], onDelete: Restrict)
+
+  /// Index is NULLS NOT DISTINCT in the migration SQL, so org-wide duplicates are rejected. Spec issue 5.
+  @@unique([userId, organisationId, propertyId, roleId])
+  @@index([propertyId])
+  @@map("memberships")
+}
+
+/// Single-use tokens for email verification and password reset (hash only). Spec issue 1.
+model AuthToken {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  purpose   AuthTokenPurpose
+  tokenHash String           @unique @map("token_hash")
+  expiresAt DateTime         @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime?        @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, purpose])
+  @@map("auth_tokens")
+}
+
+/// Staff invitation by email or phone to a role, optionally at one property. Spec issue 1.
+model Invitation {
+  id             String    @id @default(uuid()) @db.Uuid
+  organisationId String    @map("organisation_id") @db.Uuid
+  propertyId     String?   @map("property_id") @db.Uuid
+  roleId         String    @map("role_id") @db.Uuid
+  email          String?
+  phone          String?
+  tokenHash      String    @unique @map("token_hash")
+  invitedById    String    @map("invited_by_id") @db.Uuid
+  acceptedById   String?   @map("accepted_by_id") @db.Uuid
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt     DateTime? @map("accepted_at") @db.Timestamptz(6)
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property     Property?    @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  role         Role         @relation(fields: [organisationId, roleId], references: [organisationId, id], onDelete: Restrict)
+  invitedBy    User         @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Restrict)
+  acceptedBy   User?        @relation("AcceptedBy", fields: [acceptedById], references: [id], onDelete: Restrict)
+
+  @@index([organisationId])
+  @@map("invitations")
+}
+
+// ───────────────────────── Infrastructure ─────────────────────────
+
+/// Fixed-window request counters for the rate limiter ("stored in PostgreSQL", tab 2). Spec issue 2.
+model RateLimitHit {
+  key         String
+  windowStart DateTime @map("window_start") @db.Timestamptz(6)
+  count       Int      @default(1)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limit_hits")
+}

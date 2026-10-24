@@ -6,15 +6,19 @@
   "description": "Express 5 modular-monolith API (HTTP + pg-boss worker)",
   "scripts": {
     "dev": "node --watch --env-file-if-exists=../../.env src/server.ts",
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@hotel/shared": "0.0.0",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
     "cors": "2.8.6",
     "express": "5.3.0",
     "helmet": "8.3.0",
+    "pg": "8.23.1",
     "pino": "10.4.0",
     "pino-http": "11.0.0",
     "zod": "4.6.7"
@@ -22,6 +26,7 @@
   "devDependencies": {
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
+    "@types/pg": "8.23.1",
     "@types/supertest": "7.2.1",
     "pino-pretty": "13.2.0",
     "supertest": "7.3.1"

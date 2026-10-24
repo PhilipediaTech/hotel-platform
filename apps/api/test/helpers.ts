@@ -1,8 +1,8 @@
 import type { ErrorBody, ErrorEnvelope } from '@hotel/shared';
 import type { Router } from 'express';
-import { createApp } from '../app.ts';
-import type { Config } from '../core/config.ts';
-import { createLogger } from '../core/logger.ts';
+import { createApp } from '../src/app.ts';
+import type { Config } from '../src/core/config.ts';
+import { createLogger } from '../src/core/logger.ts';
 
 export const TEST_CONFIG: Config = {
   nodeEnv: 'test',
@@ -10,6 +10,8 @@ export const TEST_CONFIG: Config = {
   logLevel: 'info',
   appOrigin: 'http://app.test.localhost',
   siteOrigin: 'http://site.test.localhost',
+  // Not used by HTTP-only tests; DB tests use test/db.ts.
+  databaseUrl: 'postgresql://unused@localhost:5432/unused',
 };
 
 /** Builds the app with a logger that captures JSON log lines instead of printing them. */

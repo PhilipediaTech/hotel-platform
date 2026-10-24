@@ -187,7 +187,15 @@ export function createApiClient<Routes extends RouteTable = ApiRoutes>(
   };
 }
 
+let currentPropertyId: string | null = null;
+
+/** The property `X-Property-Id` carries on property-scoped calls; set by the session. */
+export function setApiPropertyId(propertyId: string | null): void {
+  currentPropertyId = propertyId;
+}
+
 /** The app's client: same-origin `/api/v1`, or `VITE_API_BASE_URL` when set. */
 export const api: ApiClient = createApiClient({
   baseUrl: (import.meta.env['VITE_API_BASE_URL'] as string | undefined) ?? '/api/v1',
+  propertyId: () => currentPropertyId,
 });

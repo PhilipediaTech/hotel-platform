@@ -1,4 +1,6 @@
+import type { Me } from '@hotel/shared';
 import { createContext, useContext } from 'react';
+import type { z } from 'zod';
 
 export interface ShellProperty {
   id: string;
@@ -10,7 +12,7 @@ export interface ShellProperty {
   locale: string;
 }
 
-/** What the shell needs to render. Filled from GET /me and the business day from T-010/T-013. */
+/** What the shell needs to render: from GET /me; business date and counts arrive later. */
 export interface ShellSession {
   userName: string;
   permissions: readonly string[];
@@ -24,8 +26,62 @@ export interface ShellSession {
   preview: boolean;
 }
 
+export type MeResponse = z.output<typeof Me>;
+
+/** Query key of GET /me; sign-in seeds it, sign-out clears it. */
+export const ME_QUERY_KEY = ['me'] as const;
+
 /**
- * Placeholder until sign-in exists (T-010) so the shell can be viewed and tested.
+ * Builds the shell session from GET /me for one property (the stored choice if the user
+ * still has it, else the first). Permissions are the union of the user's roles that apply
+ * there: property roles for that property and organisation-wide roles of its organisation.
+ */
+export function toShellSession(me: MeResponse, wantedPropertyId: string | null): ShellSession {
+  const property = me.properties.find((p) => p.id === wantedPropertyId) ?? me.properties[0];
+  const permissions = new Set<string>();
+  if (property) {
+    for (const m of me.memberships) {
+      const applies =
+        m.organisationId === property.organisationId &&
+        (m.propertyId === null || m.propertyId === property.id);
+      if (applies) for (const code of m.role.permissions) permissions.add(code);
+    }
+  }
+  return {
+    userName: me.user.name,
+    permissions: [...permissions].sort(),
+    properties: me.properties.map(({ id, code, name, timeZone, baseCurrency, locale }) => ({
+      id,
+      code,
+      name,
+      timeZone,
+      baseCurrency,
+      locale,
+    })),
+    currentPropertyId: property?.id ?? null,
+    businessDate: null, // business_days arrive with night audit (T-070s)
+    pendingApprovals: 0, // T-022
+    openAlerts: 0, // T-090
+    preview: false,
+  };
+}
+
+export interface SessionActions {
+  signOut: () => void;
+  switchProperty: (propertyId: string) => void;
+}
+
+export const SessionActionsContext = createContext<SessionActions>({
+  signOut: () => undefined,
+  switchProperty: () => undefined,
+});
+
+export function useSessionActions(): SessionActions {
+  return useContext(SessionActionsContext);
+}
+
+/**
+ * Fixed session for component tests and previews (the app itself uses GET /me).
  * Mirrors the seeded demo property. Every permission the shell knows about is granted.
  */
 export const PREVIEW_SESSION: ShellSession = {

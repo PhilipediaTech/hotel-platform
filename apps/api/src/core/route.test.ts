@@ -2,7 +2,9 @@ import { EXAMPLE_ROUTES } from '@hotel/shared/testing';
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
-import { buildTestApp, errorOf } from '../../test/helpers.ts';
+import type { Session, User } from '../generated/prisma/client.ts';
+import { APP_ORIGIN, buildTestApp, errorOf } from '../../test/helpers.ts';
+import { markSignedIn } from './auth.ts';
 import { mountRoute, toExpressPath } from './route.ts';
 
 const FOLIO_ID = '3f2b8a4e-7d9a-4b1c-8d3e-4f5a6b7c8d9e';
@@ -10,8 +12,20 @@ const PROPERTY_ID = '0d0d0d0d-0000-4000-8000-000000000002';
 const KEY = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 const NGN = (amountMinor: string) => ({ amountMinor, currency: 'NGN' });
 
-function appWith(mount: (router: express.Router) => void) {
+// Route tests are about mounting, not sessions: every request is signed in as this user.
+const SIGNED_IN = {
+  user: { id: '11111111-1111-4111-8111-111111111111', status: 'ACTIVE' } as User,
+  session: { id: '22222222-2222-4222-8222-222222222222' } as Session,
+};
+
+function appWith(mount: (router: express.Router) => void, signedIn = true) {
   const router = express.Router();
+  if (signedIn) {
+    router.use((req, _res, next) => {
+      markSignedIn(req, SIGNED_IN);
+      next();
+    });
+  }
   mount(router);
   return buildTestApp(router).app;
 }
@@ -64,6 +78,7 @@ describe('mountRoute: input', () => {
     const app = appWith((r) => mountRoute(r, EXAMPLE_ROUTES.postCharge, handler));
     const res = await request(app)
       .post('/api/v1/folios/not-a-uuid/charges')
+      .set('Origin', APP_ORIGIN)
       .send({ amount: { amountMinor: 4500000, currency: 'NGN' }, description: '' });
     expect(res.status).toBe(400);
     const error = errorOf(res);
@@ -89,6 +104,7 @@ describe('mountRoute: input', () => {
     const call = () =>
       request(app)
         .patch(`/api/v1/rooms/${FOLIO_ID}`)
+        .set('Origin', APP_ORIGIN)
         .set('X-Property-Id', PROPERTY_ID)
         .send({ name: 'Deluxe 101' });
     const missing = await call();
@@ -96,6 +112,32 @@ describe('mountRoute: input', () => {
       expect.objectContaining({ path: 'headers.If-Match' }),
     ]);
     await call().set('If-Match', '"3"').expect(200, { id: FOLIO_ID, name: 'Deluxe 101' });
+  });
+});
+
+describe('mountRoute: sign-in', () => {
+  it('answers 401 before validating anything when a session route has no session', async () => {
+    const handler = vi.fn();
+    const app = appWith((r) => mountRoute(r, EXAMPLE_ROUTES.postCharge, handler), false);
+    const res = await request(app)
+      .post('/api/v1/folios/not-a-uuid/charges')
+      .set('Origin', APP_ORIGIN)
+      .send({});
+    expect(res.status).toBe(401);
+    expect(errorOf(res)).toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(errorOf(res).details).toBeUndefined();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('gives the handler the signed-in user', async () => {
+    let seen: unknown;
+    const app = appWith((r) =>
+      mountRoute(r, EXAMPLE_ROUTES.deleteNote, (_input, { auth }) => {
+        seen = auth?.user.id;
+      }),
+    );
+    await request(app).delete(`/api/v1/notes/${FOLIO_ID}`).set('Origin', APP_ORIGIN).expect(204);
+    expect(seen).toBe(SIGNED_IN.user.id);
   });
 });
 
@@ -110,11 +152,12 @@ describe('mountRoute: output', () => {
     });
     await request(app)
       .post(`/api/v1/folios/${FOLIO_ID}/charges`)
+      .set('Origin', APP_ORIGIN)
       .set('X-Property-Id', PROPERTY_ID)
       .set('Idempotency-Key', KEY)
       .send({ amount: NGN('250000'), description: 'Laundry' })
       .expect(201, { id: FOLIO_ID, amount: NGN('250000') });
-    const res = await request(app).delete(`/api/v1/notes/${FOLIO_ID}`);
+    const res = await request(app).delete(`/api/v1/notes/${FOLIO_ID}`).set('Origin', APP_ORIGIN);
     expect(res.status).toBe(204);
     expect(res.text).toBe('');
   });

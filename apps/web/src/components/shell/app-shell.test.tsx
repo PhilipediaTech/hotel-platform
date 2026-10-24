@@ -1,15 +1,21 @@
+import type { ReactNode } from 'react';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { routes } from '../../app/routes.tsx';
+import { buildRoutes } from '../../app/routes.tsx';
 import { PREVIEW_SESSION, SessionContext, type ShellSession } from '../../app/session.ts';
 import { swState, updateServiceWorker } from '../../test/pwa-register-stub.ts';
 import { formatBusinessDate } from './top-bar.tsx';
 
+// The shell tests supply the session themselves instead of loading GET /me.
+function PassThroughGate({ children }: { children: ReactNode }) {
+  return children;
+}
+
 function renderApp(path: string, session: Partial<ShellSession> = {}) {
-  const router = createMemoryRouter(routes, { initialEntries: [path] });
+  const router = createMemoryRouter(buildRoutes(PassThroughGate), { initialEntries: [path] });
   render(
     <SessionContext value={{ ...PREVIEW_SESSION, ...session }}>
       <RouterProvider router={router} />

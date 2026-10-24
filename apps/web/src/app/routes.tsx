@@ -1,7 +1,17 @@
+import type { ComponentType, ReactNode } from 'react';
 import type { RouteObject } from 'react-router';
 import { AppShell } from '../components/shell/app-shell.tsx';
+import {
+  ForgotPasswordPage,
+  ResetPasswordPage,
+  VerifyEmailPage,
+} from '../routes/auth/email-and-password.tsx';
+import { AuthLayout } from '../routes/auth/layout.tsx';
+import { SignInPage } from '../routes/auth/sign-in.tsx';
+import { SignUpPage } from '../routes/auth/sign-up.tsx';
 import { HomeRedirect, NotFoundPage, PlaceholderPage, RouteErrorPage } from '../routes/pages.tsx';
 import { NAV_ITEMS, type NavItem } from './navigation.ts';
+import { SessionGate } from './session-gate.tsx';
 
 /** One placeholder route per distinct screen path (tab-style items share their screen's route). */
 function screenRoutes(): RouteObject[] {
@@ -16,15 +26,43 @@ function screenRoutes(): RouteObject[] {
   }));
 }
 
-export const routes: RouteObject[] = [
-  {
-    path: '/',
-    element: <AppShell />,
-    errorElement: <RouteErrorPage />,
-    children: [
-      { index: true, element: <HomeRedirect /> },
-      ...screenRoutes(),
-      { path: '*', element: <NotFoundPage /> },
-    ],
-  },
-];
+/**
+ * Signed-out screens (S01, S02, email links) beside the signed-in shell. `Gate` loads the
+ * session for the shell; component tests pass one that provides a fixed session instead.
+ */
+export function buildRoutes(
+  Gate: ComponentType<{ children: ReactNode }> = SessionGate,
+): RouteObject[] {
+  return [
+    {
+      path: '/',
+      errorElement: <RouteErrorPage />,
+      children: [
+        {
+          element: <AuthLayout />,
+          children: [
+            { path: 'sign-in', element: <SignInPage /> },
+            { path: 'sign-up', element: <SignUpPage /> },
+            { path: 'verify-email', element: <VerifyEmailPage /> },
+            { path: 'forgot-password', element: <ForgotPasswordPage /> },
+            { path: 'reset-password', element: <ResetPasswordPage /> },
+          ],
+        },
+        {
+          element: (
+            <Gate>
+              <AppShell />
+            </Gate>
+          ),
+          children: [
+            { index: true, element: <HomeRedirect /> },
+            ...screenRoutes(),
+            { path: '*', element: <NotFoundPage /> },
+          ],
+        },
+      ],
+    },
+  ];
+}
+
+export const routes = buildRoutes();

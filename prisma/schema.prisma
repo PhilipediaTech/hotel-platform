@@ -135,22 +135,24 @@ enum AuthTokenPurpose {
 }
 
 model User {
-  id           String     @id @default(uuid()) @db.Uuid
+  id              String     @id @default(uuid()) @db.Uuid
   /// Stored lower-case (CHECK in SQL).
-  email        String?    @unique
+  email           String?    @unique
+  /// Set when the user proves they own `email` (verify link, password reset or invitation).
+  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz(6)
   /// E.164, e.g. +2348000000000 (CHECK in SQL).
-  phone        String?    @unique
-  name         String
-  passwordHash String?    @map("password_hash")
-  pinHash      String?    @map("pin_hash")
-  mfaSecretEnc Bytes?     @map("mfa_secret_enc")
-  mfaEnabled   Boolean    @default(false) @map("mfa_enabled")
-  status       UserStatus @default(INVITED)
-  failedLogins Int        @default(0) @map("failed_logins")
-  lockedUntil  DateTime?  @map("locked_until") @db.Timestamptz(6)
-  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz(6)
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  phone           String?    @unique
+  name            String
+  passwordHash    String?    @map("password_hash")
+  pinHash         String?    @map("pin_hash")
+  mfaSecretEnc    Bytes?     @map("mfa_secret_enc")
+  mfaEnabled      Boolean    @default(false) @map("mfa_enabled")
+  status          UserStatus @default(INVITED)
+  failedLogins    Int        @default(0) @map("failed_logins")
+  lockedUntil     DateTime?  @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   sessions           Session[]
   memberships        Membership[]

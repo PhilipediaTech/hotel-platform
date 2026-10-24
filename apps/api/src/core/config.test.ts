@@ -6,6 +6,7 @@ const ORIGINS = {
   APP_ORIGIN: 'http://localhost:5173',
   SITE_ORIGIN: 'http://localhost:4321',
   DATABASE_URL: DB,
+  SESSION_SECRET: 'test-session-secret-0123456789abcdef',
 };
 
 describe('loadConfig', () => {
@@ -17,7 +18,29 @@ describe('loadConfig', () => {
       appOrigin: 'http://localhost:5173',
       siteOrigin: 'http://localhost:4321',
       databaseUrl: DB,
+      sessionSecret: 'test-session-secret-0123456789abcdef',
+      cookieDomain: undefined,
+      cookieSecure: false,
     });
+  });
+
+  it('requires a long SESSION_SECRET and refuses the placeholder in production', () => {
+    expect(() => loadConfig({ ...ORIGINS, SESSION_SECRET: 'short' })).toThrow(/SESSION_SECRET/);
+    const placeholder = 'dev-only-session-secret-change-me-0123456789';
+    expect(loadConfig({ ...ORIGINS, SESSION_SECRET: placeholder }).sessionSecret).toBe(placeholder);
+    expect(() =>
+      loadConfig({ ...ORIGINS, NODE_ENV: 'production', SESSION_SECRET: placeholder }),
+    ).toThrow(/placeholder/);
+  });
+
+  it('sets a Secure cookie in production and reads the cookie domain', () => {
+    const config = loadConfig({
+      ...ORIGINS,
+      NODE_ENV: 'production',
+      COOKIE_DOMAIN: '.example.com',
+    });
+    expect(config).toMatchObject({ cookieSecure: true, cookieDomain: '.example.com' });
+    expect(() => loadConfig({ ...ORIGINS, COOKIE_DOMAIN: 'https://x' })).toThrow(/COOKIE_DOMAIN/);
   });
 
   it('requires a PostgreSQL DATABASE_URL', () => {

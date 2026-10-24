@@ -3,7 +3,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { AppError } from './core/errors.ts';
-import { buildTestApp, errorOf, TEST_CONFIG } from '../test/helpers.ts';
+import { APP_ORIGIN, buildTestApp, errorOf, TEST_CONFIG } from '../test/helpers.ts';
 
 function routesThatFail() {
   const router = express.Router();
@@ -215,7 +215,10 @@ describe('error envelope', () => {
 describe('JSON body parser', () => {
   it('parses a JSON body', async () => {
     const { app } = buildTestApp(routesThatFail());
-    const res = await request(app).post('/api/v1/echo').send({ adults: 2 });
+    const res = await request(app)
+      .post('/api/v1/echo')
+      .set('Origin', APP_ORIGIN)
+      .send({ adults: 2 });
     expect(res.status).toBe(201);
     expect(res.body).toEqual({ received: { adults: 2 } });
   });

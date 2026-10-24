@@ -39,7 +39,7 @@ export interface RouteContract<
   query?: Query;
   body?: Body;
   /** Success status; 204 means no body (use `z.void()` as `response`). */
-  status?: 200 | 201 | 204;
+  status?: 200 | 201 | 202 | 204;
   response: Response;
   /** Domain errors this route can return, beyond the ones implied by the flags above. */
   errors?: readonly ErrorCode[];

@@ -16,10 +16,10 @@
     "alertsCount": "Alerts, {{count}} open",
     "accountMenu": "Account menu",
     "signOut": "Sign out",
-    "signOutUnavailable": "Sign-in arrives with T-010",
     "mainNav": "Main navigation",
     "quickNav": "Quick navigation",
-    "devPreview": "Preview data: sign-in and real properties arrive with T-010 and T-013."
+    "devPreview": "Preview data: not a signed-in account.",
+    "loading": "Loading your account"
   },
   "navGroup": {
     "operations": "Operations",
@@ -75,5 +75,71 @@
   "error": {
     "title": "Something went wrong",
     "reload": "Reload the page"
+  },
+  "auth": {
+    "backToSignIn": "Back to sign in",
+    "linkInvalid": "This link is incomplete. Open it again from the email.",
+    "fields": {
+      "login": "Email or phone",
+      "password": "Password",
+      "newPassword": "New password",
+      "confirmPassword": "Repeat the new password",
+      "passwordHint": "At least {{min}} characters. A short sentence is easy to remember.",
+      "name": "Your name",
+      "email": "Email",
+      "organisationName": "Company name",
+      "country": "Country",
+      "propertyName": "Hotel name"
+    },
+    "signIn": {
+      "title": "Sign in",
+      "submit": "Sign in",
+      "sharedDevice": "This is a shared device (signs out after 30 minutes without use)",
+      "forgot": "Forgot password?",
+      "createAccount": "Create an account"
+    },
+    "signUp": {
+      "title": "Create your hotel account",
+      "intro": "You will be the owner. You can add rooms, rates and staff after confirming your email.",
+      "submit": "Create account",
+      "haveAccount": "Already have an account?",
+      "checkEmailTitle": "Check your email",
+      "checkEmail": "We sent a link to {{email}}. Open it to confirm your address, then sign in. The link expires in 24 hours."
+    },
+    "verify": {
+      "checking": "Confirming your email…",
+      "doneTitle": "Email confirmed",
+      "done": "Your email address is confirmed. You can sign in now.",
+      "failedTitle": "We couldn’t confirm your email",
+      "resend": "Send the link again",
+      "resent": "If that address needs confirming, a new link is on its way."
+    },
+    "forgot": {
+      "title": "Reset your password",
+      "intro": "Enter your account email and we will send a link to choose a new password.",
+      "submit": "Send reset link",
+      "sent": "If {{email}} has an account, a reset link is on its way. It expires in 1 hour."
+    },
+    "reset": {
+      "title": "Choose a new password",
+      "submit": "Save new password",
+      "mismatch": "The two passwords are different",
+      "doneTitle": "Password changed",
+      "done": "Your password is changed and you are signed out everywhere. Sign in with the new password.",
+      "newLink": "Ask for a new link"
+    }
+  },
+  "form": {
+    "required": "Required",
+    "tooShort": "Use at least {{min}} characters",
+    "tooLong": "Use at most {{max}} characters",
+    "email": "Enter an email address like name@example.com",
+    "choose": "Choose one of the options"
+  },
+  "errors": {
+    "network": "Can’t reach the server. Check the connection and try again.",
+    "rateLimited": "Too many attempts. Wait a minute and try again.",
+    "internal": "Something went wrong on our side. If it keeps happening, quote reference {{requestId}}.",
+    "retry": "Try again"
   }
 }

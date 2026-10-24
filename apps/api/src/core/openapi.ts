@@ -22,7 +22,7 @@ const SESSION_SCHEME = 'session';
 const STATUS_TEXT: Record<number, string> = {
   200: 'OK',
   201: 'Created',
-  202: 'Approval required',
+  202: 'Accepted',
   204: 'No content',
   400: 'Bad request',
   401: 'Not signed in',

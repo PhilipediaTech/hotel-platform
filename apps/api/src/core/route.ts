@@ -1,11 +1,14 @@
 import type { ParsedRouteInput, RouteContract } from '@hotel/shared';
 import type { Request, Response, Router } from 'express';
 import type { z } from 'zod';
+import { getAuth, requireAuth, type AuthContext } from './auth.ts';
 import { AppError } from './errors.ts';
 
 export interface RouteContext {
   req: Request;
   res: Response;
+  /** Always set on `auth: 'session'` routes (default); may be null on public ones. */
+  auth: AuthContext | null;
 }
 
 /** Returns the response body before schema parsing (the schema strips unknown fields). */
@@ -72,6 +75,8 @@ export function mountRoute<R extends RouteContract>(
   handler: RouteHandler<R>,
 ): void {
   router[route.method](toExpressPath(route.path), async (req: Request, res: Response) => {
+    // Sign-in first, so anonymous callers learn nothing from validation messages.
+    const auth = route.auth === 'none' ? getAuth(req) : requireAuth(req);
     const issues: Issue[] = [];
     checkHeaders(route, req, issues);
     const params = parsePart('params', route.params, req.params, issues);
@@ -81,7 +86,11 @@ export function mountRoute<R extends RouteContract>(
       throw new AppError('VALIDATION_ERROR', 'Request validation failed.', { issues });
     }
 
-    const result = await handler({ params, query, body } as ParsedRouteInput<R>, { req, res });
+    const result = await handler({ params, query, body } as ParsedRouteInput<R>, {
+      req,
+      res,
+      auth,
+    });
     const status = route.status ?? 200;
     if (status === 204) {
       res.status(204).end();

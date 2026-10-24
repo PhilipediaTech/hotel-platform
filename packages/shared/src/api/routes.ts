@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AUTH_ROUTES } from './auth.ts';
 import { defineRoute } from './contract.ts';
 
 // The API surface, one entry per endpoint in spec tab 4. Modules add their routes here as
@@ -16,6 +17,7 @@ export const getOpenApiDocument = defineRoute({
 
 export const API_ROUTES = {
   getOpenApiDocument,
+  ...AUTH_ROUTES,
 } as const;
 
 export type ApiRoutes = typeof API_ROUTES;

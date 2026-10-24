@@ -22,13 +22,13 @@ Production hotel PMS SaaS built from "Hotel Management Platform — Master Speci
 - PostgreSQL 18 native (service `postgresql-x64-18`, binaries in `C:\Program Files\PostgreSQL\18\bin`). Databases `hotel_dev` (migrated + seeded), `hotel_test` (tests), `hotel_e2e`, `hotel_restore`.
 - `.env` holds `DATABASE_URL`, `TEST_DATABASE_URL`, `E2E_DATABASE_URL` with Philip's password — never print it.
 
-## Repo layout (as of T-007)
+## Repo layout (as of T-010)
 
 ```text
 prisma/
   schema.prisma                 Prisma models (tenancy + identity so far)
   migrations/                   SQL migrations; raw-SQL constraints appended by hand before applying
-  seed.ts                       seed(db): demo org/property/departments/roles/users (idempotent)
+  seed.ts                       seed(db, { password }): demo org/property/departments/roles/users from the identity templates (idempotent)
 prisma.config.ts                Prisma 7 config (schema, migrations, seed, datasource URL; loads .env)
 apps/api        @hotel/api      Express 5 app
   src/server.ts                 HTTP entry (config → logger → db → app.listen, graceful shutdown)
@@ -37,6 +37,14 @@ apps/api        @hotel/api      Express 5 app
   src/core/db.ts                createDb(url) (PrismaPg adapter), Db/DbClient types, pgErrorInfo()
   src/core/counters.ts          nextPropertyCounter(db|tx, propertyId, COUNTER.x)
   src/core/route.ts             mountRoute(router, contract, handler): validate in, schema-shaped out
+  src/core/auth.ts              sessions: SESSION_POLICY, createSession, sessionLoader (step 5), requireAuth/getAuth, cookies
+  src/core/csrf.ts              originCheck (step 6)
+  src/core/rate-limit.ts        rateLimiter (step 8), RATE_LIMITS
+  src/core/passwords.ts         scrypt hashPassword/verifyPassword/burnPasswordCheck
+  src/core/tokens.ts            newToken, hashToken (HMAC with SESSION_SECRET)
+  src/core/email.ts             EmailProvider + createFakeEmailProvider
+  src/core/clock.ts             Clock (inject time in tests)
+  src/modules/identity/         sign-up, verify, sign-in/out, reset, me, my sessions; role-templates.ts
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
   scripts/openapi.ts            npm run openapi → apps/api/openapi.json (committed; test checks it)
   src/core/request-id.ts        X-Request-Id
@@ -51,7 +59,10 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/main.tsx                  QueryClientProvider → SessionContext → RouterProvider
   src/app/navigation.ts         NAV_ITEMS (screen + ticket per item), HOMES, homeFor/railItems/bottomBarItems
   src/app/routes.tsx            AppShell layout route; a placeholder route per screen until its ticket
-  src/app/session.ts            ShellSession + PREVIEW_SESSION (replaced by /me in T-010/T-013)
+  src/app/session.ts            ShellSession, toShellSession(me, propertyId), SessionActions; PREVIEW_SESSION for tests
+  src/app/session-gate.tsx      SessionGate: GET /me → session or redirect to /sign-in?next=
+  src/routes/auth/              S01 sign-in, S02 sign-up, verify-email, forgot/reset password
+  src/lib/form.ts               zodResolver, apiFieldErrors, errorMessage
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -82,8 +93,10 @@ Root scripts (`dev` runs api :4000 and web :5173 via `scripts/dev.mjs`; `check:s
 - **DB errors:** map with `pgErrorInfo(err)`; never log the raw Postgres error (CHECK details contain the row).
 - **Web:** every UI string goes in `src/i18n/en.json`; use the design tokens (`bg-surface`, `text-brand`, `text-critical`…), not raw palette colours; status is always text + icon, never colour alone. A new screen replaces its placeholder by adding a route at its `NAV_ITEMS` path. Component tests: `*.test.tsx` under `apps/web/src`.
 - **New endpoint:** define it with `defineRoute` in `packages/shared/src/api/routes.ts` (wire formats from `primitives.ts`; money as `Money`, dates `IsoDate`, no transforms in responses), add it to `API_ROUTES`, implement with `mountRoute` in the module’s `routes.ts`, run `npm run openapi`, and call it from the web app with `api.call('<operationId>', …)`.
+- **Signed-in routes:** contracts default to `auth: 'session'`, so `mountRoute` answers 401 before your handler runs; read the user with `requireAuth(req)` (or `ctx.auth`). Non-GET requests in tests need `.set('Origin', APP_ORIGIN)`. Integration tests that sign in use `buildTestApp(undefined, { db: testDb(), clock })` and read links from the returned fake `email`.
+- **Local sign-in:** `npm run seed`, then any `<role-slug>@demo.hotel.test` (e.g. `owner@`, `front-desk@`) with `SEED_USER_PASSWORD` from `.env`. Verification and reset links are printed in the API log.
 - **Lockfile:** never regenerate it with `node_modules` or the old lock present (npm/cli#4828 drops platform bindings); follow the procedure in PROGRESS decisions. After any dependency change, `grep -c "node_modules/@rolldown/binding-" package-lock.json` must print 15.
 
 ## Next step
 
-T-010 Sign-up, sign-in, DB sessions, `sid` cookie, Origin (CSRF) check, lockout, password reset — middleware steps 5, 6 and 8 in `app.ts`; first real contracts in `API_ROUTES`; first form (add `react-hook-form` 7.90.0). Replaces the web `PREVIEW_SESSION` together with T-013. T-004 GitHub Actions is still blocked on a GitHub remote; when it lands, add `npm run check:size`, `npm run openapi:check` and the schema-drift check to CI. T-005 needs paid accounts (stop).
+T-011 TOTP MFA (otplib 13.5.0): `POST /me/mfa/enrol`, `/me/mfa/confirm`, `/auth/mfa/verify`; enforce MFA on sign-in for roles with `requiresMfa` (sessions have `mfa_passed`; rotate the session on MFA pass); `/mfa` screen. PIN switch on shared devices (`POST /auth/pin`, `users.pin_hash`, child sessions via `sessions.parent_session_id`, `/pin` screen). Open: spec issue 34 (phone-only password reset). T-004 is still blocked on a GitHub remote; T-005 needs paid accounts (stop).

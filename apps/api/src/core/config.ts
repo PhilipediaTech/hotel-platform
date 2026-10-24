@@ -14,7 +14,14 @@ const envSchema = z.object({
   APP_ORIGIN: origin,
   SITE_ORIGIN: origin,
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
+  COOKIE_DOMAIN: z
+    .string()
+    .regex(/^.?[a-z0-9.-]+$/i, 'COOKIE_DOMAIN must be a domain like .example.com')
+    .optional(),
 });
+
+const PLACEHOLDER_SECRET = /^dev-only-/;
 
 export interface Config {
   nodeEnv: 'development' | 'test' | 'production';
@@ -24,6 +31,12 @@ export interface Config {
   appOrigin: string;
   siteOrigin: string;
   databaseUrl: string;
+  /** HMAC key for session and email tokens; only hashes are stored (T-010). */
+  sessionSecret: string;
+  /** Domain of the `sid` cookie, e.g. `.example.com`; host-only when unset. */
+  cookieDomain: string | undefined;
+  /** `Secure` on the `sid` cookie. Off only outside production, where local HTTP is used. */
+  cookieSecure: boolean;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
@@ -32,6 +45,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     throw new Error(`Invalid environment configuration:\n${z.prettifyError(parsed.error)}`);
   }
   const e = parsed.data;
+  if (e.NODE_ENV === 'production' && PLACEHOLDER_SECRET.test(e.SESSION_SECRET)) {
+    throw new Error(
+      'Invalid environment configuration:\n✖ SESSION_SECRET is the .env.example placeholder',
+    );
+  }
   return {
     nodeEnv: e.NODE_ENV,
     port: e.PORT,
@@ -39,5 +57,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     appOrigin: e.APP_ORIGIN,
     siteOrigin: e.SITE_ORIGIN,
     databaseUrl: e.DATABASE_URL,
+    sessionSecret: e.SESSION_SECRET,
+    cookieDomain: e.COOKIE_DOMAIN,
+    cookieSecure: e.NODE_ENV === 'production',
   };
 }

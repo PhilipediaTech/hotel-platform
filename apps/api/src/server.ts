@@ -1,6 +1,7 @@
 import { createApp } from './app.ts';
 import { loadConfig } from './core/config.ts';
 import { createDb } from './core/db.ts';
+import { createFakeEmailProvider } from './core/email.ts';
 import { createLogger } from './core/logger.ts';
 
 let config;
@@ -13,7 +14,14 @@ try {
 
 const logger = createLogger(config);
 const db = createDb(config.databaseUrl);
-const app = createApp({ config, logger });
+if (config.nodeEnv === 'production') {
+  // The SES adapter arrives with the AWS account (T-005). Never fake email in production.
+  logger.fatal('No email provider configured for production');
+  process.exit(1);
+}
+// Local development: emails are logged so verification and reset links can be opened.
+const email = createFakeEmailProvider(logger);
+const app = createApp({ config, logger, db, email });
 
 const server = app.listen(config.port, (err?: Error) => {
   if (err) {

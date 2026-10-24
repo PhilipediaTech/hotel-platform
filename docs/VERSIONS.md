@@ -73,12 +73,12 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 | @testing-library/react / dom / user-event / jest-dom | 16.3.3 / 10.4.2 / 14.6.8 / 7.0.1           | dev                                                                               |
 | jsdom                                                | 30.1.3                                     | dev; Vitest `web` project                                                         |
 | eslint-plugin-react-hooks                            | 7.1.1                                      | root dev                                                                          |
+| react-hook-form                                      | 7.90.0                                     | T-010; validated with the shared Zod schemas via `apps/web/src/lib/form.ts`       |
 
 ## Stack (planned)
 
 | Package          | Version | Ticket              |
 | ---------------- | ------- | ------------------- |
-| react-hook-form  | 7.90.0  | T-010 (first form)  |
 | dexie            | 4.4.6   | T-093               |
 | otplib           | 13.5.0  | T-011               |
 | pg-boss          | 12.38.0 | T-021               |

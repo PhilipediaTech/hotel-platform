@@ -1,7 +1,7 @@
 import { Bell, Building2, CalendarDays, CircleUser, Search, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { useSession, type ShellProperty } from '../../app/session.ts';
+import { useSession, useSessionActions, type ShellProperty } from '../../app/session.ts';
 import { cn } from '../../lib/cn.ts';
 import { Button, buttonVariants } from '../ui/button.tsx';
 import {
@@ -82,6 +82,7 @@ function CountBadge({ count }: { count: number }) {
 export function TopBar() {
   const { t } = useTranslation();
   const session = useSession();
+  const { signOut, switchProperty } = useSessionActions();
   const property = session.properties.find((p) => p.id === session.currentPropertyId);
 
   return (
@@ -100,7 +101,10 @@ export function TopBar() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           <DropdownMenuLabel>{t('shell.property')}</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={session.currentPropertyId ?? ''}>
+          <DropdownMenuRadioGroup
+            value={session.currentPropertyId ?? ''}
+            onValueChange={switchProperty}
+          >
             {session.properties.map((p) => (
               <DropdownMenuRadioItem key={p.id} value={p.id}>
                 {p.name}
@@ -158,9 +162,7 @@ export function TopBar() {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>{session.userName}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled title={t('shell.signOutUnavailable')}>
-              {t('shell.signOut')}
-            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={signOut}>{t('shell.signOut')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

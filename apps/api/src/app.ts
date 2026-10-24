@@ -1,3 +1,4 @@
+import { getOpenApiDocument } from '@hotel/shared';
 import cors from 'cors';
 import express, { type Express, type Router } from 'express';
 import helmet from 'helmet';
@@ -5,7 +6,9 @@ import type { Logger } from 'pino';
 import type { Config } from './core/config.ts';
 import { errorHandler, notFoundHandler } from './core/errors.ts';
 import { httpLogger } from './core/logger.ts';
+import { openApiDocument } from './core/openapi.ts';
 import { requestId } from './core/request-id.ts';
+import { mountRoute } from './core/route.ts';
 
 export const BODY_LIMIT = '100kb';
 
@@ -47,6 +50,8 @@ export function createApp({ config, logger, routes }: AppOptions): Express {
     res.json({ status: 'ok' });
   });
   const api = express.Router();
+  // Spread: the generator types the document as an interface, which lacks an index signature.
+  mountRoute(api, getOpenApiDocument, () => ({ ...openApiDocument() }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

@@ -1,0 +1,132 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Hotel Platform API",
+    "version": "1",
+    "description": "Staff app API. Money is a string of minor units with a currency; dates are `YYYY-MM-DD`; instants are ISO 8601 UTC. Errors use the `ErrorEnvelope`."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sid",
+        "description": "Session cookie set by sign-in (httpOnly, Secure, SameSite=Lax)."
+      }
+    },
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "VALIDATION_ERROR",
+                  "UNAUTHENTICATED",
+                  "MFA_REQUIRED",
+                  "SESSION_EXPIRED",
+                  "FORBIDDEN",
+                  "MODULE_DISABLED",
+                  "PROPERTY_NOT_LIVE",
+                  "NOT_FOUND",
+                  "BOOKING_CONFLICT",
+                  "VERSION_CONFLICT",
+                  "STATE_TRANSITION_INVALID",
+                  "IDEMPOTENCY_KEY_REUSED",
+                  "PAYMENT_DUPLICATE",
+                  "BUSINESS_DAY_CLOSED",
+                  "SHIFT_NOT_OPEN",
+                  "ROOM_NOT_READY",
+                  "FOLIO_BALANCE_OUTSTANDING",
+                  "CREDIT_LIMIT_EXCEEDED",
+                  "AUDIT_IN_PROGRESS",
+                  "RATE_BELOW_LIMIT",
+                  "RESTRICTION_VIOLATED",
+                  "APPROVAL_EXPIRED",
+                  "RATE_LIMITED",
+                  "INTERNAL"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "requestId": {
+                "type": "string",
+                "example": "req_6f1c0c3f2b8a4e7d9a1b2c3d4e5f6a7b"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "requestId"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "description": "Every error response. Clients branch on `code`, never on `message`."
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/openapi.json": {
+      "get": {
+        "operationId": "getOpenApiDocument",
+        "summary": "This API description (OpenAPI 3.1)",
+        "tags": [
+          "Meta"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {},
+                  "description": "OpenAPI 3.1 document"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

@@ -5,9 +5,13 @@
   "type": "module",
   "description": "Zod schemas, state machines, permission and error codes, money and date helpers",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/api/testing.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
   }
 }

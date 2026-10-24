@@ -30,16 +30,17 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 
 ## API (installed in T-002, `apps/api`)
 
-| Package                                         | Version                | Notes                                        |
-| ----------------------------------------------- | ---------------------- | -------------------------------------------- |
-| express                                         | 5.3.0                  |                                              |
-| helmet                                          | 8.3.0                  |                                              |
-| pino / pino-http                                | 10.4.0 / 11.0.0        |                                              |
-| supertest                                       | 7.3.1                  | dev                                          |
-| cors                                            | 2.8.6                  | Added; not in the spec's stack list          |
-| zod                                             | 4.6.7                  | Env config now; API schemas from T-007       |
-| pino-pretty                                     | 13.2.0                 | dev; pretty logs when `NODE_ENV=development` |
-| @types/express / @types/cors / @types/supertest | 5.0.6 / 2.8.19 / 7.2.1 | dev                                          |
+| Package                                         | Version                | Notes                                                                                            |
+| ----------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------ |
+| express                                         | 5.3.0                  |                                                                                                  |
+| helmet                                          | 8.3.0                  |                                                                                                  |
+| pino / pino-http                                | 10.4.0 / 11.0.0        |                                                                                                  |
+| supertest                                       | 7.3.1                  | dev                                                                                              |
+| cors                                            | 2.8.6                  | Added; not in the spec's stack list                                                              |
+| zod                                             | 4.6.7                  | Env config; route contracts in `@hotel/shared` (also a dependency of shared and web since T-007) |
+| @asteasolutions/zod-to-openapi                  | 9.1.0                  | T-007; OpenAPI 3.1 generator, used only in `apps/api/src/core/openapi.ts` (brings `openapi3-ts`) |
+| pino-pretty                                     | 13.2.0                 | dev; pretty logs when `NODE_ENV=development`                                                     |
+| @types/express / @types/cors / @types/supertest | 5.0.6 / 2.8.19 / 7.2.1 | dev                                                                                              |
 
 `tsx` is no longer planned: Node 24 runs the TypeScript source directly (see PROGRESS decisions).
 
@@ -75,12 +76,11 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 
 ## Stack (planned)
 
-| Package                        | Version | Ticket              |
-| ------------------------------ | ------- | ------------------- |
-| @asteasolutions/zod-to-openapi | 9.1.0   | T-007               |
-| react-hook-form                | 7.90.0  | T-010 (first form)  |
-| dexie                          | 4.4.6   | T-093               |
-| otplib                         | 13.5.0  | T-011               |
-| pg-boss                        | 12.38.0 | T-021               |
-| @playwright/test               | 1.64.1  | First E2E journey   |
-| astro                          | 7.4.2   | V1.2 booking engine |
+| Package          | Version | Ticket              |
+| ---------------- | ------- | ------------------- |
+| react-hook-form  | 7.90.0  | T-010 (first form)  |
+| dexie            | 4.4.6   | T-093               |
+| otplib           | 13.5.0  | T-011               |
+| pg-boss          | 12.38.0 | T-021               |
+| @playwright/test | 1.64.1  | First E2E journey   |
+| astro            | 7.4.2   | V1.2 booking engine |

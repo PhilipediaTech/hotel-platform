@@ -22,7 +22,7 @@ Production hotel PMS SaaS built from "Hotel Management Platform — Master Speci
 - PostgreSQL 18 native (service `postgresql-x64-18`, binaries in `C:\Program Files\PostgreSQL\18\bin`). Databases `hotel_dev` (migrated + seeded), `hotel_test` (tests), `hotel_e2e`, `hotel_restore`.
 - `.env` holds `DATABASE_URL`, `TEST_DATABASE_URL`, `E2E_DATABASE_URL` with Philip's password — never print it.
 
-## Repo layout (as of T-006)
+## Repo layout (as of T-007)
 
 ```text
 prisma/
@@ -36,6 +36,9 @@ apps/api        @hotel/api      Express 5 app
   src/core/config.ts            env → Config (Zod)
   src/core/db.ts                createDb(url) (PrismaPg adapter), Db/DbClient types, pgErrorInfo()
   src/core/counters.ts          nextPropertyCounter(db|tx, propertyId, COUNTER.x)
+  src/core/route.ts             mountRoute(router, contract, handler): validate in, schema-shaped out
+  src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
+  scripts/openapi.ts            npm run openapi → apps/api/openapi.json (committed; test checks it)
   src/core/request-id.ts        X-Request-Id
   src/core/logger.ts            pino + pino-http (redaction, slim serializers)
   src/core/errors.ts            AppError, notFoundHandler, errorHandler → error envelope
@@ -50,6 +53,7 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/app/routes.tsx            AppShell layout route; a placeholder route per screen until its ticket
   src/app/session.ts            ShellSession + PREVIEW_SESSION (replaced by /me in T-010/T-013)
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
+  src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
   src/components/ui/            shadcn/ui components (Button, DropdownMenu)
   src/i18n/                     i18next init + en.json (every UI string)
@@ -60,10 +64,14 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   vitest.config.ts              Vitest project "web" (jsdom)
 apps/site       @hotel/site     placeholder (V1.2)
 packages/shared @hotel/shared   errors.ts: ERROR_HTTP_STATUS, ErrorCode, ErrorEnvelope
+  src/api/primitives.ts         Uuid, IsoDate, Instant, AmountMinor, Money, PageQuery, page(), ErrorEnvelopeSchema
+  src/api/contract.ts           defineRoute, RouteContract, RouteInput/ParsedRouteInput/RouteResponse, routeErrorCodes
+  src/api/routes.ts             API_ROUTES — add every new endpoint here
+  src/api/testing.ts            EXAMPLE_ROUTES (import from @hotel/shared/testing)
 docs/           PROGRESS, HANDOFF, VERSIONS, adr/000–023
 ```
 
-Root scripts (`dev` runs api :4000 and web :5173 via `scripts/dev.mjs`; `check:size` builds web and checks the budget): `dev | check:size | build | lint | typecheck | format | format:check | test | check | db:generate | db:migrate | db:deploy | db:reset | seed`.
+Root scripts (`dev` runs api :4000 and web :5173 via `scripts/dev.mjs`; `check:size` builds web and checks the budget): `dev | check:size | openapi | openapi:check | build | lint | typecheck | format | format:check | test | check | db:generate | db:migrate | db:deploy | db:reset | seed`.
 
 ## Conventions
 
@@ -73,8 +81,9 @@ Root scripts (`dev` runs api :4000 and web :5173 via `scripts/dev.mjs`; `check:s
 - **Tests:** `*.test.ts` = unit project; `*.int.test.ts` = integration project (real PostgreSQL, serial files, `resetDb()` in `beforeEach`). Constraint tests use `expectViolation(write, SQLSTATE.X, 'constraint_name')`.
 - **DB errors:** map with `pgErrorInfo(err)`; never log the raw Postgres error (CHECK details contain the row).
 - **Web:** every UI string goes in `src/i18n/en.json`; use the design tokens (`bg-surface`, `text-brand`, `text-critical`…), not raw palette colours; status is always text + icon, never colour alone. A new screen replaces its placeholder by adding a route at its `NAV_ITEMS` path. Component tests: `*.test.tsx` under `apps/web/src`.
+- **New endpoint:** define it with `defineRoute` in `packages/shared/src/api/routes.ts` (wire formats from `primitives.ts`; money as `Money`, dates `IsoDate`, no transforms in responses), add it to `API_ROUTES`, implement with `mountRoute` in the module’s `routes.ts`, run `npm run openapi`, and call it from the web app with `api.call('<operationId>', …)`.
 - **Lockfile:** never regenerate it with `node_modules` or the old lock present (npm/cli#4828 drops platform bindings); follow the procedure in PROGRESS decisions. After any dependency change, `grep -c "node_modules/@rolldown/binding-" package-lock.json` must print 15.
 
 ## Next step
 
-T-007 Zod → OpenAPI (`@asteasolutions/zod-to-openapi` 9.1.0) and the typed API client the web app will use. T-004 GitHub Actions is still blocked on a GitHub remote; when it lands, add `npm run check:size` and the schema-drift check to CI. T-005 needs paid accounts (stop).
+T-010 Sign-up, sign-in, DB sessions, `sid` cookie, Origin (CSRF) check, lockout, password reset — middleware steps 5, 6 and 8 in `app.ts`; first real contracts in `API_ROUTES`; first form (add `react-hook-form` 7.90.0). Replaces the web `PREVIEW_SESSION` together with T-013. T-004 GitHub Actions is still blocked on a GitHub remote; when it lands, add `npm run check:size`, `npm run openapi:check` and the schema-drift check to CI. T-005 needs paid accounts (stop).

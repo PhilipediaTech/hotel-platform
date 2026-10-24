@@ -43,7 +43,12 @@ export default defineConfig({
       },
     }),
   ],
-  server: { port: 5173, strictPort: true },
+  server: {
+    port: 5173,
+    strictPort: true,
+    // Same-origin API in development, so the `sid` cookie needs no cross-site rules.
+    proxy: { '/api': 'http://localhost:4000' },
+  },
   preview: { port: 4173, strictPort: true },
   build: { target: 'es2022', sourcemap: true },
 });

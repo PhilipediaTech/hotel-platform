@@ -30,7 +30,9 @@
     "db:reset": "prisma migrate reset",
     "seed": "prisma db seed",
     "postinstall": "prisma generate",
-    "check:size": "npm run build -w apps/web && npm run size -w apps/web"
+    "check:size": "npm run build -w apps/web && npm run size -w apps/web",
+    "openapi": "node apps/api/scripts/openapi.ts",
+    "openapi:check": "node apps/api/scripts/openapi.ts --check"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [

@@ -7,6 +7,7 @@ const ORIGINS = {
   SITE_ORIGIN: 'http://localhost:4321',
   DATABASE_URL: DB,
   SESSION_SECRET: 'test-session-secret-0123456789abcdef',
+  MFA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64url'),
 };
 
 describe('loadConfig', () => {
@@ -19,6 +20,7 @@ describe('loadConfig', () => {
       siteOrigin: 'http://localhost:4321',
       databaseUrl: DB,
       sessionSecret: 'test-session-secret-0123456789abcdef',
+      mfaKey: Buffer.alloc(32, 7),
       cookieDomain: undefined,
       cookieSecure: false,
     });
@@ -33,6 +35,17 @@ describe('loadConfig', () => {
     ).toThrow(/placeholder/);
   });
 
+  it('needs a 32-byte MFA key and refuses the placeholder in production', () => {
+    expect(() => loadConfig({ ...ORIGINS, MFA_ENCRYPTION_KEY: 'c2hvcnQ' })).toThrow(
+      /MFA_ENCRYPTION_KEY/,
+    );
+    const placeholder = 'ZGV2LW9ubHktbWZhLWtleS1jaGFuZ2UtbWUtMDAwMDA';
+    expect(loadConfig({ ...ORIGINS, MFA_ENCRYPTION_KEY: placeholder }).mfaKey).toHaveLength(32);
+    expect(() =>
+      loadConfig({ ...ORIGINS, NODE_ENV: 'production', MFA_ENCRYPTION_KEY: placeholder }),
+    ).toThrow(/MFA_ENCRYPTION_KEY is the .env.example placeholder/);
+  });
+
   it('sets a Secure cookie in production and reads the cookie domain', () => {
     const config = loadConfig({
       ...ORIGINS,
@@ -41,6 +54,12 @@ describe('loadConfig', () => {
     });
     expect(config).toMatchObject({ cookieSecure: true, cookieDomain: '.example.com' });
     expect(() => loadConfig({ ...ORIGINS, COOKIE_DOMAIN: 'https://x' })).toThrow(/COOKIE_DOMAIN/);
+    expect(() => loadConfig({ ...ORIGINS, COOKIE_DOMAIN: 'xexample.com/' })).toThrow(
+      /COOKIE_DOMAIN/,
+    );
+    expect(loadConfig({ ...ORIGINS, COOKIE_DOMAIN: 'example.com' }).cookieDomain).toBe(
+      'example.com',
+    );
   });
 
   it('requires a PostgreSQL DATABASE_URL', () => {

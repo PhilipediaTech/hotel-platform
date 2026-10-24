@@ -147,6 +147,8 @@ model User {
   pinHash         String?    @map("pin_hash")
   mfaSecretEnc    Bytes?     @map("mfa_secret_enc")
   mfaEnabled      Boolean    @default(false) @map("mfa_enabled")
+  /// Last TOTP time step accepted; a code is never accepted twice (RFC 6238 §5.2).
+  mfaLastUsedStep BigInt?    @map("mfa_last_used_step")
   status          UserStatus @default(INVITED)
   failedLogins    Int        @default(0) @map("failed_logins")
   lockedUntil     DateTime?  @map("locked_until") @db.Timestamptz(6)
@@ -157,8 +159,9 @@ model User {
   sessions           Session[]
   memberships        Membership[]
   authTokens         AuthToken[]
-  invitationsSent    Invitation[] @relation("InvitedBy")
-  invitationsClaimed Invitation[] @relation("AcceptedBy")
+  mfaRecoveryCodes   MfaRecoveryCode[]
+  invitationsSent    Invitation[]      @relation("InvitedBy")
+  invitationsClaimed Invitation[]      @relation("AcceptedBy")
 
   @@map("users")
 }
@@ -233,6 +236,20 @@ model Membership {
 }
 
 /// Single-use tokens for email verification and password reset (hash only). Spec issue 1.
+/// Single-use codes shown once when MFA is turned on, for a lost phone. Only HMACs are stored.
+model MfaRecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @unique @map("code_hash")
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
+}
+
 model AuthToken {
   id        String           @id @default(uuid()) @db.Uuid
   userId    String           @map("user_id") @db.Uuid

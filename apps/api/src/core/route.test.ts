@@ -15,14 +15,17 @@ const NGN = (amountMinor: string) => ({ amountMinor, currency: 'NGN' });
 // Route tests are about mounting, not sessions: every request is signed in as this user.
 const SIGNED_IN = {
   user: { id: '11111111-1111-4111-8111-111111111111', status: 'ACTIVE' } as User,
-  session: { id: '22222222-2222-4222-8222-222222222222' } as Session,
+  session: { id: '22222222-2222-4222-8222-222222222222', mfaPassed: true } as Session,
 };
 
-function appWith(mount: (router: express.Router) => void, signedIn = true) {
+function appWith(
+  mount: (router: express.Router) => void,
+  signedIn: false | typeof SIGNED_IN = SIGNED_IN,
+) {
   const router = express.Router();
   if (signedIn) {
     router.use((req, _res, next) => {
-      markSignedIn(req, SIGNED_IN);
+      markSignedIn(req, signedIn);
       next();
     });
   }
@@ -127,6 +130,22 @@ describe('mountRoute: sign-in', () => {
     expect(errorOf(res)).toMatchObject({ code: 'UNAUTHENTICATED' });
     expect(errorOf(res).details).toBeUndefined();
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('answers MFA_REQUIRED until MFA is passed, except on routes that allow it', async () => {
+    const pending = { ...SIGNED_IN, session: { ...SIGNED_IN.session, mfaPassed: false } };
+    const app = appWith((r) => {
+      mountRoute(r, EXAMPLE_ROUTES.deleteNote, () => undefined);
+      mountRoute(
+        r,
+        { ...EXAMPLE_ROUTES.deleteNote, path: '/mfa-ok/{noteId}', allowPendingMfa: true },
+        () => undefined,
+      );
+    }, pending);
+    const res = await request(app).delete(`/api/v1/notes/${FOLIO_ID}`).set('Origin', APP_ORIGIN);
+    expect(res.status).toBe(401);
+    expect(errorOf(res).code).toBe('MFA_REQUIRED');
+    await request(app).delete(`/api/v1/mfa-ok/${FOLIO_ID}`).set('Origin', APP_ORIGIN).expect(204);
   });
 
   it('gives the handler the signed-in user', async () => {

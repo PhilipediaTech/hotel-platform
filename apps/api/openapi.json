@@ -142,6 +142,9 @@
               "mfaPassed": {
                 "type": "boolean"
               },
+              "pinSwitchAvailable": {
+                "type": "boolean"
+              },
               "expiresAt": {
                 "$ref": "#/components/schemas/Instant"
               }
@@ -150,6 +153,7 @@
               "id",
               "sharedDevice",
               "mfaPassed",
+              "pinSwitchAvailable",
               "expiresAt"
             ]
           },
@@ -710,9 +714,39 @@
           "Auth"
         ],
         "security": [],
+        "description": "On a shared device: signing out of a PIN session leaves the device ready for the next PIN. Signing out of the device session closes the device and its PIN sessions, unless `keepDevice` is true (\"Switch user\"), which only forgets this browser’s signed-in user.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "keepDevice": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "default": {
+                  "keepDevice": false
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": "No content"
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           },
           "429": {
             "description": "Too many requests: `RATE_LIMITED`",
@@ -892,6 +926,7 @@
             "session": []
           }
         ],
+        "description": "Also answers before MFA is passed, so the app can show the MFA step.",
         "responses": {
           "200": {
             "description": "OK",
@@ -1096,6 +1131,535 @@
           },
           "404": {
             "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/mfa/verify": {
+      "post": {
+        "operationId": "verifyMfa",
+        "summary": "Pass MFA for this session with an authenticator or recovery code",
+        "tags": [
+          "Auth"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Rotates the session cookie. A wrong code counts towards the sign-in lockout (5 failures, 15 minutes). A code is never accepted twice; a recovery code works once.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      }
+                    },
+                    "required": [
+                      "code"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "recoveryCode": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 20
+                      }
+                    },
+                    "required": [
+                      "recoveryCode"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/mfa/enrol": {
+      "post": {
+        "operationId": "enrolMfa",
+        "summary": "Start turning on MFA: a new secret for the authenticator app",
+        "tags": [
+          "Me"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Returns the secret and an otpauth:// link for the QR code. MFA is on only after /me/mfa/confirm.",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "secret": {
+                      "type": "string"
+                    },
+                    "otpauthUri": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "secret",
+                    "otpauthUri"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/mfa/confirm": {
+      "post": {
+        "operationId": "confirmMfa",
+        "summary": "Finish turning on MFA with a code from the app",
+        "tags": [
+          "Me"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Turns MFA on, passes it for this session (rotating the cookie) and returns 10 single-use recovery codes. They are shown only this once.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recoveryCodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "recoveryCodes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/pin": {
+      "put": {
+        "operationId": "setMyPin",
+        "summary": "Set or change my PIN for shared devices",
+        "tags": [
+          "Me"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Needs the current password. A wrong password counts towards the sign-in lockout.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pin": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "pin",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/device": {
+      "get": {
+        "operationId": "getDevice",
+        "summary": "Whether this browser is a shared device staff can PIN into",
+        "tags": [
+          "Auth"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pinSwitchAvailable": {
+                      "type": "boolean"
+                    },
+                    "deviceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "pinSwitchAvailable",
+                    "deviceLabel"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/pin": {
+      "post": {
+        "operationId": "pinSwitch",
+        "summary": "Switch user on a shared device with email or phone and PIN",
+        "tags": [
+          "Auth"
+        ],
+        "security": [],
+        "description": "Needs the device cookie from a manager’s shared-device sign-in. Creates a session under the device session (30-minute idle, ends with the device). Users whose roles require MFA must sign in with their password instead (403, details.reason = MFA_USERS_SIGN_IN_WITH_PASSWORD). Wrong PINs count towards the lockout.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "login": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 254
+                  },
+                  "pin": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "login",
+                  "pin"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`",
             "content": {
               "application/json": {
                 "schema": {

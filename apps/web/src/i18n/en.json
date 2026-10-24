@@ -19,7 +19,9 @@
     "mainNav": "Main navigation",
     "quickNav": "Quick navigation",
     "devPreview": "Preview data: not a signed-in account.",
-    "loading": "Loading your account"
+    "loading": "Loading your account",
+    "switchUser": "Switch user",
+    "setPin": "Set my PIN"
   },
   "navGroup": {
     "operations": "Operations",
@@ -127,6 +129,46 @@
       "doneTitle": "Password changed",
       "done": "Your password is changed and you are signed out everywhere. Sign in with the new password.",
       "newLink": "Ask for a new link"
+    },
+    "mfa": {
+      "title": "Enter your sign-in code",
+      "intro": "Open your authenticator app and enter the 6-digit code for Hotel Platform.",
+      "recoveryIntro": "Enter one of the recovery codes you saved when you set up two-step sign-in. Each works once.",
+      "code": "6-digit code",
+      "codeFormat": "Enter the 6 digits from the app",
+      "recoveryCode": "Recovery code",
+      "submit": "Continue",
+      "useRecovery": "Lost your phone? Use a recovery code",
+      "useApp": "Use the authenticator app instead",
+      "setUpTitle": "Set up two-step sign-in",
+      "setUpIntro": "Your role needs a code from an authenticator app (for example Google Authenticator or Microsoft Authenticator) each time you sign in.",
+      "start": "Set up now",
+      "scan": "Scan this code with your authenticator app, then enter the 6-digit code it shows.",
+      "qrLabel": "QR code for your authenticator app",
+      "manualKey": "Can’t scan? Enter this key:",
+      "confirm": "Turn on two-step sign-in",
+      "recoveryTitle": "Save your recovery codes",
+      "recoveryShown": "If you lose your phone, each code lets you sign in once. Write them down or print them now: they are shown only this time.",
+      "savedCodes": "I have saved them"
+    },
+    "pin": {
+      "title": "Switch user",
+      "device": "Shared device: {{label}}",
+      "pin": "PIN",
+      "submit": "Switch",
+      "usePassword": "Sign in with password instead",
+      "notShared": "PIN switching works on shared devices a manager has signed in. Sign in with your password here.",
+      "sharedHere": "This is a shared device. Staff can switch in with their PIN.",
+      "switch": "Switch user with PIN",
+      "newPin": "New 6-digit PIN",
+      "repeatPin": "Repeat the PIN",
+      "mismatch": "The two PINs are different"
+    },
+    "setPin": {
+      "title": "Set my PIN",
+      "intro": "Use your PIN to switch in quickly on shared front-desk tablets. Avoid easy PINs like 123456.",
+      "submit": "Save PIN",
+      "saved": "Your PIN is saved."
     }
   },
   "form": {

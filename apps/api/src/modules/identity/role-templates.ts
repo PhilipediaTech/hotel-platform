@@ -3,7 +3,8 @@
 //
 // PROVISIONAL permission lists: T-013 builds the permission catalogue and replaces these.
 // They use the PRD codes the web navigation already checks, so a signed-in user sees the
-// screens their role is meant for.
+// screens their role is meant for. `device.manage` (T-011) lets a manager open a shared
+// device that staff switch into with a PIN.
 
 export const DEPARTMENT_TEMPLATES = [
   { code: 'MGT', name: 'Management' },
@@ -48,6 +49,7 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
       'task.assign',
       'task.report',
       'handover.manage',
+      'device.manage',
       'approval.decide',
       'approval.policy.manage',
       'leakage.review',
@@ -83,6 +85,7 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
       'task.assign',
       'task.report',
       'handover.manage',
+      'device.manage',
       'approval.decide',
       'leakage.review',
       'rate.manage',
@@ -147,6 +150,7 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
       'task.assign',
       'task.report',
       'handover.manage',
+      'device.manage',
     ],
   },
   {
@@ -171,7 +175,7 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
     requiresMfa: false,
     orgWide: false,
     department: 'FO',
-    permissions: ['task.create', 'task.assign', 'task.report', 'handover.manage'],
+    permissions: ['task.create', 'task.assign', 'task.report', 'handover.manage', 'device.manage'],
   },
   {
     name: 'Staff Member',

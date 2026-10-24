@@ -7,7 +7,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { safeNext } from '../../app/session-gate.tsx';
 import { ME_QUERY_KEY } from '../../app/session.ts';
 import { Alert } from '../../components/ui/alert.tsx';
-import { Button } from '../../components/ui/button.tsx';
+import { Button, buttonVariants } from '../../components/ui/button.tsx';
+import { cn } from '../../lib/cn.ts';
+import { useSharedDevice } from './pin.tsx';
 import { api, ApiError } from '../../lib/api.ts';
 import { errorMessage, zodResolver } from '../../lib/form.ts';
 import { AuthHeading, Field } from './layout.tsx';
@@ -22,6 +24,7 @@ export function SignInPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const queryClient = useQueryClient();
+  const device = useSharedDevice();
   const form = useForm({
     resolver: zodResolver(SignInBody),
     defaultValues: { sharedDevice: false },
@@ -31,7 +34,11 @@ export function SignInPage() {
     mutationFn: (body: z.output<typeof SignInBody>) => api.call('signIn', { body }),
     onSuccess: (me) => {
       queryClient.setQueryData(ME_QUERY_KEY, me);
-      void navigate(safeNext(params.get('next')), { replace: true });
+      const next = safeNext(params.get('next'));
+      // Roles that need MFA stop at the code (or set-up) step first.
+      void navigate(me.session.mfaPassed ? next : `/mfa?next=${encodeURIComponent(next)}`, {
+        replace: true,
+      });
     },
   });
 
@@ -43,6 +50,17 @@ export function SignInPage() {
   return (
     <>
       <AuthHeading title={t('auth.signIn.title')} />
+      {device.data?.pinSwitchAvailable && (
+        <Alert tone="info" className="mb-4">
+          <p>{t('auth.pin.sharedHere')}</p>
+          <Link
+            to={`/pin${params.get('next') ? `?next=${encodeURIComponent(params.get('next') ?? '')}` : ''}`}
+            className={cn(buttonVariants({ size: 'sm' }), 'mt-2')}
+          >
+            {t('auth.pin.switch')}
+          </Link>
+        </Alert>
+      )}
       <form
         noValidate
         onSubmit={(event) => void form.handleSubmit((body) => submit.mutate(body))(event)}

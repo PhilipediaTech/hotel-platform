@@ -60,12 +60,14 @@ export function SessionGate({ children }: { children: ReactNode }) {
   const [chosenProperty, setChosenProperty] = useState<string | null>(null);
 
   const signOut = useMutation({
-    mutationFn: () => api.call('signOut'),
-    onSettled: () => {
+    // "Switch user" (→ /pin) keeps the shared device open for the next person.
+    mutationFn: (next: '/sign-in' | '/pin') =>
+      api.call('signOut', { body: { keepDevice: next === '/pin' } }),
+    onSettled: (_data, _error, next) => {
       // Whatever the server said, this browser forgets the user.
       setApiPropertyId(null);
       queryClient.clear();
-      void navigate('/sign-in', { replace: true });
+      void navigate(next, { replace: true });
     },
   });
 
@@ -78,7 +80,8 @@ export function SessionGate({ children }: { children: ReactNode }) {
 
   const actions = useMemo<SessionActions>(
     () => ({
-      signOut: () => signOut.mutate(),
+      signOut: () => signOut.mutate('/sign-in'),
+      switchUser: () => signOut.mutate('/pin'),
       switchProperty: (propertyId) => {
         if (userId) storeProperty(userId, propertyId);
         setChosenProperty(propertyId);
@@ -89,9 +92,13 @@ export function SessionGate({ children }: { children: ReactNode }) {
     [signOut, userId, queryClient],
   );
 
+  const next = encodeURIComponent(`${location.pathname}${location.search}`);
   if (me.error instanceof ApiError && me.error.status === 401) {
-    const next = `${location.pathname}${location.search}`;
-    return <Navigate to={`/sign-in?next=${encodeURIComponent(next)}`} replace />;
+    return <Navigate to={`/sign-in?next=${next}`} replace />;
+  }
+  if (me.data && !me.data.session.mfaPassed) {
+    // Signed in, but the role needs MFA first (M1-06).
+    return <Navigate to={`/mfa?next=${next}`} replace />;
   }
   if (me.error) {
     return (

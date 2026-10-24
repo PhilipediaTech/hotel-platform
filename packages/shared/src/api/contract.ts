@@ -25,6 +25,8 @@ export interface RouteContract<
   tags: readonly string[];
   /** `session` = needs the `sid` cookie (default); `none` = public. */
   auth?: 'session' | 'none';
+  /** Reachable before MFA is passed (only the routes that get a user through MFA). */
+  allowPendingMfa?: boolean;
   /** Sends `X-Property-Id`; the server checks membership (tab 4, "Property scope"). */
   propertyScoped?: boolean;
   /** Permission code the caller must hold (PRD codes are canonical, spec issue 22). */
@@ -69,7 +71,12 @@ export type RouteInput<R extends RouteContract> = (Defines<R['params']> extends 
   ? { params: SchemaInput<R['params']> }
   : { params?: never }) &
   (Defines<R['query']> extends true ? { query?: SchemaInput<R['query']> } : { query?: never }) &
-  (Defines<R['body']> extends true ? { body: SchemaInput<R['body']> } : { body?: never });
+  (Defines<R['body']> extends true
+    ? // A body schema with a default may be left out.
+      undefined extends SchemaInput<R['body']>
+      ? { body?: SchemaInput<R['body']> }
+      : { body: SchemaInput<R['body']> }
+    : { body?: never });
 
 /** What a handler receives after validation (defaults applied, coercions done). */
 export interface ParsedRouteInput<R extends RouteContract> {

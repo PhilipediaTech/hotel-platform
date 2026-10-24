@@ -45,7 +45,8 @@ export function makeMe(over: Partial<MeResponse> = {}): MeResponse {
     session: {
       id: '22222222-2222-4222-8222-222222222222',
       sharedDevice: false,
-      mfaPassed: false,
+      mfaPassed: true,
+      pinSwitchAvailable: false,
       expiresAt: '2026-12-12T09:00:00.000Z',
     },
     organisations: [{ id: ORG, name: 'Obi Hotels' }],

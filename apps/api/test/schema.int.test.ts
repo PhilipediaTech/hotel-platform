@@ -25,6 +25,7 @@ describe('migrations', () => {
       'feature_flags',
       'invitations',
       'memberships',
+      'mfa_recovery_codes',
       'organisations',
       'properties',
       'property_counters',

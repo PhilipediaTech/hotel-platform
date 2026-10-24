@@ -15,9 +15,12 @@ const envSchema = z.object({
   SITE_ORIGIN: origin,
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
+  MFA_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, 'base64url').length === 32, {
+    message: 'MFA_ENCRYPTION_KEY must be 32 bytes, base64url-encoded',
+  }),
   COOKIE_DOMAIN: z
     .string()
-    .regex(/^.?[a-z0-9.-]+$/i, 'COOKIE_DOMAIN must be a domain like .example.com')
+    .regex(/^\.?[a-z0-9.-]+$/i, 'COOKIE_DOMAIN must be a domain like .example.com')
     .optional(),
 });
 
@@ -33,6 +36,8 @@ export interface Config {
   databaseUrl: string;
   /** HMAC key for session and email tokens; only hashes are stored (T-010). */
   sessionSecret: string;
+  /** AES-256-GCM key for TOTP secrets at rest (T-011). */
+  mfaKey: Buffer;
   /** Domain of the `sid` cookie, e.g. `.example.com`; host-only when unset. */
   cookieDomain: string | undefined;
   /** `Secure` on the `sid` cookie. Off only outside production, where local HTTP is used. */
@@ -45,6 +50,12 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     throw new Error(`Invalid environment configuration:\n${z.prettifyError(parsed.error)}`);
   }
   const e = parsed.data;
+  const mfaKey = Buffer.from(e.MFA_ENCRYPTION_KEY, 'base64url');
+  if (e.NODE_ENV === 'production' && mfaKey.toString('latin1').startsWith('dev-only-')) {
+    throw new Error(
+      'Invalid environment configuration:\n✖ MFA_ENCRYPTION_KEY is the .env.example placeholder',
+    );
+  }
   if (e.NODE_ENV === 'production' && PLACEHOLDER_SECRET.test(e.SESSION_SECRET)) {
     throw new Error(
       'Invalid environment configuration:\n✖ SESSION_SECRET is the .env.example placeholder',
@@ -58,6 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     siteOrigin: e.SITE_ORIGIN,
     databaseUrl: e.DATABASE_URL,
     sessionSecret: e.SESSION_SECRET,
+    mfaKey,
     cookieDomain: e.COOKIE_DOMAIN,
     cookieSecure: e.NODE_ENV === 'production',
   };

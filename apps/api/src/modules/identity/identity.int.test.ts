@@ -4,14 +4,21 @@ import type { z } from 'zod';
 import request from 'supertest';
 import { SESSION_POLICY } from '../../core/auth.ts';
 import { hashPassword, SCRYPT_PARAMS } from '../../core/passwords.ts';
+import {
+  authApi,
+  PASSWORD,
+  setCookies,
+  sidCookie,
+  tokenFromEmail,
+  verifiedUser as verifiedUserIn,
+  type AuthApi,
+} from '../../../test/auth.ts';
 import { RATE_LIMITS } from '../../core/rate-limit.ts';
 import { resetDb, testDb } from '../../../test/db.ts';
-import { makeUser } from '../../../test/factories.ts';
-import { APP_ORIGIN, buildTestApp, errorOf, TEST_CONFIG } from '../../../test/helpers.ts';
+import { errorOf, TEST_CONFIG } from '../../../test/helpers.ts';
 import { LOCKOUT, TOKEN_TTL_MS } from './service.ts';
 
 const db = testDb();
-const PASSWORD = 'correct horse battery staple';
 const MINUTE = 60_000;
 
 let now: Date;
@@ -20,44 +27,8 @@ const advance = (ms: number) => {
   now = new Date(now.getTime() + ms);
 };
 
-function setup() {
-  const { app, email } = buildTestApp(undefined, { db, clock });
-  const post = (path: string, body?: object, cookie?: string) => {
-    const req = request(app).post(`/api/v1${path}`).set('Origin', APP_ORIGIN);
-    if (cookie) req.set('Cookie', cookie);
-    return body ? req.send(body) : req;
-  };
-  const get = (path: string, cookie?: string) => {
-    const req = request(app).get(`/api/v1${path}`);
-    return cookie ? req.set('Cookie', cookie) : req;
-  };
-  const del = (path: string, cookie: string) =>
-    request(app).delete(`/api/v1${path}`).set('Origin', APP_ORIGIN).set('Cookie', cookie);
-  return { app, email, post, get, del };
-}
-
-type Api = ReturnType<typeof setup>;
-
-/** Set-Cookie lines of a response (Node always gives an array for this header). */
-function setCookies(res: { headers: Record<string, unknown> }): string[] {
-  return (res.headers['set-cookie'] as string[] | undefined) ?? [];
-}
-
-/** `sid=<token>` from a response's Set-Cookie, ready for a Cookie header. */
-function sidCookie(res: { headers: Record<string, unknown> }): string {
-  const cookies = setCookies(res);
-  const sid = cookies.find((c) => c.startsWith('sid=') && !c.startsWith('sid=;'));
-  if (!sid) throw new Error(`No sid cookie in ${JSON.stringify(cookies)}`);
-  return sid.split(';')[0] as string;
-}
-
-/** Token from the last link emailed to `to`. */
-function tokenFromEmail(api: Api, to: string): string {
-  const text = api.email.lastTo(to)?.text ?? '';
-  const token = /token=([\w-]+)/.exec(text)?.[1];
-  if (!token) throw new Error(`No token in email to ${to}: ${text}`);
-  return token;
-}
+const setup = () => authApi(db, clock);
+type Api = AuthApi;
 
 const SIGN_UP = {
   name: 'Ada Obi',
@@ -68,17 +39,7 @@ const SIGN_UP = {
   propertyName: 'Obi Lagos Suites',
 };
 
-async function verifiedUser(data: { email?: string; phone?: string } = {}) {
-  const user = await makeUser(db, data);
-  return db.user.update({
-    where: { id: user.id },
-    data: {
-      status: 'ACTIVE',
-      passwordHash: await hashPassword(PASSWORD),
-      ...(user.email ? { emailVerifiedAt: new Date() } : {}),
-    },
-  });
-}
+const verifiedUser = (data: { email?: string; phone?: string } = {}) => verifiedUserIn(db, data);
 
 async function signedIn(api: Api, login: string, extra: object = {}) {
   const res = await api.post('/auth/sign-in', { login, password: PASSWORD, ...extra });

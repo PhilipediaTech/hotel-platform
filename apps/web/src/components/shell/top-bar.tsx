@@ -1,6 +1,6 @@
 import { Bell, Building2, CalendarDays, CircleUser, Search, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useSession, useSessionActions, type ShellProperty } from '../../app/session.ts';
 import { cn } from '../../lib/cn.ts';
 import { Button, buttonVariants } from '../ui/button.tsx';
@@ -82,7 +82,8 @@ function CountBadge({ count }: { count: number }) {
 export function TopBar() {
   const { t } = useTranslation();
   const session = useSession();
-  const { signOut, switchProperty } = useSessionActions();
+  const { signOut, switchProperty, switchUser } = useSessionActions();
+  const navigate = useNavigate();
   const property = session.properties.find((p) => p.id === session.currentPropertyId);
 
   return (
@@ -162,6 +163,12 @@ export function TopBar() {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>{session.userName}</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {session.pinSwitchAvailable && (
+              <DropdownMenuItem onSelect={switchUser}>{t('shell.switchUser')}</DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => void navigate('/account/pin')}>
+              {t('shell.setPin')}
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={signOut}>{t('shell.signOut')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

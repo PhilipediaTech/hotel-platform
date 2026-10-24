@@ -76,7 +76,10 @@ export function mountRoute<R extends RouteContract>(
 ): void {
   router[route.method](toExpressPath(route.path), async (req: Request, res: Response) => {
     // Sign-in first, so anonymous callers learn nothing from validation messages.
-    const auth = route.auth === 'none' ? getAuth(req) : requireAuth(req);
+    const auth =
+      route.auth === 'none'
+        ? getAuth(req)
+        : requireAuth(req, { allowPendingMfa: route.allowPendingMfa ?? false });
     const issues: Issue[] = [];
     checkHeaders(route, req, issues);
     const params = parsePart('params', route.params, req.params, issues);

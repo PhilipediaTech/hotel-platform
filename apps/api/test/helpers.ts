@@ -16,6 +16,7 @@ export const TEST_CONFIG: Config = {
   // HTTP-only tests never reach the database; DB tests pass testDb() to buildTestApp.
   databaseUrl: 'postgresql://unused@localhost:5432/unused',
   sessionSecret: 'test-session-secret-0123456789abcdef',
+  mfaKey: Buffer.alloc(32, 7),
   cookieDomain: undefined,
   cookieSecure: false,
 };

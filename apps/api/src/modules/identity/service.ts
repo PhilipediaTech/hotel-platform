@@ -261,35 +261,64 @@ export interface ClientInfo {
 
 const E164 = /^\+[1-9]\d{6,14}$/;
 
-function findByLogin(db: Db, login: string): Promise<User | null> {
+/** Email (any case) or E.164 phone. */
+export function findByLogin(db: Db, login: string): Promise<User | null> {
   const value = login.trim();
   if (value.includes('@')) return db.user.findUnique({ where: { email: value.toLowerCase() } });
   if (E164.test(value)) return db.user.findUnique({ where: { phone: value } });
   return Promise.resolve(null);
 }
 
-async function recordFailure(deps: IdentityDeps, userId: string): Promise<void> {
+export function isLocked(user: User, now: Date): boolean {
+  return user.lockedUntil !== null && user.lockedUntil > now;
+}
+
+/**
+ * Counts a wrong password, PIN or MFA code; the fifth locks the account for 15 minutes.
+ * Returns true when this failure locked it.
+ */
+export async function recordFailure(deps: IdentityDeps, userId: string): Promise<boolean> {
   // Atomic increment, so parallel guesses can't slip past the limit.
   const rows = await deps.db.$queryRaw<{ failed_logins: number }[]>`
     UPDATE users SET failed_logins = failed_logins + 1 WHERE id = ${userId}::uuid
     RETURNING failed_logins`;
-  if ((rows[0]?.failed_logins ?? 0) >= LOCKOUT.maxFailures) {
-    await deps.db.user.update({
-      where: { id: userId },
-      data: { failedLogins: 0, lockedUntil: new Date(deps.clock().getTime() + LOCKOUT.durationMs) },
-    });
-  }
+  if ((rows[0]?.failed_logins ?? 0) < LOCKOUT.maxFailures) return false;
+  await deps.db.user.update({
+    where: { id: userId },
+    data: { failedLogins: 0, lockedUntil: new Date(deps.clock().getTime() + LOCKOUT.durationMs) },
+  });
+  return true;
 }
+
+/** Every permission code the user holds through active memberships, in any property. */
+export async function allPermissions(db: Db, userId: string): Promise<Set<string>> {
+  const memberships = await db.membership.findMany({
+    where: { userId, active: true },
+    include: { role: true },
+  });
+  return new Set(memberships.flatMap((m) => m.role.permissions));
+}
+
+/** M1-06: MFA is mandatory once enabled, or when any of the user's roles requires it. */
+export async function mfaRequiredFor(db: Db, user: User): Promise<boolean> {
+  if (user.mfaEnabled) return true;
+  const count = await db.membership.count({
+    where: { userId: user.id, active: true, role: { requiresMfa: true } },
+  });
+  return count > 0;
+}
+
+/** M1-07: only managers may open a shared device that others PIN into. */
+export const DEVICE_PERMISSION = 'device.manage';
 
 export async function signIn(
   deps: IdentityDeps,
   input: SignInInput,
   client: ClientInfo,
-): Promise<{ user: User; session: Session; token: string }> {
+): Promise<{ user: User; session: Session; token: string; opensDevice: boolean }> {
   const now = deps.clock();
   const user = await findByLogin(deps.db, input.login);
-  const usable =
-    user?.passwordHash && user.status === 'ACTIVE' && !(user.lockedUntil && user.lockedUntil > now);
+  const usable = user?.passwordHash && user.status === 'ACTIVE' && !isLocked(user, now);
   if (!user?.passwordHash || !usable) {
     await burnPasswordCheck(input.password);
     throw new AppError('UNAUTHENTICATED', SIGN_IN_FAILED);
@@ -320,14 +349,20 @@ export async function signIn(
       ...(needsRehash ? { passwordHash: await hashPassword(input.password) } : {}),
     },
   });
+  // MFA is checked at every sign-in, so a role that starts requiring it applies from the next
+  // sign-in (M1 acceptance). Until the code is entered the session can only reach MFA routes.
+  const mfaRequired = await mfaRequiredFor(deps.db, updated);
   const { session, token } = await createSession(deps, {
     userId: user.id,
     sharedDevice: input.sharedDevice,
+    mfaPassed: !mfaRequired,
     deviceLabel: input.deviceLabel,
     ip: client.ip,
     userAgent: client.userAgent,
   });
-  return { user: updated, session, token };
+  const opensDevice =
+    input.sharedDevice && (await allPermissions(deps.db, user.id)).has(DEVICE_PERMISSION);
+  return { user: updated, session, token, opensDevice };
 }
 
 // ---------------------------------------------------------------------------------------
@@ -373,7 +408,13 @@ export async function resetPassword(
 // ---------------------------------------------------------------------------------------
 // Me and my sessions
 
-export async function buildMe(db: Db, user: User, session: Session) {
+/** GET /me and the answer to sign-in, MFA and PIN switch. */
+export async function buildMe(
+  db: Db,
+  user: User,
+  session: Session,
+  options: { pinSwitchAvailable: boolean },
+) {
   const memberships = await db.membership.findMany({
     where: { userId: user.id, active: true },
     include: { role: true, organisation: true },
@@ -402,6 +443,7 @@ export async function buildMe(db: Db, user: User, session: Session) {
       id: session.id,
       sharedDevice: session.sharedDevice,
       mfaPassed: session.mfaPassed,
+      pinSwitchAvailable: options.pinSwitchAvailable,
       expiresAt: session.expiresAt.toISOString(),
     },
     organisations: [...organisations.values()].map((o) => ({ id: o.id, name: o.name })),

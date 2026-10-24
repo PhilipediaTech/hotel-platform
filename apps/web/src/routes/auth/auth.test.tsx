@@ -36,7 +36,10 @@ const calls: { key: string; body: unknown; headers: Headers }[] = [];
 
 beforeEach(() => {
   calls.length = 0;
-  handlers = { 'GET /me': () => apiError(401, 'UNAUTHENTICATED', 'Sign in to continue.') };
+  handlers = {
+    'GET /me': () => apiError(401, 'UNAUTHENTICATED', 'Sign in to continue.'),
+    'GET /auth/device': () => json(200, { pinSwitchAvailable: false, deviceLabel: null }),
+  };
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init: RequestInit) => {

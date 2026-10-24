@@ -7,6 +7,8 @@ import {
   VerifyEmailPage,
 } from '../routes/auth/email-and-password.tsx';
 import { AuthLayout } from '../routes/auth/layout.tsx';
+import { MfaPage } from '../routes/auth/mfa.tsx';
+import { PinSwitchPage, SetPinPage } from '../routes/auth/pin.tsx';
 import { SignInPage } from '../routes/auth/sign-in.tsx';
 import { SignUpPage } from '../routes/auth/sign-up.tsx';
 import { HomeRedirect, NotFoundPage, PlaceholderPage, RouteErrorPage } from '../routes/pages.tsx';
@@ -46,6 +48,8 @@ export function buildRoutes(
             { path: 'verify-email', element: <VerifyEmailPage /> },
             { path: 'forgot-password', element: <ForgotPasswordPage /> },
             { path: 'reset-password', element: <ResetPasswordPage /> },
+            { path: 'mfa', element: <MfaPage /> },
+            { path: 'pin', element: <PinSwitchPage /> },
           ],
         },
         {
@@ -56,6 +60,7 @@ export function buildRoutes(
           ),
           children: [
             { index: true, element: <HomeRedirect /> },
+            { path: 'account/pin', element: <SetPinPage /> },
             ...screenRoutes(),
             { path: '*', element: <NotFoundPage /> },
           ],

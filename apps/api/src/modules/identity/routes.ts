@@ -1,18 +1,72 @@
 import { AUTH_ROUTES } from '@hotel/shared';
-import express, { type Router } from 'express';
+import express, { type Request, type Response, type Router } from 'express';
+import type { Session } from '../../generated/prisma/client.ts';
 import {
+  clearDeviceCookie,
   clearSessionCookie,
+  getAuth,
+  loadDeviceSession,
   requireAuth,
-  revokeCurrentSession,
+  revokeSessionTree,
+  rotateSession,
+  setDeviceCookie,
   setSessionCookie,
 } from '../../core/auth.ts';
+import { AppError } from '../../core/errors.ts';
 import { mountRoute } from '../../core/route.ts';
+import * as mfa from './mfa.ts';
+import * as pin from './pin.ts';
 import * as identity from './service.ts';
 
-/** Auth and "me" endpoints (tab 4 rows Auth and Me). */
+/** Auth and "me" endpoints (tab 4 rows Auth and Me; T-010, T-011). */
 export function identityRoutes(deps: identity.IdentityDeps): Router {
   const router = express.Router();
   const r = AUTH_ROUTES;
+
+  /** This browser's shared device, if it is still one staff may PIN into. */
+  async function activeDevice(req: Request): Promise<Session | null> {
+    const device = await loadDeviceSession(deps, req);
+    return device && (await pin.deviceAllowed(deps, device)) ? device : null;
+  }
+
+  /** Ends the browser's current session, but never the shared device itself. */
+  async function endCurrentSession(req: Request, device: Session | null): Promise<void> {
+    const current = getAuth(req);
+    if (current && current.session.id !== device?.id) {
+      await revokeSessionTree(deps.db, current.session.id, deps.clock());
+    }
+  }
+
+  /**
+   * A manager's MFA-passed shared-device session becomes this browser's device: remembered
+   * in `did`, replacing any earlier device session here (and its PIN sessions).
+   */
+  async function adoptDevice(
+    req: Request,
+    res: Response,
+    session: Session,
+    token: string,
+  ): Promise<boolean> {
+    if (!session.sharedDevice || session.parentSessionId || !session.mfaPassed) return false;
+    if (!(await pin.deviceAllowed(deps, session))) return false;
+    const previous = await loadDeviceSession(deps, req);
+    if (previous && previous.id !== session.id) {
+      await revokeSessionTree(deps.db, previous.id, deps.clock());
+    }
+    setDeviceCookie(res, deps.config, token, session.expiresAt);
+    return true;
+  }
+
+  /** `deviceJustOpened`: the device cookie is in this response, not yet in the request. */
+  const me = async (
+    req: Request,
+    user: Parameters<typeof identity.buildMe>[1],
+    session: Session,
+    deviceJustOpened = false,
+  ) =>
+    identity.buildMe(deps.db, user, session, {
+      pinSwitchAvailable: deviceJustOpened || (await activeDevice(req)) !== null,
+    });
 
   mountRoute(router, r.signUp, async ({ body }) => {
     await identity.signUp(deps, body);
@@ -31,14 +85,28 @@ export function identityRoutes(deps: identity.IdentityDeps): Router {
       ip: req.ip,
       userAgent: req.get('user-agent'),
     });
-    // A browser that was signed in as someone else keeps only the new session.
-    await revokeCurrentSession(deps.db, req, deps.clock());
+    // Whoever was signed in on this browser is replaced (the shared device itself stays).
+    await endCurrentSession(req, await loadDeviceSession(deps, req));
     setSessionCookie(res, deps.config, token, session.expiresAt);
-    return identity.buildMe(deps.db, user, session);
+    const opened = await adoptDevice(req, res, session, token);
+    return me(req, user, session, opened);
   });
 
-  mountRoute(router, r.signOut, async (_input, { req, res }) => {
-    await revokeCurrentSession(deps.db, req, deps.clock());
+  mountRoute(router, r.signOut, async ({ body }, { req, res }) => {
+    const current = getAuth(req);
+    const device = await loadDeviceSession(deps, req);
+    const isDevice = current !== null && device?.id === current.session.id;
+    if (current && isDevice && body.keepDevice) {
+      // "Switch user" on the manager's own session: the device lives on for the next PIN,
+      // under a fresh token, so the value this browser held as `sid` stops working.
+      const { session, token } = await rotateSession(deps, current.session);
+      setDeviceCookie(res, deps.config, token, session.expiresAt);
+    } else if (current) {
+      // Signing out of the device session closes the device and every PIN session on it;
+      // signing out of a PIN session leaves the device ready for the next PIN.
+      await revokeSessionTree(deps.db, current.session.id, deps.clock());
+      if (isDevice) clearDeviceCookie(res, deps.config);
+    }
     clearSessionCookie(res, deps.config);
   });
 
@@ -52,8 +120,8 @@ export function identityRoutes(deps: identity.IdentityDeps): Router {
   );
 
   mountRoute(router, r.getMe, (_input, { req }) => {
-    const { user, session } = requireAuth(req);
-    return identity.buildMe(deps.db, user, session);
+    const { user, session } = requireAuth(req, { allowPendingMfa: true });
+    return me(req, user, session);
   });
 
   mountRoute(router, r.listMySessions, async (_input, { req }) => ({
@@ -63,6 +131,59 @@ export function identityRoutes(deps: identity.IdentityDeps): Router {
   mountRoute(router, r.revokeMySession, ({ params }, { req }) =>
     identity.revokeMySession(deps, requireAuth(req), params.sessionId),
   );
+
+  // MFA (M1-06) ---------------------------------------------------------------------------
+
+  mountRoute(router, r.enrolMfa, (_input, { req }) =>
+    mfa.enrolMfa(deps, requireAuth(req, { allowPendingMfa: true })),
+  );
+
+  mountRoute(router, r.confirmMfa, async ({ body }, { req, res }) => {
+    const { recoveryCodes, session, token } = await mfa.confirmMfa(
+      deps,
+      requireAuth(req, { allowPendingMfa: true }),
+      body.code,
+    );
+    setSessionCookie(res, deps.config, token, session.expiresAt);
+    await adoptDevice(req, res, session, token);
+    return { recoveryCodes };
+  });
+
+  mountRoute(router, r.verifyMfa, async ({ body }, { req, res }) => {
+    const { user, session, token } = await mfa.verifyMfa(
+      deps,
+      requireAuth(req, { allowPendingMfa: true }),
+      body,
+    );
+    setSessionCookie(res, deps.config, token, session.expiresAt);
+    const opened = await adoptDevice(req, res, session, token);
+    return me(req, user, session, opened);
+  });
+
+  // PIN switch on shared devices (M1-07) --------------------------------------------------
+
+  mountRoute(router, r.setMyPin, ({ body }, { req }) => pin.setMyPin(deps, requireAuth(req), body));
+
+  mountRoute(router, r.getDevice, async (_input, { req }) => {
+    const device = await activeDevice(req);
+    return { pinSwitchAvailable: device !== null, deviceLabel: device?.deviceLabel ?? null };
+  });
+
+  mountRoute(router, r.pinSwitch, async ({ body }, { req, res }) => {
+    const device = await activeDevice(req);
+    if (!device) {
+      throw new AppError('FORBIDDEN', 'This is not a shared device. Sign in with your password.', {
+        reason: 'NO_SHARED_DEVICE',
+      });
+    }
+    const { user, session, token } = await pin.pinSwitch(deps, device, body, {
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    await endCurrentSession(req, device);
+    setSessionCookie(res, deps.config, token, session.expiresAt);
+    return me(req, user, session);
+  });
 
   return router;
 }

@@ -24,6 +24,8 @@ export interface ShellSession {
   openAlerts: number;
   /** True while showing PREVIEW_SESSION instead of a real signed-in user. */
   preview: boolean;
+  /** A manager-opened shared device: offer "Switch user" (PIN, M1-07). */
+  pinSwitchAvailable: boolean;
 }
 
 export type MeResponse = z.output<typeof Me>;
@@ -63,16 +65,20 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
     pendingApprovals: 0, // T-022
     openAlerts: 0, // T-090
     preview: false,
+    pinSwitchAvailable: me.session.pinSwitchAvailable,
   };
 }
 
 export interface SessionActions {
   signOut: () => void;
+  /** Ends this PIN session and opens the PIN screen for the next person. */
+  switchUser: () => void;
   switchProperty: (propertyId: string) => void;
 }
 
 export const SessionActionsContext = createContext<SessionActions>({
   signOut: () => undefined,
+  switchUser: () => undefined,
   switchProperty: () => undefined,
 });
 
@@ -128,6 +134,7 @@ export const PREVIEW_SESSION: ShellSession = {
   pendingApprovals: 0,
   openAlerts: 0,
   preview: true,
+  pinSwitchAvailable: false,
 };
 
 export const SessionContext = createContext<ShellSession>(PREVIEW_SESSION);

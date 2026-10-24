@@ -39,6 +39,7 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 | cors                                            | 2.8.6                  | Added; not in the spec's stack list                                                              |
 | zod                                             | 4.6.7                  | Env config; route contracts in `@hotel/shared` (also a dependency of shared and web since T-007) |
 | @asteasolutions/zod-to-openapi                  | 9.1.0                  | T-007; OpenAPI 3.1 generator, used only in `apps/api/src/core/openapi.ts` (brings `openapi3-ts`) |
+| otplib                                          | 13.5.0                 | T-011; TOTP (brings `@otplib/*` 13.5.0, noble crypto, scure base32)                              |
 | pino-pretty                                     | 13.2.0                 | dev; pretty logs when `NODE_ENV=development`                                                     |
 | @types/express / @types/cors / @types/supertest | 5.0.6 / 2.8.19 / 7.2.1 | dev                                                                                              |
 
@@ -74,13 +75,13 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 | jsdom                                                | 30.1.3                                     | dev; Vitest `web` project                                                         |
 | eslint-plugin-react-hooks                            | 7.1.1                                      | root dev                                                                          |
 | react-hook-form                                      | 7.90.0                                     | T-010; validated with the shared Zod schemas via `apps/web/src/lib/form.ts`       |
+| uqr                                                  | 0.1.3                                      | T-011; QR matrix for MFA set-up (MIT, no dependencies)                            |
 
 ## Stack (planned)
 
 | Package          | Version | Ticket              |
 | ---------------- | ------- | ------------------- |
 | dexie            | 4.4.6   | T-093               |
-| otplib           | 13.5.0  | T-011               |
 | pg-boss          | 12.38.0 | T-021               |
 | @playwright/test | 1.64.1  | First E2E journey   |
 | astro            | 7.4.2   | V1.2 booking engine |

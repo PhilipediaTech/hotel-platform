@@ -120,7 +120,10 @@ export const Me = z
     session: z.object({
       id: Uuid,
       sharedDevice: z.boolean(),
+      /** False until the user enters an MFA code, when their roles require MFA. */
       mfaPassed: z.boolean(),
+      /** This browser is a manager-opened shared device: staff can switch in with a PIN. */
+      pinSwitchAvailable: z.boolean(),
       expiresAt: Instant,
     }),
     organisations: z.array(z.object({ id: Uuid, name: z.string() })),
@@ -157,8 +160,11 @@ export const signOut = defineRoute({
   method: 'post',
   path: '/auth/sign-out',
   summary: 'End the current session',
+  description:
+    'On a shared device: signing out of a PIN session leaves the device ready for the next PIN. Signing out of the device session closes the device and its PIN sessions, unless `keepDevice` is true ("Switch user"), which only forgets this browser’s signed-in user.',
   tags: ['Auth'],
   auth: 'none',
+  body: z.object({ keepDevice: z.boolean().default(false) }).default({ keepDevice: false }),
   status: 204,
   response: z.void(),
 });
@@ -193,7 +199,9 @@ export const getMe = defineRoute({
   method: 'get',
   path: '/me',
   summary: 'The signed-in user',
+  description: 'Also answers before MFA is passed, so the app can show the MFA step.',
   tags: ['Me'],
+  allowPendingMfa: true,
   response: Me,
 });
 
@@ -228,6 +236,117 @@ export const revokeMySession = defineRoute({
   response: z.void(),
 });
 
+// ---------------------------------------------------------------------------------------
+// MFA (M1-06) and PIN switch on shared devices (M1-07), T-011
+
+const SIX_DIGITS = /^\d{6}$/;
+
+const TotpCode = z.string().regex(SIX_DIGITS, 'Enter the 6-digit code');
+
+export const MfaVerifyBody = z.union([
+  z.object({ code: TotpCode }),
+  z.object({ recoveryCode: z.string().trim().min(8).max(20) }),
+]);
+
+export const verifyMfa = defineRoute({
+  operationId: 'verifyMfa',
+  method: 'post',
+  path: '/auth/mfa/verify',
+  summary: 'Pass MFA for this session with an authenticator or recovery code',
+  description:
+    'Rotates the session cookie. A wrong code counts towards the sign-in lockout (5 failures, 15 minutes). A code is never accepted twice; a recovery code works once.',
+  tags: ['Auth'],
+  allowPendingMfa: true,
+  body: MfaVerifyBody,
+  response: Me,
+  errors: ['UNAUTHENTICATED'],
+});
+
+export const enrolMfa = defineRoute({
+  operationId: 'enrolMfa',
+  method: 'post',
+  path: '/me/mfa/enrol',
+  summary: 'Start turning on MFA: a new secret for the authenticator app',
+  description:
+    'Returns the secret and an otpauth:// link for the QR code. MFA is on only after /me/mfa/confirm.',
+  tags: ['Me'],
+  allowPendingMfa: true,
+  status: 201,
+  response: z.object({ secret: z.string(), otpauthUri: z.string() }),
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const confirmMfa = defineRoute({
+  operationId: 'confirmMfa',
+  method: 'post',
+  path: '/me/mfa/confirm',
+  summary: 'Finish turning on MFA with a code from the app',
+  description:
+    'Turns MFA on, passes it for this session (rotating the cookie) and returns 10 single-use recovery codes. They are shown only this once.',
+  tags: ['Me'],
+  allowPendingMfa: true,
+  body: z.object({ code: TotpCode }),
+  response: z.object({ recoveryCodes: z.array(z.string()) }),
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+/** 6 digits, not all the same, not a straight run like 123456 or 987654. */
+export const Pin = z
+  .string()
+  .regex(SIX_DIGITS, 'Use exactly 6 digits')
+  .refine(
+    (pin) => !isWeakPin(pin),
+    'Too easy to guess: avoid repeated digits and runs like 123456',
+  );
+
+export function isWeakPin(pin: string): boolean {
+  const digits = [...pin].map(Number);
+  const steps = new Set(digits.slice(1).map((d, i) => d - (digits[i] ?? 0)));
+  return steps.size === 1 && [0, 1, -1].includes([...steps][0] ?? 2);
+}
+
+export const setMyPin = defineRoute({
+  operationId: 'setMyPin',
+  method: 'put',
+  path: '/me/pin',
+  summary: 'Set or change my PIN for shared devices',
+  description: 'Needs the current password. A wrong password counts towards the sign-in lockout.',
+  tags: ['Me'],
+  body: z.object({ pin: Pin, password: z.string().min(1).max(PASSWORD_MAX_LENGTH) }),
+  status: 204,
+  response: z.void(),
+  errors: ['UNAUTHENTICATED'],
+});
+
+export const getDevice = defineRoute({
+  operationId: 'getDevice',
+  method: 'get',
+  path: '/auth/device',
+  summary: 'Whether this browser is a shared device staff can PIN into',
+  tags: ['Auth'],
+  auth: 'none',
+  response: z.object({ pinSwitchAvailable: z.boolean(), deviceLabel: z.string().nullable() }),
+});
+
+export const PinSwitchBody = z.object({
+  login: z.string().trim().min(3).max(254),
+  pin: z.string().regex(SIX_DIGITS, 'Use exactly 6 digits'),
+});
+
+export const pinSwitch = defineRoute({
+  operationId: 'pinSwitch',
+  method: 'post',
+  path: '/auth/pin',
+  summary: 'Switch user on a shared device with email or phone and PIN',
+  description:
+    'Needs the device cookie from a manager’s shared-device sign-in. Creates a session under the device session (30-minute idle, ends with the device). Users whose roles require MFA must sign in with their password instead (403, details.reason = MFA_USERS_SIGN_IN_WITH_PASSWORD). Wrong PINs count towards the lockout.',
+  tags: ['Auth'],
+  auth: 'none',
+  body: PinSwitchBody,
+  response: Me,
+  errors: ['UNAUTHENTICATED', 'FORBIDDEN'],
+});
+
 export const AUTH_ROUTES = {
   signUp,
   verifyEmail,
@@ -239,4 +358,10 @@ export const AUTH_ROUTES = {
   getMe,
   listMySessions,
   revokeMySession,
+  verifyMfa,
+  enrolMfa,
+  confirmMfa,
+  setMyPin,
+  getDevice,
+  pinSwitch,
 } as const;

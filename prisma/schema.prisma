@@ -41,6 +41,7 @@ model Organisation {
   departments  Department[]
   invitations  Invitation[]
   featureFlags FeatureFlag[]
+  auditEvents  AuditEvent[]
 
   @@map("organisations")
 }
@@ -70,6 +71,7 @@ model Property {
   memberships  Membership[]
   invitations  Invitation[]
   counters     PropertyCounter[]
+  auditEvents  AuditEvent[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -167,6 +169,7 @@ model User {
   memberships        Membership[]
   authTokens         AuthToken[]
   mfaRecoveryCodes   MfaRecoveryCode[]
+  auditEvents        AuditEvent[]
   invitationsSent    Invitation[]      @relation("InvitedBy")
   invitationsClaimed Invitation[]      @relation("AcceptedBy")
 
@@ -275,6 +278,41 @@ model AuthToken {
 }
 
 /// Staff invitation by email or phone to a role, optionally at one property. Spec issue 1.
+/// Who changed what, written in the same transaction as the change (tab 2). Append-only:
+/// a trigger refuses UPDATE and DELETE. Never holds secrets (the writer strips them).
+model AuditEvent {
+  id                BigInt   @id @default(autoincrement())
+  organisationId    String   @map("organisation_id") @db.Uuid
+  /// null = an organisation-level event (roles, sign-ins)
+  propertyId        String?  @map("property_id") @db.Uuid
+  actorUserId       String?  @map("actor_user_id") @db.Uuid
+  /// USER | SYSTEM | SUPPORT (CHECK in SQL)
+  actorType         String   @map("actor_type")
+  /// resource.verb, e.g. role.updated, user.roles_changed, auth.signed_in
+  action            String
+  entityType        String   @map("entity_type")
+  entityId          String   @map("entity_id")
+  before            Json?
+  after             Json?
+  reason            String?
+  approvalRequestId String?  @map("approval_request_id") @db.Uuid
+  requestId         String?  @map("request_id")
+  ip                String?
+  /// The "device" of tab 2 (spec issue 7).
+  userAgent         String?  @map("user_agent")
+  occurredAt        DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property     Property?    @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, occurredAt])
+  @@index([organisationId, occurredAt])
+  @@index([entityType, entityId])
+  @@index([actorUserId, occurredAt])
+  @@map("audit_events")
+}
+
 model Invitation {
   id             String    @id @default(uuid()) @db.Uuid
   organisationId String    @map("organisation_id") @db.Uuid

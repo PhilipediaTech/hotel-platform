@@ -27,6 +27,8 @@ export const TENANT_MODELS: Record<string, Scope> = {
   Membership: { kind: 'organisation' },
   Invitation: { kind: 'organisation' },
   FeatureFlag: { kind: 'organisation' },
+  // Events can name any property of the organisation, or none (organisation-level).
+  AuditEvent: { kind: 'organisation' },
 };
 
 /** Fields (and values) that pin a row of `model` to `tenant`. */

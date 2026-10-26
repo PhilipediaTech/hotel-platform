@@ -4,7 +4,8 @@ import type { Invitation, Membership, Role, User } from '../../generated/prisma/
 import type { AuthContext } from '../../core/auth.ts';
 import type { Clock } from '../../core/clock.ts';
 import type { Config } from '../../core/config.ts';
-import { pgErrorInfo, type Db } from '../../core/db.ts';
+import { recordAudit } from '../../core/audit.ts';
+import { pgErrorInfo, type Db, type DbClient } from '../../core/db.ts';
 import type { EmailProvider } from '../../core/email.ts';
 import { AppError } from '../../core/errors.ts';
 import { hashPassword } from '../../core/passwords.ts';
@@ -96,6 +97,16 @@ export async function listRoles(deps: AccessDeps) {
   return roles.map((r) => toRole(r, counts.get(r.id) ?? 0));
 }
 
+/** What the audit log keeps about a role. */
+function roleSnapshot(role: Role) {
+  return {
+    name: role.name,
+    permissions: [...role.permissions].sort(),
+    limits: role.limits,
+    requiresMfa: role.requiresMfa,
+  };
+}
+
 function checkLimits(limits: RoleLimitsValue, permissions: readonly string[]): void {
   const extra = Object.keys(limits).filter((code) => !permissions.includes(code));
   if (extra.length > 0) {
@@ -116,14 +127,24 @@ export async function createRole(
 ) {
   checkLimits(body.limits, body.permissions);
   try {
-    const role = await deps.tenantDb.role.create({
-      data: {
-        name: body.name,
-        permissions: body.permissions,
-        limits: body.limits,
-        requiresMfa: body.requiresMfa,
-        isSystem: false,
-      } as never, // organisationId is stamped by the tenant client
+    const role = await deps.tenantDb.$transaction(async (tx) => {
+      const created = await tx.role.create({
+        data: {
+          name: body.name,
+          permissions: body.permissions,
+          limits: body.limits,
+          requiresMfa: body.requiresMfa,
+          isSystem: false,
+        } as never, // organisationId is stamped by the tenant client
+      });
+      await recordAudit(tx, {
+        action: 'role.created',
+        entityType: 'role',
+        entityId: created.id,
+        after: roleSnapshot(created),
+        propertyId: null,
+      });
+      return created;
     });
     return toRole(role, 0);
   } catch (err) {
@@ -169,14 +190,26 @@ export async function updateRole(
   }
   checkLimits(limits, permissions);
   try {
-    const updated = await deps.tenantDb.role.update({
-      where: { id: role.id },
-      data: {
-        ...(body.name !== undefined ? { name: body.name } : {}),
-        permissions,
-        limits,
-        ...(body.requiresMfa !== undefined ? { requiresMfa: body.requiresMfa } : {}),
-      },
+    const updated = await deps.tenantDb.$transaction(async (tx) => {
+      const saved = await tx.role.update({
+        where: { id: role.id },
+        data: {
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          permissions,
+          limits,
+          ...(body.requiresMfa !== undefined ? { requiresMfa: body.requiresMfa } : {}),
+        },
+      });
+      // PRD M1 acceptance: role changes show the actor and the before/after codes.
+      await recordAudit(tx, {
+        action: 'role.updated',
+        entityType: 'role',
+        entityId: role.id,
+        before: roleSnapshot(role),
+        after: roleSnapshot(saved),
+        propertyId: null,
+      });
+      return saved;
     });
     return toRole(updated, (await memberCounts(deps)).get(role.id) ?? 0);
   } catch (err) {
@@ -290,7 +323,7 @@ async function manageable(deps: AccessDeps, tenant: TenantContext, userId: strin
   return { user, memberships };
 }
 
-async function revokeAllSessions(db: Db, userId: string, now: Date): Promise<void> {
+async function revokeAllSessions(db: DbClient, userId: string, now: Date): Promise<void> {
   await db.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } });
 }
 
@@ -380,30 +413,73 @@ export async function updateUser(
   }
 
   const now = deps.clock();
-  await deps.tenantDb.$transaction(async (tx) => {
-    if (changes.remove.length > 0) {
-      await tx.membership.deleteMany({ where: { id: { in: changes.remove.map((m) => m.id) } } });
+  const orgId = tenant.organisationId;
+  const grants = (list: readonly MembershipWithRole[]) =>
+    list
+      .map((m) => ({ roleId: m.roleId, role: m.role.name, scope: scopeOf(m.propertyId) }))
+      .sort((a, b) => a.role.localeCompare(b.role));
+  // One transaction for every change and its audit events. The plain client is needed for
+  // `users` and `sessions`; membership writes name the organisation explicitly (the role
+  // IDs were checked against it above through the tenant client).
+  await deps.db.$transaction(async (tx) => {
+    if (changes.add.length > 0 || changes.remove.length > 0) {
+      if (changes.remove.length > 0) {
+        await tx.membership.deleteMany({
+          where: { id: { in: changes.remove.map((m) => m.id) }, organisationId: orgId },
+        });
+      }
+      for (const add of changes.add) {
+        await tx.membership.create({
+          data: {
+            userId: user.id,
+            organisationId: orgId,
+            roleId: add.roleId,
+            propertyId: add.propertyId,
+          },
+        });
+      }
+      const removed = new Set(changes.remove.map((m) => m.id));
+      const after = [
+        ...memberships.filter((m) => !removed.has(m.id)),
+        ...changes.add.map(
+          (a) => ({ ...a, role: roleById.get(a.roleId) }) as unknown as MembershipWithRole,
+        ),
+      ];
+      await recordAudit(tx, {
+        action: 'user.roles_changed',
+        entityType: 'user',
+        entityId: user.id,
+        before: { roles: grants(memberships) },
+        after: { roles: grants(after) },
+      });
     }
-    for (const add of changes.add) {
-      await tx.membership.create({
-        data: { userId: user.id, roleId: add.roleId, propertyId: add.propertyId } as never,
+    if (body.status && body.status !== user.status) {
+      await tx.user.update({ where: { id: user.id }, data: { status: body.status } });
+      if (body.status === 'DISABLED') await revokeAllSessions(tx, user.id, now);
+      await recordAudit(tx, {
+        action: body.status === 'DISABLED' ? 'user.disabled' : 'user.enabled',
+        entityType: 'user',
+        entityId: user.id,
+        before: { status: user.status },
+        after: { status: body.status },
+      });
+    }
+    if (body.resetMfa) {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { mfaEnabled: false, mfaSecretEnc: null, mfaLastUsedStep: null },
+      });
+      await tx.mfaRecoveryCode.deleteMany({ where: { userId: user.id } });
+      await revokeAllSessions(tx, user.id, now);
+      await recordAudit(tx, {
+        action: 'user.mfa_reset',
+        entityType: 'user',
+        entityId: user.id,
+        before: { mfaEnabled: user.mfaEnabled },
+        after: { mfaEnabled: false },
       });
     }
   });
-  if (body.status) {
-    await deps.db.user.update({ where: { id: user.id }, data: { status: body.status } });
-    if (body.status === 'DISABLED') await revokeAllSessions(deps.db, user.id, now);
-  }
-  if (body.resetMfa) {
-    await deps.db.$transaction([
-      deps.db.user.update({
-        where: { id: user.id },
-        data: { mfaEnabled: false, mfaSecretEnc: null, mfaLastUsedStep: null },
-      }),
-      deps.db.mfaRecoveryCode.deleteMany({ where: { userId: user.id } }),
-    ]);
-    await revokeAllSessions(deps.db, user.id, now);
-  }
 
   const after = await applicable(deps, tenant, user.id);
   const fresh = await deps.db.user.findUniqueOrThrow({ where: { id: user.id } });
@@ -423,13 +499,16 @@ export async function createPasswordResetLink(
       'Only active accounts can reset their password.',
     );
   }
-  const token = await issueLinkToken(
-    deps.db,
-    deps,
-    user.id,
-    'PASSWORD_RESET',
-    MANAGER_RESET_TTL_MS,
-  );
+  const token = await deps.db.$transaction(async (tx) => {
+    const issued = await issueLinkToken(tx, deps, user.id, 'PASSWORD_RESET', MANAGER_RESET_TTL_MS);
+    await recordAudit(tx, {
+      action: 'user.password_reset_link_created',
+      entityType: 'user',
+      entityId: user.id,
+      propertyId: null,
+    });
+    return issued;
+  });
   return {
     link: appLink(deps, '/reset-password', token),
     expiresAt: new Date(deps.clock().getTime() + MANAGER_RESET_TTL_MS).toISOString(),
@@ -507,7 +586,7 @@ export async function createInvitation(
       where: { ...contact, propertyId, ...pending(now) },
       data: { revokedAt: now },
     });
-    return tx.invitation.create({
+    const created = await tx.invitation.create({
       data: {
         ...contact,
         propertyId,
@@ -518,6 +597,14 @@ export async function createInvitation(
       } as never,
       include: { role: true, invitedBy: true, organisation: true, property: true },
     });
+    await recordAudit(tx, {
+      action: 'invitation.created',
+      entityType: 'invitation',
+      entityId: created.id,
+      propertyId,
+      after: { ...contact, role: role.name, scope: body.scope, expiresAt: created.expiresAt },
+    });
+    return created;
   });
 
   const link = appLink(deps, '/accept-invitation', token);
@@ -537,11 +624,23 @@ export async function createInvitation(
 }
 
 export async function revokeInvitation(deps: AccessDeps, invitationId: string) {
-  const result = await deps.tenantDb.invitation.updateMany({
-    where: { id: invitationId, ...pending(deps.clock()) },
-    data: { revokedAt: deps.clock() },
+  const now = deps.clock();
+  await deps.tenantDb.$transaction(async (tx) => {
+    const invitation = await tx.invitation.findFirst({
+      where: { id: invitationId, ...pending(now) },
+      include: { role: true },
+    });
+    if (!invitation) throw new AppError('NOT_FOUND', 'Invitation not found.');
+    await tx.invitation.update({ where: { id: invitation.id }, data: { revokedAt: now } });
+    await recordAudit(tx, {
+      action: 'invitation.revoked',
+      entityType: 'invitation',
+      entityId: invitation.id,
+      propertyId: invitation.propertyId,
+      before: { ...contactOf(invitation), role: invitation.role.name, status: 'PENDING' },
+      after: { status: 'REVOKED' },
+    });
   });
-  if (result.count === 0) throw new AppError('NOT_FOUND', 'Invitation not found.');
 }
 
 // Public: preview and accept, by token (no tenant context; the plain client) --------------
@@ -619,6 +718,7 @@ export async function acceptInvitation(
       throw new AppError('VALIDATION_ERROR', 'Request validation failed.', { issues });
   }
 
+  const newAccount = !user;
   const passwordHash = user ? null : await hashPassword(body.password ?? '');
   await deps.db.$transaction(async (tx) => {
     // Single use, even when two tabs accept at once.
@@ -658,5 +758,19 @@ export async function acceptInvitation(
         },
       });
     }
+    await recordAudit(tx, {
+      action: 'invitation.accepted',
+      entityType: 'invitation',
+      entityId: inv.id,
+      organisationId: inv.organisationId,
+      propertyId: inv.propertyId,
+      actorUserId: user.id,
+      after: {
+        userId: user.id,
+        role: inv.role.name,
+        scope: scopeOf(inv.propertyId),
+        newAccount,
+      },
+    });
   });
 }

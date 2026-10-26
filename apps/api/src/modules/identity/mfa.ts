@@ -1,5 +1,6 @@
 import type { Session, User } from '../../generated/prisma/client.ts';
 import { revokeSessionTree, rotateSession, type AuthContext } from '../../core/auth.ts';
+import { recordUserEvent } from '../../core/audit.ts';
 import { AppError } from '../../core/errors.ts';
 import {
   decryptSecret,
@@ -81,19 +82,24 @@ export async function confirmMfa(
   if (!result.ok) throw codeRejected('code');
 
   const recoveryCodes = newRecoveryCodes();
-  await deps.db.$transaction([
-    deps.db.user.update({
+  await deps.db.$transaction(async (tx) => {
+    await tx.user.update({
       where: { id: user.id },
       data: { mfaEnabled: true, mfaLastUsedStep: result.step },
-    }),
-    deps.db.mfaRecoveryCode.deleteMany({ where: { userId: user.id } }),
-    deps.db.mfaRecoveryCode.createMany({
+    });
+    await tx.mfaRecoveryCode.deleteMany({ where: { userId: user.id } });
+    await tx.mfaRecoveryCode.createMany({
       data: recoveryCodes.map((c) => ({
         userId: user.id,
         codeHash: hashRecoveryCode(deps.config.sessionSecret, c),
       })),
-    }),
-  ]);
+    });
+    await recordUserEvent(tx, user.id, {
+      action: 'user.mfa_enabled',
+      before: { mfaEnabled: false },
+      after: { mfaEnabled: true },
+    });
+  });
   const { session, token } = await rotateSession(deps, auth.session, { mfaPassed: true });
   return { recoveryCodes, session, token };
 }
@@ -159,5 +165,11 @@ export async function verifyMfa(
     data: { failedLogins: 0, lockedUntil: null },
   });
   const { session, token } = await rotateSession(deps, auth.session, { mfaPassed: true });
+  await recordUserEvent(deps.db, user.id, {
+    action: 'auth.mfa_passed',
+    entityType: 'session',
+    entityId: session.id,
+    after: { method: 'code' in body ? 'TOTP' : 'RECOVERY_CODE' },
+  });
   return { user: updated, session, token };
 }

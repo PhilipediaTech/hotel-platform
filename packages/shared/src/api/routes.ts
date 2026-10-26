@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ACCESS_ROUTES } from './access.ts';
+import { AUDIT_ROUTES } from './audit.ts';
 import { AUTH_ROUTES } from './auth.ts';
 import { defineRoute } from './contract.ts';
 
@@ -20,6 +21,7 @@ export const API_ROUTES = {
   getOpenApiDocument,
   ...AUTH_ROUTES,
   ...ACCESS_ROUTES,
+  ...AUDIT_ROUTES,
 } as const;
 
 export type ApiRoutes = typeof API_ROUTES;

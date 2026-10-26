@@ -3,6 +3,7 @@ import cors from 'cors';
 import express, { type Express, type Router } from 'express';
 import helmet from 'helmet';
 import type { Logger } from 'pino';
+import { auditContext } from './core/audit.ts';
 import { sessionLoader } from './core/auth.ts';
 import { systemClock, type Clock } from './core/clock.ts';
 import type { Config } from './core/config.ts';
@@ -18,6 +19,7 @@ import { tenancyContext } from './core/tenancy.ts';
 import { requestId } from './core/request-id.ts';
 import { mountRoute } from './core/route.ts';
 import { accessRoutes } from './modules/access/routes.ts';
+import { auditRoutes } from './modules/audit/routes.ts';
 import { identityRoutes } from './modules/identity/routes.ts';
 
 export const BODY_LIMIT = '100kb';
@@ -64,6 +66,8 @@ export function createApp({
   app.use(express.json({ limit: BODY_LIMIT }));
   // 5. Session load (cookie → sessions row)
   app.use(sessionLoader({ db, config, clock }));
+  // Request facts (request ID, IP, device, user) for audit events.
+  app.use(auditContext());
   // 6. CSRF: Origin must be allow-listed on every non-GET
   app.use(originCheck(config));
   // 7. Tenancy context: X-Property-Id → membership → AsyncLocalStorage
@@ -82,6 +86,7 @@ export function createApp({
   // Module code reads and writes tenant tables through the tenant-scoped client (T-012).
   const tenantDb = createTenantDb(db);
   api.use(accessRoutes({ db, tenantDb, config, clock, email, logger }));
+  api.use(auditRoutes({ tenantDb }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

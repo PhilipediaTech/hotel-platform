@@ -1,6 +1,7 @@
 import { SIGN_UP_COUNTRIES, type SignUpCountry } from '@hotel/shared';
 import type { Logger } from 'pino';
 import type { AuthTokenPurpose, Session, User } from '../../generated/prisma/client.ts';
+import { recordAudit, recordUserEvent } from '../../core/audit.ts';
 import { createSession, isSessionOver, type AuthContext } from '../../core/auth.ts';
 import type { Clock } from '../../core/clock.ts';
 import type { Config } from '../../core/config.ts';
@@ -196,6 +197,20 @@ export async function signUp(deps: IdentityDeps, input: SignUpInput): Promise<vo
           roleId: ownerRole.id,
         },
       });
+      await recordAudit(tx, {
+        action: 'organisation.created',
+        entityType: 'organisation',
+        entityId: organisation.id,
+        organisationId: organisation.id,
+        propertyId: null,
+        actorUserId: user.id,
+        after: {
+          name: organisation.name,
+          country: organisation.country,
+          property: { id: property.id, name: property.name, code: property.code },
+          owner: { id: user.id, name: user.name, email: user.email },
+        },
+      });
       return issueLinkToken(tx, deps, user.id, 'EMAIL_VERIFY');
     });
   } catch (err) {
@@ -231,10 +246,13 @@ async function notifyExistingAccount(deps: IdentityDeps, user: User): Promise<vo
 export async function verifyEmail(deps: IdentityDeps, token: string): Promise<void> {
   await deps.db.$transaction(async (tx) => {
     const userId = await consumeLinkToken(tx, deps, 'EMAIL_VERIFY', token);
-    await tx.user.updateMany({
+    const verified = await tx.user.updateMany({
       where: { id: userId, emailVerifiedAt: null },
       data: { emailVerifiedAt: deps.clock() },
     });
+    if (verified.count > 0) {
+      await recordUserEvent(tx, userId, { action: 'user.email_verified', actorUserId: userId });
+    }
   });
 }
 
@@ -287,9 +305,15 @@ export async function recordFailure(deps: IdentityDeps, userId: string): Promise
     UPDATE users SET failed_logins = failed_logins + 1 WHERE id = ${userId}::uuid
     RETURNING failed_logins`;
   if ((rows[0]?.failed_logins ?? 0) < LOCKOUT.maxFailures) return false;
-  await deps.db.user.update({
-    where: { id: userId },
-    data: { failedLogins: 0, lockedUntil: new Date(deps.clock().getTime() + LOCKOUT.durationMs) },
+  const lockedUntil = new Date(deps.clock().getTime() + LOCKOUT.durationMs);
+  await deps.db.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: userId }, data: { failedLogins: 0, lockedUntil } });
+    await recordUserEvent(tx, userId, {
+      action: 'auth.locked',
+      actorType: 'SYSTEM',
+      actorUserId: null,
+      after: { lockedUntil, failedAttempts: LOCKOUT.maxFailures },
+    });
   });
   return true;
 }
@@ -364,6 +388,14 @@ export async function signIn(
     ip: client.ip,
     userAgent: client.userAgent,
   });
+  // Security events are written right after the session they describe (not in its
+  // transaction): createSession owns its own write.
+  await recordUserEvent(deps.db, user.id, {
+    action: 'auth.signed_in',
+    entityType: 'session',
+    entityId: session.id,
+    after: { method: 'PASSWORD', sharedDevice: input.sharedDevice, mfaPending: mfaRequired },
+  });
   const opensDevice =
     input.sharedDevice && (await allPermissions(deps.db, user.id)).has(DEVICE_PERMISSION);
   return { user: updated, session, token, opensDevice };
@@ -406,6 +438,7 @@ export async function resetPassword(
       },
     });
     await tx.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } });
+    await recordUserEvent(tx, userId, { action: 'auth.password_reset', actorUserId: userId });
   });
 }
 
@@ -500,9 +533,17 @@ export async function revokeMySession(
   auth: AuthContext,
   sessionId: string,
 ): Promise<void> {
-  const result = await deps.db.session.updateMany({
-    where: { id: sessionId, userId: auth.user.id, revokedAt: null },
-    data: { revokedAt: deps.clock() },
+  await deps.db.$transaction(async (tx) => {
+    const result = await tx.session.updateMany({
+      where: { id: sessionId, userId: auth.user.id, revokedAt: null },
+      data: { revokedAt: deps.clock() },
+    });
+    if (result.count === 0) throw new AppError('NOT_FOUND', 'Session not found.');
+    await recordUserEvent(tx, auth.user.id, {
+      action: 'session.revoked',
+      entityType: 'session',
+      entityId: sessionId,
+      actorUserId: auth.user.id,
+    });
   });
-  if (result.count === 0) throw new AppError('NOT_FOUND', 'Session not found.');
 }

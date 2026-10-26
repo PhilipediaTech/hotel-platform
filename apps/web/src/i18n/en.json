@@ -253,6 +253,89 @@
       "reports": "Reports"
     }
   },
+  "audit": {
+    "title": "Audit log",
+    "intro": "Every change to access and accounts at this property and organisation-wide, newest first.",
+    "events": "Events",
+    "filters": "Filters",
+    "person": "Person",
+    "anyone": "Anyone",
+    "action": "Action",
+    "anyAction": "Any action",
+    "recordType": "Record",
+    "anyRecord": "Any record",
+    "recordId": "Record ID",
+    "from": "From",
+    "to": "To",
+    "clear": "Clear filters",
+    "empty": "No events match these filters.",
+    "more": "Show more",
+    "system": "System",
+    "support": "Platform support",
+    "organisationWide": "organisation-wide",
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "changed": "changed",
+    "noValues": "No values recorded for this event.",
+    "record": "Record ID",
+    "reason": "Reason",
+    "ip": "IP address",
+    "device": "Device",
+    "requestId": "Request ID",
+    "groups": {
+      "auth": "Sign-ins and lockouts",
+      "user": "People",
+      "role": "Roles",
+      "invitation": "Invitations",
+      "organisation": "Organisation",
+      "session": "Sessions",
+      "device": "Shared devices"
+    },
+    "entities": {
+      "user": "Person",
+      "role": "Role",
+      "invitation": "Invitation",
+      "organisation": "Organisation",
+      "session": "Session"
+    },
+    "actions": {
+      "organisation": {
+        "created": "Organisation created"
+      },
+      "role": {
+        "created": "Role created",
+        "updated": "Role changed"
+      },
+      "user": {
+        "roles_changed": "Roles changed",
+        "disabled": "Account disabled",
+        "enabled": "Account enabled",
+        "mfa_reset": "Two-step sign-in reset",
+        "mfa_enabled": "Two-step sign-in turned on",
+        "password_reset_link_created": "Password reset link created",
+        "email_verified": "Email confirmed",
+        "pin_set": "PIN set"
+      },
+      "auth": {
+        "signed_in": "Signed in",
+        "mfa_passed": "Two-step code accepted",
+        "locked": "Account locked after failed attempts",
+        "password_reset": "Password reset"
+      },
+      "session": {
+        "revoked": "Session signed out"
+      },
+      "device": {
+        "opened": "Shared device opened"
+      },
+      "invitation": {
+        "created": "Invitation sent",
+        "revoked": "Invitation withdrawn",
+        "accepted": "Invitation accepted"
+      }
+    }
+  },
   "accept": {
     "title": "Join {{organisation}}",
     "intro": "You are invited as {{role}} at {{where}} ({{contact}}).",

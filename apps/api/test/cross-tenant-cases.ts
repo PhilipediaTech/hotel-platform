@@ -49,6 +49,29 @@ async function bInvitation(db: Db, world: TenantWorld, propertyId: string) {
   return { invitationId: invitation.id, roleId: role.id };
 }
 
+async function bAuditEvents(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  const event = (propertyIdOrNull: string | null) =>
+    db.auditEvent.create({
+      data: {
+        organisationId,
+        propertyId: propertyIdOrNull,
+        actorType: 'SYSTEM',
+        action: 'leak.test',
+        entityType: 'leak',
+        entityId: crypto.randomUUID(),
+      },
+    });
+  const own = await event(propertyId);
+  // Organisation-level events are shared by the organisation's properties, so only
+  // another organisation's count as a leak.
+  const orgLevel = organisationId === world.orgB.id ? await event(null) : null;
+  return {
+    eventId: own.id.toString(),
+    ...(orgLevel ? { orgEventId: orgLevel.id.toString() } : {}),
+  };
+}
+
 const ids = (body: unknown) => (body as { data: { id: string }[] }).data.map((row) => row.id);
 
 /** B's organisation has exactly the roles it started with plus the seeded ones. */
@@ -76,6 +99,7 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     },
   },
   listUsers: { seed: bUser, listIds: ids },
+  listAuditEvents: { seed: bAuditEvents, listIds: ids },
   updateUser: {
     seed: bUser,
     body: () => ({ status: 'DISABLED' }),

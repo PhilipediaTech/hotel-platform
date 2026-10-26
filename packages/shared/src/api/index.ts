@@ -1,4 +1,5 @@
 export * from './access.ts';
+export * from './audit.ts';
 export * from './auth.ts';
 export * from './contract.ts';
 export * from './primitives.ts';

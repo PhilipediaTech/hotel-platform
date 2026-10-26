@@ -1,13 +1,12 @@
 import { HOTEL_PERMISSION_CODES } from '@hotel/shared';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { hashPassword } from '../../core/passwords.ts';
 import { PASSWORD } from '../../../test/auth.ts';
 import { resetDb, testDb } from '../../../test/db.ts';
-import { makeOrganisation, makeProperty, makeUser } from '../../../test/factories.ts';
+import { makeUser } from '../../../test/factories.ts';
 import { APP_ORIGIN, buildTestApp, errorOf } from '../../../test/helpers.ts';
+import { hotelClient, makeHotel as makeHotelIn } from '../../../test/hotel.ts';
 import { sessionCookie } from '../../../test/tenancy.ts';
-import { ROLE_TEMPLATES } from '../identity/role-templates.ts';
 import { INVITATION_TTL_MS } from './service.ts';
 
 const db = testDb();
@@ -15,71 +14,8 @@ const db = testDb();
 let now: Date;
 const clock = () => new Date(now);
 
-/** An organisation like a fresh sign-up: the role templates, two properties, three people. */
-async function makeHotel() {
-  const org = await makeOrganisation(db, { name: 'Obi Hotels' });
-  const p1 = await makeProperty(db, org.id, { code: 'P1' });
-  const p2 = await makeProperty(db, org.id, { code: 'P2' });
-  const roles: Record<string, string> = {};
-  for (const t of ROLE_TEMPLATES) {
-    const role = await db.role.create({
-      data: {
-        organisationId: org.id,
-        name: t.name,
-        isSystem: true,
-        requiresMfa: t.requiresMfa,
-        permissions: [...t.permissions],
-      },
-    });
-    roles[t.slug] = role.id;
-  }
-  const person = async (
-    slug: string,
-    propertyId: string | null,
-    data: { email?: string; phone?: string } = {},
-  ) => {
-    const user = await makeUser(db, data);
-    await db.user.update({
-      where: { id: user.id },
-      data: {
-        status: 'ACTIVE',
-        passwordHash: await hashPassword(PASSWORD),
-        ...(user.email ? { emailVerifiedAt: now } : {}),
-      },
-    });
-    await db.membership.create({
-      data: { userId: user.id, organisationId: org.id, propertyId, roleId: roles[slug] ?? '' },
-    });
-    return user;
-  };
-  const owner = await person('owner', null);
-  const gm = await person('gm', p1.id);
-  const fd = await person('front-desk', p1.id);
-  const role = (slug: string) => roles[slug] ?? '';
-  return { org, p1, p2, roles, role, owner, gm, fd, person };
-}
-
-function client(propertyId: string) {
-  const { app, email } = buildTestApp(undefined, { db, clock });
-  const as = (cookie: string) => {
-    const withHeaders = (req: request.Test) =>
-      req.set('Cookie', cookie).set('X-Property-Id', propertyId).set('Origin', APP_ORIGIN);
-    return {
-      get: (path: string) => withHeaders(request(app).get(`/api/v1${path}`)),
-      post: (path: string, body?: object) =>
-        withHeaders(request(app).post(`/api/v1${path}`)).send(body ?? {}),
-      patch: (path: string, body: object) =>
-        withHeaders(request(app).patch(`/api/v1${path}`)).send(body),
-    };
-  };
-  const anon = {
-    post: (path: string, body: object, cookie?: string) => {
-      const req = request(app).post(`/api/v1${path}`).set('Origin', APP_ORIGIN);
-      return (cookie ? req.set('Cookie', cookie) : req).send(body);
-    },
-  };
-  return { app, email, as, anon };
-}
+const makeHotel = () => makeHotelIn(db, now);
+const client = (propertyId: string) => hotelClient(db, clock, propertyId);
 
 const tokenFrom = (link: string) => new URL(link).searchParams.get('token') ?? '';
 

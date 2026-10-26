@@ -1,5 +1,6 @@
 import type { Session, User } from '../../generated/prisma/client.ts';
 import { createSession, revokeSessionTree, type AuthContext } from '../../core/auth.ts';
+import { recordUserEvent } from '../../core/audit.ts';
 import { AppError } from '../../core/errors.ts';
 import { burnPasswordCheck, hashPassword, verifyPassword } from '../../core/passwords.ts';
 import {
@@ -41,9 +42,14 @@ export async function setMyPin(
       issues: [{ path: 'body.password', code: 'custom', message: 'The password is incorrect.' }],
     });
   }
-  await deps.db.user.update({
-    where: { id: user.id },
-    data: { pinHash: await hashPassword(input.pin), failedLogins: 0 },
+  const pinHash = await hashPassword(input.pin);
+  await deps.db.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: user.id }, data: { pinHash, failedLogins: 0 } });
+    await recordUserEvent(tx, user.id, {
+      action: 'user.pin_set',
+      before: { hasPin: user.pinHash !== null },
+      after: { hasPin: true },
+    });
   });
 }
 
@@ -91,6 +97,12 @@ export async function openDevice(
       sharedDevice: false,
       expiresAt: session.expiresAt < device.expiresAt ? session.expiresAt : device.expiresAt,
     },
+  });
+  await recordUserEvent(deps.db, session.userId, {
+    action: 'device.opened',
+    entityType: 'session',
+    entityId: device.id,
+    after: { deviceLabel: device.deviceLabel },
   });
   return { session: updated, device, deviceToken };
 }
@@ -149,6 +161,12 @@ export async function pinSwitch(
     parent: device,
     ip: client.ip,
     userAgent: client.userAgent,
+  });
+  await recordUserEvent(deps.db, user.id, {
+    action: 'auth.signed_in',
+    entityType: 'session',
+    entityId: session.id,
+    after: { method: 'PIN', deviceSessionId: device.id },
   });
   return { user: updated, session, token };
 }

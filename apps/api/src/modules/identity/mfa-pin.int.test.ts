@@ -433,7 +433,22 @@ describe('shared devices (M1-07)', () => {
     await api.post('/auth/pin', { login: w.colleague.email, pin: '730158' }, did).expect(200);
   });
 
-  it('“Switch user” on the manager’s own session keeps the device open under a new token', async () => {
+  it('keeps the manager’s session and the device apart (issue 38)', async () => {
+    const api = setup();
+    const w = await sharedDeviceWorld();
+    const device = await openDevice(api, w.manager.email);
+    expect(device.sid).not.toBe(device.did.replace(/^did=/, 'sid='));
+    const rows = await db.session.findMany({ where: { userId: w.manager.user.id } });
+    const deviceRow = rows.find((s) => s.kind === 'DEVICE');
+    const own = rows.find((s) => s.kind === 'USER');
+    expect(deviceRow).toMatchObject({ sharedDevice: true, parentSessionId: null });
+    expect(own).toMatchObject({ sharedDevice: false, parentSessionId: deviceRow?.id });
+    // The device's token is never accepted as a sign-in, even if copied into `sid`.
+    const copied = device.did.replace(/^did=/, 'sid=');
+    expect(errorOf(await api.get('/me', copied)).code).toBe('SESSION_EXPIRED');
+  });
+
+  it('“Switch user” on the manager’s own session ends it and keeps the device open', async () => {
     const api = setup();
     const w = await sharedDeviceWorld();
     const device = await openDevice(api, w.manager.email);
@@ -443,15 +458,12 @@ describe('shared devices (M1-07)', () => {
       both(device.sid, device.did),
     );
     expect(out.status).toBe(204);
-    const newDid = cookieFrom(out, 'did');
-    expect(newDid).toBeDefined();
-    expect(newDid).not.toBe(device.did);
-    // The old value is dead as a sign-in and as a device; the new device cookie works.
+    expect(cookieFrom(out, 'did')).toBeUndefined(); // the device cookie is untouched
     expect((await api.get('/me', device.sid)).status).toBe(401);
     expect((await api.get('/auth/device', device.did)).body).toMatchObject({
-      pinSwitchAvailable: false,
+      pinSwitchAvailable: true,
     });
-    await api.post('/auth/pin', { login: w.staff.email, pin: PIN }, newDid).expect(200);
+    await api.post('/auth/pin', { login: w.staff.email, pin: PIN }, device.did).expect(200);
   });
 
   it('the manager signing out closes the device and every PIN session on it', async () => {

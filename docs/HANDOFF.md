@@ -22,7 +22,7 @@ Production hotel PMS SaaS built from "Hotel Management Platform — Master Speci
 - PostgreSQL 18 native (service `postgresql-x64-18`, binaries in `C:\Program Files\PostgreSQL\18\bin`). Databases `hotel_dev` (migrated + seeded), `hotel_test` (tests), `hotel_e2e`, `hotel_restore`.
 - `.env` holds `DATABASE_URL`, `TEST_DATABASE_URL`, `E2E_DATABASE_URL` with Philip's password — never print it.
 
-## Repo layout (as of T-012)
+## Repo layout (as of T-013)
 
 ```text
 prisma/
@@ -47,7 +47,8 @@ apps/api        @hotel/api      Express 5 app
   src/core/mfa.ts               AES-GCM secret encryption, TOTP verify (replay-safe), recovery codes
   src/core/email.ts             EmailProvider + createFakeEmailProvider
   src/core/clock.ts             Clock (inject time in tests)
-  src/modules/identity/         service.ts (sign-up, sign-in, reset, me), mfa.ts, pin.ts, routes.ts, role-templates.ts
+  src/modules/identity/         service.ts (sign-up, sign-in, reset, me), mfa.ts, pin.ts (devices), routes.ts, role-templates.ts
+  src/modules/access/           users, roles, invitations (S26 API): service.ts, routes.ts, emails.ts
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
   scripts/openapi.ts            npm run openapi → apps/api/openapi.json (committed; test checks it)
   src/core/request-id.ts        X-Request-Id
@@ -69,6 +70,7 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/app/session-gate.tsx      SessionGate: GET /me → session or redirect to /sign-in?next=
   src/routes/auth/              S01 sign-in, /mfa, /pin; S02 sign-up; verify-email, forgot/reset password; /account/pin
   src/lib/form.ts               zodResolver, apiFieldErrors, errorMessage
+  src/routes/settings/access.tsx S26 Users and roles; app/routes.tsx SCREENS maps implemented screens
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -85,6 +87,8 @@ packages/shared @hotel/shared   errors.ts: ERROR_HTTP_STATUS, ErrorCode, ErrorEn
   src/api/contract.ts           defineRoute, RouteContract, RouteInput/ParsedRouteInput/RouteResponse, routeErrorCodes
   src/api/routes.ts             API_ROUTES — add every new endpoint here
   src/api/testing.ts            EXAMPLE_ROUTES (import from @hotel/shared/testing)
+  src/api/auth.ts, access.ts    auth/me and users-and-roles contracts
+  src/permissions.ts            PERMISSIONS catalogue, HOTEL_PERMISSION_CODES, RoleLimits
 docs/           PROGRESS, HANDOFF, VERSIONS, adr/000–023
 ```
 
@@ -101,10 +105,11 @@ Root scripts (`dev` runs api :4000 and web :5173 via `scripts/dev.mjs`; `check:s
 - **New endpoint:** define it with `defineRoute` in `packages/shared/src/api/routes.ts` (wire formats from `primitives.ts`; money as `Money`, dates `IsoDate`, no transforms in responses), add it to `API_ROUTES`, implement with `mountRoute` in the module’s `routes.ts`, run `npm run openapi`, and call it from the web app with `api.call('<operationId>', …)`.
 - **Signed-in routes:** contracts default to `auth: 'session'`, so `mountRoute` answers 401 before your handler runs; read the user with `requireAuth(req)` (or `ctx.auth`). Non-GET requests in tests need `.set('Origin', APP_ORIGIN)`. Integration tests that sign in use `buildTestApp(undefined, { db: testDb(), clock })` and read links from the returned fake `email`.
 - **Tenant data:** property-scoped contracts (`propertyScoped: true`, plus `permission`) get `ctx.tenant`. Read and write tenant tables only through `createTenantDb(db)`; add every new tenant table to `TENANT_MODELS` in `core/tenant-db.ts`; add a case for every property-scoped route to `test/cross-tenant-cases.ts`. Raw SQL must filter by `requireTenant()` IDs itself.
+- **Permissions:** every new endpoint names one catalogue code in its contract (`permission`); add new codes to `packages/shared/src/permissions.ts` (and to the role templates that should get them). Contract PATCH bodies must not carry defaults (use a default-free schema; Zod `.partial()` keeps defaults).
 - **Local sign-in:** `npm run seed`, then any `<role-slug>@demo.hotel.test` (e.g. `owner@`, `front-desk@`) with `SEED_USER_PASSWORD` from `.env`. Verification and reset links are printed in the API log.
 - **MFA and PINs locally:** Owner, GM and Finance demo users must set up MFA at first sign-in; generate codes from the shown key with `node --input-type=module -e "import { generate } from 'otplib'; console.log(await generate({ secret: '<key>' }))"` (run in `apps/api`). For PIN switching: set a PIN at `/account/pin` (e.g. as `front-desk@`), sign in as `dept-manager@` with "shared device" ticked, then Account menu → Switch user. Integration tests for these flows use `test/auth.ts`.
 - **Lockfile:** never regenerate it with `node_modules` or the old lock present (npm/cli#4828 drops platform bindings); follow the procedure in PROGRESS decisions. After any dependency change, `grep -c "node_modules/@rolldown/binding-" package-lock.json` must print 15.
 
 ## Next step
 
-T-013 Roles, permissions, memberships, invitations, property switcher (M1-04, M1-05, M1-08): the permission catalogue in `@hotel/shared` replacing the provisional template lists; role editing; invitations by email or phone; membership removal revoking that property’s sessions (issue 35); MFA reset (issue 37); manager password reset for phone-only staff if chosen (issue 34). The first property-scoped routes need cross-tenant cases. Then T-014 (audit). Open calls: issues 34 and 38. T-004 is still blocked on a GitHub remote; T-005 needs paid accounts (stop).
+T-014 Audit writer (same transaction as the change) and audit API (`audit_events`, M1-11, S27). Must cover the access changes from T-013 (issue 39) and sign-in events; add `userAgent` (spec issue 7). Then T-02x (idempotency, outbox/jobs, approvals). T-004 is still blocked on a GitHub remote; T-005 needs paid accounts (stop).

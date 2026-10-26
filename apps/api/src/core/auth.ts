@@ -1,5 +1,5 @@
 import type { CookieOptions, Request, RequestHandler, Response } from 'express';
-import type { Session, User } from '../generated/prisma/client.ts';
+import type { Session, SessionKind, User } from '../generated/prisma/client.ts';
 import type { Clock } from './clock.ts';
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
@@ -9,10 +9,10 @@ import { hashToken, newToken } from './tokens.ts';
 // Server-side sessions (spec tab 2; PRD M1 rule 5): an opaque `sid` cookie, its HMAC in
 // `sessions`, revocable at any time. Middleware step 5 loads it on every request.
 //
-// Shared devices (M1-07): a manager's sign-in with "shared device" opens a device session,
-// remembered in a second cookie `did`. Staff then switch in with a PIN, which creates a
-// child session (`parent_session_id` = the device session) in `sid`. A child ends when its
-// device session ends.
+// Shared devices (M1-07): a manager's sign-in with "shared device" opens a DEVICE session,
+// held only in a second cookie `did` and never accepted as `sid` (issue 38). The manager's
+// own session and every PIN session (staff switching in) are USER sessions under it
+// (`parent_session_id`), in `sid`. A child ends when its device session ends.
 
 export const SESSION_COOKIE = 'sid';
 export const DEVICE_COOKIE = 'did';
@@ -105,8 +105,10 @@ export interface NewSession {
   sharedDevice: boolean;
   /** False until the user passes MFA when their roles require it. */
   mfaPassed: boolean;
-  /** Set for a PIN session: the device session it runs under. */
+  /** Set for a session on a shared device: the device session it runs under. */
   parent?: Session | undefined;
+  /** DEVICE only for the device session itself (cookie `did`). */
+  kind?: SessionKind;
   deviceLabel?: string | undefined;
   ip?: string | undefined;
   userAgent?: string | undefined;
@@ -131,6 +133,7 @@ export async function createSession(
       tokenHash: hashToken(config.sessionSecret, token),
       userId: input.userId,
       parentSessionId: input.parent?.id ?? null,
+      kind: input.kind ?? 'USER',
       sharedDevice: input.sharedDevice,
       mfaPassed: input.mfaPassed,
       deviceLabel: input.deviceLabel ?? input.parent?.deviceLabel ?? null,
@@ -176,6 +179,8 @@ export function sessionLoader(deps: SessionDeps): RequestHandler {
     });
     const over =
       !found ||
+      // A device session lives only in `did`; presented as `sid` it is refused (issue 38).
+      found.kind !== 'USER' ||
       isSessionOver(found, now) ||
       found.user.status !== 'ACTIVE' ||
       (found.parentSession !== null && isSessionOver(found.parentSession, now));
@@ -245,6 +250,7 @@ export async function loadDeviceSession(
   });
   if (
     !device ||
+    device.kind !== 'DEVICE' ||
     !device.sharedDevice ||
     !device.mfaPassed ||
     device.parentSessionId !== null ||

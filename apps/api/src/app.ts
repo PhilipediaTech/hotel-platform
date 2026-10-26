@@ -13,9 +13,11 @@ import { errorHandler, notFoundHandler } from './core/errors.ts';
 import { httpLogger } from './core/logger.ts';
 import { openApiDocument } from './core/openapi.ts';
 import { rateLimiter } from './core/rate-limit.ts';
+import { createTenantDb } from './core/tenant-db.ts';
 import { tenancyContext } from './core/tenancy.ts';
 import { requestId } from './core/request-id.ts';
 import { mountRoute } from './core/route.ts';
+import { accessRoutes } from './modules/access/routes.ts';
 import { identityRoutes } from './modules/identity/routes.ts';
 
 export const BODY_LIMIT = '100kb';
@@ -77,6 +79,9 @@ export function createApp({
   // Spread: the generator types the document as an interface, which lacks an index signature.
   mountRoute(api, getOpenApiDocument, () => ({ ...openApiDocument() }));
   api.use(identityRoutes({ db, config, clock, email, logger }));
+  // Module code reads and writes tenant tables through the tenant-scoped client (T-012).
+  const tenantDb = createTenantDb(db);
+  api.use(accessRoutes({ db, tenantDb, config, clock, email, logger }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

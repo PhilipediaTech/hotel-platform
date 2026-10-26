@@ -1,10 +1,10 @@
-// Role and department templates every new organisation starts with (Strategy §5; PRD M1-05
-// lets the owner edit them). Used by sign-up and by the demo seed.
-//
-// PROVISIONAL permission lists: T-013 builds the permission catalogue and replaces these.
-// They use the PRD codes the web navigation already checks, so a signed-in user sees the
-// screens their role is meant for. `device.manage` (T-011) lets a manager open a shared
-// device that staff switch into with a PIN.
+import { HOTEL_PERMISSION_CODES } from '@hotel/shared';
+
+// Role and department templates every new organisation starts with (Strategy §5 "Roles and
+// permissions"; PRD M1-05 lets the owner edit them). Used by sign-up and by the demo seed.
+// Codes come from the permission catalogue in @hotel/shared; each role gets what its
+// Strategy §5 "key permissions" describe. Limits start empty: approval policies supply the
+// thresholds until an owner sets role limits (spec issue 21).
 
 export const DEPARTMENT_TEMPLATES = [
   { code: 'MGT', name: 'Management' },
@@ -28,100 +28,117 @@ export interface RoleTemplate {
   permissions: readonly string[];
 }
 
-const FRONT_DESK = ['frontdesk.read', 'reservation.create', 'folio.read', 'shift.open'] as const;
-const REPORTING = ['report.dashboard', 'report.audit', 'report.tax', 'report.flash'] as const;
+/** Everyone who works shifts. */
+const SELF_SERVICE = ['task.report', 'attendance.clock', 'leave.request'] as const;
+
+/** Owner-only: the organisation, its subscription, roles and approval policies. */
+const OWNER_ONLY = new Set([
+  'role.manage',
+  'property.create',
+  'approval.policy.manage',
+  'subscription.read',
+  'owner.read',
+  'report.group',
+]);
 
 export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
   {
+    // Properties, subscription, group reports, access, owner approvals
     name: 'Owner',
     slug: 'owner',
     requiresMfa: true,
     orgWide: true,
     department: null,
-    permissions: [
-      'owner.read',
-      ...REPORTING,
-      ...FRONT_DESK,
-      'audit.run',
-      'hk.read',
-      'hk.assign',
-      'task.create',
-      'task.assign',
-      'task.report',
-      'handover.manage',
-      'device.manage',
-      'approval.decide',
-      'approval.policy.manage',
-      'leakage.review',
-      'rate.manage',
-      'message.send',
-      'template.manage',
-      'room.manage',
-      'roomtype.manage',
-      'tax.manage',
-      'fx.manage',
-      'property.setup',
-      'user.invite',
-      'role.assign',
-      'role.manage',
-      'import.run',
-      'subscription.read',
-      'audit.read',
-    ],
+    permissions: HOTEL_PERMISSION_CODES,
   },
   {
+    // Operations, rates, staff, reports, approvals within limits
     name: 'General Manager',
     slug: 'gm',
     requiresMfa: true,
     orgWide: false,
     department: 'MGT',
-    permissions: [
-      ...REPORTING,
-      ...FRONT_DESK,
-      'audit.run',
-      'hk.read',
-      'hk.assign',
-      'task.create',
-      'task.assign',
-      'task.report',
-      'handover.manage',
-      'device.manage',
-      'approval.decide',
-      'leakage.review',
-      'rate.manage',
-      'message.send',
-      'room.manage',
-      'property.setup',
-      'user.invite',
-      'role.assign',
-      'audit.read',
-    ],
+    permissions: HOTEL_PERMISSION_CODES.filter((code) => !OWNER_ONLY.has(code)),
   },
   {
+    // Run night audit, review exceptions, close the business day
     name: 'Night Auditor',
     slug: 'night-auditor',
     requiresMfa: false,
     orgWide: false,
     department: 'FO',
-    permissions: ['audit.run', 'report.audit', 'frontdesk.read', 'folio.read', 'task.report'],
+    permissions: [
+      'audit.run',
+      'frontdesk.read',
+      'availability.read',
+      'reservation.noshow',
+      'folio.read',
+      'folio.charge',
+      'payment.capture',
+      'shift.open',
+      'shift.close',
+      'report.audit',
+      'report.flash',
+      ...SELF_SERVICE,
+    ],
   },
   {
+    // Reservations, check-in/out, charges, payments within own shift
     name: 'Front Desk / Cashier',
     slug: 'front-desk',
     requiresMfa: false,
     orgWide: false,
     department: 'FO',
-    permissions: [...FRONT_DESK, 'message.send', 'task.report'],
+    permissions: [
+      'frontdesk.read',
+      'availability.read',
+      'reservation.create',
+      'reservation.modify',
+      'reservation.cancel',
+      'reservation.checkin',
+      'reservation.checkout',
+      'reservation.noshow',
+      'reservation.dayuse',
+      'room.assign',
+      'room.move',
+      'guest.manage',
+      'key.issue',
+      'folio.read',
+      'folio.charge',
+      'folio.discount',
+      'folio.route',
+      'payment.capture',
+      'payment.request',
+      'shift.open',
+      'shift.close',
+      'shift.handover',
+      'message.send',
+      ...SELF_SERVICE,
+    ],
   },
   {
+    // Availability, bookings, group blocks, guest records
     name: 'Reservations Agent',
     slug: 'reservations',
     requiresMfa: false,
     orgWide: false,
     department: 'FO',
-    permissions: ['frontdesk.read', 'reservation.create', 'message.send', 'task.report'],
+    permissions: [
+      'frontdesk.read',
+      'availability.read',
+      'reservation.create',
+      'reservation.modify',
+      'reservation.cancel',
+      'group.manage',
+      'guest.manage',
+      'company.manage',
+      'payment.request',
+      'message.send',
+      ...SELF_SERVICE,
+    ],
   },
   {
+    // Folios, city ledger, refunds within limits, expenses, reconciliation, tax reports
     name: 'Finance',
     slug: 'finance',
     requiresMfa: true,
@@ -129,15 +146,31 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
     department: 'FIN',
     permissions: [
       'folio.read',
+      'folio.invoice',
+      'folio.house',
+      'folio.reverse',
+      'payment.capture',
+      'payment.refund',
       'shift.open',
-      'report.tax',
-      'report.audit',
+      'shift.signoff',
+      'ar.manage',
+      'ar.commission',
+      'recon.manage',
+      'einvoice.submit',
       'tax.manage',
       'fx.manage',
-      'task.report',
+      'expense.manage',
+      'accounting.export',
+      'report.tax',
+      'report.ar',
+      'report.audit',
+      'report.flash',
+      'report.export',
+      ...SELF_SERVICE,
     ],
   },
   {
+    // Room status, checklists, inspections, lost and found, minibar
     name: 'Housekeeping Supervisor',
     slug: 'hk-supervisor',
     requiresMfa: false,
@@ -146,11 +179,17 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
     permissions: [
       'hk.read',
       'hk.assign',
+      'hk.inspect',
+      'hk.report',
+      'room.block',
+      'lostfound.manage',
+      'checklist.manage',
       'task.create',
       'task.assign',
-      'task.report',
+      'task.verify',
       'handover.manage',
       'device.manage',
+      ...SELF_SERVICE,
     ],
   },
   {
@@ -159,39 +198,74 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
     requiresMfa: false,
     orgWide: false,
     department: 'HK',
-    permissions: ['hk.work', 'task.report'],
+    permissions: ['hk.work', 'lostfound.manage', ...SELF_SERVICE],
   },
   {
+    // Work orders, assets, parts, generator log
     name: 'Maintenance',
     slug: 'maintenance',
     requiresMfa: false,
     orgWide: false,
     department: 'MNT',
-    permissions: ['task.work', 'task.report'],
+    permissions: [
+      'wo.work',
+      'task.work',
+      'asset.manage',
+      'pm.manage',
+      'utility.log',
+      ...SELF_SERVICE,
+    ],
   },
   {
+    // Task queue, assignments, department approvals
     name: 'Department Manager',
     slug: 'dept-manager',
     requiresMfa: false,
     orgWide: false,
     department: 'FO',
-    permissions: ['task.create', 'task.assign', 'task.report', 'handover.manage', 'device.manage'],
+    permissions: [
+      'task.create',
+      'task.assign',
+      'task.verify',
+      'handover.manage',
+      'device.manage',
+      'rota.manage',
+      'leave.approve',
+      'timesheet.approve',
+      'report.ops',
+      ...SELF_SERVICE,
+    ],
   },
   {
+    // Own tasks, attendance, leave, handovers
     name: 'Staff Member',
     slug: 'staff',
     requiresMfa: false,
     orgWide: false,
     department: 'FO',
-    permissions: ['task.report'],
+    permissions: ['task.work', ...SELF_SERVICE],
   },
   {
+    // Reports and records, no changes
     name: 'Auditor (read-only)',
     slug: 'auditor',
     requiresMfa: false,
     orgWide: true,
     department: null,
-    permissions: ['audit.read', 'report.audit', 'folio.read'],
+    permissions: [
+      'audit.read',
+      'frontdesk.read',
+      'availability.read',
+      'folio.read',
+      'hk.read',
+      'report.dashboard',
+      'report.audit',
+      'report.tax',
+      'report.ar',
+      'report.ops',
+      'report.flash',
+      'report.export',
+    ],
   },
 ];
 
@@ -200,3 +274,7 @@ export function roleTemplate(slug: string): RoleTemplate {
   if (!template) throw new Error(`Unknown role template ${slug}`);
   return template;
 }
+
+/** The Owner role keeps these so an organisation can never lock itself out (M1-05). */
+export const OWNER_ROLE_NAME = 'Owner';
+export const OWNER_LOCKED_PERMISSIONS = ['role.manage', 'role.assign', 'user.invite'] as const;

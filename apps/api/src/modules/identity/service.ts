@@ -37,12 +37,16 @@ const SIGN_IN_FAILED =
 // ---------------------------------------------------------------------------------------
 // Link tokens (email verification, password reset)
 
-/** Issues a fresh single-use token, cancelling earlier unused ones for the same purpose. */
-async function issueLinkToken(
+/**
+ * Issues a fresh single-use token, cancelling earlier unused ones for the same purpose.
+ * `ttlMs` overrides the purpose's default (manager-issued reset links last 24 hours).
+ */
+export async function issueLinkToken(
   db: DbClient,
-  deps: IdentityDeps,
+  deps: Pick<IdentityDeps, 'clock' | 'config'>,
   userId: string,
   purpose: AuthTokenPurpose,
+  ttlMs: number = TOKEN_TTL_MS[purpose],
 ): Promise<string> {
   const now = deps.clock();
   await db.authToken.updateMany({
@@ -55,7 +59,7 @@ async function issueLinkToken(
       userId,
       purpose,
       tokenHash: hashToken(deps.config.sessionSecret, token),
-      expiresAt: new Date(now.getTime() + TOKEN_TTL_MS[purpose]),
+      expiresAt: new Date(now.getTime() + ttlMs),
     },
   });
   return token;
@@ -91,7 +95,7 @@ async function consumeLinkToken(
   return row.userId;
 }
 
-function appLink(deps: IdentityDeps, path: string, token?: string): string {
+export function appLink(deps: Pick<IdentityDeps, 'config'>, path: string, token?: string): string {
   const url = new URL(path, deps.config.appOrigin);
   if (token) url.searchParams.set('token', token);
   return url.toString();

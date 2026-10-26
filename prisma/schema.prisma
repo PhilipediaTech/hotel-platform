@@ -127,6 +127,13 @@ enum UserStatus {
   @@map("user_status")
 }
 
+enum SessionKind {
+  USER
+  DEVICE
+
+  @@map("session_kind")
+}
+
 enum AuthTokenPurpose {
   EMAIL_VERIFY
   PASSWORD_RESET
@@ -167,21 +174,23 @@ model User {
 }
 
 model Session {
-  id              String    @id @default(uuid()) @db.Uuid
+  id              String      @id @default(uuid()) @db.Uuid
   /// HMAC of the cookie token; the raw token is never stored.
-  tokenHash       String    @unique @map("token_hash")
-  userId          String    @map("user_id") @db.Uuid
+  tokenHash       String      @unique @map("token_hash")
+  userId          String      @map("user_id") @db.Uuid
   /// Set on a user's PIN session; points at the shared-device session a manager opened. Spec issue 4.
-  parentSessionId String?   @map("parent_session_id") @db.Uuid
-  mfaPassed       Boolean   @default(false) @map("mfa_passed")
-  sharedDevice    Boolean   @default(false) @map("shared_device")
-  deviceLabel     String?   @map("device_label")
+  parentSessionId String?     @map("parent_session_id") @db.Uuid
+  mfaPassed       Boolean     @default(false) @map("mfa_passed")
+  /// DEVICE = a manager-opened shared tablet (cookie `did` only, never accepted as `sid`). Spec issue 38.
+  kind            SessionKind @default(USER)
+  sharedDevice    Boolean     @default(false) @map("shared_device")
+  deviceLabel     String?     @map("device_label")
   ip              String?
-  userAgent       String?   @map("user_agent")
-  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
-  lastSeenAt      DateTime  @map("last_seen_at") @db.Timestamptz(6)
-  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  userAgent       String?     @map("user_agent")
+  expiresAt       DateTime    @map("expires_at") @db.Timestamptz(6)
+  lastSeenAt      DateTime    @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt       DateTime?   @map("revoked_at") @db.Timestamptz(6)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   parentSession Session?  @relation("DeviceSession", fields: [parentSessionId], references: [id], onDelete: Cascade)

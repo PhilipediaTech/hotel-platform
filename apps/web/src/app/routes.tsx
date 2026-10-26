@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentType, ReactElement, ReactNode } from 'react';
 import type { RouteObject } from 'react-router';
 import { AppShell } from '../components/shell/app-shell.tsx';
 import {
@@ -11,11 +11,18 @@ import { MfaPage } from '../routes/auth/mfa.tsx';
 import { PinSwitchPage, SetPinPage } from '../routes/auth/pin.tsx';
 import { SignInPage } from '../routes/auth/sign-in.tsx';
 import { SignUpPage } from '../routes/auth/sign-up.tsx';
+import { AcceptInvitationPage } from '../routes/auth/accept-invitation.tsx';
+import { UsersAndRolesPage } from '../routes/settings/access.tsx';
 import { HomeRedirect, NotFoundPage, PlaceholderPage, RouteErrorPage } from '../routes/pages.tsx';
 import { NAV_ITEMS, type NavItem } from './navigation.ts';
 import { SessionGate } from './session-gate.tsx';
 
-/** One placeholder route per distinct screen path (tab-style items share their screen's route). */
+/** Screens that exist; every other navigation path shows its placeholder. */
+const SCREENS: Record<string, ReactElement> = {
+  '/settings/access': <UsersAndRolesPage />,
+};
+
+/** One route per distinct screen path (tab-style items share their screen's route). */
 function screenRoutes(): RouteObject[] {
   const byPath = new Map<string, NavItem>();
   for (const item of NAV_ITEMS) {
@@ -24,7 +31,7 @@ function screenRoutes(): RouteObject[] {
   }
   return [...byPath.entries()].map(([path, item]) => ({
     path: path.replace(/^\//, ''),
-    element: <PlaceholderPage item={item} />,
+    element: SCREENS[path] ?? <PlaceholderPage item={item} />,
   }));
 }
 
@@ -50,6 +57,7 @@ export function buildRoutes(
             { path: 'reset-password', element: <ResetPasswordPage /> },
             { path: 'mfa', element: <MfaPage /> },
             { path: 'pin', element: <PinSwitchPage /> },
+            { path: 'accept-invitation', element: <AcceptInvitationPage /> },
           ],
         },
         {

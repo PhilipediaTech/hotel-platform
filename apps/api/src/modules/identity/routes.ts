@@ -8,7 +8,6 @@ import {
   loadDeviceSession,
   requireAuth,
   revokeSessionTree,
-  rotateSession,
   setDeviceCookie,
   setSessionCookie,
 } from '../../core/auth.ts';
@@ -29,32 +28,29 @@ export function identityRoutes(deps: identity.IdentityDeps): Router {
     return device && (await pin.deviceAllowed(deps, device)) ? device : null;
   }
 
-  /** Ends the browser's current session, but never the shared device itself. */
-  async function endCurrentSession(req: Request, device: Session | null): Promise<void> {
+  /** Ends the browser's current session (never the device: that lives only in `did`). */
+  async function endCurrentSession(req: Request): Promise<void> {
     const current = getAuth(req);
-    if (current && current.session.id !== device?.id) {
-      await revokeSessionTree(deps.db, current.session.id, deps.clock());
-    }
+    if (current) await revokeSessionTree(deps.db, current.session.id, deps.clock());
   }
 
   /**
-   * A manager's MFA-passed shared-device session becomes this browser's device: remembered
-   * in `did`, replacing any earlier device session here (and its PIN sessions).
+   * A manager's MFA-passed "shared device" sign-in opens this browser's device: a DEVICE
+   * session in `did` (replacing any earlier one here, with its sessions), the manager's own
+   * session moved under it. Returns the manager's updated session, or null if not a device.
    */
   async function adoptDevice(
     req: Request,
     res: Response,
     session: Session,
-    token: string,
-  ): Promise<boolean> {
-    if (!session.sharedDevice || session.parentSessionId || !session.mfaPassed) return false;
-    if (!(await pin.deviceAllowed(deps, session))) return false;
+  ): Promise<Session | null> {
+    if (!session.sharedDevice || session.parentSessionId || !session.mfaPassed) return null;
+    if (!(await pin.deviceAllowed(deps, session))) return null;
     const previous = await loadDeviceSession(deps, req);
-    if (previous && previous.id !== session.id) {
-      await revokeSessionTree(deps.db, previous.id, deps.clock());
-    }
-    setDeviceCookie(res, deps.config, token, session.expiresAt);
-    return true;
+    if (previous) await revokeSessionTree(deps.db, previous.id, deps.clock());
+    const opened = await pin.openDevice(deps, session);
+    setDeviceCookie(res, deps.config, opened.deviceToken, opened.device.expiresAt);
+    return opened.session;
   }
 
   /** `deviceJustOpened`: the device cookie is in this response, not yet in the request. */
@@ -81,31 +77,31 @@ export function identityRoutes(deps: identity.IdentityDeps): Router {
   });
 
   mountRoute(router, r.signIn, async ({ body }, { req, res }) => {
-    const { user, session, token } = await identity.signIn(deps, body, {
+    const result = await identity.signIn(deps, body, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
     });
     // Whoever was signed in on this browser is replaced (the shared device itself stays).
-    await endCurrentSession(req, await loadDeviceSession(deps, req));
-    setSessionCookie(res, deps.config, token, session.expiresAt);
-    const opened = await adoptDevice(req, res, session, token);
-    return me(req, user, session, opened);
+    await endCurrentSession(req);
+    const adopted = await adoptDevice(req, res, result.session);
+    const session = adopted ?? result.session;
+    setSessionCookie(res, deps.config, result.token, session.expiresAt);
+    return me(req, result.user, session, adopted !== null);
   });
 
   mountRoute(router, r.signOut, async ({ body }, { req, res }) => {
     const current = getAuth(req);
-    const device = await loadDeviceSession(deps, req);
-    const isDevice = current !== null && device?.id === current.session.id;
-    if (current && isDevice && body.keepDevice) {
-      // "Switch user" on the manager's own session: the device lives on for the next PIN,
-      // under a fresh token, so the value this browser held as `sid` stops working.
-      const { session, token } = await rotateSession(deps, current.session);
-      setDeviceCookie(res, deps.config, token, session.expiresAt);
-    } else if (current) {
-      // Signing out of the device session closes the device and every PIN session on it;
-      // signing out of a PIN session leaves the device ready for the next PIN.
-      await revokeSessionTree(deps.db, current.session.id, deps.clock());
-      if (isDevice) clearDeviceCookie(res, deps.config);
+    if (current) {
+      const device = await loadDeviceSession(deps, req);
+      const onDevice = device !== null && current.session.parentSessionId === device.id;
+      if (onDevice && device.userId === current.user.id && !body.keepDevice) {
+        // The manager who opened the device signing out closes it and every session on it.
+        await revokeSessionTree(deps.db, device.id, deps.clock());
+        clearDeviceCookie(res, deps.config);
+      } else {
+        // Anyone else, or "Switch user": only this session ends; the device waits for a PIN.
+        await revokeSessionTree(deps.db, current.session.id, deps.clock());
+      }
     }
     clearSessionCookie(res, deps.config);
   });
@@ -144,8 +140,8 @@ export function identityRoutes(deps: identity.IdentityDeps): Router {
       requireAuth(req, { allowPendingMfa: true }),
       body.code,
     );
-    setSessionCookie(res, deps.config, token, session.expiresAt);
-    await adoptDevice(req, res, session, token);
+    const adopted = await adoptDevice(req, res, session);
+    setSessionCookie(res, deps.config, token, (adopted ?? session).expiresAt);
     return { recoveryCodes };
   });
 
@@ -155,9 +151,9 @@ export function identityRoutes(deps: identity.IdentityDeps): Router {
       requireAuth(req, { allowPendingMfa: true }),
       body,
     );
-    setSessionCookie(res, deps.config, token, session.expiresAt);
-    const opened = await adoptDevice(req, res, session, token);
-    return me(req, user, session, opened);
+    const adopted = await adoptDevice(req, res, session);
+    setSessionCookie(res, deps.config, token, (adopted ?? session).expiresAt);
+    return me(req, user, adopted ?? session, adopted !== null);
   });
 
   // PIN switch on shared devices (M1-07) --------------------------------------------------
@@ -180,7 +176,7 @@ export function identityRoutes(deps: identity.IdentityDeps): Router {
       ip: req.ip,
       userAgent: req.get('user-agent'),
     });
-    await endCurrentSession(req, device);
+    await endCurrentSession(req);
     setSessionCookie(res, deps.config, token, session.expiresAt);
     return me(req, user, session);
   });

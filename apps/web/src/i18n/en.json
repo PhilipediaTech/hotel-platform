@@ -183,5 +183,85 @@
     "rateLimited": "Too many attempts. Wait a minute and try again.",
     "internal": "Something went wrong on our side. If it keeps happening, quote reference {{requestId}}.",
     "retry": "Try again"
+  },
+  "access": {
+    "title": "Users and roles",
+    "tabs": {
+      "people": "People",
+      "invitations": "Invitations",
+      "roles": "Roles"
+    },
+    "allProperties": "all properties",
+    "disabled": "Disabled",
+    "manage": "Manage",
+    "rolesHere": "Roles at this property",
+    "rolesEverywhere": "Roles at every property",
+    "saveRoles": "Save roles",
+    "saved": "Saved.",
+    "enable": "Enable account",
+    "disable": "Disable account",
+    "resetMfa": "Reset two-step sign-in",
+    "confirmResetMfa": "Confirm: reset two-step sign-in",
+    "resetLink": "Password reset link",
+    "resetLinkReady": "Give this link to the person (it works once, for 24 hours):",
+    "oneTimeLink": "One-time link",
+    "copy": "Copy",
+    "copied": "Copied",
+    "invite": "Invite someone",
+    "contactKind": "Invite by",
+    "by": {
+      "email": "By email",
+      "phone": "By phone"
+    },
+    "contact": {
+      "email": "Email address",
+      "phone": "Phone number (e.g. +2348012345678)"
+    },
+    "role": "Role",
+    "chooseRole": "Choose a role",
+    "everyProperty": "For every property of the organisation",
+    "sendInvite": "Send invitation",
+    "emailInviteSent": "Invitation emailed. It expires in 7 days.",
+    "phoneInviteReady": "Send this link to them by WhatsApp or SMS (it works once, for 7 days):",
+    "pending": "Pending invitations",
+    "noPending": "No pending invitations.",
+    "revoke": "Withdraw",
+    "people_one": "{{count}} person",
+    "people_other": "{{count}} people",
+    "newRole": "New role",
+    "roleName": "Role name",
+    "requiresMfa": "Requires two-step sign-in",
+    "saveRole": "Save role",
+    "createRole": "Create role",
+    "limit": {
+      "amount": "Max amount (₦)",
+      "percent": "Max %",
+      "count": "Max count"
+    },
+    "groups": {
+      "access": "Setup and access",
+      "rooms": "Rooms and rates",
+      "frontdesk": "Reservations and front desk",
+      "money": "Folios, payments and night audit",
+      "housekeeping": "Housekeeping and maintenance",
+      "control": "Tasks and control",
+      "workforce": "Workforce",
+      "pos": "Point of sale",
+      "events": "Events",
+      "stock": "Stock and expenses",
+      "channels": "Booking engine and messages",
+      "reports": "Reports"
+    }
+  },
+  "accept": {
+    "title": "Join {{organisation}}",
+    "intro": "You are invited as {{role}} at {{where}} ({{contact}}).",
+    "invalidTitle": "This invitation can’t be used",
+    "signInFirst": "You already have an account. Sign in to it to accept.",
+    "acceptAs": "Accept as {{name}}",
+    "done": "You have joined. The new property is in your property switcher.",
+    "continue": "Continue",
+    "join": "Join",
+    "created": "Your account is ready. Sign in with your email or phone and password."
   }
 }

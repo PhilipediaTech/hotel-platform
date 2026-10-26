@@ -161,7 +161,7 @@ export const signOut = defineRoute({
   path: '/auth/sign-out',
   summary: 'End the current session',
   description:
-    'On a shared device: signing out of a PIN session leaves the device ready for the next PIN. Signing out of the device session closes the device and its PIN sessions, unless `keepDevice` is true ("Switch user"), which only forgets this browser’s signed-in user.',
+    'On a shared device only this session ends and the device waits for the next PIN, except when the manager who opened the device signs out without `keepDevice`: that closes the device and every session on it. "Switch user" sends `keepDevice: true`.',
   tags: ['Auth'],
   auth: 'none',
   body: z.object({ keepDevice: z.boolean().default(false) }).default({ keepDevice: false }),

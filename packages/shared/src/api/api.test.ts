@@ -93,3 +93,10 @@ describe('API_ROUTES', () => {
     }
   });
 });
+
+describe('role edit body', () => {
+  it('leaves out what the caller leaves out (no defaults on PATCH)', async () => {
+    const { RolePatchBody } = await import('./access.ts');
+    expect(RolePatchBody.parse({ name: 'Bar' })).toEqual({ name: 'Bar' });
+  });
+});

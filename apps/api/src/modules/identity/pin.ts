@@ -67,6 +67,35 @@ async function sharesOrganisation(deps: IdentityDeps, a: string, b: string): Pro
 }
 
 /**
+ * Turns a manager's MFA-passed "shared device" sign-in into a device: a DEVICE session (for
+ * `did`) and the manager's own session moved under it, like any PIN session. Returns both.
+ */
+export async function openDevice(
+  deps: IdentityDeps,
+  session: Session,
+): Promise<{ session: Session; device: Session; deviceToken: string }> {
+  const { session: device, token: deviceToken } = await createSession(deps, {
+    userId: session.userId,
+    kind: 'DEVICE',
+    sharedDevice: true,
+    mfaPassed: true,
+    deviceLabel: session.deviceLabel ?? undefined,
+    ip: session.ip ?? undefined,
+    userAgent: session.userAgent ?? undefined,
+  });
+  const updated = await deps.db.session.update({
+    where: { id: session.id },
+    data: {
+      parentSessionId: device.id,
+      // Shared-device behaviour now comes from the parent (the CHECK keeps children non-shared).
+      sharedDevice: false,
+      expiresAt: session.expiresAt < device.expiresAt ? session.expiresAt : device.expiresAt,
+    },
+  });
+  return { session: updated, device, deviceToken };
+}
+
+/**
  * POST /auth/pin: a session for the PIN user under the device session. Unknown logins,
  * other organisations' staff, missing PINs and locked accounts all get the same answer.
  */

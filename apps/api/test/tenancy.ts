@@ -79,6 +79,13 @@ export interface CrossTenantCase {
   seed(db: Db, world: TenantWorld, propertyId: string): Promise<Record<string, string>>;
   /** For list routes: the IDs in a response body. */
   listIds?(body: unknown): string[];
+  /**
+   * For routes that create (no record ID in the path): A's user in A1 may succeed or be
+   * refused, but `untouched` must show nothing was written into B.
+   */
+  creates?: true;
+  /** Asserts B's data is as seeded (writes and creates). */
+  untouched?(db: Db, world: TenantWorld, theirs: Record<string, string>): Promise<void>;
   /** Request body for writes. */
   body?(params: Record<string, string>): object;
 }
@@ -128,6 +135,8 @@ export async function expectCrossTenantSafe(
       ids.filter((id) => theirIds.includes(id)),
       `${route.operationId} leaked B's rows`,
     ).toEqual([]);
+  } else if (testCase.creates) {
+    expect(fromA1.status, `${route.operationId} from A1`).toBeLessThan(500);
   } else {
     expect(fromA1.status, `${route.operationId} with B's record from A1`).toBe(404);
   }
@@ -136,4 +145,5 @@ export async function expectCrossTenantSafe(
   expect(inB1.status, `${route.operationId} in B1`).toBe(404);
   const inA2 = await call(app, route, theirs, world.a2.id, cookie, body);
   expect(inA2.status, `${route.operationId} in A2 without a role there`).toBe(404);
+  await testCase.untouched?.(db, world, theirs);
 }

@@ -1,4 +1,11 @@
-import { API_ROUTES, defineRoute, page, PageQuery, Uuid } from '@hotel/shared';
+import {
+  API_ROUTES,
+  defineRoute,
+  HOTEL_PERMISSION_CODES,
+  page,
+  PageQuery,
+  Uuid,
+} from '@hotel/shared';
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -357,11 +364,16 @@ describe('cross-tenant suite (test plan, suite 1)', () => {
     expect(missing, 'add these to apps/api/test/cross-tenant-cases.ts').toEqual([]);
   });
 
-  it('every registered case leaks nothing', async () => {
-    const { app } = buildTestApp(undefined, { db });
-    for (const route of scoped) {
-      const testCase = CROSS_TENANT_CASES[route.operationId as keyof typeof CROSS_TENANT_CASES];
-      if (testCase) await expectCrossTenantSafe(app, db, world, route, testCase);
-    }
-  });
+  it.each(scoped.map((route) => [route.operationId, route] as const))(
+    '%s leaks nothing across tenants',
+    async (operationId, route) => {
+      const testCase = CROSS_TENANT_CASES[operationId as keyof typeof CROSS_TENANT_CASES];
+      if (!testCase) return; // reported by the test above
+      // Every permission, so a 404 can only come from tenancy, never from a missing grant.
+      await resetDb(db);
+      const fullWorld = await makeTenantWorld(db, HOTEL_PERMISSION_CODES);
+      const { app } = buildTestApp(undefined, { db });
+      await expectCrossTenantSafe(app, db, fullWorld, route, testCase);
+    },
+  );
 });

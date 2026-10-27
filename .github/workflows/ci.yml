@@ -31,14 +31,13 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
     env:
-      NODE_ENV: test
       TZ: UTC
       # CI-only database in a throwaway container; not a secret.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hotel_test
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hotel_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -57,6 +56,9 @@ jobs:
         run: npx --no-install prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
       - name: Tests (unit, web, integration)
         run: npm run test -- --reporter=dot
+        # Only here: a job-wide NODE_ENV=test would make Vite build React's development bundle.
+        env:
+          NODE_ENV: test
       - name: Build
         run: npm run build
       - name: Bundle budget (300 KB)

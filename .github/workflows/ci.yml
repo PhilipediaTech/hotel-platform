@@ -1,0 +1,64 @@
+# CI (T-004; runbook tab 9 "CI workflow"): every push and pull request must be green.
+# Adapted from the runbook: PostgreSQL 18 like local dev, tests use TEST_DATABASE_URL (the
+# suite refuses a database not ending in _test), and the repo's own checks (format,
+# OpenAPI drift, schema drift, build, bundle budget). Playwright joins when T-0xx adds E2E.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hotel_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
+    env:
+      NODE_ENV: test
+      TZ: UTC
+      # CI-only database in a throwaway container; not a secret.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hotel_test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hotel_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Format
+        run: npm run format:check
+      - name: OpenAPI document is up to date
+        run: npm run openapi:check
+      - name: Migrations apply
+        run: npx --no-install prisma migrate deploy
+      - name: Schema matches migrations (no drift)
+        run: npx --no-install prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - name: Tests (unit, web, integration)
+        run: npm run test -- --reporter=dot
+      - name: Build
+        run: npm run build
+      - name: Bundle budget (300 KB)
+        run: npm run size -w apps/web
+      - name: Dependency audit
+        run: npm audit --audit-level=high

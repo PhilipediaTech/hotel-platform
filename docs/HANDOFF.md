@@ -10,7 +10,7 @@ Production hotel PMS SaaS built from "Hotel Management Platform — Master Speci
 
 - Follow tab 6 (Implementation Backlog) ticket by ticket; re-read the cited PRD stories, schema models, API contracts and UI screens first.
 - Every PRD acceptance criterion becomes at least one automated test. Read files before editing; never guess shapes.
-- Commit after each ticket: `T-042: reservations create/modify/cancel` (enforced by the commit-msg hook).
+- Commit after each ticket: `T-042: reservations create/modify/cancel` (enforced by the commit-msg hook). Since T-004: work on a branch `feat/T-0NN-<slug>`, push, open a pull request into `main` (remote `origin` = github.com/PhilipediaTech/hotel-platform); CI (`.github/workflows/ci.yml`) must be green before merging.
 - Keep `docs/PROGRESS.md` and this file current; new architectural decisions go in `docs/adr/` and must be reported to Philip.
 - Stop and ask before: spending money or creating paid accounts; touching production; open ADRs 019–022 and the tax stack per state; deleting files; rewriting applied migrations; schema changes the spec doesn't cover; changing the stack or an accepted ADR.
 - Commands given to Philip never contain placeholders.
@@ -117,4 +117,4 @@ Root scripts (`dev` runs api :4000 and web :5173 via `scripts/dev.mjs`; `check:s
 
 ## Next step
 
-T-02x per tab 6: idempotency keys, outbox/jobs, approvals (M1-12, which also writes `approval_request_id` on audit events). T-004 is still blocked on a GitHub remote; T-005 needs paid accounts (stop).
+T-02x per tab 6: idempotency keys, outbox/jobs, approvals (M1-12, which also writes `approval_request_id` on audit events). T-005 needs paid accounts (stop).

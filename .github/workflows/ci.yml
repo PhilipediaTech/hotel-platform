@@ -4,10 +4,11 @@
 # OpenAPI drift, schema drift, build, bundle budget). Playwright joins when T-0xx adds E2E.
 name: ci
 
+# Every push, any branch. A pull request from a branch of this repo shows the push run as its
+# check, so `pull_request` would only run everything twice (no forks for this repo).
 on:
   push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

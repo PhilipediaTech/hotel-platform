@@ -68,6 +68,7 @@ apps/api        @hotel/api      Express 5 app
   src/modules/tax/              revenue codes, tax rules and versions, confirm; defaults.ts = Lagos EXAMPLE taxes
   src/modules/rates/            cancellation policies, rate plans (If-Match), rate calendar (bulk SQL upsert), packages
   src/modules/imports/          check (POST /imports) and apply spreadsheet imports: ROOMS, RATES
+  src/modules/guests/           guests (search, flags, merge → moveGuestReferences) and companies
   src/modules/availability/     inventory.ts: rebuildInventory, takeInventory/releaseInventory, daily job; inventory API;
                                 quotes.ts: GET /availability, POST /quotes (live pricing, restrictions, taxes per night)
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
@@ -101,6 +102,7 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/routes/rates.tsx          S23 rate grid, bulk edit, plan and package forms
   src/routes/settings/imports.tsx S03 imports: template, upload, report, apply
   src/routes/rooms-left.tsx     S23 "Rooms left" view and overbooking form
+  src/routes/guests.tsx         S13 guests: search, add, profile (details, flags, merge); companies.tsx
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -154,10 +156,11 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 - **Imports:** a new kind (GUESTS with T-043, COMPANIES, BALANCES with folios) adds its columns to `IMPORT_COLUMNS` and a branch in `parseSheet`, a `check…`/`apply…` pair in `modules/imports/service.ts`, and the kind to `IMPORT_KINDS`. `.xlsx` test fixtures are plain zips (see `apps/api/test/fixtures/rooms.xlsx`).
 - **Inventory:** anything that changes rooms, room types or out-of-order blocks calls `rebuildInventory` in its transaction (see `refreshInventory` in `modules/rooms/service.ts`). Reservations take nights with `takeInventory(tx, …, field: 'sold' | 'held')` and give them back with `releaseInventory`; never update `sold`/`held` directly.
 - **Quotes:** a booking (T-042) loads the quote (same property, not expired, same room type/plan/dates), re-checks occupancy, calls `takeInventory` per stay, and copies the quote’s `nights` (price, rule version, lines with tax versions) into `stay_nights`; posting (T-060/T-073) uses those lines. An expired quote means quoting again.
+- **Guests:** guests and companies are organisation-wide (tenant kind `organisation`). Anything that stores a guest ID (reservations, stays, folios) must add its update to `moveGuestReferences` in `modules/guests/service.ts`, so merges move it. Never send `vip`/`doNotRent`/`flagReason` to callers without `guest.flag`.
 - **Local sign-in:** `npm run seed`, then any `<role-slug>@demo.hotel.test` (e.g. `owner@`, `front-desk@`) with `SEED_USER_PASSWORD` from `.env`. Verification and reset links are printed in the API log.
 - **MFA and PINs locally:** Owner, GM and Finance demo users must set up MFA at first sign-in; generate codes from the shown key with `node --input-type=module -e "import { generate } from 'otplib'; console.log(await generate({ secret: '<key>' }))"` (run in `apps/api`). For PIN switching: set a PIN at `/account/pin` (e.g. as `front-desk@`), sign in as `dept-manager@` with "shared device" ticked, then Account menu → Switch user. Integration tests for these flows use `test/auth.ts`.
 - **Lockfile:** never regenerate it with `node_modules` or the old lock present (npm/cli#4828 drops platform bindings); follow the procedure in PROGRESS decisions. After any dependency change, `grep -c "node_modules/@rolldown/binding-" package-lock.json` must print 15.
 
 ## Next step
 
-T-042 reservations (M3-01–M3-05): create from quotes (Idempotency-Key, 403 PROPERTY_NOT_LIVE when the property is not LIVE, inventory via takeInventory, confirmation numbers via property counters), modify (requote), cancel, reinstate, tentative holds with an expiry job, the state machine and status history. Needs guests (T-043 is the guest module: create the booker’s guest record minimally here or ask Philip about order). The import still needs GUESTS/COMPANIES (T-043) and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-042 reservations (M3-01–M3-05): create from quotes (Idempotency-Key; 403 PROPERTY_NOT_LIVE unless the property is LIVE; booker = existing guest or new guest record; takeInventory per stay; confirmation numbers from property counters; do-not-rent bookers need a manager approval, M3 rule), modify (requote), cancel, reinstate, tentative holds with an expiry job, state machine and status history; add reservations/stays to `moveGuestReferences`. The import still needs GUESTS/COMPANIES (now possible) and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

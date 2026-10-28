@@ -4,6 +4,7 @@ export * from './audit.ts';
 export * from './auth.ts';
 export * from './contract.ts';
 export * from './files.ts';
+export * from './guests.ts';
 export * from './imports.ts';
 export * from './inventory.ts';
 export * from './primitives.ts';

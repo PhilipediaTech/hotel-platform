@@ -64,6 +64,8 @@ model Organisation {
   roomTypes        RoomType[]
   rooms            Room[]
   ratePlans        RatePlan[]
+  guests           Guest[]
+  companies        Company[]
 
   @@map("organisations")
 }
@@ -887,4 +889,66 @@ model Quote {
 
   @@index([propertyId, expiresAt])
   @@map("quotes")
+}
+
+// ───────────────────────── Guests and companies (M3-15, M3-18, M3-16 basic; T-043) ─────────────
+
+enum CompanyKind {
+  COMPANY
+  TRAVEL_AGENT
+  EVENT_CLIENT
+
+  @@map("company_kind")
+}
+
+/// A guest of the organisation (shared by its properties). A merged duplicate keeps its row
+/// with mergedIntoId set and is hidden from search (M3 rule: merge keeps the oldest profile).
+/// vip, doNotRent and flagReason are shown only to roles with guest.flag (M3-18).
+model Guest {
+  id               String    @id @default(uuid()) @db.Uuid
+  organisationId   String    @map("organisation_id") @db.Uuid
+  firstName        String    @map("first_name")
+  lastName         String    @map("last_name")
+  email            String?
+  phone            String?
+  nationality      String?   @db.Char(2)
+  preferences      Json      @default("{}")
+  marketingConsent Boolean   @default(false) @map("marketing_consent")
+  consentAt        DateTime? @map("consent_at") @db.Timestamptz(6)
+  vip              Boolean   @default(false)
+  doNotRent        Boolean   @default(false) @map("do_not_rent")
+  flagReason       String?   @map("flag_reason")
+  mergedIntoId     String?   @map("merged_into_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  mergedInto   Guest?       @relation("GuestMerge", fields: [mergedIntoId], references: [id], onDelete: Restrict)
+  mergedFrom   Guest[]      @relation("GuestMerge")
+
+  @@index([organisationId, phone])
+  @@index([organisationId, email])
+  @@index([organisationId, lastName])
+  @@map("guests")
+}
+
+/// A company, travel agent or event client of the organisation. Basic in V1 (name, contacts,
+/// tax ID); credit limits, terms, commission and billing instructions are used from V1.1.
+model Company {
+  id                  String      @id @default(uuid()) @db.Uuid
+  organisationId      String      @map("organisation_id") @db.Uuid
+  kind                CompanyKind
+  name                String
+  contacts            Json        @default("[]")
+  taxId               String?     @map("tax_id")
+  creditLimitMinor    BigInt?     @map("credit_limit_minor")
+  paymentTermsDays    Int?        @map("payment_terms_days")
+  commissionBps       Int?        @map("commission_bps")
+  billingInstructions Json        @default("{}") @map("billing_instructions")
+  active              Boolean     @default(true)
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  @@index([organisationId, name])
+  @@map("companies")
 }

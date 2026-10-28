@@ -2222,6 +2222,235 @@
           "createdAt",
           "expiresAt"
         ]
+      },
+      "Guest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nationality": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preferences": {
+            "type": "object",
+            "properties": {
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "notes",
+              "tags"
+            ]
+          },
+          "marketingConsent": {
+            "type": "boolean"
+          },
+          "consentAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "flags": {
+            "$ref": "#/components/schemas/GuestFlags"
+          },
+          "mergedIntoId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "email",
+          "phone",
+          "nationality",
+          "preferences",
+          "marketingConsent",
+          "consentAt",
+          "flags",
+          "mergedIntoId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "GuestFlags": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "vip": {
+            "type": "boolean"
+          },
+          "doNotRent": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "vip",
+          "doNotRent",
+          "reason"
+        ]
+      },
+      "GuestPreferences": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "default": null
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "maxItems": 20,
+            "default": []
+          }
+        },
+        "default": {
+          "notes": null,
+          "tags": []
+        }
+      },
+      "Company": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COMPANY",
+              "TRAVEL_AGENT",
+              "EVENT_CLIENT"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "phone": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "role",
+                "phone",
+                "email"
+              ]
+            }
+          },
+          "taxId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "contacts",
+          "taxId",
+          "active"
+        ]
       }
     },
     "parameters": {}
@@ -11363,6 +11592,1426 @@
           },
           "422": {
             "description": "Business rule violated: `RESTRICTION_VIOLATED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guests": {
+      "get": {
+        "operationId": "listGuests",
+        "summary": "Find guests by name, phone or email (newest first without a search)",
+        "tags": [
+          "Guests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Names match from the start of the first or last name (\"ada ob\" finds Ada Obi); digits match anywhere in the phone number; text with @ matches the start of the email. Merged duplicates are left out.",
+        "x-permission": "guest.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Guest"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "nextCursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createGuest",
+        "summary": "Add a guest profile",
+        "tags": [
+          "Guests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "guest.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "firstName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 254,
+                    "default": null
+                  },
+                  "phone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^\\+[1-9]\\d{6,14}$",
+                    "default": null
+                  },
+                  "nationality": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[A-Z]{2}$",
+                    "default": null
+                  },
+                  "preferences": {
+                    "$ref": "#/components/schemas/GuestPreferences"
+                  },
+                  "marketingConsent": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "firstName",
+                  "lastName"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Guest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guests/{guestId}": {
+      "get": {
+        "operationId": "getGuest",
+        "summary": "A guest profile",
+        "tags": [
+          "Guests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "guest.manage",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "guestId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Guest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateGuest",
+        "summary": "Change a guest profile",
+        "tags": [
+          "Guests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "guest.manage",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "guestId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "firstName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 254
+                  },
+                  "phone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^\\+[1-9]\\d{6,14}$"
+                  },
+                  "nationality": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[A-Z]{2}$"
+                  },
+                  "preferences": {
+                    "$ref": "#/components/schemas/GuestPreferences"
+                  },
+                  "marketingConsent": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Guest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guests/{guestId}/merge": {
+      "post": {
+        "operationId": "mergeGuests",
+        "summary": "Merge a duplicate into this guest; the older profile is kept",
+        "tags": [
+          "Guests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "The older of the two profiles is kept whichever is named in the path (PRD M3 rule); its empty fields are filled from the other, flags are combined, and the other is marked merged. Both IDs are audited.",
+        "x-permission": "guest.manage",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "guestId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "otherGuestId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  }
+                },
+                "required": [
+                  "otherGuestId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Guest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guests/{guestId}/flags": {
+      "post": {
+        "operationId": "flagGuest",
+        "summary": "Set or clear VIP and do-not-rent, with a reason",
+        "tags": [
+          "Guests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "guest.flag",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "guestId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "vip": {
+                    "type": "boolean"
+                  },
+                  "doNotRent": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "default": null
+                  }
+                },
+                "required": [
+                  "vip",
+                  "doNotRent"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Guest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies": {
+      "get": {
+        "operationId": "listCompanies",
+        "summary": "Companies, travel agents and event clients (by name)",
+        "tags": [
+          "Guests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COMPANY",
+                "TRAVEL_AGENT",
+                "EVENT_CLIENT"
+              ]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Company"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCompany",
+        "summary": "Add a company, travel agent or event client",
+        "tags": [
+          "Guests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "company.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "COMPANY",
+                      "TRAVEL_AGENT",
+                      "EVENT_CLIENT"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "contacts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "role": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "maxLength": 80,
+                          "default": null
+                        },
+                        "phone": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "pattern": "^\\+[1-9]\\d{6,14}$",
+                          "default": null
+                        },
+                        "email": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "maxLength": 254,
+                          "default": null
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    "maxItems": 20,
+                    "default": []
+                  },
+                  "taxId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 30,
+                    "default": null
+                  }
+                },
+                "required": [
+                  "kind",
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Company"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{companyId}": {
+      "get": {
+        "operationId": "getCompany",
+        "summary": "A company profile",
+        "tags": [
+          "Guests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "companyId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Company"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateCompany",
+        "summary": "Change a company profile",
+        "tags": [
+          "Guests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "company.manage",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "companyId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "COMPANY",
+                      "TRAVEL_AGENT",
+                      "EVENT_CLIENT"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "contacts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "role": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "maxLength": 80,
+                          "default": null
+                        },
+                        "phone": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "pattern": "^\\+[1-9]\\d{6,14}$",
+                          "default": null
+                        },
+                        "email": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "maxLength": 254,
+                          "default": null
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    "maxItems": 20
+                  },
+                  "taxId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 30
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Company"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
             "content": {
               "application/json": {
                 "schema": {

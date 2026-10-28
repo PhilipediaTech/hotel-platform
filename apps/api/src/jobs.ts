@@ -13,6 +13,7 @@ import {
 } from './modules/approvals/jobs.ts';
 import { fileScanJob } from './modules/files/jobs.ts';
 import { inventoryJob } from './modules/availability/inventory.ts';
+import { holdExpiryJob } from './modules/reservations/jobs.ts';
 import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
@@ -27,6 +28,7 @@ export function workerJobs(deps: {
     fileScanJob({ store: deps.files, scanner: deps.scanner }),
     roomBlockStatusJob,
     inventoryJob,
+    holdExpiryJob,
   ];
 }
 

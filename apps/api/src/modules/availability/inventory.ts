@@ -94,10 +94,11 @@ export async function rebuildInventory(
 
 /** Today at the property, for callers that only have the property ID. */
 export async function propertyToday(db: Client, propertyId: string, clock: Clock): Promise<string> {
-  const { timeZone } = await db.property.findUniqueOrThrow({
-    where: { id: propertyId },
-    select: { timeZone: true },
-  });
+  // Raw: the same call on every kind of client (a method call on the union types poorly).
+  const rows = await db.$queryRaw<{ time_zone: string }[]>`
+    SELECT time_zone FROM properties WHERE id = ${propertyId}::uuid`;
+  const timeZone = rows[0]?.time_zone;
+  if (!timeZone) throw new Error(`Property ${propertyId} not found`);
   return localDate(clock(), timeZone);
 }
 

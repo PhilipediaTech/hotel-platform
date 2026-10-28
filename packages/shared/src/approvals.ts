@@ -76,6 +76,13 @@ export const APPROVAL_ACTIONS = [
     limitCode: 'folio.route',
     backOffice: false,
   }),
+  // M3 rule 8: a do-not-rent guest is booked only with a manager's approval.
+  a({
+    code: 'reservation.do_not_rent',
+    label: 'Booking a do-not-rent guest',
+    measure: 'none',
+    backOffice: false,
+  }),
   a({
     code: 'ar.over_limit',
     label: 'City-ledger transfer over the credit limit',

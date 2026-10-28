@@ -1,4 +1,4 @@
-import { defineRoute, type ApprovalRequestItem } from '@hotel/shared';
+import { APPROVAL_ACTIONS, defineRoute, type ApprovalRequestItem } from '@hotel/shared';
 import express from 'express';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -373,7 +373,7 @@ describe('policies (M1-12)', () => {
         }[];
       }
     ).data;
-    expect(data).toHaveLength(10);
+    expect(data).toHaveLength(APPROVAL_ACTIONS.length);
     expect(data.every((p) => p.active)).toBe(true);
     expect(data.find((p) => p.action === 'folio.discount')).toMatchObject({
       thresholdBps: 1500,
@@ -443,7 +443,7 @@ describe('policies (M1-12)', () => {
       .expect(201);
     expect(tokenFromEmail(api, 'ada@example.test')).toBeTruthy();
     const policies = await db.approvalPolicy.findMany();
-    expect(policies).toHaveLength(10);
+    expect(policies).toHaveLength(APPROVAL_ACTIONS.length);
     expect(policies.every((p) => p.approverRoleIds.length === 2)).toBe(true);
   });
 });

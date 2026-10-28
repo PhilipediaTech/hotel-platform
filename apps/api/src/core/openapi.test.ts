@@ -50,7 +50,7 @@ describe('buildOpenApiDocument', () => {
       ['header', 'X-Property-Id', true],
       ['header', 'Idempotency-Key', true],
     ]);
-    const list = op('/reservations', 'get');
+    const list = op('/example-reservations', 'get');
     expect(list.parameters?.filter((p) => p.in === 'query').map((p) => p.name)).toEqual([
       'limit',
       'cursor',

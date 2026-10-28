@@ -65,7 +65,7 @@ describe('createApiClient: requests', () => {
     const { client, sent } = setup(jsonResponse(200, { data: [], nextCursor: null }));
     await client.call('listReservations', { query: { limit: 20, status: 'CONFIRMED' } });
     expect(sent().url).toBe(
-      'https://api.example.test/api/v1/reservations?limit=20&status=CONFIRMED',
+      'https://api.example.test/api/v1/example-reservations?limit=20&status=CONFIRMED',
     );
   });
 

@@ -11,6 +11,7 @@ import { INVENTORY_ROUTES } from './inventory.ts';
 import { QUOTE_ROUTES } from './quotes.ts';
 import { PROPERTY_ROUTES } from './properties.ts';
 import { RATE_ROUTES } from './rates.ts';
+import { RESERVATION_ROUTES } from './reservations.ts';
 import { ROOM_ROUTES } from './rooms.ts';
 import { TAX_ROUTES } from './tax.ts';
 
@@ -42,6 +43,7 @@ export const API_ROUTES = {
   ...INVENTORY_ROUTES,
   ...QUOTE_ROUTES,
   ...GUEST_ROUTES,
+  ...RESERVATION_ROUTES,
 } as const;
 
 export type ApiRoutes = typeof API_ROUTES;

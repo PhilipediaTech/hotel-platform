@@ -1,4 +1,8 @@
 import type { DbClient } from './db.ts';
+import type { TenantDb } from './tenant-db.ts';
+
+/** The plain client, a transaction, or a tenant-scoped transaction. */
+type Client = DbClient | Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
 
 export const COUNTER = {
   CONFIRMATION: 'confirmation',
@@ -13,7 +17,7 @@ export type CounterName = (typeof COUNTER)[keyof typeof COUNTER];
  * booking does not consume a number.
  */
 export async function nextPropertyCounter(
-  db: DbClient,
+  db: Client,
   propertyId: string,
   name: CounterName,
 ): Promise<number> {

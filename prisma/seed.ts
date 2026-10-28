@@ -13,7 +13,11 @@ import {
 import { createDefaultApprovalPolicies } from '../apps/api/src/modules/approvals/defaults.ts';
 import { createDefaultTaxes } from '../apps/api/src/modules/tax/defaults.ts';
 import { rebuildInventory } from '../apps/api/src/modules/availability/inventory.ts';
-import { localDate } from '@hotel/shared';
+import { createQuote } from '../apps/api/src/modules/availability/quotes.ts';
+import { createReservation } from '../apps/api/src/modules/reservations/service.ts';
+import { resolveTenant, runAsTenant } from '../apps/api/src/core/tenancy.ts';
+import { createTenantDb } from '../apps/api/src/core/tenant-db.ts';
+import { addDays, localDate } from '@hotel/shared';
 
 export const DEMO_ORG_ID = '0d0d0d0d-0000-4000-8000-000000000001';
 export const DEMO_PROPERTY_ID = '0d0d0d0d-0000-4000-8000-000000000002';
@@ -170,6 +174,116 @@ export async function seed(db: Db, options: SeedOptions = {}): Promise<void> {
   await seedRates(db, localDate(new Date(), property.timeZone));
   // Rooms left per type and date (T-040).
   await rebuildInventory(db, DEMO_PROPERTY_ID, localDate(new Date(), property.timeZone));
+  await seedReservations(db, localDate(new Date(), property.timeZone));
+}
+
+/**
+ * Demo reservations (T-042), made through the booking service as the front-desk user: a
+ * confirmed stay, a tentative hold for two days, and two rooms under one booker. Only once
+ * the property is live and has no reservations yet.
+ */
+async function seedReservations(db: Db, today: string): Promise<void> {
+  const property = await db.property.findUniqueOrThrow({ where: { id: DEMO_PROPERTY_ID } });
+  if (property.status !== 'LIVE') return;
+  if ((await db.reservation.count({ where: { propertyId: DEMO_PROPERTY_ID } })) > 0) return;
+  const desk = await db.user.findUnique({
+    where: { email: `front-desk@${DEMO_EMAIL_DOMAIN}` },
+  });
+  const tenant = desk ? await resolveTenant(db, desk.id, DEMO_PROPERTY_ID) : null;
+  if (!tenant) return;
+  const deps = { db, tenantDb: createTenantDb(db), clock: () => new Date() };
+  const plan = async (code: string) =>
+    db.ratePlan.findUniqueOrThrow({
+      where: { propertyId_code: { propertyId: DEMO_PROPERTY_ID, code } },
+    });
+  const type = async (code: string) =>
+    db.roomType.findUniqueOrThrow({
+      where: { propertyId_code: { propertyId: DEMO_PROPERTY_ID, code } },
+    });
+  const [bar, corp, std, dlx] = [
+    await plan('BAR'),
+    await plan('CORP'),
+    await type('STD'),
+    await type('DLX'),
+  ];
+  await runAsTenant(tenant, async () => {
+    const quote = async (
+      roomTypeId: string,
+      ratePlanId: string,
+      from: number,
+      nights: number,
+      adults: number,
+    ) =>
+      (
+        await createQuote(deps, tenant, {
+          roomTypeId,
+          ratePlanId,
+          arrival: addDays(today, from),
+          departure: addDays(today, from + nights),
+          adults,
+          children: 0,
+        })
+      ).quoteId;
+    const sameAsBooker = { sameAsBooker: true, guestId: null, phone: null, email: null };
+    const book = (body: object) =>
+      createReservation(deps, tenant, {
+        guarantee: 'NONE',
+        holdUntil: null,
+        companyId: null,
+        notes: null,
+        ...body,
+      } as Parameters<typeof createReservation>[2]);
+    await book({
+      source: 'PHONE',
+      guarantee: 'DEPOSIT',
+      booker: {
+        guestId: null,
+        firstName: 'Ada',
+        lastName: 'Obi',
+        phone: '+2348031234567',
+        email: 'ada.obi@example.com',
+      },
+      stays: [{ quoteId: await quote(std.id, bar.id, 2, 2, 2), guest: sameAsBooker, roomId: null }],
+      notes: 'Late arrival, around 22:00',
+    });
+    await book({
+      source: 'WHATSAPP',
+      holdUntil: new Date(Date.now() + 2 * 86_400_000).toISOString().replace(/.d{3}Z$/, 'Z'),
+      booker: {
+        guestId: null,
+        firstName: 'Bola',
+        lastName: 'Ade',
+        phone: '+2348021112222',
+        email: null,
+      },
+      stays: [{ quoteId: await quote(dlx.id, bar.id, 5, 1, 1), guest: sameAsBooker, roomId: null }],
+    });
+    await book({
+      source: 'EMAIL',
+      booker: {
+        guestId: null,
+        firstName: 'Chidi',
+        lastName: 'Eze',
+        phone: '+2348035556666',
+        email: 'chidi.eze@example.com',
+      },
+      stays: [
+        { quoteId: await quote(std.id, corp.id, 7, 2, 1), guest: sameAsBooker, roomId: null },
+        {
+          quoteId: await quote(std.id, corp.id, 7, 2, 1),
+          guest: {
+            sameAsBooker: false,
+            guestId: null,
+            firstName: 'Ngozi',
+            lastName: 'Eze',
+            phone: null,
+            email: null,
+          },
+          roomId: null,
+        },
+      ],
+    });
+  });
 }
 
 /**

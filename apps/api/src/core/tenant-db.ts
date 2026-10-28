@@ -51,6 +51,10 @@ export const TENANT_MODELS: Record<string, Scope> = {
   // Guests and companies belong to the organisation: every property sees them.
   Guest: { kind: 'organisation' },
   Company: { kind: 'organisation' },
+  Reservation: { kind: 'property', organisationField: 'organisationId' },
+  // Status history and stay nights have no property column: reach them through their
+  // (scoped) reservation and stay.
+  Stay: { kind: 'property' },
   // Components have no property column: reach them through their (scoped) rate plan.
 };
 

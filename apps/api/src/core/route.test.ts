@@ -82,7 +82,7 @@ describe('mountRoute: input', () => {
       }),
     );
     await request(app)
-      .get('/api/v1/reservations?status=CONFIRMED')
+      .get('/api/v1/example-reservations?status=CONFIRMED')
       .set('X-Property-Id', PROPERTY_ID)
       .expect(200);
     expect(seen).toEqual({ limit: 50, status: 'CONFIRMED' });

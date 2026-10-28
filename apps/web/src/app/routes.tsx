@@ -18,6 +18,7 @@ import { SetupWizardPage } from '../routes/onboarding.tsx';
 import { UsersAndRolesPage } from '../routes/settings/access.tsx';
 import { CompaniesPage, CompanyProfilePage } from '../routes/companies.tsx';
 import { GuestProfilePage, GuestsPage } from '../routes/guests.tsx';
+import { ReservationPage, ReservationsPage } from '../routes/reservations.tsx';
 import { RatesPage } from '../routes/rates.tsx';
 import { FinanceSettingsPage } from '../routes/settings/finance.tsx';
 import { ImportsPage } from '../routes/settings/imports.tsx';
@@ -34,6 +35,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/rates': <RatesPage />,
   '/guests': <GuestsPage />,
   '/companies': <CompaniesPage />,
+  '/reservations': <ReservationsPage />,
   '/settings/imports': <ImportsPage />,
   '/audit': <AuditLogPage />,
   '/approvals': <ApprovalsPage />,
@@ -89,6 +91,7 @@ export function buildRoutes(
             { path: 'account/pin', element: <SetPinPage /> },
             { path: 'guests/:guestId', element: <GuestProfilePage /> },
             { path: 'companies/:companyId', element: <CompanyProfilePage /> },
+            { path: 'reservations/:reservationId', element: <ReservationPage /> },
             ...screenRoutes(),
             { path: '*', element: <NotFoundPage /> },
           ],

@@ -66,6 +66,7 @@ model Organisation {
   ratePlans        RatePlan[]
   guests           Guest[]
   companies        Company[]
+  reservations     Reservation[]
 
   @@map("organisations")
 }
@@ -111,6 +112,8 @@ model Property {
   importJobs           ImportJob[]
   inventory            RoomTypeInventory[]
   quotes               Quote[]
+  reservations         Reservation[]
+  stays                Stay[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -551,6 +554,7 @@ model RoomType {
   rateDays     RateDay[]
   inventory    RoomTypeInventory[]
   quotes       Quote[]
+  stays        Stay[]
 
   @@unique([propertyId, code])
   // Target of composite foreign keys: a room can only have a type of its own property.
@@ -584,6 +588,7 @@ model Room {
   connectingRoom Room?        @relation("ConnectingRoom", fields: [connectingRoomId], references: [id], onDelete: SetNull)
   connectedFrom  Room[]       @relation("ConnectingRoom")
   blocks         RoomBlock[]
+  stays          Stay[]
 
   @@unique([propertyId, number])
   // Target of composite foreign keys: blocks and connecting rooms stay within the property.
@@ -768,6 +773,7 @@ model RatePlan {
   days               RateDay[]
   components         PackageComponent[]
   quotes             Quote[]
+  stays              Stay[]
 
   @@unique([propertyId, code])
   @@unique([propertyId, id])
@@ -887,6 +893,8 @@ model Quote {
   ratePlan RatePlan @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
   roomType RoomType @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
 
+  stay Stay?
+
   @@index([propertyId, expiresAt])
   @@map("quotes")
 }
@@ -922,9 +930,11 @@ model Guest {
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  mergedInto   Guest?       @relation("GuestMerge", fields: [mergedIntoId], references: [id], onDelete: Restrict)
-  mergedFrom   Guest[]      @relation("GuestMerge")
+  organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  mergedInto   Guest?        @relation("GuestMerge", fields: [mergedIntoId], references: [id], onDelete: Restrict)
+  mergedFrom   Guest[]       @relation("GuestMerge")
+  bookings     Reservation[] @relation("ReservationBooker")
+  stays        Stay[]
 
   @@index([organisationId, phone])
   @@index([organisationId, email])
@@ -947,8 +957,151 @@ model Company {
   billingInstructions Json        @default("{}") @map("billing_instructions")
   active              Boolean     @default(true)
 
-  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  bookings     Reservation[] @relation("ReservationCompany")
+  agentOf      Reservation[] @relation("ReservationAgent")
 
   @@index([organisationId, name])
   @@map("companies")
+}
+
+// ───────────────────────── Reservations (M3-01–M3-05, M3 rules 1 and 8; T-042) ─────────────
+
+enum ReservationStatus {
+  ENQUIRY
+  TENTATIVE
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  NO_SHOW
+  CANCELLED
+
+  @@map("reservation_status")
+}
+
+enum BookingSource {
+  WALK_IN
+  PHONE
+  EMAIL
+  WHATSAPP
+  DIRECT
+  OTA_MANUAL
+  OTA_CHANNEL
+  CORPORATE
+  TRAVEL_AGENT
+
+  @@map("booking_source")
+}
+
+/// A booking: one booker, one or more stays (one per room). Transitions follow the fixed
+/// table in packages/shared (M3 rule 1). A TENTATIVE hold has holdExpiresAt (CHECK) and is
+/// released by the hold-expiry job.
+model Reservation {
+  id             String            @id @default(uuid()) @db.Uuid
+  organisationId String            @map("organisation_id") @db.Uuid
+  propertyId     String            @map("property_id") @db.Uuid
+  confirmationNo String            @map("confirmation_no")
+  bookerGuestId  String            @map("booker_guest_id") @db.Uuid
+  companyId      String?           @map("company_id") @db.Uuid
+  travelAgentId  String?           @map("travel_agent_id") @db.Uuid
+  source         BookingSource
+  channelRef     String?           @map("channel_ref")
+  status         ReservationStatus @default(CONFIRMED)
+  guarantee      Guarantee         @default(NONE)
+  holdExpiresAt  DateTime?         @map("hold_expires_at") @db.Timestamptz(6)
+  notes          String?
+  cancelReason   String?           @map("cancel_reason")
+  cancelledAt    DateTime?         @map("cancelled_at") @db.Timestamptz(6)
+  createdById    String?           @map("created_by_id") @db.Uuid
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version        Int               @default(0)
+
+  organisation Organisation               @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property     Property                   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  booker       Guest                      @relation("ReservationBooker", fields: [bookerGuestId], references: [id], onDelete: Restrict)
+  company      Company?                   @relation("ReservationCompany", fields: [companyId], references: [id], onDelete: Restrict)
+  travelAgent  Company?                   @relation("ReservationAgent", fields: [travelAgentId], references: [id], onDelete: Restrict)
+  stays        Stay[]
+  history      ReservationStatusHistory[]
+
+  @@unique([propertyId, confirmationNo])
+  @@unique([propertyId, source, channelRef])
+  @@unique([propertyId, id])
+  @@index([propertyId, status])
+  @@index([status, holdExpiresAt])
+  @@index([bookerGuestId])
+  @@map("reservations")
+}
+
+/// One room of a reservation, made from a quote (kept for its prices and taxes; a quote
+/// makes one stay at most). folioId is set by folios (T-060), roomId by assignment (T-050).
+model Stay {
+  id            String            @id @default(uuid()) @db.Uuid
+  propertyId    String            @map("property_id") @db.Uuid
+  reservationId String            @map("reservation_id") @db.Uuid
+  guestId       String            @map("guest_id") @db.Uuid
+  roomTypeId    String            @map("room_type_id") @db.Uuid
+  roomId        String?           @map("room_id") @db.Uuid
+  ratePlanId    String            @map("rate_plan_id") @db.Uuid
+  quoteId       String            @unique @map("quote_id") @db.Uuid
+  arrival       DateTime          @db.Date
+  departure     DateTime          @db.Date
+  adults        Int               @default(1)
+  children      Int               @default(0)
+  status        ReservationStatus
+  isDayUse      Boolean           @default(false) @map("is_day_use")
+  dayUseStart   DateTime?         @map("day_use_start") @db.Timestamptz(6)
+  dayUseEnd     DateTime?         @map("day_use_end") @db.Timestamptz(6)
+  folioId       String?           @map("folio_id") @db.Uuid
+  checkedInAt   DateTime?         @map("checked_in_at") @db.Timestamptz(6)
+  checkedOutAt  DateTime?         @map("checked_out_at") @db.Timestamptz(6)
+  version       Int               @default(0)
+
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation Reservation @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  guest       Guest       @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  roomType    RoomType    @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
+  room        Room?       @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+  ratePlan    RatePlan    @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
+  quote       Quote       @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  nights      StayNight[]
+
+  @@index([propertyId, arrival])
+  @@index([propertyId, departure])
+  @@index([propertyId, status])
+  @@index([reservationId])
+  @@index([guestId])
+  @@map("stays")
+}
+
+/// A night of a stay as quoted: price, the plan that priced it and its rule version (M2 rule 4).
+model StayNight {
+  stayId      String   @map("stay_id") @db.Uuid
+  date        DateTime @db.Date
+  amountMinor BigInt   @map("amount_minor")
+  ratePlanId  String   @map("rate_plan_id") @db.Uuid
+  ruleVersion Int      @map("rule_version")
+
+  stay Stay @relation(fields: [stayId], references: [id], onDelete: Cascade)
+
+  @@id([stayId, date])
+  @@map("stay_nights")
+}
+
+/// Every status change of a reservation (or one of its stays), append-only.
+model ReservationStatusHistory {
+  id            BigInt             @id @default(autoincrement())
+  reservationId String             @map("reservation_id") @db.Uuid
+  stayId        String?            @map("stay_id") @db.Uuid
+  fromStatus    ReservationStatus? @map("from_status")
+  toStatus      ReservationStatus  @map("to_status")
+  reason        String?
+  byUserId      String?            @map("by_user_id") @db.Uuid
+  at            DateTime           @default(now()) @db.Timestamptz(6)
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId, at])
+  @@map("reservation_status_history")
 }

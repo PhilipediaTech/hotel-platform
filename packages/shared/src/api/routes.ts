@@ -7,6 +7,7 @@ import { defineRoute } from './contract.ts';
 import { FILE_ROUTES } from './files.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
+import { QUOTE_ROUTES } from './quotes.ts';
 import { PROPERTY_ROUTES } from './properties.ts';
 import { RATE_ROUTES } from './rates.ts';
 import { ROOM_ROUTES } from './rooms.ts';
@@ -38,6 +39,7 @@ export const API_ROUTES = {
   ...RATE_ROUTES,
   ...IMPORT_ROUTES,
   ...INVENTORY_ROUTES,
+  ...QUOTE_ROUTES,
 } as const;
 
 export type ApiRoutes = typeof API_ROUTES;

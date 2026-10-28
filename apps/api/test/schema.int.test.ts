@@ -38,6 +38,7 @@ describe('migrations', () => {
       'package_components',
       'properties',
       'property_counters',
+      'quotes',
       'rate_days',
       'rate_limit_hits',
       'rate_plans',

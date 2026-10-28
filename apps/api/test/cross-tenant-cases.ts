@@ -601,6 +601,29 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       expect(rows.map((r) => r.overbookLimit)).toEqual([0]);
     },
   },
+  getAvailability: {
+    seed: bPlan,
+    query: () => ({ arrival: '2099-01-01', departure: '2099-01-02', adults: '1' }),
+    listIds: (body) =>
+      (
+        body as { roomTypes: { roomTypeId: string; plans: { ratePlanId: string }[] }[] }
+      ).roomTypes.flatMap((t) => [t.roomTypeId, ...t.plans.map((p) => p.ratePlanId)]),
+  },
+  createQuote: {
+    // B's room type and plan from A1: refused as unknown, and no quote is stored in B.
+    seed: bPlan,
+    creates: true,
+    body: (theirs) => ({
+      roomTypeId: theirs['roomTypeId'],
+      ratePlanId: theirs['ratePlanId'],
+      arrival: '2099-01-01',
+      departure: '2099-01-02',
+      adults: 1,
+    }),
+    untouched: async (db, world) => {
+      expect(await db.quote.count({ where: { propertyId: world.b1.id } })).toBe(0);
+    },
+  },
   releaseRoomBlock: {
     seed: bBlock,
     untouched: async (db, _w, theirs) => {

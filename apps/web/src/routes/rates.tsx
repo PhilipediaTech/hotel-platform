@@ -27,6 +27,7 @@ import { api, ApiError } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { apiFieldErrors, errorMessage } from '../lib/form.ts';
 import { Field } from './auth/layout.tsx';
+import { RoomsLeft } from './rooms-left.tsx';
 import { fieldErrorsOf, serverErrors, validated, type FieldErrors } from './settings/room-form.ts';
 
 // S23 Rate calendar and plans (PRD M2-04–M2-08; T-033): a price and restriction grid per
@@ -106,10 +107,47 @@ export function RatesPage() {
   const plans = r.plans.data;
   const plan = plans.find((p) => p.id === search.get('plan')) ?? plans[0];
   const from = start ?? r.today;
+  const view = search.get('view') === 'rooms-left' ? 'rooms-left' : 'prices';
+  const views = (
+    <div
+      role="tablist"
+      aria-label={t('rates.views')}
+      className="mt-3 flex gap-1 border-b border-border"
+    >
+      {(['prices', 'rooms-left'] as const).map((name) => (
+        <button
+          key={name}
+          type="button"
+          role="tab"
+          aria-selected={view === name}
+          onClick={() => setSearch(name === 'prices' ? {} : { view: name })}
+          className={cn(
+            '-mb-px border-b-2 px-3 py-2 text-sm',
+            view === name
+              ? 'border-brand font-semibold text-brand-strong'
+              : 'border-transparent text-text-muted',
+          )}
+        >
+          {t(`rates.viewNames.${name}`)}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (view === 'rooms-left') {
+    return (
+      <section>
+        <h1 className="text-xl font-semibold">{t('rates.title')}</h1>
+        {views}
+        <RoomsLeft />
+      </section>
+    );
+  }
 
   return (
     <section>
       <h1 className="text-xl font-semibold">{t('rates.title')}</h1>
+      {views}
       {plans.length === 0 ? (
         <p className="mt-2 text-sm text-text-muted">{t('rates.noPlans')}</p>
       ) : (

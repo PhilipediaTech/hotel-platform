@@ -776,6 +776,11 @@
       "perPerson": "Per guest",
       "remove": "Remove",
       "add": "Add item"
+    },
+    "views": "Rates views",
+    "viewNames": {
+      "prices": "Prices",
+      "rooms-left": "Rooms left"
     }
   },
   "imports": {
@@ -831,5 +836,16 @@
       "daysChanged_one": "{{count}} day changed",
       "daysChanged_other": "{{count}} days changed"
     }
+  },
+  "roomsLeft": {
+    "intro": "Rooms still to sell per room type and night: rooms − out of order − booked − held + overbooking.",
+    "grid": "Rooms left",
+    "of": "of {{capacity}}",
+    "ooo": "{{n}} out of order",
+    "plus": "+{{n}} overbook",
+    "overbook": "Overbooking limit",
+    "overbookIntro": "Allow selling this many rooms above what you have, per room type and night (default 0). Use it only when you expect cancellations or no-shows.",
+    "limit": "Extra rooms",
+    "limitHint": "0 to 50"
   }
 }

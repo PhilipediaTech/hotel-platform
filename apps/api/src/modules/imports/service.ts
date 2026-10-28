@@ -23,6 +23,7 @@ import { AppError } from '../../core/errors.ts';
 import type { FileStore } from '../../core/files.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import { rebuildInventory } from '../availability/inventory.ts';
 import { writeRateDays } from '../rates/service.ts';
 
 // Spreadsheet imports (PRD M1-03; T-034). Checking reads the uploaded file once, checks
@@ -336,7 +337,7 @@ export async function getImport(deps: ImportDeps, importId: string): Promise<Job
 
 // ── Apply ──────────────────────────────────────────────────────────────────────────────
 
-async function applyRooms(tx: Tx, rows: RoomRow[]) {
+async function applyRooms(tx: Tx, propertyId: string, today: string, rows: RoomRow[]) {
   const types = new Map((await tx.roomType.findMany()).map((t) => [t.code, t]));
   const nextSort = Math.max(0, ...[...types.values()].map((t) => t.sortOrder + 1));
   let sort = nextSort;
@@ -393,6 +394,12 @@ async function applyRooms(tx: Tx, rows: RoomRow[]) {
     }
     roomsWritten++;
   }
+  await rebuildInventory(
+    tx,
+    propertyId,
+    today,
+    [...types.values()].map((type) => type.id),
+  );
   return { roomsWritten };
 }
 
@@ -454,7 +461,7 @@ export async function applyImport(
         }
         const applied =
           fresh.kind === 'ROOMS'
-            ? await applyRooms(tx, report.data as RoomRow[])
+            ? await applyRooms(tx, tenant.propertyId, today, report.data as RoomRow[])
             : await applyRates(tx, tenant.propertyId, report.data as RateRow[]);
         const updated = await tx.importJob.update({
           where: { id: fresh.id },

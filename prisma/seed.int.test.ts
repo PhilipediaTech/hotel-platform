@@ -1,3 +1,4 @@
+import { INVENTORY_DAYS } from '@hotel/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resetDb, testDb } from '../apps/api/test/db.ts';
 import {
@@ -23,6 +24,7 @@ async function counts() {
     rooms: await db.room.count(),
     ratePlans: await db.ratePlan.count(),
     rateDays: await db.rateDay.count(),
+    inventoryDays: await db.roomTypeInventory.count(),
   };
 }
 
@@ -48,6 +50,7 @@ describe('seed', () => {
       rooms: 30, // runbook: 30 rooms
       ratePlans: 3, // BAR, Corporate (−10%), Bed and breakfast
       rateDays: 3 * DEMO_RATE_DAYS,
+      inventoryDays: 3 * INVENTORY_DAYS,
     });
     await expect(
       db.property.findUnique({ where: { id: DEMO_PROPERTY_ID } }),

@@ -1,13 +1,14 @@
 import { AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, isRouteErrorResponse, useRouteError } from 'react-router';
-import { landingPath, type NavItem } from '../app/navigation.ts';
+import { startPath, type NavItem } from '../app/navigation.ts';
 import { useSession } from '../app/session.ts';
 
-/** `/` sends each user to their role's home screen. */
+/** `/` sends each user to their role's home screen, or to setup while it is unfinished. */
 export function HomeRedirect() {
-  const { permissions } = useSession();
-  return <Navigate to={landingPath(permissions)} replace />;
+  const { permissions, properties, currentPropertyId } = useSession();
+  const status = properties.find((p) => p.id === currentPropertyId)?.status ?? null;
+  return <Navigate to={startPath(permissions, status)} replace />;
 }
 
 /** Stands in for a screen until its ticket builds it. */

@@ -6,6 +6,7 @@ import {
   bottomBarItems,
   homeFor,
   landingPath,
+  startPath,
   navItem,
   railItems,
 } from './navigation.ts';
@@ -135,5 +136,14 @@ describe('navigation data', () => {
       expect(item.screen).toMatch(/^S\d{2}$/);
       expect(item.ticket).toMatch(/^T-\d{3}$/);
     }
+  });
+});
+
+describe('startPath (M1-02)', () => {
+  it('opens the setup wizard while the property is in setup, for people who can finish it', () => {
+    expect(startPath(['property.setup', 'owner.read'], 'SETUP')).toBe('/onboarding');
+    expect(startPath(['property.setup', 'owner.read'], 'LIVE')).toBe('/owner');
+    expect(startPath(['frontdesk.read'], 'SETUP')).toBe('/front-desk');
+    expect(startPath(['property.setup'], null)).toBe('/tasks');
   });
 });

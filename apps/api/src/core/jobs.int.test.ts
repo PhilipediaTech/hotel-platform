@@ -52,6 +52,20 @@ const HANDLERS = [
 ];
 
 let worker: RunningWorker;
+
+/** Waits for a handler; on timeout the error lists the queue's jobs (CI shows only the error). */
+async function handled(name: string, count: number, timeout: number) {
+  try {
+    await expect.poll(() => seen[name]?.length, { timeout }).toBe(count);
+  } catch (err) {
+    const jobs = await worker.boss.findJobs(`event.test-${name}`);
+    const states = jobs.map(
+      (j) =>
+        `${j.state}/r${j.retryCount}${j.output ? ` ${JSON.stringify(j.output).slice(0, 120)}` : ''}`,
+    );
+    throw new Error(`${String(err)}; jobs: ${states.join(', ')}`, { cause: err });
+  }
+}
 let pool: pg.Pool;
 
 beforeAll(async () => {
@@ -169,7 +183,7 @@ describe('outbox publisher and handlers', () => {
       organisationId: t.organisation.id,
     });
     await worker.publish();
-    await expect.poll(() => seen['flaky']?.length, { timeout: 30_000 }).toBe(1);
+    await handled('flaky', 1, 30_000);
     expect(flakyFailures).toBe(0);
   }, 40_000);
 
@@ -190,7 +204,7 @@ describe('outbox publisher and handlers', () => {
     let total = counts.reduce((a, b) => a + b, 0);
     while (total < 20) total += await worker.publish();
     expect(total).toBe(20);
-    await expect.poll(() => seen['tally']?.length, { timeout: 20_000 }).toBe(20);
+    await handled('tally', 20, 20_000);
     const ns = seen['tally']?.map((e) => e.payload['n']);
     expect(new Set(ns).size).toBe(20);
   }, 30_000);

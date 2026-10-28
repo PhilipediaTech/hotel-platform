@@ -1,4 +1,4 @@
-import { SIGN_UP_COUNTRIES, type SignUpCountry } from '@hotel/shared';
+import { localDate, SIGN_UP_COUNTRIES, type SignUpCountry } from '@hotel/shared';
 import type { Logger } from 'pino';
 import type { AuthTokenPurpose, Session, User } from '../../generated/prisma/client.ts';
 import { recordAudit, recordUserEvent } from '../../core/audit.ts';
@@ -12,6 +12,7 @@ import { burnPasswordCheck, hashPassword, verifyPassword } from '../../core/pass
 import { hashToken, newToken } from '../../core/tokens.ts';
 import { accountExistsMessage, passwordResetMessage, verifyEmailMessage } from './emails.ts';
 import { createDefaultApprovalPolicies } from '../approvals/defaults.ts';
+import { createDefaultTaxes } from '../tax/defaults.ts';
 import { DEPARTMENT_TEMPLATES, ROLE_TEMPLATES, roleTemplate } from './role-templates.ts';
 
 export interface IdentityDeps {
@@ -199,6 +200,11 @@ export async function signUp(deps: IdentityDeps, input: SignUpInput): Promise<vo
         },
       });
       await createDefaultApprovalPolicies(tx, organisation.id, property.id);
+      await createDefaultTaxes(
+        tx,
+        { id: property.id, country: input.country, settings: property.settings },
+        localDate(deps.clock(), property.timeZone),
+      );
       await recordAudit(tx, {
         action: 'organisation.created',
         entityType: 'organisation',

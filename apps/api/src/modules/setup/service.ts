@@ -1,4 +1,5 @@
 import {
+  localDate,
   LOCKED_WHEN_LIVE,
   SETUP_STEPS,
   SIGN_UP_COUNTRIES,
@@ -18,6 +19,7 @@ import { pgErrorInfo, type Db, type DbClient } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { createDefaultApprovalPolicies } from '../approvals/defaults.ts';
+import { createDefaultTaxes, taxSettingsOf } from '../tax/defaults.ts';
 import { DEPARTMENT_TEMPLATES } from '../identity/role-templates.ts';
 import { propertyCodeFor } from '../identity/service.ts';
 
@@ -114,6 +116,8 @@ async function stepDone(
     case 'rooms':
       return (await db.room.count({ where: { propertyId: p.id, active: true } })) > 0;
     case 'tax':
+      // Someone with tax.manage checked the rates (the defaults are only examples).
+      return taxSettingsOf(p.settings).confirmedAt !== undefined;
     case 'rates':
       // Not built yet (SETUP_STEPS `later`); their tickets add the check here.
       return false;
@@ -285,6 +289,11 @@ export async function createProperty(
         })),
       });
       await createDefaultApprovalPolicies(tx, organisation.id, property.id);
+      await createDefaultTaxes(
+        tx,
+        { id: property.id, country: organisation.country, settings: property.settings },
+        localDate(deps.clock(), property.timeZone),
+      );
       await recordAudit(tx, {
         action: 'property.created',
         entityType: 'property',

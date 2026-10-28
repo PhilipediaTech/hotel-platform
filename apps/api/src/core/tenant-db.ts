@@ -39,6 +39,9 @@ export const TENANT_MODELS: Record<string, Scope> = {
   RoomType: { kind: 'property', organisationField: 'organisationId' },
   Room: { kind: 'property', organisationField: 'organisationId' },
   RoomBlock: { kind: 'property' },
+  RevenueCode: { kind: 'property' },
+  // Versions have no property column: reach them through their (scoped) rule.
+  TaxRule: { kind: 'property' },
 };
 
 /** Fields (and values) that pin a row of `model` to `tenant`. */

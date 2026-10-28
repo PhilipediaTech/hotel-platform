@@ -36,11 +36,14 @@ describe('migrations', () => {
       'properties',
       'property_counters',
       'rate_limit_hits',
+      'revenue_codes',
       'roles',
       'room_blocks',
       'room_types',
       'rooms',
       'sessions',
+      'tax_rule_versions',
+      'tax_rules',
       'users',
     ]);
   });

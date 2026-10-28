@@ -10,6 +10,8 @@ import {
   type DepartmentCode,
 } from '../apps/api/src/modules/identity/role-templates.ts';
 import { createDefaultApprovalPolicies } from '../apps/api/src/modules/approvals/defaults.ts';
+import { createDefaultTaxes } from '../apps/api/src/modules/tax/defaults.ts';
+import { localDate } from '@hotel/shared';
 
 export const DEMO_ORG_ID = '0d0d0d0d-0000-4000-8000-000000000001';
 export const DEMO_PROPERTY_ID = '0d0d0d0d-0000-4000-8000-000000000002';
@@ -119,6 +121,14 @@ export async function seed(db: Db, options: SeedOptions = {}): Promise<void> {
 
   // PRD M1 rule 2 defaults (T-022); policies already there are kept.
   await createDefaultApprovalPolicies(db, DEMO_ORG_ID, DEMO_PROPERTY_ID);
+
+  // Example Lagos taxes (T-032), kept if the property already has revenue codes.
+  const property = await db.property.findUniqueOrThrow({ where: { id: DEMO_PROPERTY_ID } });
+  await createDefaultTaxes(
+    db,
+    { id: property.id, country: 'NG', settings: property.settings },
+    localDate(new Date(), property.timeZone),
+  );
 
   for (const [sortOrder, t] of DEMO_ROOM_TYPES.entries()) {
     const type = await db.roomType.upsert({

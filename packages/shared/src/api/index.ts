@@ -7,4 +7,5 @@ export * from './files.ts';
 export * from './primitives.ts';
 export * from './properties.ts';
 export * from './rooms.ts';
+export * from './tax.ts';
 export * from './routes.ts';

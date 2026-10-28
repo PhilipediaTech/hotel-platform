@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button.tsx';
 import { api, ApiError, setApiPropertyId } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import {
+  APPROVALS_QUERY_KEY,
   ME_QUERY_KEY,
   SessionActionsContext,
   SessionContext,
@@ -72,11 +73,28 @@ export function SessionGate({ children }: { children: ReactNode }) {
   });
 
   const userId = me.data?.user.id;
-  const session = useMemo(() => {
+  const base = useMemo(() => {
     if (!me.data) return null;
     const wanted = chosenProperty ?? readStoredProperty(me.data.user.id);
     return toShellSession(me.data, wanted);
   }, [me.data, chosenProperty]);
+
+  // Approvals bell (T-022): requests this approver can decide at the current property.
+  const isApprover = base?.permissions.includes('approval.decide') ?? false;
+  const pending = useQuery({
+    queryKey: [...APPROVALS_QUERY_KEY, base?.currentPropertyId ?? '', 'pending'],
+    queryFn: () => api.call('listApprovals', { query: { status: 'PENDING', limit: 100 } }),
+    enabled: isApprover && !!base?.currentPropertyId && (me.data?.session.mfaPassed ?? false),
+    refetchInterval: 60_000,
+  });
+  const session = useMemo(
+    () =>
+      base && {
+        ...base,
+        pendingApprovals: pending.data?.data.filter((r) => r.canDecide).length ?? 0,
+      },
+    [base, pending.data],
+  );
 
   const actions = useMemo<SessionActions>(
     () => ({

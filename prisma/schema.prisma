@@ -18,6 +18,15 @@ datasource db {
 
 // ───────────────────────── Tenancy ─────────────────────────
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  EXECUTED
+  FAILED
+}
+
 enum PropertyStatus {
   SETUP
   LIVE
@@ -35,14 +44,16 @@ model Organisation {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  properties   Property[]
-  roles        Role[]
-  memberships  Membership[]
-  departments  Department[]
-  invitations  Invitation[]
-  featureFlags FeatureFlag[]
-  auditEvents  AuditEvent[]
-  domainEvents DomainEvent[]
+  properties       Property[]
+  roles            Role[]
+  memberships      Membership[]
+  departments      Department[]
+  invitations      Invitation[]
+  featureFlags     FeatureFlag[]
+  auditEvents      AuditEvent[]
+  domainEvents     DomainEvent[]
+  approvalPolicies ApprovalPolicy[]
+  approvalRequests ApprovalRequest[]
 
   @@map("organisations")
 }
@@ -67,13 +78,15 @@ model Property {
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organisation Organisation      @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  departments  Department[]
-  memberships  Membership[]
-  invitations  Invitation[]
-  counters     PropertyCounter[]
-  auditEvents  AuditEvent[]
-  domainEvents DomainEvent[]
+  organisation     Organisation      @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  departments      Department[]
+  memberships      Membership[]
+  invitations      Invitation[]
+  counters         PropertyCounter[]
+  auditEvents      AuditEvent[]
+  domainEvents     DomainEvent[]
+  approvalPolicies ApprovalPolicy[]
+  approvalRequests ApprovalRequest[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -173,6 +186,8 @@ model User {
   mfaRecoveryCodes   MfaRecoveryCode[]
   auditEvents        AuditEvent[]
   idempotencyKeys    IdempotencyKey[]
+  approvalsRequested ApprovalRequest[] @relation("RequestedBy")
+  approvalsDecided   ApprovalRequest[] @relation("DecidedBy")
   invitationsSent    Invitation[]      @relation("InvitedBy")
   invitationsClaimed Invitation[]      @relation("AcceptedBy")
 
@@ -388,4 +403,57 @@ model DomainEvent {
 
   @@index([publishedAt])
   @@map("domain_events")
+}
+
+/// Approval policy (tab 3; PRD M1-12; T-022): which protected action needs approval at a
+/// property, above what threshold, decided by which roles, within how long.
+model ApprovalPolicy {
+  id              String       @id @default(uuid()) @db.Uuid
+  organisationId  String       @map("organisation_id") @db.Uuid
+  propertyId      String       @map("property_id") @db.Uuid
+  /// A code from APPROVAL_ACTIONS (packages/shared/src/approvals.ts).
+  action          String
+  thresholdMinor  BigInt?      @map("threshold_minor")
+  thresholdBps    Int?         @map("threshold_bps")
+  approverRoleIds String[]     @map("approver_role_ids") @db.Uuid
+  expiryMinutes   Int          @default(30) @map("expiry_minutes")
+  active          Boolean      @default(true)
+  organisation    Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property        Property     @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+
+  @@unique([propertyId, action])
+  @@map("approval_policies")
+}
+
+/// Approval request (tab 3; PRD M1-09, M1-10; T-022): the exact payload of an action over
+/// the caller's limit, waiting for a decision. OTP fields: spec issue 3 (approved).
+model ApprovalRequest {
+  id              String         @id @default(uuid()) @db.Uuid
+  organisationId  String         @map("organisation_id") @db.Uuid
+  propertyId      String         @map("property_id") @db.Uuid
+  action          String
+  payload         Json
+  payloadHash     String         @map("payload_hash")
+  amountMinor     BigInt?        @map("amount_minor")
+  reason          String
+  requestedById   String         @map("requested_by_id") @db.Uuid
+  status          ApprovalStatus @default(PENDING)
+  decidedById     String?        @map("decided_by_id") @db.Uuid
+  decidedAt       DateTime?      @map("decided_at") @db.Timestamptz(6)
+  /// APP | WHATSAPP_OTP
+  decisionChannel String?        @map("decision_channel")
+  decisionNote    String?        @map("decision_note")
+  resultRef       String?        @map("result_ref")
+  otpHash         String?        @map("otp_hash")
+  otpExpiresAt    DateTime?      @map("otp_expires_at") @db.Timestamptz(6)
+  otpAttempts     Int            @default(0) @map("otp_attempts")
+  expiresAt       DateTime       @map("expires_at") @db.Timestamptz(6)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  organisation    Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property        Property       @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  requestedBy     User           @relation("RequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  decidedBy       User?          @relation("DecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, status])
+  @@map("approval_requests")
 }

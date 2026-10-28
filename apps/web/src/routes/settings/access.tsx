@@ -18,6 +18,7 @@ import { Label } from '../../components/ui/label.tsx';
 import { api } from '../../lib/api.ts';
 import { cn } from '../../lib/cn.ts';
 import { errorMessage } from '../../lib/form.ts';
+import { ApprovalPoliciesTab } from './approval-policies.tsx';
 
 // S26 Users and roles (PRD M1-04, M1-05; T-013): people with a role in this property,
 // pending invitations, and the organisation's roles. The server enforces every rule; the
@@ -87,6 +88,7 @@ export function UsersAndRolesPage() {
     ...(has('role.assign') ? (['people'] as const) : []),
     ...(has('user.invite') ? (['invitations'] as const) : []),
     ...(has('role.assign') ? (['roles'] as const) : []),
+    ...(has('approval.policy.manage') ? (['policies'] as const) : []),
   ];
   const [tab, setTab] = useState<(typeof tabs)[number] | undefined>(tabs[0]);
 
@@ -120,6 +122,7 @@ export function UsersAndRolesPage() {
         {tab === 'people' && <PeopleTab />}
         {tab === 'invitations' && <InvitationsTab />}
         {tab === 'roles' && <RolesTab />}
+        {tab === 'policies' && <ApprovalPoliciesTab />}
       </div>
     </section>
   );

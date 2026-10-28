@@ -1,7 +1,8 @@
-import type { ParsedRouteInput, RouteContract } from '@hotel/shared';
+import { ApprovalPending, type ParsedRouteInput, type RouteContract } from '@hotel/shared';
 import type { Request, Response, Router } from 'express';
 import type { z } from 'zod';
 import { getAuth, requireAuth, type AuthContext } from './auth.ts';
+import { isApprovalPending, type ApprovalPendingResult } from './approvals.ts';
 import { AppError } from './errors.ts';
 import { withIdempotency } from './idempotency.ts';
 import { tenantOf, type TenantContext } from './tenancy.ts';
@@ -15,11 +16,16 @@ export interface RouteContext {
   tenant: TenantContext | null;
 }
 
-/** Returns the response body before schema parsing (the schema strips unknown fields). */
+/**
+ * Returns the response body before schema parsing (the schema strips unknown fields), or
+ * performOrRequest's pending result, sent as 202 (only routes marked `approval`; checked
+ * when it happens, since contract flags are not literal types).
+ */
+type HandlerResult<R extends RouteContract> = z.input<R['response']> | ApprovalPendingResult;
 export type RouteHandler<R extends RouteContract> = (
   input: ParsedRouteInput<R>,
   ctx: RouteContext,
-) => z.input<R['response']> | Promise<z.input<R['response']>>;
+) => HandlerResult<R> | Promise<HandlerResult<R>>;
 
 /** `/folios/{folioId}` → `/folios/:folioId` */
 export function toExpressPath(path: string): string {
@@ -120,6 +126,11 @@ export function mountRoute<R extends RouteContract>(
         auth,
         tenant,
       });
+      // Over the caller's limit: an approval request was stored instead (tab 4, "Approvals").
+      if (isApprovalPending(result)) {
+        if (!route.approval) throw new Error(`${route.operationId} is not marked approval: true`);
+        return { status: 202, body: ApprovalPending.parse(result) };
+      }
       const status = route.status ?? 200;
       if (status === 204) return { status, body: undefined };
       const parsed = route.response.safeParse(result);

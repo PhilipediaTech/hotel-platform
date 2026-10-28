@@ -66,7 +66,16 @@ export const ErrorEnvelopeSchema = z
     description: 'Every error response. Clients branch on `code`, never on `message`.',
   });
 
-/** Body of a 202 when an action needs approval (tab 4, "Approvals"). */
+/**
+ * Body of a 202 when an action needs approval (tab 4, "Approvals"). Tab 5 rule: the screen
+ * shows "Sent for approval" with the approver and the expiry, hence the two extra fields.
+ */
 export const ApprovalPending = z
-  .object({ approvalRequestId: Uuid, status: z.literal('PENDING') })
+  .object({
+    approvalRequestId: Uuid,
+    status: z.literal('PENDING'),
+    expiresAt: Instant,
+    /** Names of the roles that can decide. */
+    approverRoles: z.array(z.string()),
+  })
   .meta({ id: 'ApprovalPending' });

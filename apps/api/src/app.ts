@@ -21,6 +21,9 @@ import { requestId } from './core/request-id.ts';
 import { mountRoute } from './core/route.ts';
 import { accessRoutes } from './modules/access/routes.ts';
 import { auditRoutes } from './modules/audit/routes.ts';
+import { approvalRoutes } from './modules/approvals/routes.ts';
+import { APPROVAL_HANDLERS } from './approval-actions.ts';
+import type { ApprovalActionHandler } from './core/approvals.ts';
 import { identityRoutes } from './modules/identity/routes.ts';
 
 export const BODY_LIMIT = '100kb';
@@ -33,6 +36,8 @@ export interface AppOptions {
   clock?: Clock;
   /** Extra routes mounted under /api/v1 after the modules (tests use this). */
   routes?: Router;
+  /** Protected actions the approvals engine executes (tests add their own). */
+  approvalHandlers?: readonly ApprovalActionHandler<never>[];
 }
 
 /** Middleware order follows spec tab 2, "Request lifecycle". */
@@ -43,6 +48,7 @@ export function createApp({
   email,
   clock = systemClock,
   routes,
+  approvalHandlers = APPROVAL_HANDLERS,
 }: AppOptions): Express {
   const app = express();
   app.disable('x-powered-by');
@@ -91,6 +97,15 @@ export function createApp({
   const tenantDb = createTenantDb(db);
   api.use(accessRoutes({ db, tenantDb, config, clock, email, logger }));
   api.use(auditRoutes({ tenantDb }));
+  api.use(
+    approvalRoutes({
+      db,
+      tenantDb,
+      clock,
+      handlers: approvalHandlers,
+      otpSecret: config.sessionSecret,
+    }),
+  );
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

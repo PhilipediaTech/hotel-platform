@@ -8,6 +8,7 @@ import {
   ROLE_TEMPLATES,
   type DepartmentCode,
 } from '../apps/api/src/modules/identity/role-templates.ts';
+import { createDefaultApprovalPolicies } from '../apps/api/src/modules/approvals/defaults.ts';
 
 export const DEMO_ORG_ID = '0d0d0d0d-0000-4000-8000-000000000001';
 export const DEMO_PROPERTY_ID = '0d0d0d0d-0000-4000-8000-000000000002';
@@ -107,6 +108,9 @@ export async function seed(db: Db, options: SeedOptions = {}): Promise<void> {
       });
     }
   }
+
+  // PRD M1 rule 2 defaults (T-022); policies already there are kept.
+  await createDefaultApprovalPolicies(db, DEMO_ORG_ID, DEMO_PROPERTY_ID);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

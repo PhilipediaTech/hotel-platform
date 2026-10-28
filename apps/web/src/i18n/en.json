@@ -189,7 +189,8 @@
     "tabs": {
       "people": "People",
       "invitations": "Invitations",
-      "roles": "Roles"
+      "roles": "Roles",
+      "policies": "Approval policies"
     },
     "allProperties": "all properties",
     "disabled": "Disabled",
@@ -334,6 +335,71 @@
         "revoked": "Invitation withdrawn",
         "accepted": "Invitation accepted"
       }
+    }
+  },
+  "approvals": {
+    "title": "Approvals",
+    "requests": "Requests",
+    "views": {
+      "pending": "Pending",
+      "decided": "Decided"
+    },
+    "empty": {
+      "pending": "Nothing waiting for a decision.",
+      "decided": "No decided requests yet."
+    },
+    "requestedBy": "Requested by {{name}} · {{when}}",
+    "expires": "Expires {{when}}",
+    "decidedBy": "Decided by {{name}} · {{when}}",
+    "byCode": "by WhatsApp code",
+    "status": {
+      "APPROVED": "Approved",
+      "EXECUTED": "Approved and done",
+      "REJECTED": "Rejected",
+      "EXPIRED": "Expired",
+      "FAILED": "Approved, but it no longer applied",
+      "PENDING": "Pending"
+    },
+    "decide": "Decide",
+    "note": "Note (needed to reject)",
+    "code": "WhatsApp code",
+    "approve": "Approve",
+    "reject": "Reject",
+    "rejectNeedsNote": "Write a note to reject",
+    "actions": {
+      "folio": {
+        "discount": "Discount above the limit",
+        "reverse": "Void of a posted charge",
+        "backdate": "Back-dated posting",
+        "route": "Folio transfer between guests",
+        "write_off": "Write-off"
+      },
+      "rate": {
+        "below_floor": "Rate below the plan’s floor"
+      },
+      "payment": {
+        "refund": "Refund"
+      },
+      "room": {
+        "comp": "Complimentary room",
+        "move": "Room move after midnight"
+      },
+      "ar": {
+        "over_limit": "City-ledger transfer over the credit limit"
+      }
+    },
+    "policies": {
+      "tab": "Approval policies",
+      "intro": "Which actions need approval at this property, above what, who decides and how long the request waits.",
+      "action": "Action",
+      "active": "Needs approval",
+      "threshold": "Above",
+      "always": "Always",
+      "approvers": "Approvers",
+      "expiry": "Waits (minutes)",
+      "save": "Save policies",
+      "saved": "Saved.",
+      "percent": "%"
     }
   },
   "accept": {

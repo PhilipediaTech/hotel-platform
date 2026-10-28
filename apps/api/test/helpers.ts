@@ -6,6 +6,7 @@ import type { Config } from '../src/core/config.ts';
 import { createDb, type Db } from '../src/core/db.ts';
 import { createFakeEmailProvider } from '../src/core/email.ts';
 import { createLogger } from '../src/core/logger.ts';
+import type { ApprovalActionHandler } from '../src/core/approvals.ts';
 
 export const TEST_CONFIG: Config = {
   nodeEnv: 'test',
@@ -30,6 +31,8 @@ export interface TestAppOptions {
   /** Real database for integration tests (`testDb()`); omitted = never connects. */
   db?: Db;
   clock?: Clock;
+  /** Protected actions for approval tests. */
+  approvalHandlers?: readonly ApprovalActionHandler<never>[];
 }
 
 /** Builds the app with a fake email provider and a logger that captures JSON log lines. */
@@ -50,6 +53,7 @@ export function buildTestApp(routes?: Router, options: TestAppOptions = {}) {
     email,
     ...(options.clock ? { clock: options.clock } : {}),
     ...(routes ? { routes } : {}),
+    ...(options.approvalHandlers ? { approvalHandlers: options.approvalHandlers } : {}),
   });
   return { app, logLines, logger, email };
 }

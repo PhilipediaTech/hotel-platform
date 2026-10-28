@@ -31,6 +31,8 @@ export const TENANT_MODELS: Record<string, Scope> = {
   AuditEvent: { kind: 'organisation' },
   // Outbox rows: like audit events, any property of the organisation or none.
   DomainEvent: { kind: 'organisation' },
+  ApprovalPolicy: { kind: 'property', organisationField: 'organisationId' },
+  ApprovalRequest: { kind: 'property', organisationField: 'organisationId' },
 };
 
 /** Fields (and values) that pin a row of `model` to `tenant`. */

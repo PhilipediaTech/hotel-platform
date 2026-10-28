@@ -3,7 +3,7 @@ import { systemClock } from './core/clock.ts';
 import { createDb } from './core/db.ts';
 import { startWorker } from './core/jobs.ts';
 import { createLogger } from './core/logger.ts';
-import { EVENT_HANDLERS, JOBS } from './jobs.ts';
+import { eventHandlers, JOBS } from './jobs.ts';
 
 // Worker entry (tab 2: one process for HTTP, one for jobs; T-021): scheduled jobs, outbox
 // handlers and the outbox publisher. Needs the same environment as the API.
@@ -27,7 +27,7 @@ try {
     clock: systemClock,
     logger,
     jobs: JOBS,
-    handlers: EVENT_HANDLERS,
+    handlers: eventHandlers({ db, config, logger }),
   });
 } catch (err) {
   logger.fatal({ err }, 'Worker failed to start');

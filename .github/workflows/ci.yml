@@ -55,7 +55,8 @@ jobs:
       - name: Schema matches migrations (no drift)
         run: npx --no-install prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
       - name: Tests (unit, web, integration)
-        run: npm run test -- --reporter=dot
+        # `github-actions` turns each failure into an annotation (logs need a GitHub sign-in).
+        run: npm run test -- --reporter=dot --reporter=github-actions
         # Only here: a job-wide NODE_ENV=test would make Vite build React's development bundle.
         env:
           NODE_ENV: test

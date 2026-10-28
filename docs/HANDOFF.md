@@ -22,7 +22,7 @@ Production hotel PMS SaaS built from "Hotel Management Platform — Master Speci
 - PostgreSQL 18 native (service `postgresql-x64-18`, binaries in `C:\Program Files\PostgreSQL\18\bin`). Databases `hotel_dev` (migrated + seeded), `hotel_test` (tests), `hotel_e2e`, `hotel_restore`.
 - `.env` holds `DATABASE_URL`, `TEST_DATABASE_URL`, `E2E_DATABASE_URL` with Philip's password — never print it.
 
-## Repo layout (as of T-020)
+## Repo layout (as of T-021)
 
 ```text
 prisma/
@@ -32,6 +32,8 @@ prisma/
 prisma.config.ts                Prisma 7 config (schema, migrations, seed, datasource URL; loads .env)
 apps/api        @hotel/api      Express 5 app
   src/server.ts                 HTTP entry (config → logger → db → app.listen, graceful shutdown)
+  src/worker.ts                 worker entry: pg-boss scheduled jobs, outbox handlers, outbox publisher
+  src/jobs.ts                   JOBS and EVENT_HANDLERS the worker runs (modules add theirs here)
   src/app.ts                    createApp({ config, logger, routes }) — middleware order per tab 2
   src/core/config.ts            env → Config (Zod)
   src/core/db.ts                createDb(url) (PrismaPg adapter), Db/DbClient types, pgErrorInfo()
@@ -42,6 +44,9 @@ apps/api        @hotel/api      Express 5 app
   src/core/rate-limit.ts        rateLimiter (step 8), RATE_LIMITS
   src/core/tenancy.ts           tenancyContext (step 7), resolveTenant, currentTenant/requireTenant, runAsTenant
   src/core/tenant-db.ts         createTenantDb(db): Prisma extension scoping TENANT_MODELS by tenant
+  src/core/outbox.ts            recordEvent(tx, …) (domain_events), publishPending, EventHandler
+  src/core/jobs.ts              defineJob, startWorker (pg-boss)
+  src/core/cleanup.ts           hourly cleanup job (sessions, links, rate limits, idempotency keys, old events)
   src/core/idempotency.ts       idempotencyStore middleware + withIdempotency (used by mountRoute for ● routes)
   src/core/audit.ts             auditContext (request facts), recordAudit(tx, …), recordUserEvent (fan-out), auditValue (redaction)
   src/core/passwords.ts         scrypt hashPassword/verifyPassword/burnPasswordCheck
@@ -97,7 +102,7 @@ packages/shared @hotel/shared   errors.ts: ERROR_HTTP_STATUS, ErrorCode, ErrorEn
 docs/           PROGRESS, HANDOFF, VERSIONS, adr/000–023
 ```
 
-Root scripts (`dev` runs api :4000 and web :5173 via `scripts/dev.mjs`; `check:size` builds web and checks the budget): `dev | check:size | openapi | openapi:check | build | lint | typecheck | format | format:check | test | check | db:generate | db:migrate | db:deploy | db:reset | seed`.
+Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mjs`; `check:size` builds web and checks the budget): `dev | check:size | openapi | openapi:check | build | lint | typecheck | format | format:check | test | check | db:generate | db:migrate | db:deploy | db:reset | seed`.
 
 ## Conventions
 
@@ -112,10 +117,11 @@ Root scripts (`dev` runs api :4000 and web :5173 via `scripts/dev.mjs`; `check:s
 - **Tenant data:** property-scoped contracts (`propertyScoped: true`, plus `permission`) get `ctx.tenant`. Read and write tenant tables only through `createTenantDb(db)`; add every new tenant table to `TENANT_MODELS` in `core/tenant-db.ts`; add a case for every property-scoped route to `test/cross-tenant-cases.ts`. Raw SQL must filter by `requireTenant()` IDs itself.
 - **Permissions:** every new endpoint names one catalogue code in its contract (`permission`); add new codes to `packages/shared/src/permissions.ts` (and to the role templates that should get them). Contract PATCH bodies must not carry defaults (use a default-free schema; Zod `.partial()` keeps defaults).
 - **Audit:** every state change writes `recordAudit(tx, { action: 'resource.verb', entityType, entityId, before, after, reason? })` with the same transaction client as the change (plain or tenant client). Never audit after the commit except for sign-in-type events; never put secrets in before/after (they are stripped by key name, but don’t rely on it). Add a label for new actions under `audit.actions` in `en.json`.
+- **Side effects across modules:** never call another module's side effect directly; `recordEvent(tx, { type: 'resource.past_tense', payload })` in the change's transaction and add an `EventHandler` (to `EVENT_HANDLERS` in `src/jobs.ts`) that must tolerate running twice. Timetabled work is a `defineJob` with `schedule` in `JOBS`. Payloads carry IDs and facts, never secrets.
 - **Local sign-in:** `npm run seed`, then any `<role-slug>@demo.hotel.test` (e.g. `owner@`, `front-desk@`) with `SEED_USER_PASSWORD` from `.env`. Verification and reset links are printed in the API log.
 - **MFA and PINs locally:** Owner, GM and Finance demo users must set up MFA at first sign-in; generate codes from the shown key with `node --input-type=module -e "import { generate } from 'otplib'; console.log(await generate({ secret: '<key>' }))"` (run in `apps/api`). For PIN switching: set a PIN at `/account/pin` (e.g. as `front-desk@`), sign in as `dept-manager@` with "shared device" ticked, then Account menu → Switch user. Integration tests for these flows use `test/auth.ts`.
 - **Lockfile:** never regenerate it with `node_modules` or the old lock present (npm/cli#4828 drops platform bindings); follow the procedure in PROGRESS decisions. After any dependency change, `grep -c "node_modules/@rolldown/binding-" package-lock.json` must print 15.
 
 ## Next step
 
-T-021 Outbox, pg-boss worker, scheduled jobs framework (add the purge of expired `idempotency_keys`, sessions, tokens and rate-limit windows), then T-022 approvals. T-005 needs paid accounts (stop).
+T-022 Approvals engine: policies, requests, executor, expiry (a scheduled job), OTP channel stub; it fills `approval_request_id` on audit events. T-005 needs paid accounts (stop).

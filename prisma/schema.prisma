@@ -42,6 +42,7 @@ model Organisation {
   invitations  Invitation[]
   featureFlags FeatureFlag[]
   auditEvents  AuditEvent[]
+  domainEvents DomainEvent[]
 
   @@map("organisations")
 }
@@ -72,6 +73,7 @@ model Property {
   invitations  Invitation[]
   counters     PropertyCounter[]
   auditEvents  AuditEvent[]
+  domainEvents DomainEvent[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -369,4 +371,21 @@ model IdempotencyKey {
   @@id([userId, key])
   @@index([expiresAt])
   @@map("idempotency_keys")
+}
+
+/// Outbox (tab 2 "Audit, outbox and jobs", ADR-012; T-021): written in the transaction of the
+/// change, then published by the worker to each handler as a pg-boss job.
+model DomainEvent {
+  id             BigInt       @id @default(autoincrement())
+  organisationId String       @map("organisation_id") @db.Uuid
+  propertyId     String?      @map("property_id") @db.Uuid
+  type           String
+  payload        Json
+  occurredAt     DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  publishedAt    DateTime?    @map("published_at") @db.Timestamptz(6)
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property       Property?    @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+
+  @@index([publishedAt])
+  @@map("domain_events")
 }

@@ -1,9 +1,10 @@
 // `npm run dev`: runs every app's dev server side by side with prefixed output (runbook §1).
-// Add the worker (T-021) and site (V1.2) here when they exist.
+// Add the site (V1.2) here when it exists.
 import { spawn } from 'node:child_process';
 
 const APPS = [
   { name: 'api', workspace: 'apps/api', colour: 36 }, // cyan, :4000
+  { name: 'worker', workspace: 'apps/api', script: 'worker', colour: 33 }, // yellow, jobs (T-021)
   { name: 'web', workspace: 'apps/web', colour: 35 }, // magenta, :5173
 ];
 
@@ -23,9 +24,9 @@ function prefixed(prefix, out) {
   };
 }
 
-const children = APPS.map(({ name, workspace, colour }) => {
+const children = APPS.map(({ name, workspace, script = 'dev', colour }) => {
   const prefix = `\x1b[${colour}m[${name}]\x1b[0m`;
-  const child = spawn(process.execPath, [npmCli, 'run', 'dev', '-w', workspace], {
+  const child = spawn(process.execPath, [npmCli, 'run', script, '-w', workspace], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: process.env,
   });

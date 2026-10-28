@@ -23,6 +23,7 @@ describe('migrations', () => {
       'audit_events',
       'auth_tokens',
       'departments',
+      'domain_events',
       'feature_flags',
       'idempotency_keys',
       'invitations',

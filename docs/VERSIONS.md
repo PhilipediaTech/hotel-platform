@@ -76,12 +76,12 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 | eslint-plugin-react-hooks                            | 7.1.1                                      | root dev                                                                          |
 | react-hook-form                                      | 7.90.0                                     | T-010; validated with the shared Zod schemas via `apps/web/src/lib/form.ts`       |
 | uqr                                                  | 0.1.3                                      | T-011; QR matrix for MFA set-up (MIT, no dependencies)                            |
+| pg-boss                                              | 12.38.0                                    | T-021; `apps/api` worker. Brings its peer `@opentelemetry/api` 1.10.0             |
 
 ## Stack (planned)
 
 | Package          | Version | Ticket              |
 | ---------------- | ------- | ------------------- |
 | dexie            | 4.4.6   | T-093               |
-| pg-boss          | 12.38.0 | T-021               |
 | @playwright/test | 1.64.1  | First E2E journey   |
 | astro            | 7.4.2   | V1.2 booking engine |

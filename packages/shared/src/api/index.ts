@@ -5,4 +5,5 @@ export * from './auth.ts';
 export * from './contract.ts';
 export * from './files.ts';
 export * from './primitives.ts';
+export * from './properties.ts';
 export * from './routes.ts';

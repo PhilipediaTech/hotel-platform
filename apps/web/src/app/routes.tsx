@@ -14,6 +14,7 @@ import { SignUpPage } from '../routes/auth/sign-up.tsx';
 import { AcceptInvitationPage } from '../routes/auth/accept-invitation.tsx';
 import { ApprovalsPage } from '../routes/approvals.tsx';
 import { AuditLogPage } from '../routes/audit.tsx';
+import { SetupWizardPage } from '../routes/onboarding.tsx';
 import { UsersAndRolesPage } from '../routes/settings/access.tsx';
 import { HomeRedirect, NotFoundPage, PlaceholderPage, RouteErrorPage } from '../routes/pages.tsx';
 import { NAV_ITEMS, type NavItem } from './navigation.ts';
@@ -24,6 +25,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/settings/access': <UsersAndRolesPage />,
   '/audit': <AuditLogPage />,
   '/approvals': <ApprovalsPage />,
+  '/onboarding': <SetupWizardPage />,
 };
 
 /** One route per distinct screen path (tab-style items share their screen's route). */

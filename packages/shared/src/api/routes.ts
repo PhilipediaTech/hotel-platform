@@ -5,6 +5,7 @@ import { AUDIT_ROUTES } from './audit.ts';
 import { AUTH_ROUTES } from './auth.ts';
 import { defineRoute } from './contract.ts';
 import { FILE_ROUTES } from './files.ts';
+import { PROPERTY_ROUTES } from './properties.ts';
 
 // The API surface, one entry per endpoint in spec tab 4. Modules add their routes here as
 // they are built; `npm run openapi` regenerates apps/api/openapi.json from this list.
@@ -26,6 +27,7 @@ export const API_ROUTES = {
   ...AUDIT_ROUTES,
   ...APPROVAL_ROUTES,
   ...FILE_ROUTES,
+  ...PROPERTY_ROUTES,
 } as const;
 
 export type ApiRoutes = typeof API_ROUTES;

@@ -6,6 +6,8 @@ export interface ShellProperty {
   id: string;
   code: string;
   name: string;
+  /** SETUP until the owner finishes the checklist and goes live (M1-02). */
+  status: 'SETUP' | 'LIVE' | 'SUSPENDED' | 'ARCHIVED';
   timeZone: string;
   baseCurrency: string;
   /** BCP 47 locale for dates, numbers and money (tab 5 rule 8), e.g. en-NG. */
@@ -55,10 +57,11 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
   return {
     userName: me.user.name,
     permissions: [...permissions].sort(),
-    properties: me.properties.map(({ id, code, name, timeZone, baseCurrency, locale }) => ({
+    properties: me.properties.map(({ id, code, name, status, timeZone, baseCurrency, locale }) => ({
       id,
       code,
       name,
+      status,
       timeZone,
       baseCurrency,
       locale,
@@ -127,6 +130,7 @@ export const PREVIEW_SESSION: ShellSession = {
       id: '0d0d0d0d-0000-4000-8000-000000000002',
       code: 'LAG',
       name: 'Demo Lagos Hotel',
+      status: 'SETUP',
       timeZone: 'Africa/Lagos',
       baseCurrency: 'NGN',
       locale: 'en-NG',

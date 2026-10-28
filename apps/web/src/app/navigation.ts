@@ -224,6 +224,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-032',
   },
   {
+    id: 'setup',
+    path: '/onboarding',
+    anyOf: ['property.setup'],
+    group: 'admin',
+    screen: 'S02',
+    ticket: 'T-030',
+  },
+  {
     id: 'settings-access',
     path: '/settings/access',
     anyOf: ['role.manage', 'user.invite'],
@@ -381,4 +389,14 @@ export function bottomBarItems(permissions: Iterable<string>): NavItem[] {
 
 export function landingPath(permissions: Iterable<string>): string {
   return navItem(homeFor(permissions).landing).path;
+}
+
+/**
+ * Where `/` goes: the setup wizard while the property is in setup and the user can finish it
+ * (M1-02), else the role's home screen.
+ */
+export function startPath(permissions: Iterable<string>, propertyStatus: string | null): string {
+  const held = new Set(permissions);
+  if (propertyStatus === 'SETUP' && held.has('property.setup')) return navItem('setup').path;
+  return landingPath(held);
 }

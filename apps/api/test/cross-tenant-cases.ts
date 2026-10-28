@@ -139,6 +139,15 @@ async function bFile(db: Db, world: TenantWorld, propertyId: string) {
   return { fileId: id };
 }
 
+/** B's own property: the path names it while the header names A's. */
+const bProperty = (_db: Db, _world: TenantWorld, propertyId: string) =>
+  Promise.resolve({ propertyId });
+
+async function bPropertyUnchanged(db: Db, world: TenantWorld) {
+  const b1 = await db.property.findUniqueOrThrow({ where: { id: world.b1.id } });
+  expect([b1.name, b1.status]).toEqual([world.b1.name, 'SETUP']);
+}
+
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
   createRole: {
@@ -237,4 +246,33 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       ]);
     },
   },
+  getOrganisation: {
+    seed: (_db, world) => Promise.resolve({ organisationId: world.orgB.id }),
+    listIds: (body) => [(body as { id: string }).id],
+  },
+  updateOrganisation: {
+    seed: () => Promise.resolve({}),
+    creates: true,
+    body: () => ({ name: 'Leak Org' }),
+    untouched: async (db, world) => {
+      const org = await db.organisation.findUniqueOrThrow({ where: { id: world.orgB.id } });
+      expect(org.name).toBe(world.orgB.name);
+    },
+  },
+  listProperties: { seed: bProperty, listIds: ids },
+  createProperty: {
+    seed: () => Promise.resolve({}),
+    creates: true,
+    body: () => ({ name: 'Leak Hotel' }),
+    untouched: async (db, world) => {
+      expect(await db.property.count({ where: { organisationId: world.orgB.id } })).toBe(1);
+    },
+  },
+  getProperty: { seed: bProperty },
+  updateProperty: {
+    seed: bProperty,
+    body: () => ({ name: 'Leak' }),
+    untouched: bPropertyUnchanged,
+  },
+  goLiveProperty: { seed: bProperty, untouched: bPropertyUnchanged },
 };

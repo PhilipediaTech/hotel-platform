@@ -119,8 +119,17 @@ async function stepDone(
       // Someone with tax.manage checked the rates (the defaults are only examples).
       return taxSettingsOf(p.settings).confirmedAt !== undefined;
     case 'rates':
-      // Not built yet (SETUP_STEPS `later`); their tickets add the check here.
-      return false;
+      // An active plan with a price from today on.
+      return (
+        (await db.rateDay.count({
+          where: {
+            propertyId: p.id,
+            amountMinor: { not: null },
+            date: { gte: new Date(`${localDate(now, p.timeZone)}T00:00:00Z`) },
+            ratePlan: { active: true },
+          },
+        })) > 0
+      );
   }
 }
 

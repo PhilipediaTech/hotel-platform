@@ -99,7 +99,7 @@ export function AppShell() {
       </div>
       <div className="flex flex-1">
         <LeftRail />
-        <main id="main" tabIndex={-1} className="flex-1 p-4 pb-20 md:p-6 md:pb-6 print:p-0">
+        <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-4 pb-20 md:p-6 md:pb-6 print:p-0">
           <Outlet />
         </main>
       </div>

@@ -16,6 +16,7 @@ import { ApprovalsPage } from '../routes/approvals.tsx';
 import { AuditLogPage } from '../routes/audit.tsx';
 import { SetupWizardPage } from '../routes/onboarding.tsx';
 import { UsersAndRolesPage } from '../routes/settings/access.tsx';
+import { RatesPage } from '../routes/rates.tsx';
 import { FinanceSettingsPage } from '../routes/settings/finance.tsx';
 import { RoomsSettingsPage } from '../routes/settings/rooms.tsx';
 import { HomeRedirect, NotFoundPage, PlaceholderPage, RouteErrorPage } from '../routes/pages.tsx';
@@ -27,6 +28,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/settings/access': <UsersAndRolesPage />,
   '/settings/rooms': <RoomsSettingsPage />,
   '/settings/finance': <FinanceSettingsPage />,
+  '/rates': <RatesPage />,
   '/audit': <AuditLogPage />,
   '/approvals': <ApprovalsPage />,
   '/onboarding': <SetupWizardPage />,

@@ -1,6 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resetDb, testDb } from '../apps/api/test/db.ts';
-import { DEMO_EMAIL_DOMAIN, DEMO_ORG_ID, DEMO_PROPERTY_ID, DEMO_ROLES, seed } from './seed.ts';
+import {
+  DEMO_RATE_DAYS,
+  DEMO_EMAIL_DOMAIN,
+  DEMO_ORG_ID,
+  DEMO_PROPERTY_ID,
+  DEMO_ROLES,
+  seed,
+} from './seed.ts';
 
 const db = testDb();
 
@@ -14,6 +21,8 @@ async function counts() {
     memberships: await db.membership.count(),
     roomTypes: await db.roomType.count(),
     rooms: await db.room.count(),
+    ratePlans: await db.ratePlan.count(),
+    rateDays: await db.rateDay.count(),
   };
 }
 
@@ -37,6 +46,8 @@ describe('seed', () => {
       memberships: DEMO_ROLES.length,
       roomTypes: 3,
       rooms: 30, // runbook: 30 rooms
+      ratePlans: 3, // BAR, Corporate (−10%), Bed and breakfast
+      rateDays: 3 * DEMO_RATE_DAYS,
     });
     await expect(
       db.property.findUnique({ where: { id: DEMO_PROPERTY_ID } }),

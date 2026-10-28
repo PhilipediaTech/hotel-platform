@@ -63,6 +63,7 @@ model Organisation {
   files            FileObject[]
   roomTypes        RoomType[]
   rooms            Room[]
+  ratePlans        RatePlan[]
 
   @@map("organisations")
 }
@@ -87,21 +88,24 @@ model Property {
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organisation     Organisation      @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  departments      Department[]
-  memberships      Membership[]
-  invitations      Invitation[]
-  counters         PropertyCounter[]
-  auditEvents      AuditEvent[]
-  domainEvents     DomainEvent[]
-  approvalPolicies ApprovalPolicy[]
-  approvalRequests ApprovalRequest[]
-  files            FileObject[]
-  roomTypes        RoomType[]
-  rooms            Room[]
-  roomBlocks       RoomBlock[]
-  revenueCodes     RevenueCode[]
-  taxRules         TaxRule[]
+  organisation         Organisation         @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  departments          Department[]
+  memberships          Membership[]
+  invitations          Invitation[]
+  counters             PropertyCounter[]
+  auditEvents          AuditEvent[]
+  domainEvents         DomainEvent[]
+  approvalPolicies     ApprovalPolicy[]
+  approvalRequests     ApprovalRequest[]
+  files                FileObject[]
+  roomTypes            RoomType[]
+  rooms                Room[]
+  roomBlocks           RoomBlock[]
+  revenueCodes         RevenueCode[]
+  taxRules             TaxRule[]
+  cancellationPolicies CancellationPolicy[]
+  ratePlans            RatePlan[]
+  rateDays             RateDay[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -537,6 +541,7 @@ model RoomType {
   organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
   property     Property     @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
   rooms        Room[]
+  rateDays     RateDay[]
 
   @@unique([propertyId, code])
   // Target of composite foreign keys: a room can only have a type of its own property.
@@ -633,8 +638,9 @@ model RevenueCode {
   taxRuleIds String[]     @map("tax_rule_ids") @db.Uuid
   active     Boolean      @default(true)
 
-  property Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  taxRules TaxRule[] @relation("TaxLineCode")
+  property          Property           @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  taxRules          TaxRule[]          @relation("TaxLineCode")
+  packageComponents PackageComponent[]
 
   @@unique([propertyId, code])
   // Target of composite foreign keys: a tax rule posts to a code of its own property.
@@ -676,4 +682,126 @@ model TaxRuleVersion {
 
   @@index([taxRuleId, effectiveFrom])
   @@map("tax_rule_versions")
+}
+
+// ───────────────────────── Rates and restrictions (M2-04–M2-08; T-033) ─────────────────────────
+
+enum RatePlanKind {
+  BAR
+  DERIVED
+  PACKAGE
+  DAY_USE
+  NEGOTIATED
+
+  @@map("rate_plan_kind")
+}
+
+enum Guarantee {
+  NONE
+  DEPOSIT
+  CARD_ON_FILE
+  COMPANY
+
+  @@map("guarantee")
+}
+
+/// rules: [{"daysBefore":2,"feeType":"NIGHTS","value":1}], noShowFee: {"feeType":"NIGHTS","value":1}.
+model CancellationPolicy {
+  id         String @id @default(uuid()) @db.Uuid
+  propertyId String @map("property_id") @db.Uuid
+  name       String
+  rules      Json
+  noShowFee  Json   @map("no_show_fee")
+
+  property  Property   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  ratePlans RatePlan[]
+
+  @@unique([propertyId, id])
+  @@map("cancellation_policies")
+}
+
+/// A way of selling rooms. BAR prices are set per room type and date; DERIVED plans follow
+/// their parent (derivationBps and/or derivationAmountMinor, rounded to roundingMinor, never
+/// below floorMinor); PACKAGE and DAY_USE plans have prices of their own, or derive too.
+model RatePlan {
+  id                    String       @id @default(uuid()) @db.Uuid
+  organisationId        String       @map("organisation_id") @db.Uuid
+  propertyId            String       @map("property_id") @db.Uuid
+  code                  String
+  name                  String
+  kind                  RatePlanKind
+  parentRatePlanId      String?      @map("parent_rate_plan_id") @db.Uuid
+  /// -1000 = 10% off the parent.
+  derivationBps         Int?         @map("derivation_bps")
+  derivationAmountMinor BigInt?      @map("derivation_amount_minor")
+  /// Derived prices round to the nearest multiple (10000 = NGN 100).
+  roundingMinor         BigInt       @default(10000) @map("rounding_minor")
+  floorMinor            BigInt?      @map("floor_minor")
+  mealPlan              String       @default("ROOM_ONLY") @map("meal_plan")
+  cancellationPolicyId  String       @map("cancellation_policy_id") @db.Uuid
+  guarantee             Guarantee    @default(NONE)
+  currency              String       @db.Char(3)
+  /// Offered on the booking engine and channels (channel availability).
+  isPublic              Boolean      @default(false) @map("is_public")
+  companyId             String?      @map("company_id") @db.Uuid
+  dayUseMaxMinutes      Int?         @map("day_use_max_minutes")
+  /// Empty = every room type.
+  roomTypeIds           String[]     @map("room_type_ids") @db.Uuid
+  active                Boolean      @default(true)
+  version               Int          @default(0)
+  createdAt             DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organisation       Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property           Property           @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  cancellationPolicy CancellationPolicy @relation(fields: [propertyId, cancellationPolicyId], references: [propertyId, id], onDelete: Restrict)
+  parent             RatePlan?          @relation("DerivedFrom", fields: [parentRatePlanId], references: [id], onDelete: Restrict)
+  children           RatePlan[]         @relation("DerivedFrom")
+  days               RateDay[]
+  components         PackageComponent[]
+
+  @@unique([propertyId, code])
+  @@unique([propertyId, id])
+  @@map("rate_plans")
+}
+
+/// Price and restrictions of one plan, room type and night. amountMinor is null on DERIVED
+/// plans (computed from the parent). ruleVersion goes up on every change; quotes store it.
+model RateDay {
+  propertyId        String   @map("property_id") @db.Uuid
+  ratePlanId        String   @map("rate_plan_id") @db.Uuid
+  roomTypeId        String   @map("room_type_id") @db.Uuid
+  date              DateTime @db.Date
+  amountMinor       BigInt?  @map("amount_minor")
+  minStay           Int?     @map("min_stay")
+  maxStay           Int?     @map("max_stay")
+  closedToArrival   Boolean  @default(false) @map("closed_to_arrival")
+  closedToDeparture Boolean  @default(false) @map("closed_to_departure")
+  stopSell          Boolean  @default(false) @map("stop_sell")
+  ruleVersion       Int      @default(1) @map("rule_version")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  ratePlan RatePlan @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
+  roomType RoomType @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
+
+  @@id([ratePlanId, roomTypeId, date])
+  @@index([propertyId, date])
+  @@map("rate_days")
+}
+
+/// Part of a package price posted to its own revenue code each night (breakfast, transfer);
+/// the room line gets the rest (PRD M2 acceptance: the lines add up to the package price).
+model PackageComponent {
+  id            String  @id @default(uuid()) @db.Uuid
+  ratePlanId    String  @map("rate_plan_id") @db.Uuid
+  name          String
+  revenueCodeId String  @map("revenue_code_id") @db.Uuid
+  amountMinor   BigInt  @map("amount_minor")
+  perPerson     Boolean @default(false) @map("per_person")
+
+  ratePlan    RatePlan    @relation(fields: [ratePlanId], references: [id], onDelete: Cascade)
+  revenueCode RevenueCode @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
+
+  @@index([ratePlanId])
+  @@map("package_components")
 }

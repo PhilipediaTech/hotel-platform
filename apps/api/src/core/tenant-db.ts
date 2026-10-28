@@ -42,6 +42,10 @@ export const TENANT_MODELS: Record<string, Scope> = {
   RevenueCode: { kind: 'property' },
   // Versions have no property column: reach them through their (scoped) rule.
   TaxRule: { kind: 'property' },
+  CancellationPolicy: { kind: 'property' },
+  RatePlan: { kind: 'property', organisationField: 'organisationId' },
+  RateDay: { kind: 'property' },
+  // Components have no property column: reach them through their (scoped) rate plan.
 };
 
 /** Fields (and values) that pin a row of `model` to `tenant`. */

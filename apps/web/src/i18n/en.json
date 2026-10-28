@@ -656,5 +656,126 @@
       "on": "on {{base}}",
       "total": "Guest pays"
     }
+  },
+  "rates": {
+    "title": "Rates",
+    "plans": "Rate plans",
+    "noPlans": "No rate plans yet. Add a BAR plan first: other plans can follow its prices.",
+    "cancel": "Cancel",
+    "save": "Save",
+    "earlier": "Earlier dates",
+    "later": "Later dates",
+    "roomType": "Room type",
+    "gridNamed": "Prices for {{plan}}",
+    "ownPrices": "Prices in {{currency}} per night, set on this plan.",
+    "follows": "Follows {{parent}}: {{rule}}.",
+    "samePrice": "same price",
+    "percentOff": "{{n}}% off",
+    "percentOn": "{{n}}% on top",
+    "amountOff": "{{amount}} off",
+    "amountOn": "{{amount}} on top",
+    "tags": {
+      "stop": "Stop sell",
+      "cta": "No arrivals",
+      "ctd": "No departures",
+      "min": "Min {{n}}",
+      "max": "Max {{n}}"
+    },
+    "kinds": {
+      "BAR": "BAR",
+      "DERIVED": "Derived",
+      "PACKAGE": "Package",
+      "DAY_USE": "Day use",
+      "NEGOTIATED": "Negotiated"
+    },
+    "kindHints": {
+      "BAR": "Best available rate: you set the price per room type and date.",
+      "DERIVED": "Follows a BAR plan: a percentage and/or amount off (or on top), rounded.",
+      "PACKAGE": "Room plus extras (e.g. breakfast) posted to their own revenue codes. Own prices, or follows BAR.",
+      "DAY_USE": "Rooms used during the day for a few hours, priced per stay.",
+      "NEGOTIATED": "Company and travel agent rates arrive with companies (V1.1)."
+    },
+    "meals": {
+      "ROOM_ONLY": "Room only",
+      "BREAKFAST": "Breakfast",
+      "HALF_BOARD": "Half board",
+      "FULL_BOARD": "Full board"
+    },
+    "guarantees": {
+      "NONE": "None",
+      "DEPOSIT": "Deposit",
+      "CARD_ON_FILE": "Card on file",
+      "COMPANY": "Company"
+    },
+    "bulk": {
+      "open": "Edit prices and restrictions",
+      "title": "Edit {{plan}}",
+      "apply": "Apply",
+      "from": "From",
+      "to": "To (included)",
+      "weekdays": "On these days",
+      "roomTypes": "Room types",
+      "price": "Price per night ({{currency}})",
+      "leaveBlank": "Leave blank to keep prices",
+      "clearPrice": "Remove the price (not for sale)",
+      "derivedPrice": "Prices follow the parent plan; you can still set restrictions here.",
+      "minStay": "Minimum nights",
+      "maxStay": "Maximum nights",
+      "stayHint": "Blank keeps it; \"-\" removes it",
+      "cta": "Closed to arrival",
+      "ctd": "Closed to departure",
+      "stop": "Stop sell",
+      "leave": "Keep as is",
+      "on": "On",
+      "off": "Off",
+      "done_one": "{{count}} day changed.",
+      "done_other": "{{count}} days changed."
+    },
+    "plan": {
+      "add": "Add rate plan",
+      "edit": "Edit plan",
+      "editNamed": "Edit {{name}}",
+      "kind": "Kind",
+      "code": "Code",
+      "name": "Name",
+      "parent": "Follows",
+      "noParent": "Own prices",
+      "percentOff": "% off",
+      "percentHint": "e.g. 10; negative adds",
+      "amount": "Then {{currency}} off",
+      "amountHint": "Negative adds, e.g. -7500 for breakfast",
+      "rounding": "Round to ({{currency}})",
+      "floor": "Never below ({{currency}})",
+      "floorHint": "Lower needs approval",
+      "mealPlan": "Meal plan",
+      "guarantee": "Guarantee",
+      "dayUseHours": "Longest stay (hours)",
+      "policy": "Cancellation policy",
+      "needPolicy": "Add a cancellation policy first.",
+      "roomTypes": "Room types",
+      "roomTypesHint": "None ticked = every room type.",
+      "public": "Offer on the booking engine and channels",
+      "active": "Active"
+    },
+    "policy": {
+      "add": "New policy",
+      "name": "Policy name",
+      "days": "Free until days before",
+      "nights": "Then fee (nights)",
+      "noShow": "No-show fee (nights)",
+      "save": "Add policy"
+    },
+    "package": {
+      "open": "Package contents",
+      "title": "What {{plan}} includes",
+      "intro": "Each night, these amounts post to their own revenue codes; the room gets the rest of the package price.",
+      "component": "Item {{n}}",
+      "name": "Item",
+      "code": "Revenue code",
+      "amount": "Amount per night",
+      "perPerson": "Per guest",
+      "remove": "Remove",
+      "add": "Add item"
+    }
   }
 }

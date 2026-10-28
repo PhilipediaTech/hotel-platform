@@ -230,7 +230,8 @@ describe('mountRoute: tenancy and permissions', () => {
 describe('mountRoute: output', () => {
   it('uses the route status, and sends no body for 204', async () => {
     const app = appWith((r) => {
-      mountRoute(r, EXAMPLE_ROUTES.postCharge, ({ body }) => ({
+      // Not idempotent here: this unit test has no database (the store: idempotency.int.test.ts).
+      mountRoute(r, { ...EXAMPLE_ROUTES.postCharge, idempotent: false }, ({ body }) => ({
         id: FOLIO_ID,
         amount: body.amount,
       }));

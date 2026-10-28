@@ -3,6 +3,7 @@ import type { Request, Response, Router } from 'express';
 import type { z } from 'zod';
 import { getAuth, requireAuth, type AuthContext } from './auth.ts';
 import { AppError } from './errors.ts';
+import { withIdempotency } from './idempotency.ts';
 import { tenantOf, type TenantContext } from './tenancy.ts';
 
 export interface RouteContext {
@@ -82,6 +83,10 @@ export function mountRoute<R extends RouteContract>(
   if (route.permission && !route.propertyScoped) {
     throw new Error(`${route.operationId}: a permission needs a propertyScoped route`);
   }
+  // Keys belong to the signed-in user (T-020).
+  if (route.idempotent && route.auth === 'none') {
+    throw new Error(`${route.operationId}: idempotent routes need a signed-in user`);
+  }
   router[route.method](toExpressPath(route.path), async (req: Request, res: Response) => {
     // Sign-in first, so anonymous callers learn nothing from validation messages.
     const auth =
@@ -108,24 +113,30 @@ export function mountRoute<R extends RouteContract>(
       });
     }
 
-    const result = await handler({ params, query, body } as ParsedRouteInput<R>, {
-      req,
-      res,
-      auth,
-      tenant,
-    });
-    const status = route.status ?? 200;
+    const run = async (): Promise<{ status: number; body: unknown }> => {
+      const result = await handler({ params, query, body } as ParsedRouteInput<R>, {
+        req,
+        res,
+        auth,
+        tenant,
+      });
+      const status = route.status ?? 200;
+      if (status === 204) return { status, body: undefined };
+      const parsed = route.response.safeParse(result);
+      if (!parsed.success) {
+        // A server bug, not a client error: surfaces as 500 INTERNAL and is logged.
+        throw new Error(
+          `Response for ${route.operationId} does not match its contract: ${parsed.error.message}`,
+        );
+      }
+      return { status, body: parsed.data };
+    };
+    const { status, body: out } =
+      route.idempotent && auth ? await withIdempotency(req, res, auth.user.id, run) : await run();
     if (status === 204) {
       res.status(204).end();
       return;
     }
-    const parsed = route.response.safeParse(result);
-    if (!parsed.success) {
-      // A server bug, not a client error: surfaces as 500 INTERNAL and is logged.
-      throw new Error(
-        `Response for ${route.operationId} does not match its contract: ${parsed.error.message}`,
-      );
-    }
-    res.status(status).json(parsed.data);
+    res.status(status).json(out);
   });
 }

@@ -22,7 +22,7 @@ Production hotel PMS SaaS built from "Hotel Management Platform — Master Speci
 - PostgreSQL 18 native (service `postgresql-x64-18`, binaries in `C:\Program Files\PostgreSQL\18\bin`). Databases `hotel_dev` (migrated + seeded), `hotel_test` (tests), `hotel_e2e`, `hotel_restore`.
 - `.env` holds `DATABASE_URL`, `TEST_DATABASE_URL`, `E2E_DATABASE_URL` with Philip's password — never print it.
 
-## Repo layout (as of T-014)
+## Repo layout (as of T-020)
 
 ```text
 prisma/
@@ -42,6 +42,7 @@ apps/api        @hotel/api      Express 5 app
   src/core/rate-limit.ts        rateLimiter (step 8), RATE_LIMITS
   src/core/tenancy.ts           tenancyContext (step 7), resolveTenant, currentTenant/requireTenant, runAsTenant
   src/core/tenant-db.ts         createTenantDb(db): Prisma extension scoping TENANT_MODELS by tenant
+  src/core/idempotency.ts       idempotencyStore middleware + withIdempotency (used by mountRoute for ● routes)
   src/core/audit.ts             auditContext (request facts), recordAudit(tx, …), recordUserEvent (fan-out), auditValue (redaction)
   src/core/passwords.ts         scrypt hashPassword/verifyPassword/burnPasswordCheck
   src/core/tokens.ts            newToken, hashToken (HMAC with SESSION_SECRET)
@@ -117,4 +118,4 @@ Root scripts (`dev` runs api :4000 and web :5173 via `scripts/dev.mjs`; `check:s
 
 ## Next step
 
-T-02x per tab 6: idempotency keys, outbox/jobs, approvals (M1-12, which also writes `approval_request_id` on audit events). T-005 needs paid accounts (stop).
+T-021 Outbox, pg-boss worker, scheduled jobs framework (add the purge of expired `idempotency_keys`, sessions, tokens and rate-limit windows), then T-022 approvals. T-005 needs paid accounts (stop).

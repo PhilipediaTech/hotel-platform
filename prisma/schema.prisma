@@ -170,6 +170,7 @@ model User {
   authTokens         AuthToken[]
   mfaRecoveryCodes   MfaRecoveryCode[]
   auditEvents        AuditEvent[]
+  idempotencyKeys    IdempotencyKey[]
   invitationsSent    Invitation[]      @relation("InvitedBy")
   invitationsClaimed Invitation[]      @relation("AcceptedBy")
 
@@ -349,4 +350,23 @@ model RateLimitHit {
   @@id([key, windowStart])
   @@index([windowStart])
   @@map("rate_limit_hits")
+}
+
+/// Idempotency-Key store (tab 2 "Idempotency", T-020): one row per user and key for 48 hours.
+/// responseStatus is null while the first request is still running.
+model IdempotencyKey {
+  userId         String   @map("user_id") @db.Uuid
+  key            String
+  method         String
+  path           String
+  requestHash    String   @map("request_hash")
+  responseStatus Int?     @map("response_status")
+  responseBody   Json?    @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
 }

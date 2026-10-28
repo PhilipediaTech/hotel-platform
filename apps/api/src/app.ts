@@ -4,6 +4,7 @@ import express, { type Express, type Router } from 'express';
 import helmet from 'helmet';
 import type { Logger } from 'pino';
 import { auditContext } from './core/audit.ts';
+import { idempotencyStore } from './core/idempotency.ts';
 import { sessionLoader } from './core/auth.ts';
 import { systemClock, type Clock } from './core/clock.ts';
 import type { Config } from './core/config.ts';
@@ -74,6 +75,9 @@ export function createApp({
   app.use(tenancyContext({ db }));
   // 8. Rate limiter (per IP on auth routes, per user)
   app.use(rateLimiter({ db, clock, logger }));
+
+  // Idempotency-Key store for the ● routes (T-020); mountRoute uses it.
+  app.use(idempotencyStore({ db, clock }));
 
   // 9. Routes
   app.get('/health', (_req, res) => {

@@ -24,6 +24,7 @@ describe('migrations', () => {
       'auth_tokens',
       'departments',
       'feature_flags',
+      'idempotency_keys',
       'invitations',
       'memberships',
       'mfa_recovery_codes',

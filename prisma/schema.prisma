@@ -61,6 +61,8 @@ model Organisation {
   approvalPolicies ApprovalPolicy[]
   approvalRequests ApprovalRequest[]
   files            FileObject[]
+  roomTypes        RoomType[]
+  rooms            Room[]
 
   @@map("organisations")
 }
@@ -95,6 +97,9 @@ model Property {
   approvalPolicies ApprovalPolicy[]
   approvalRequests ApprovalRequest[]
   files            FileObject[]
+  roomTypes        RoomType[]
+  rooms            Room[]
+  roomBlocks       RoomBlock[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -198,6 +203,7 @@ model User {
   approvalsDecided   ApprovalRequest[] @relation("DecidedBy")
   invitationsSent    Invitation[]      @relation("InvitedBy")
   filesUploaded      FileObject[]
+  roomBlocksCreated  RoomBlock[]
   invitationsClaimed Invitation[]      @relation("AcceptedBy")
 
   @@map("users")
@@ -489,4 +495,105 @@ model FileObject {
 
   @@index([propertyId, entityType, entityId])
   @@map("files")
+}
+
+// ───────────────────────── Rooms (M2-01–M2-03; T-031) ─────────────────────────
+
+enum HkStatus {
+  DIRTY
+  CLEANING
+  CLEAN
+  INSPECTED
+  OUT_OF_ORDER
+  OUT_OF_SERVICE
+
+  @@map("hk_status")
+}
+
+enum BlockKind {
+  OUT_OF_ORDER
+  OUT_OF_SERVICE
+
+  @@map("block_kind")
+}
+
+model RoomType {
+  id             String   @id @default(uuid()) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  propertyId     String   @map("property_id") @db.Uuid
+  code           String
+  name           String
+  baseOccupancy  Int      @default(2) @map("base_occupancy")
+  maxOccupancy   Int      @default(2) @map("max_occupancy")
+  description    String?
+  amenities      String[]
+  /// Files of kind RoomType (FILE_KINDS); shown once the scan marks them CLEAN.
+  photoFileIds   String[] @map("photo_file_ids") @db.Uuid
+  sortOrder      Int      @default(0) @map("sort_order")
+  active         Boolean  @default(true)
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property     Property     @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  rooms        Room[]
+
+  @@unique([propertyId, code])
+  // Target of composite foreign keys: a room can only have a type of its own property.
+  @@unique([propertyId, id])
+  @@map("room_types")
+}
+
+/// A sellable room. qrToken is the unguessable token printed on the room's QR sticker
+/// (fault reports, T-082). connectingRoomId points at another room of the same property;
+/// both rooms point at each other.
+model Room {
+  id               String   @id @default(uuid()) @db.Uuid
+  organisationId   String   @map("organisation_id") @db.Uuid
+  propertyId       String   @map("property_id") @db.Uuid
+  roomTypeId       String   @map("room_type_id") @db.Uuid
+  number           String
+  floor            String?
+  building         String?
+  features         String[]
+  connectingRoomId String?  @map("connecting_room_id") @db.Uuid
+  hkStatus         HkStatus @default(DIRTY) @map("hk_status")
+  hkStatusAt       DateTime @default(now()) @map("hk_status_at") @db.Timestamptz(6)
+  qrToken          String   @unique @map("qr_token")
+  active           Boolean  @default(true)
+  version          Int      @default(0)
+
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property       Property     @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  roomType       RoomType     @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
+  // Same property is checked by the service (Prisma can't mix a required and an optional column in one relation).
+  connectingRoom Room?        @relation("ConnectingRoom", fields: [connectingRoomId], references: [id], onDelete: SetNull)
+  connectedFrom  Room[]       @relation("ConnectingRoom")
+  blocks         RoomBlock[]
+
+  @@unique([propertyId, number])
+  // Target of composite foreign keys: blocks and connecting rooms stay within the property.
+  @@unique([propertyId, id])
+  @@index([propertyId, roomTypeId])
+  @@map("rooms")
+}
+
+/// Out-of-order or out-of-service period of a room, endDate exclusive. Unreleased blocks
+/// of one room never overlap (exclusion constraint in the migration SQL).
+model RoomBlock {
+  id          String    @id @default(uuid()) @db.Uuid
+  propertyId  String    @map("property_id") @db.Uuid
+  roomId      String    @map("room_id") @db.Uuid
+  kind        BlockKind
+  startDate   DateTime  @map("start_date") @db.Date
+  endDate     DateTime  @map("end_date") @db.Date
+  reason      String
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  releasedAt  DateTime? @map("released_at") @db.Timestamptz(6)
+
+  property  Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  room      Room     @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+  createdBy User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, startDate])
+  @@map("room_blocks")
 }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDb, testDb } from '../../../test/db.ts';
+import { makeRoom, makeRoomType } from '../../../test/factories.ts';
 import { errorOf } from '../../../test/helpers.ts';
 import { hotelClient, makeHotel } from '../../../test/hotel.ts';
 import { sessionCookie } from '../../../test/tenancy.ts';
@@ -16,8 +17,10 @@ beforeEach(async () => {
   now = new Date();
 });
 
+/** A hotel whose first property already has a room type and a room (T-031 steps done). */
 async function hotel() {
   const h = await makeHotel(db, now);
+  await makeRoom(db, await makeRoomType(db, h.p1));
   const c = hotelClient(db, clock, h.p1.id);
   const as = async (userId: string) => c.as(await sessionCookie(db, userId));
   return { ...h, c, as, path: `/properties/${h.p1.id}` };
@@ -67,8 +70,8 @@ describe('setup checklist', () => {
       details: 'TODO',
       region: 'DONE',
       tax: 'LATER',
-      'room-types': 'LATER',
-      rooms: 'LATER',
+      'room-types': 'DONE',
+      rooms: 'DONE',
       rates: 'LATER',
       'payment-methods': 'TODO',
       staff: 'DONE', // the hotel has a GM and a front-desk agent
@@ -173,7 +176,7 @@ describe('go-live', () => {
       entityId: h.p1.id,
       actorUserId: h.owner.id,
       before: { status: 'SETUP' },
-      after: { status: 'LIVE', later: ['tax', 'room-types', 'rooms', 'rates'] },
+      after: { status: 'LIVE', later: ['tax', 'rates'] },
     });
     const me = await owner.get('/me');
     expect(
@@ -302,7 +305,11 @@ describe('add a property', () => {
       address: { country: 'NG' },
     });
     // Only the org-wide owner reaches the new property, so staff is still to do (optional).
-    expect(statuses(body(res))['staff']).toBe('TODO');
+    expect(statuses(body(res))).toMatchObject({
+      'room-types': 'TODO',
+      rooms: 'TODO',
+      staff: 'TODO',
+    });
     const id = body(res).id;
     expect(await db.department.count({ where: { propertyId: id } })).toBe(5);
     expect(await db.approvalPolicy.count({ where: { propertyId: id } })).toBeGreaterThan(0);

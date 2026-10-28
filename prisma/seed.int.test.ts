@@ -12,6 +12,8 @@ async function counts() {
     roles: await db.role.count(),
     users: await db.user.count(),
     memberships: await db.membership.count(),
+    roomTypes: await db.roomType.count(),
+    rooms: await db.room.count(),
   };
 }
 
@@ -33,6 +35,8 @@ describe('seed', () => {
       roles: DEMO_ROLES.length,
       users: DEMO_ROLES.length,
       memberships: DEMO_ROLES.length,
+      roomTypes: 3,
+      rooms: 30, // runbook: 30 rooms
     });
     await expect(
       db.property.findUnique({ where: { id: DEMO_PROPERTY_ID } }),
@@ -41,6 +45,13 @@ describe('seed', () => {
       code: 'LAG',
       status: 'SETUP',
     });
+  });
+
+  it('numbers rooms by floor with one QR token each', async () => {
+    const rooms = await db.room.findMany({ orderBy: { number: 'asc' } });
+    expect(rooms.slice(0, 2).map((r) => r.number)).toEqual(['101', '102']);
+    expect(rooms.at(-1)?.number).toBe('305');
+    expect(new Set(rooms.map((r) => r.qrToken)).size).toBe(30);
   });
 
   it('is idempotent', async () => {

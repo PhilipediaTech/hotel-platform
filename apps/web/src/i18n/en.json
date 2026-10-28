@@ -495,5 +495,93 @@
     "goLive": "Go live",
     "isLive": "This property is live and taking bookings.",
     "notInSetup": "This property is not in setup, so it cannot go live from here."
+  },
+  "rooms": {
+    "title": "Rooms and room types",
+    "tabs": {
+      "rooms": "Rooms",
+      "types": "Room types",
+      "qr": "QR codes"
+    },
+    "actions": "Actions",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "inactive": "Inactive",
+    "commaHint": "Separate with commas",
+    "hk": {
+      "DIRTY": "Dirty",
+      "CLEANING": "Cleaning",
+      "CLEAN": "Clean",
+      "INSPECTED": "Inspected",
+      "OUT_OF_ORDER": "Out of order",
+      "OUT_OF_SERVICE": "Out of service"
+    },
+    "types": {
+      "none": "No room types yet. Add your first one, e.g. Standard or Deluxe.",
+      "add": "Add room type",
+      "editNamed": "Edit {{name}}",
+      "code": "Code",
+      "codeHint": "e.g. STD, DLX",
+      "name": "Name",
+      "occupancy": "Guests",
+      "occupancyValue": "{{base}} (up to {{max}})",
+      "rooms": "Rooms",
+      "base": "Base occupancy",
+      "max": "Maximum occupancy",
+      "sortOrder": "Sort order",
+      "amenities": "Beds and amenities",
+      "description": "Description",
+      "photos": "Photos",
+      "addPhoto": "Add photo",
+      "uploading": "Uploading…",
+      "photoAlt": "Photo {{n}}",
+      "removePhoto": "Remove photo {{n}}",
+      "photoChecking": "Checking the file…",
+      "photoBlocked": "Blocked by the virus check",
+      "photoType": "Use a JPEG, PNG or WebP image.",
+      "active": "Active (offered for booking)"
+    },
+    "list": {
+      "none": "No rooms yet. Add your rooms one by one, or import them from Excel later.",
+      "needType": "Add a room type first; every room has one.",
+      "add": "Add room",
+      "editNamed": "Edit room {{number}}",
+      "number": "Room",
+      "type": "Room type",
+      "floor": "Floor",
+      "building": "Building or wing",
+      "status": "Status",
+      "blocks": "Out of order / service",
+      "features": "Features",
+      "connecting": "Connecting room",
+      "noConnecting": "None",
+      "connects": "Connects to {{number}}",
+      "active": "Active (can be sold and assigned)"
+    },
+    "block": {
+      "action": "Block",
+      "titleNamed": "Take room {{number}} out of use",
+      "kind": "Kind",
+      "hint": {
+        "OUT_OF_ORDER": "Cannot be sold: it leaves availability (e.g. broken AC, flooding).",
+        "OUT_OF_SERVICE": "Still counted but not given to guests (e.g. a short repair)."
+      },
+      "from": "From",
+      "back": "Back in use on",
+      "backHint": "The first day it can be used again",
+      "reason": "Reason",
+      "save": "Block room",
+      "range": "{{from}} – back {{back}}",
+      "release": "Release now"
+    },
+    "qr": {
+      "intro": "Print this sheet and stick each code in its room. Staff scan it to report a fault in that room.",
+      "print": "Print",
+      "sheet": "Room QR codes",
+      "label": "QR code for room {{number}}",
+      "caption": "{{property}} · scan to report a fault",
+      "none": "Add rooms to print their QR codes."
+    }
   }
 }

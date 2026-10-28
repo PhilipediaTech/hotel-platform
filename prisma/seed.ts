@@ -1,5 +1,6 @@
 // Demo data for local development: `npm run seed`. Safe to run repeatedly (upserts).
-// Grows with each ticket (rooms and rates arrive with T-031/T-033).
+// Grows with each ticket (rates arrive with T-033).
+import { randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { createDb, type Db } from '../apps/api/src/core/db.ts';
 import { hashPassword } from '../apps/api/src/core/passwords.ts';
@@ -17,6 +18,13 @@ export const DEMO_EMAIL_DOMAIN = 'demo.hotel.test';
 /** Same templates a real sign-up gets; one demo user per role (`<slug>@demo.hotel.test`). */
 export const DEMO_DEPARTMENTS = DEPARTMENT_TEMPLATES;
 export const DEMO_ROLES = ROLE_TEMPLATES;
+
+/** Runbook: 30 rooms. Three types on three floors (T-031). */
+export const DEMO_ROOM_TYPES = [
+  { code: 'STD', name: 'Standard', baseOccupancy: 2, maxOccupancy: 2, floor: '1', rooms: 15 },
+  { code: 'DLX', name: 'Deluxe', baseOccupancy: 2, maxOccupancy: 3, floor: '2', rooms: 10 },
+  { code: 'STE', name: 'Suite', baseOccupancy: 2, maxOccupancy: 4, floor: '3', rooms: 5 },
+] as const;
 
 export interface SeedOptions {
   /** Password for demo users that have none yet (local sign-in). Omit to leave them without. */
@@ -111,6 +119,37 @@ export async function seed(db: Db, options: SeedOptions = {}): Promise<void> {
 
   // PRD M1 rule 2 defaults (T-022); policies already there are kept.
   await createDefaultApprovalPolicies(db, DEMO_ORG_ID, DEMO_PROPERTY_ID);
+
+  for (const [sortOrder, t] of DEMO_ROOM_TYPES.entries()) {
+    const type = await db.roomType.upsert({
+      where: { propertyId_code: { propertyId: DEMO_PROPERTY_ID, code: t.code } },
+      update: {},
+      create: {
+        organisationId: DEMO_ORG_ID,
+        propertyId: DEMO_PROPERTY_ID,
+        code: t.code,
+        name: t.name,
+        baseOccupancy: t.baseOccupancy,
+        maxOccupancy: t.maxOccupancy,
+        sortOrder,
+      },
+    });
+    for (let n = 1; n <= t.rooms; n++) {
+      const number = `${t.floor}${String(n).padStart(2, '0')}`;
+      await db.room.upsert({
+        where: { propertyId_number: { propertyId: DEMO_PROPERTY_ID, number } },
+        update: {},
+        create: {
+          organisationId: DEMO_ORG_ID,
+          propertyId: DEMO_PROPERTY_ID,
+          roomTypeId: type.id,
+          number,
+          floor: t.floor,
+          qrToken: randomBytes(16).toString('base64url'),
+        },
+      });
+    }
+  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

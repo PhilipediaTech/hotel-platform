@@ -21,7 +21,7 @@ function LeftRail() {
   return (
     <nav
       aria-label={t('shell.mainNav')}
-      className="hidden w-60 shrink-0 overflow-y-auto border-r border-border bg-surface p-3 md:block"
+      className="hidden w-60 shrink-0 overflow-y-auto border-r border-border bg-surface p-3 md:block print:hidden"
     >
       {railItems(permissions).map(({ group, items }) => (
         <section key={group} className="mb-4">
@@ -49,7 +49,7 @@ function BottomTabBar({ items }: { items: NavItem[] }) {
   return (
     <nav
       aria-label={t('shell.quickNav')}
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
     >
       <ul className="flex">
         {items.map((item) => (
@@ -84,19 +84,22 @@ export function AppShell() {
       >
         {t('shell.skipToContent')}
       </a>
-      <TopBar />
-      {/* Phones: the property context chip does not fit in the top bar. */}
-      <PropertyContext className="flex border-b border-border bg-surface px-4 py-1 sm:hidden" />
-      <OfflineBanner />
-      <UpdateBanner />
-      {session.preview && (
-        <p className="bg-surface-sunken px-4 py-1 text-xs text-text-muted">
-          {t('shell.devPreview')}
-        </p>
-      )}
+      {/* Printed pages (QR sheets, documents) show only the content. */}
+      <div className="print:hidden">
+        <TopBar />
+        {/* Phones: the property context chip does not fit in the top bar. */}
+        <PropertyContext className="flex border-b border-border bg-surface px-4 py-1 sm:hidden" />
+        <OfflineBanner />
+        <UpdateBanner />
+        {session.preview && (
+          <p className="bg-surface-sunken px-4 py-1 text-xs text-text-muted">
+            {t('shell.devPreview')}
+          </p>
+        )}
+      </div>
       <div className="flex flex-1">
         <LeftRail />
-        <main id="main" tabIndex={-1} className="flex-1 p-4 pb-20 md:p-6 md:pb-6">
+        <main id="main" tabIndex={-1} className="flex-1 p-4 pb-20 md:p-6 md:pb-6 print:p-0">
           <Outlet />
         </main>
       </div>

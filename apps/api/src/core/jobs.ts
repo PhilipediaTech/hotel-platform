@@ -35,13 +35,14 @@ export function defineJob<Data extends object = object>(job: JobDefinition<Data>
   return job;
 }
 
+/** Outbox handlers retry with backoff: up to 5 attempts over about a minute. */
+const HANDLER_QUEUE = { retryLimit: 5, retryDelay: 2, retryBackoff: true };
 /**
- * Outbox handlers retry with backoff (up to 5 attempts over about a minute) and wake on
- * NOTIFY, which Postgres delivers when the publishing transaction commits.
+ * Handler jobs run a few at a time and are polled every second. Not LISTEN/NOTIFY: the
+ * publisher inserts jobs inside its own transaction, so a NOTIFY can arrive before the commit,
+ * and with NOTIFY on, pg-boss falls back to a 30-second poll (retries never notify at all).
  */
-const HANDLER_QUEUE = { retryLimit: 5, retryDelay: 2, retryBackoff: true, notify: true };
-/** Handler jobs run a few at a time per worker process. */
-const HANDLER_WORK = { localConcurrency: 4, pollingIntervalSeconds: 2 };
+const HANDLER_WORK = { localConcurrency: 4, pollingIntervalSeconds: 1 };
 
 export interface WorkerOptions extends JobContext {
   databaseUrl: string;
@@ -79,7 +80,7 @@ export async function startWorker(options: WorkerOptions): Promise<RunningWorker
   const duplicate = names.find((n, i) => names.indexOf(n) !== i);
   if (duplicate) throw new Error(`Two jobs or handlers share the queue name ${duplicate}`);
 
-  const boss = new PgBoss({ connectionString: options.databaseUrl, useListenNotify: true });
+  const boss = new PgBoss({ connectionString: options.databaseUrl });
   boss.on('error', (err: unknown) => logger.error({ err }, 'pg-boss error'));
   await boss.start();
 

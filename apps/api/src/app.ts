@@ -27,6 +27,7 @@ import { approvalRoutes } from './modules/approvals/routes.ts';
 import { APPROVAL_HANDLERS } from './approval-actions.ts';
 import type { ApprovalActionHandler } from './core/approvals.ts';
 import { identityRoutes } from './modules/identity/routes.ts';
+import { roomRoutes } from './modules/rooms/routes.ts';
 import { setupRoutes } from './modules/setup/routes.ts';
 
 export const BODY_LIMIT = '100kb';
@@ -118,6 +119,7 @@ export function createApp({
   );
   api.use(fileRoutes({ tenantDb, store: files, clock }));
   api.use(setupRoutes({ db, clock }));
+  api.use(roomRoutes({ db, tenantDb, clock }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

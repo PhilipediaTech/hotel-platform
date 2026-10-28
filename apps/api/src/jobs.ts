@@ -12,6 +12,7 @@ import {
   createLoggingOtpChannel,
 } from './modules/approvals/jobs.ts';
 import { fileScanJob } from './modules/files/jobs.ts';
+import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
 
@@ -19,7 +20,12 @@ export function workerJobs(deps: {
   files: FileStore;
   scanner: FileScanner;
 }): readonly JobDefinition<never>[] {
-  return [cleanupJob, approvalExpiryJob, fileScanJob({ store: deps.files, scanner: deps.scanner })];
+  return [
+    cleanupJob,
+    approvalExpiryJob,
+    fileScanJob({ store: deps.files, scanner: deps.scanner }),
+    roomBlockStatusJob,
+  ];
 }
 
 export function eventHandlers(deps: { db: Db; config: Config; logger: Logger }): EventHandler[] {

@@ -5,6 +5,7 @@ export const SQLSTATE = {
   UNIQUE: '23505',
   FOREIGN_KEY: '23503',
   CHECK: '23514',
+  EXCLUSION: '23P01',
 } as const;
 
 /** Asserts that a write fails on one specific PostgreSQL constraint. */

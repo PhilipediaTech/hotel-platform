@@ -16,6 +16,7 @@ import { ApprovalsPage } from '../routes/approvals.tsx';
 import { AuditLogPage } from '../routes/audit.tsx';
 import { SetupWizardPage } from '../routes/onboarding.tsx';
 import { UsersAndRolesPage } from '../routes/settings/access.tsx';
+import { RoomsSettingsPage } from '../routes/settings/rooms.tsx';
 import { HomeRedirect, NotFoundPage, PlaceholderPage, RouteErrorPage } from '../routes/pages.tsx';
 import { NAV_ITEMS, type NavItem } from './navigation.ts';
 import { SessionGate } from './session-gate.tsx';
@@ -23,6 +24,7 @@ import { SessionGate } from './session-gate.tsx';
 /** Screens that exist; every other navigation path shows its placeholder. */
 const SCREENS: Record<string, ReactElement> = {
   '/settings/access': <UsersAndRolesPage />,
+  '/settings/rooms': <RoomsSettingsPage />,
   '/audit': <AuditLogPage />,
   '/approvals': <ApprovalsPage />,
   '/onboarding': <SetupWizardPage />,

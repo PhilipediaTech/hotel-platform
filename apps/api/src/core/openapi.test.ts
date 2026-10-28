@@ -57,7 +57,9 @@ describe('buildOpenApiDocument', () => {
       'status',
       'arrivalFrom',
     ]);
-    expect(op('/rooms/{roomId}', 'patch').parameters?.map((p) => p.name)).toContain('If-Match');
+    expect(op('/example-rooms/{roomId}', 'patch').parameters?.map((p) => p.name)).toContain(
+      'If-Match',
+    );
   });
 
   it('groups error codes by HTTP status, all using the error envelope', () => {

@@ -36,6 +36,9 @@ export const TENANT_MODELS: Record<string, Scope> = {
   // Every file kind so far belongs to a property; organisation-level files (null property)
   // would need their own scope.
   FileObject: { kind: 'property', organisationField: 'organisationId' },
+  RoomType: { kind: 'property', organisationField: 'organisationId' },
+  Room: { kind: 'property', organisationField: 'organisationId' },
+  RoomBlock: { kind: 'property' },
 };
 
 /** Fields (and values) that pin a row of `model` to `tenant`. */

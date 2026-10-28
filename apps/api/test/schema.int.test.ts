@@ -37,6 +37,9 @@ describe('migrations', () => {
       'property_counters',
       'rate_limit_hits',
       'roles',
+      'room_blocks',
+      'room_types',
+      'rooms',
       'sessions',
       'users',
     ]);

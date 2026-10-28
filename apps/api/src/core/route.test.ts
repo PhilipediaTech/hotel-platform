@@ -118,7 +118,7 @@ describe('mountRoute: input', () => {
     );
     const call = () =>
       request(app)
-        .patch(`/api/v1/rooms/${FOLIO_ID}`)
+        .patch(`/api/v1/example-rooms/${FOLIO_ID}`)
         .set('Origin', APP_ORIGIN)
         .set('X-Property-Id', PROPERTY_ID)
         .send({ name: 'Deluxe 101' });

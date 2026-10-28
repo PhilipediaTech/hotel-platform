@@ -52,7 +52,7 @@ export const EXAMPLE_ROUTES = {
   renameRoom: defineRoute({
     operationId: 'renameRoom',
     method: 'patch',
-    path: '/rooms/{roomId}',
+    path: '/example-rooms/{roomId}',
     summary: 'Rename a room',
     tags: ['Rooms'],
     propertyScoped: true,

@@ -64,6 +64,7 @@ apps/api        @hotel/api      Express 5 app
   src/modules/approvals/        inbox and policies API, default policies, expiry job, OTP stub handler
   src/modules/files/            upload-url / download-url, scanPendingFiles + file-scan job (every minute)
   src/modules/setup/            organisation, properties, setup checklist (checklistFor) and go-live
+  src/modules/rooms/            room types, rooms (If-Match), blocks, room-block-status job (every 15 min)
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
   scripts/openapi.ts            npm run openapi → apps/api/openapi.json (committed; test checks it)
   src/core/request-id.ts        X-Request-Id
@@ -90,6 +91,7 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/routes/audit.tsx          S27 Audit log
   src/routes/approvals.tsx      Approvals inbox; src/routes/settings/approval-policies.tsx S26 policies tab
   src/routes/onboarding.tsx     S02 setup wizard: checklist, step forms, go-live
+  src/routes/settings/rooms.tsx S24 rooms, room types (photos) and QR print sheet; rooms-tab, room-types-tab
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -110,6 +112,7 @@ packages/shared @hotel/shared   errors.ts: ERROR_HTTP_STATUS, ErrorCode, ErrorEn
   src/approvals.ts              APPROVAL_ACTIONS catalogue (protected actions, measures, defaults)
   src/files.ts                  FILE_KINDS catalogue (entity type → permission, types, max size), link lifetimes
   src/setup.ts                  SETUP_STEPS checklist, MANUAL_PAY_METHODS, LOCKED_WHEN_LIVE
+  src/dates.ts                  localDate(instant, timeZone), addDays, daysBetween (YYYY-MM-DD)
   src/permissions.ts            PERMISSIONS catalogue, HOTEL_PERMISSION_CODES, RoleLimits
 docs/           PROGRESS, HANDOFF, VERSIONS, adr/000–023
 ```
@@ -133,10 +136,11 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 - **Protected actions (approvals):** an action in `APPROVAL_ACTIONS` is performed only through `performOrRequest(deps, tenant, handler, payload, reason)` from a route marked `approval: true`; define its `ApprovalActionHandler` (payload schema, `measure`, `execute` that re-validates current state and passes `approvalRequestId` to its audit events) and add it to `APPROVAL_HANDLERS`. Never add an "approve" path of your own.
 - **Files:** a record that takes files adds its kind to `FILE_KINDS` (permission, types, size). The web app uploads with `uploadFile(entityType, file)` (`apps/web/src/lib/files.ts`) and stores the returned file ID on the record; the file opens once the scan job marks it CLEAN (`GET /files/{id}/download-url`, else 409 `FILE_NOT_READY`). Never serve a file any other way. Locally, files land in `.data/files`.
 - **Setup checklist:** a ticket that builds a checklist step (T-031 room types and rooms, T-032 tax, T-033 rates) removes `later` from its entry in `SETUP_STEPS` and adds its check to `stepDone` in `modules/setup/service.ts`. Booking routes (T-042) refuse a property that is not LIVE with 403 `PROPERTY_NOT_LIVE`.
+- **Rooms:** OUT_OF_ORDER/OUT_OF_SERVICE housekeeping status always comes from a `room_blocks` row (the `room-block-status` job keeps them in step); housekeeping (T-080) creates blocks rather than setting those statuses. Availability (T-040/T-041) counts unreleased OUT_OF_ORDER blocks; OUT_OF_SERVICE rooms stay counted but are not assignable. Versioned resources answer with `ETag` and take `If-Match: "<version>"` (see `modules/rooms/routes.ts`). Test sessions on a fixed clock: `sessionCookie(db, userId, clock)`.
 - **Local sign-in:** `npm run seed`, then any `<role-slug>@demo.hotel.test` (e.g. `owner@`, `front-desk@`) with `SEED_USER_PASSWORD` from `.env`. Verification and reset links are printed in the API log.
 - **MFA and PINs locally:** Owner, GM and Finance demo users must set up MFA at first sign-in; generate codes from the shown key with `node --input-type=module -e "import { generate } from 'otplib'; console.log(await generate({ secret: '<key>' }))"` (run in `apps/api`). For PIN switching: set a PIN at `/account/pin` (e.g. as `front-desk@`), sign in as `dept-manager@` with "shared device" ticked, then Account menu → Switch user. Integration tests for these flows use `test/auth.ts`.
 - **Lockfile:** never regenerate it with `node_modules` or the old lock present (npm/cli#4828 drops platform bindings); follow the procedure in PROGRESS decisions. After any dependency change, `grep -c "node_modules/@rolldown/binding-" package-lock.json` must print 15.
 
 ## Next step
 
-T-031 room types, rooms, QR tokens and blocks (M2-01–M2-03): it also turns the "room types" and "rooms" setup steps into real checks (see Setup checklist above). Still waiting for accounts: the R2 adapter and scan engine (T-023 runs on a local store and fake scanner), T-024 notifications (SES, WhatsApp), T-025 nightly dump to R2, T-005 staging (paid accounts: stop and ask).
+T-032 revenue codes, tax rules and versions, shared tax calculator. Stop and ask Philip first: the tax stack per state (VAT, state consumption taxes, service charge) is an open decision. Then T-033 rates (also turns the rates setup step into a real check). Still waiting for accounts: R2 and the scan engine (T-023 runs on a local store and fake scanner), T-024 notifications (SES, WhatsApp), T-025 nightly dump, T-005 staging (paid: stop and ask).

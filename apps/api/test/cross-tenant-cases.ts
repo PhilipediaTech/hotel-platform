@@ -1,7 +1,7 @@
 import type { OperationId } from '@hotel/shared';
 import { expect } from 'vitest';
 import type { Db } from '../src/core/db.ts';
-import { makeRole, makeUser } from './factories.ts';
+import { makeRole, makeRoom, makeRoomType, makeUser } from './factories.ts';
 import type { CrossTenantCase, TenantWorld } from './tenancy.ts';
 
 /**
@@ -148,6 +148,38 @@ async function bPropertyUnchanged(db: Db, world: TenantWorld) {
   expect([b1.name, b1.status]).toEqual([world.b1.name, 'SETUP']);
 }
 
+async function bRoomType(db: Db, world: TenantWorld, propertyId: string) {
+  const type = await makeRoomType(db, { id: propertyId, organisationId: orgOf(world, propertyId) });
+  return { roomTypeId: type.id };
+}
+
+async function bRoom(db: Db, world: TenantWorld, propertyId: string) {
+  const type = await makeRoomType(db, { id: propertyId, organisationId: orgOf(world, propertyId) });
+  const room = await makeRoom(db, type, { number: '101' });
+  return { roomId: room.id, roomTypeId: type.id };
+}
+
+async function bBlock(db: Db, world: TenantWorld, propertyId: string) {
+  const { roomId } = await bRoom(db, world, propertyId);
+  const block = await db.roomBlock.create({
+    data: {
+      propertyId,
+      roomId,
+      kind: 'OUT_OF_ORDER',
+      startDate: new Date('2099-01-01'),
+      endDate: new Date('2099-01-05'),
+      reason: 'Leak test',
+      createdById: world.bStaff.id,
+    },
+  });
+  return { blockId: block.id };
+}
+
+async function bRoomUnchanged(db: Db, _world: TenantWorld, theirs: Record<string, string>) {
+  const room = await db.room.findUniqueOrThrow({ where: { id: theirs['roomId'] ?? '' } });
+  expect([room.floor, room.version, room.hkStatus]).toEqual([null, 0, 'DIRTY']);
+}
+
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
   createRole: {
@@ -275,4 +307,65 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bPropertyUnchanged,
   },
   goLiveProperty: { seed: bProperty, untouched: bPropertyUnchanged },
+  listRoomTypes: { seed: bRoomType, listIds: ids },
+  createRoomType: {
+    seed: bRoomType,
+    creates: true,
+    body: () => ({ code: 'LEAK', name: 'Leak' }),
+    untouched: async (db, world) => {
+      expect(await db.roomType.count({ where: { propertyId: world.b1.id } })).toBe(1);
+    },
+  },
+  updateRoomType: {
+    seed: bRoomType,
+    body: () => ({ name: 'Leak' }),
+    untouched: async (db, _w, theirs) => {
+      const type = await db.roomType.findUniqueOrThrow({
+        where: { id: theirs['roomTypeId'] ?? '' },
+      });
+      expect(type.name).not.toBe('Leak');
+    },
+  },
+  listRooms: {
+    seed: bRoom,
+    listIds: (body) =>
+      (body as { data: { id: string; roomTypeId: string }[] }).data.flatMap((r) => [
+        r.id,
+        r.roomTypeId,
+      ]),
+  },
+  createRoom: {
+    // B's room type from A1: refused as unknown, and nothing is created in B.
+    seed: bRoomType,
+    creates: true,
+    body: (theirs) => ({ number: '999', roomTypeId: theirs['roomTypeId'] }),
+    untouched: async (db, world) => {
+      expect(await db.room.count({ where: { propertyId: world.b1.id } })).toBe(0);
+    },
+  },
+  updateRoom: { seed: bRoom, body: () => ({ floor: '9' }), untouched: bRoomUnchanged },
+  createRoomBlock: {
+    seed: bRoom,
+    creates: true,
+    body: (theirs) => ({
+      roomId: theirs['roomId'],
+      kind: 'OUT_OF_ORDER',
+      startDate: '2099-02-01',
+      endDate: '2099-02-03',
+      reason: 'Leak',
+    }),
+    untouched: async (db, world, theirs) => {
+      expect(await db.roomBlock.count({ where: { propertyId: world.b1.id } })).toBe(0);
+      await bRoomUnchanged(db, world, theirs);
+    },
+  },
+  releaseRoomBlock: {
+    seed: bBlock,
+    untouched: async (db, _w, theirs) => {
+      const block = await db.roomBlock.findUniqueOrThrow({
+        where: { id: theirs['blockId'] ?? '' },
+      });
+      expect(block.releasedAt).toBeNull();
+    },
+  },
 };

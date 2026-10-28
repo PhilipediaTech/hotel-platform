@@ -3,7 +3,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { expect } from 'vitest';
 import { createSession } from '../src/core/auth.ts';
-import { systemClock } from '../src/core/clock.ts';
+import { systemClock, type Clock } from '../src/core/clock.ts';
 import type { Db } from '../src/core/db.ts';
 import { resolveTenant, type TenantContext } from '../src/core/tenancy.ts';
 import { makeOrganisation, makeProperty, makeRole, makeUser } from './factories.ts';
@@ -62,9 +62,14 @@ export async function tenantFor(
 }
 
 /** A signed-in, MFA-passed session for `userId`, as a Cookie header value. */
-export async function sessionCookie(db: Db, userId: string): Promise<string> {
+/** A signed-in, MFA-passed session; pass the test clock when the app runs on one. */
+export async function sessionCookie(
+  db: Db,
+  userId: string,
+  clock: Clock = systemClock,
+): Promise<string> {
   const { token } = await createSession(
-    { db, config: TEST_CONFIG, clock: systemClock },
+    { db, config: TEST_CONFIG, clock },
     { userId, sharedDevice: false, mfaPassed: true },
   );
   return `sid=${token}`;

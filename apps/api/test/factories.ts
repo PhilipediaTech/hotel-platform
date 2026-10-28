@@ -45,3 +45,34 @@ export async function makeTenant(db: Db) {
   const role = await makeRole(db, organisation.id);
   return { organisation, property, role };
 }
+
+export function makeRoomType(
+  db: Db,
+  property: { id: string; organisationId: string },
+  data: { code?: string; name?: string } = {},
+) {
+  return db.roomType.create({
+    data: {
+      organisationId: property.organisationId,
+      propertyId: property.id,
+      code: data.code ?? `T${uid().slice(0, 6).toUpperCase()}`,
+      name: data.name ?? `Type ${uid()}`,
+    },
+  });
+}
+
+export function makeRoom(
+  db: Db,
+  roomType: { id: string; propertyId: string; organisationId: string },
+  data: { number?: string } = {},
+) {
+  return db.room.create({
+    data: {
+      organisationId: roomType.organisationId,
+      propertyId: roomType.propertyId,
+      roomTypeId: roomType.id,
+      number: data.number ?? uid().slice(0, 6),
+      qrToken: `qr-${uid()}`,
+    },
+  });
+}

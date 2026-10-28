@@ -109,9 +109,11 @@ async function stepDone(
       return (settingsOf(p).paymentMethods ?? []).length > 0;
     case 'staff':
       return hasStaff(db, p, now);
-    case 'tax':
     case 'room-types':
+      return (await db.roomType.count({ where: { propertyId: p.id, active: true } })) > 0;
     case 'rooms':
+      return (await db.room.count({ where: { propertyId: p.id, active: true } })) > 0;
+    case 'tax':
     case 'rates':
       // Not built yet (SETUP_STEPS `later`); their tickets add the check here.
       return false;

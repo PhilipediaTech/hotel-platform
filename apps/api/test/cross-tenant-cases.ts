@@ -301,6 +301,70 @@ async function bGuestUnchanged(db: Db, world: TenantWorld) {
   expect(companies.map((c) => [c.name, c.active])).toEqual([['Leak Ltd', true]]);
 }
 
+/** B's confirmed reservation with one stay, made from a quote of B's plan. */
+async function bReservation(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  const plan = await bPlan(db, world, propertyId);
+  const { guestId } = await bGuest(db, world, propertyId);
+  const quote = await db.quote.create({
+    data: {
+      propertyId,
+      ratePlanId: plan.ratePlanId,
+      roomTypeId: plan.roomTypeId,
+      arrival: new Date('2099-01-01'),
+      departure: new Date('2099-01-02'),
+      nights: [
+        {
+          date: '2099-01-01',
+          amountMinor: '100',
+          ruleVersion: 1,
+          pricedBy: plan.ratePlanId,
+          lines: [],
+          guests: 1,
+        },
+      ],
+      taxes: [],
+      totalMinor: 100n,
+      currency: 'NGN',
+      expiresAt: new Date('2099-01-01'),
+    },
+  });
+  const reservation = await db.reservation.create({
+    data: {
+      organisationId,
+      propertyId,
+      confirmationNo: 'B-00001',
+      bookerGuestId: guestId,
+      source: 'PHONE',
+      history: { create: { toStatus: 'CONFIRMED' } },
+    },
+  });
+  await db.stay.create({
+    data: {
+      propertyId,
+      reservationId: reservation.id,
+      guestId,
+      roomTypeId: plan.roomTypeId,
+      ratePlanId: plan.ratePlanId,
+      quoteId: quote.id,
+      arrival: quote.arrival,
+      departure: quote.departure,
+      status: 'CONFIRMED',
+    },
+  });
+  return { reservationId: reservation.id, guestId, quoteId: quote.id };
+}
+
+async function bReservationUnchanged(db: Db, world: TenantWorld) {
+  const rows = await db.reservation.findMany({
+    where: { propertyId: world.b1.id },
+    include: { stays: true },
+  });
+  expect(rows.map((r) => [r.status, r.version, r.notes, r.stays.length])).toEqual([
+    ['CONFIRMED', 0, null, 1],
+  ]);
+}
+
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
   createRole: {
@@ -669,6 +733,31 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   getCompany: { seed: bGuest },
   updateCompany: { seed: bGuest, body: () => ({ active: false }), untouched: bGuestUnchanged },
+  listReservations: { seed: bReservation, listIds: ids },
+  createReservation: {
+    // B's quote and guest from A1: refused, and nothing is booked in B.
+    seed: bReservation,
+    creates: true,
+    body: (theirs) => ({
+      source: 'PHONE',
+      booker: { guestId: theirs['guestId'] },
+      stays: [{ quoteId: theirs['quoteId'] }],
+    }),
+    untouched: bReservationUnchanged,
+  },
+  getReservation: { seed: bReservation },
+  updateReservation: {
+    seed: bReservation,
+    body: () => ({ notes: 'Leak' }),
+    untouched: bReservationUnchanged,
+  },
+  cancelReservation: {
+    seed: bReservation,
+    body: () => ({ reason: 'OTHER' }),
+    untouched: bReservationUnchanged,
+  },
+  reinstateReservation: { seed: bReservation, untouched: bReservationUnchanged },
+  getReservationHistory: { seed: bReservation },
   releaseRoomBlock: {
     seed: bBlock,
     untouched: async (db, _w, theirs) => {

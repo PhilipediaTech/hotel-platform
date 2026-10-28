@@ -24,13 +24,14 @@ import { mountRoute } from './core/route.ts';
 import { accessRoutes } from './modules/access/routes.ts';
 import { auditRoutes } from './modules/audit/routes.ts';
 import { approvalRoutes } from './modules/approvals/routes.ts';
-import { APPROVAL_HANDLERS } from './approval-actions.ts';
+import { approvalHandlers as defaultApprovalHandlers } from './approval-actions.ts';
 import type { ApprovalActionHandler } from './core/approvals.ts';
 import { identityRoutes } from './modules/identity/routes.ts';
 import { availabilityRoutes } from './modules/availability/routes.ts';
 import { guestRoutes } from './modules/guests/routes.ts';
 import { importRoutes } from './modules/imports/routes.ts';
 import { rateRoutes } from './modules/rates/routes.ts';
+import { reservationRoutes } from './modules/reservations/routes.ts';
 import { roomRoutes } from './modules/rooms/routes.ts';
 import { setupRoutes } from './modules/setup/routes.ts';
 import { taxRoutes } from './modules/tax/routes.ts';
@@ -60,7 +61,7 @@ export function createApp({
   files,
   clock = systemClock,
   routes,
-  approvalHandlers = APPROVAL_HANDLERS,
+  approvalHandlers,
 }: AppOptions): Express {
   const app = express();
   app.disable('x-powered-by');
@@ -118,7 +119,7 @@ export function createApp({
       db,
       tenantDb,
       clock,
-      handlers: approvalHandlers,
+      handlers: approvalHandlers ?? defaultApprovalHandlers({ db, tenantDb, clock }),
       otpSecret: config.sessionSecret,
     }),
   );
@@ -130,6 +131,7 @@ export function createApp({
   api.use(importRoutes({ db, tenantDb, store: files, clock }));
   api.use(availabilityRoutes({ db, tenantDb, clock }));
   api.use(guestRoutes({ tenantDb, clock }));
+  api.use(reservationRoutes({ db, tenantDb, clock }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

@@ -23,7 +23,7 @@ export const EXAMPLE_ROUTES = {
   listReservations: defineRoute({
     operationId: 'listReservations',
     method: 'get',
-    path: '/reservations',
+    path: '/example-reservations',
     summary: 'List reservations',
     tags: ['Reservations'],
     propertyScoped: true,

@@ -1,0 +1,312 @@
+import { z } from 'zod';
+import { BOOKING_SOURCES, CANCEL_REASONS, RESERVATION_STATUSES } from '../reservations.ts';
+import { Email, Phone } from './auth.ts';
+import { defineRoute } from './contract.ts';
+import { AmountMinor, Instant, IsoDate, page, PageQuery, Uuid } from './primitives.ts';
+import { GUARANTEES } from './rates.ts';
+
+// Reservations (tab 4 row "Reservations" and the POST /reservations example; PRD M3-01–M3-05,
+// M3 rules 1 and 8; S09; T-042). A booking is made from quotes (one per room), so it charges
+// exactly the quoted nights; it takes inventory in the same transaction (sold when confirmed,
+// held while tentative) and answers BOOKING_CONFLICT when a night has no room left.
+
+const Name = z.string().trim().min(1).max(80);
+
+/** An existing guest, or the details of a new one (a profile is created). */
+export const Booker = z
+  .object({
+    guestId: Uuid.nullable().default(null),
+    firstName: Name.optional(),
+    lastName: Name.optional(),
+    phone: Phone.nullable().default(null),
+    email: Email.nullable().default(null),
+  })
+  .refine((b) => b.guestId !== null || (b.firstName && b.lastName), {
+    message: 'Choose a guest or give a first and last name',
+    path: ['lastName'],
+  });
+
+export const StayGuest = z
+  .object({
+    sameAsBooker: z.boolean().default(false),
+    guestId: Uuid.nullable().default(null),
+    firstName: Name.optional(),
+    lastName: Name.optional(),
+    phone: Phone.nullable().default(null),
+    email: Email.nullable().default(null),
+  })
+  .refine((g) => g.sameAsBooker || g.guestId !== null || (g.firstName && g.lastName), {
+    message: 'Same as the booker, a guest, or a first and last name',
+    path: ['lastName'],
+  });
+
+export const NewStay = z.object({
+  quoteId: Uuid,
+  /** Must add up to the guests the quote was priced for; defaults to that many adults. */
+  adults: z.number().int().min(1).max(20).optional(),
+  children: z.number().int().min(0).max(20).optional(),
+  guest: StayGuest.default({
+    sameAsBooker: true,
+    guestId: null,
+    phone: null,
+    email: null,
+  }),
+  /** Assigning rooms arrives with T-050; send null. */
+  roomId: Uuid.nullable().default(null),
+});
+
+export const ReservationBody = z.object({
+  source: z.enum(BOOKING_SOURCES),
+  guarantee: z.enum(GUARANTEES).default('NONE'),
+  /** Set for a tentative hold (M3-02): inventory is held until then, then released. */
+  holdUntil: Instant.nullable().default(null),
+  booker: Booker,
+  companyId: Uuid.nullable().default(null),
+  /** One stay per room (M3-05): one booker, a guest per room. */
+  stays: z.array(NewStay).min(1).max(20),
+  notes: z.string().trim().max(2000).nullable().default(null),
+  /** Needed when a guest is flagged do-not-rent and a manager must approve (M3 rule 8). */
+  approvalReason: z.string().trim().max(500).optional(),
+});
+
+const GuestRef = z.object({
+  id: Uuid,
+  firstName: z.string(),
+  lastName: z.string(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+});
+
+export const StayItem = z
+  .object({
+    id: Uuid,
+    status: z.enum(RESERVATION_STATUSES),
+    guest: GuestRef,
+    roomTypeId: Uuid,
+    roomTypeName: z.string(),
+    roomId: Uuid.nullable(),
+    ratePlanId: Uuid,
+    ratePlanCode: z.string(),
+    arrival: IsoDate,
+    departure: IsoDate,
+    adults: z.number().int(),
+    children: z.number().int(),
+    folioId: Uuid.nullable(),
+    /** Nightly prices as quoted (M2 rule 4). */
+    nights: z.array(z.object({ date: IsoDate, amountMinor: AmountMinor })),
+    /** What the guest pays for this stay, taxes included (from its quote). */
+    totalMinor: AmountMinor,
+    version: z.number().int(),
+  })
+  .meta({ id: 'Stay' });
+
+export const ReservationItem = z
+  .object({
+    id: Uuid,
+    confirmationNo: z.string(),
+    status: z.enum(RESERVATION_STATUSES),
+    source: z.enum(BOOKING_SOURCES),
+    guarantee: z.enum(GUARANTEES),
+    holdExpiresAt: Instant.nullable(),
+    booker: GuestRef,
+    company: z.object({ id: Uuid, name: z.string() }).nullable(),
+    notes: z.string().nullable(),
+    cancelReason: z.string().nullable(),
+    cancelledAt: Instant.nullable(),
+    currency: z.string(),
+    totalMinor: AmountMinor,
+    /** First night of each stay when the guarantee is DEPOSIT, else 0. */
+    depositDueMinor: AmountMinor,
+    stays: z.array(StayItem),
+    createdAt: Instant,
+    updatedAt: Instant,
+    /** Send as `If-Match: "<version>"` when changing the reservation. */
+    version: z.number().int(),
+  })
+  .meta({ id: 'Reservation' });
+
+export const ReservationSummary = z
+  .object({
+    id: Uuid,
+    confirmationNo: z.string(),
+    status: z.enum(RESERVATION_STATUSES),
+    source: z.enum(BOOKING_SOURCES),
+    bookerName: z.string(),
+    arrival: IsoDate,
+    departure: IsoDate,
+    rooms: z.number().int(),
+    totalMinor: AmountMinor,
+    holdExpiresAt: Instant.nullable(),
+  })
+  .meta({ id: 'ReservationSummary' });
+
+export const ReservationQuery = PageQuery.extend({
+  /** Confirmation number, or the start of the booker's last name, or phone digits. */
+  q: z.string().trim().max(100).optional(),
+  status: z.enum(RESERVATION_STATUSES).optional(),
+  /** Stays arriving from (inclusive) … to (inclusive). */
+  arrivalFrom: IsoDate.optional(),
+  arrivalTo: IsoDate.optional(),
+});
+
+const ReservationParams = z.object({ reservationId: Uuid });
+
+export const listReservations = defineRoute({
+  operationId: 'listReservations',
+  method: 'get',
+  path: '/reservations',
+  summary: 'Find reservations (newest first)',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'frontdesk.read',
+  query: ReservationQuery,
+  response: page(ReservationSummary),
+});
+
+export const createReservation = defineRoute({
+  operationId: 'createReservation',
+  method: 'post',
+  path: '/reservations',
+  summary: 'Book one or more rooms from quotes',
+  description:
+    'Each stay names a quote (POST /quotes) that has not expired; its nights and prices are kept. With `holdUntil` the booking is a tentative hold that is released when it runs out; without, it is confirmed. A do-not-rent guest needs a manager’s approval: the answer is 202 with the request (give `approvalReason`), unless the caller can approve.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.create',
+  idempotent: true,
+  approval: true,
+  body: ReservationBody,
+  status: 201,
+  response: ReservationItem,
+  errors: ['BOOKING_CONFLICT', 'PROPERTY_NOT_LIVE', 'STATE_TRANSITION_INVALID'],
+});
+
+export const getReservation = defineRoute({
+  operationId: 'getReservation',
+  method: 'get',
+  path: '/reservations/{reservationId}',
+  summary: 'A reservation with its stays',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'frontdesk.read',
+  params: ReservationParams,
+  response: ReservationItem,
+});
+
+export const StayChange = z.object({
+  stayId: Uuid,
+  /** A new quote: new dates, room type or plan (M3-03). */
+  quoteId: Uuid.optional(),
+  adults: z.number().int().min(1).max(20).optional(),
+  children: z.number().int().min(0).max(20).optional(),
+  guestId: Uuid.optional(),
+});
+
+export const ReservationPatchBody = z
+  .object({
+    notes: z.string().trim().max(2000).nullable().optional(),
+    guarantee: z.enum(GUARANTEES).optional(),
+    companyId: Uuid.nullable().optional(),
+    /** A tentative hold only: move its expiry. */
+    holdUntil: Instant.optional(),
+    /** Turn a tentative hold into a confirmed booking. */
+    confirm: z.literal(true).optional(),
+    stays: z.array(StayChange).min(1).max(20).optional(),
+  })
+  .refine((b) => Object.values(b).some((v) => v !== undefined), {
+    message: 'Change at least one thing',
+  });
+
+export const ReservationChange = ReservationItem.extend({
+  /** New total minus the old one (negative when the guest now pays less). */
+  differenceMinor: AmountMinor,
+}).meta({ id: 'ReservationChange' });
+
+export const updateReservation = defineRoute({
+  operationId: 'updateReservation',
+  method: 'patch',
+  path: '/reservations/{reservationId}',
+  summary: 'Change a reservation: details, a stay’s quote or guests, or confirm a hold',
+  description:
+    'A stay changed to a new quote gives back its old nights and takes the new ones in one transaction (BOOKING_CONFLICT if a night is full); the answer says how much the total changed.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.modify',
+  ifMatch: true,
+  params: ReservationParams,
+  body: ReservationPatchBody,
+  response: ReservationChange,
+  errors: ['BOOKING_CONFLICT', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
+});
+
+export const CancelBody = z.object({
+  reason: z.enum(CANCEL_REASONS),
+  note: z.string().trim().max(500).nullable().default(null),
+});
+
+export const ReservationCancelled = ReservationItem.extend({
+  /** Cancellation fee per the plans' policies; posted to the folio with T-060. */
+  feeMinor: AmountMinor,
+}).meta({ id: 'ReservationCancelled' });
+
+export const cancelReservation = defineRoute({
+  operationId: 'cancelReservation',
+  method: 'post',
+  path: '/reservations/{reservationId}/cancel',
+  summary: 'Cancel with a reason; gives back the rooms and works out the fee',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.cancel',
+  idempotent: true,
+  params: ReservationParams,
+  body: CancelBody,
+  response: ReservationCancelled,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const reinstateReservation = defineRoute({
+  operationId: 'reinstateReservation',
+  method: 'post',
+  path: '/reservations/{reservationId}/reinstate',
+  summary: 'Bring back a cancelled reservation if its rooms are still free',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.modify',
+  idempotent: true,
+  params: ReservationParams,
+  response: ReservationItem,
+  errors: ['BOOKING_CONFLICT', 'STATE_TRANSITION_INVALID'],
+});
+
+export const ReservationHistoryItem = z
+  .object({
+    at: Instant,
+    stayId: Uuid.nullable(),
+    fromStatus: z.enum(RESERVATION_STATUSES).nullable(),
+    toStatus: z.enum(RESERVATION_STATUSES),
+    reason: z.string().nullable(),
+    byName: z.string().nullable(),
+  })
+  .meta({ id: 'ReservationHistoryItem' });
+
+export const getReservationHistory = defineRoute({
+  operationId: 'getReservationHistory',
+  method: 'get',
+  path: '/reservations/{reservationId}/history',
+  summary: 'Status changes of a reservation, oldest first',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'frontdesk.read',
+  params: ReservationParams,
+  response: z.object({ data: z.array(ReservationHistoryItem) }),
+});
+
+export const RESERVATION_ROUTES = {
+  listReservations,
+  createReservation,
+  getReservation,
+  updateReservation,
+  cancelReservation,
+  reinstateReservation,
+  getReservationHistory,
+} as const;

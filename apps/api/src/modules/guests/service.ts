@@ -248,8 +248,11 @@ export async function flagGuest(
  * Points everything that refers to `fromId` at `toId`. Nothing refers to guests yet; T-042
  * (reservations, stays) and T-060 (folios) add their updates here.
  */
-async function moveGuestReferences(_tx: Tx, _fromId: string, _toId: string): Promise<void> {
-  // Reservations, stays and folios arrive with T-042 and T-060.
+async function moveGuestReferences(tx: Tx, fromId: string, toId: string): Promise<void> {
+  // Guest IDs belong to one organisation, so this reaches every property's bookings of it.
+  await tx.$executeRaw`UPDATE reservations SET booker_guest_id = ${toId}::uuid WHERE booker_guest_id = ${fromId}::uuid`;
+  await tx.$executeRaw`UPDATE stays SET guest_id = ${toId}::uuid WHERE guest_id = ${fromId}::uuid`;
+  // Folios arrive with T-060.
 }
 
 /** M3 rule: keep the oldest profile, move everything onto it, audit both IDs. */

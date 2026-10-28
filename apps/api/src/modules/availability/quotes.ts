@@ -67,6 +67,8 @@ export interface QuoteNight {
   /** The plan whose day priced it: the plan itself, or its parent for derived prices. */
   pricedBy: string;
   lines: QuoteLine[];
+  /** Guests it was priced for (package parts per person); bookings must match (T-042). */
+  guests?: number;
 }
 
 interface Pricing {
@@ -404,7 +406,7 @@ export async function createQuote(
       roomTypeId: type.id,
       arrival: dbDate(body.arrival),
       departure: dbDate(body.departure),
-      nights: p.nights as unknown as object,
+      nights: p.nights.map((n) => ({ ...n, guests })) as unknown as object,
       taxes,
       totalMinor: p.totalMinor,
       currency,

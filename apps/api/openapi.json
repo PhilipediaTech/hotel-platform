@@ -2000,6 +2000,228 @@
           "overbookLimit",
           "available"
         ]
+      },
+      "AvailabilityRoomType": {
+        "type": "object",
+        "properties": {
+          "roomTypeId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "maxOccupancy": {
+            "type": "integer"
+          },
+          "available": {
+            "type": "integer"
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AvailabilityPlan"
+            }
+          }
+        },
+        "required": [
+          "roomTypeId",
+          "code",
+          "name",
+          "maxOccupancy",
+          "available",
+          "plans"
+        ]
+      },
+      "AvailabilityPlan": {
+        "type": "object",
+        "properties": {
+          "ratePlanId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "BAR",
+              "DERIVED",
+              "PACKAGE",
+              "DAY_USE",
+              "NEGOTIATED"
+            ]
+          },
+          "mealPlan": {
+            "type": "string",
+            "enum": [
+              "ROOM_ONLY",
+              "BREAKFAST",
+              "HALF_BOARD",
+              "FULL_BOARD"
+            ]
+          },
+          "guarantee": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "DEPOSIT",
+              "CARD_ON_FILE",
+              "COMPANY"
+            ]
+          },
+          "roomMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "totalMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "sellable": {
+            "type": "boolean"
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RestrictionViolation"
+            }
+          }
+        },
+        "required": [
+          "ratePlanId",
+          "code",
+          "name",
+          "kind",
+          "mealPlan",
+          "guarantee",
+          "roomMinor",
+          "totalMinor",
+          "sellable",
+          "violations"
+        ]
+      },
+      "RestrictionViolation": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "type": "string",
+            "enum": [
+              "STOP_SELL",
+              "CLOSED_TO_ARRIVAL",
+              "CLOSED_TO_DEPARTURE",
+              "MIN_STAY",
+              "MAX_STAY",
+              "NO_PRICE"
+            ]
+          },
+          "date": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule",
+          "date"
+        ]
+      },
+      "Quote": {
+        "type": "object",
+        "properties": {
+          "quoteId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "ratePlanId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "roomTypeId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "arrival": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "departure": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "nights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "$ref": "#/components/schemas/IsoDate"
+                },
+                "amountMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "ruleVersion": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "date",
+                "amountMinor",
+                "ruleVersion"
+              ]
+            }
+          },
+          "taxes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "amountMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                }
+              },
+              "required": [
+                "code",
+                "name",
+                "amountMinor"
+              ]
+            }
+          },
+          "netMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "totalMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "expiresAt": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "required": [
+          "quoteId",
+          "ratePlanId",
+          "roomTypeId",
+          "arrival",
+          "departure",
+          "currency",
+          "nights",
+          "taxes",
+          "netMinor",
+          "totalMinor",
+          "createdAt",
+          "expiresAt"
+        ]
       }
     },
     "parameters": {}
@@ -10819,6 +11041,328 @@
           },
           "409": {
             "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/availability": {
+      "get": {
+        "operationId": "getAvailability",
+        "summary": "Room types that fit the guests, rooms left, and the price per rate plan",
+        "tags": [
+          "Availability"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Overnight stays from today, at most 60 nights. Day-use plans are quoted with day-use bookings (T-052).",
+        "x-permission": "availability.read",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": true,
+            "name": "arrival",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": true,
+            "name": "departure",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "required": true,
+            "name": "adults",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 20,
+              "default": 0
+            },
+            "required": false,
+            "name": "children",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": false,
+            "name": "roomTypeId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "arrival": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "departure": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "nights": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "roomTypes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AvailabilityRoomType"
+                      }
+                    }
+                  },
+                  "required": [
+                    "arrival",
+                    "departure",
+                    "nights",
+                    "currency",
+                    "roomTypes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotes": {
+      "post": {
+        "operationId": "createQuote",
+        "summary": "Price a stay on one rate plan; the quote holds for 30 minutes",
+        "tags": [
+          "Availability"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Answers 422 RESTRICTION_VIOLATED with details.violations (min/max stay, closed to arrival or departure, stop-sell, no price), 409 BOOKING_CONFLICT with details.dates when no room of the type is left, and 409 STATE_TRANSITION_INVALID when the property has no room revenue code yet.",
+        "x-permission": "availability.read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arrival": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "departure": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "adults": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "children": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 20,
+                    "default": 0
+                  },
+                  "roomTypeId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "ratePlanId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  }
+                },
+                "required": [
+                  "arrival",
+                  "departure",
+                  "adults",
+                  "roomTypeId",
+                  "ratePlanId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `BOOKING_CONFLICT`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule violated: `RESTRICTION_VIOLATED`",
             "content": {
               "application/json": {
                 "schema": {

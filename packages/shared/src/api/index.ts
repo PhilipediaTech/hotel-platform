@@ -8,6 +8,7 @@ export * from './imports.ts';
 export * from './inventory.ts';
 export * from './primitives.ts';
 export * from './properties.ts';
+export * from './quotes.ts';
 export * from './rates.ts';
 export * from './rooms.ts';
 export * from './tax.ts';

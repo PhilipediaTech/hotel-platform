@@ -47,6 +47,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   RateDay: { kind: 'property' },
   ImportJob: { kind: 'property' },
   RoomTypeInventory: { kind: 'property' },
+  Quote: { kind: 'property' },
   // Components have no property column: reach them through their (scoped) rate plan.
 };
 

@@ -284,6 +284,23 @@ async function bInventory(db: Db, world: TenantWorld, propertyId: string) {
   return { roomTypeId };
 }
 
+async function bGuest(db: Db, world: TenantWorld, propertyId: string) {
+  const guest = await db.guest.create({
+    data: { organisationId: orgOf(world, propertyId), firstName: 'Bola', lastName: 'Leak' },
+  });
+  const company = await db.company.create({
+    data: { organisationId: orgOf(world, propertyId), kind: 'COMPANY', name: 'Leak Ltd' },
+  });
+  return { guestId: guest.id, companyId: company.id };
+}
+
+async function bGuestUnchanged(db: Db, world: TenantWorld) {
+  const guests = await db.guest.findMany({ where: { organisationId: world.orgB.id } });
+  expect(guests.map((g) => [g.firstName, g.vip, g.mergedIntoId])).toEqual([['Bola', false, null]]);
+  const companies = await db.company.findMany({ where: { organisationId: world.orgB.id } });
+  expect(companies.map((c) => [c.name, c.active])).toEqual([['Leak Ltd', true]]);
+}
+
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
   createRole: {
@@ -624,6 +641,34 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       expect(await db.quote.count({ where: { propertyId: world.b1.id } })).toBe(0);
     },
   },
+  listGuests: { seed: bGuest, listIds: ids },
+  createGuest: {
+    seed: bGuest,
+    creates: true,
+    body: () => ({ firstName: 'Ada', lastName: 'Obi' }),
+    untouched: bGuestUnchanged,
+  },
+  getGuest: { seed: bGuest },
+  updateGuest: { seed: bGuest, body: () => ({ firstName: 'Leak' }), untouched: bGuestUnchanged },
+  mergeGuests: {
+    seed: bGuest,
+    body: (theirs) => ({ otherGuestId: theirs['guestId'] }),
+    untouched: bGuestUnchanged,
+  },
+  flagGuest: {
+    seed: bGuest,
+    body: () => ({ vip: true, doNotRent: false, reason: 'Leak' }),
+    untouched: bGuestUnchanged,
+  },
+  listCompanies: { seed: bGuest, listIds: ids },
+  createCompany: {
+    seed: bGuest,
+    creates: true,
+    body: () => ({ kind: 'COMPANY', name: 'Leak 2' }),
+    untouched: bGuestUnchanged,
+  },
+  getCompany: { seed: bGuest },
+  updateCompany: { seed: bGuest, body: () => ({ active: false }), untouched: bGuestUnchanged },
   releaseRoomBlock: {
     seed: bBlock,
     untouched: async (db, _w, theirs) => {

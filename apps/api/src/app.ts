@@ -28,6 +28,7 @@ import { APPROVAL_HANDLERS } from './approval-actions.ts';
 import type { ApprovalActionHandler } from './core/approvals.ts';
 import { identityRoutes } from './modules/identity/routes.ts';
 import { availabilityRoutes } from './modules/availability/routes.ts';
+import { guestRoutes } from './modules/guests/routes.ts';
 import { importRoutes } from './modules/imports/routes.ts';
 import { rateRoutes } from './modules/rates/routes.ts';
 import { roomRoutes } from './modules/rooms/routes.ts';
@@ -128,6 +129,7 @@ export function createApp({
   api.use(rateRoutes({ db, tenantDb, clock }));
   api.use(importRoutes({ db, tenantDb, store: files, clock }));
   api.use(availabilityRoutes({ db, tenantDb, clock }));
+  api.use(guestRoutes({ tenantDb, clock }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

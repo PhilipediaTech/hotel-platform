@@ -48,6 +48,9 @@ export const TENANT_MODELS: Record<string, Scope> = {
   ImportJob: { kind: 'property' },
   RoomTypeInventory: { kind: 'property' },
   Quote: { kind: 'property' },
+  // Guests and companies belong to the organisation: every property sees them.
+  Guest: { kind: 'organisation' },
+  Company: { kind: 'organisation' },
   // Components have no property column: reach them through their (scoped) rate plan.
 };
 

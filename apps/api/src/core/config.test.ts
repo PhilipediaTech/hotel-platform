@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from './config.ts';
 
@@ -23,7 +24,15 @@ describe('loadConfig', () => {
       mfaKey: Buffer.alloc(32, 7),
       cookieDomain: undefined,
       cookieSecure: false,
+      localFilesDir: path.resolve(import.meta.dirname, '../../../../.data/files'),
     });
+  });
+
+  it('resolves LOCAL_FILES_DIR from the repository root', () => {
+    const root = path.resolve(import.meta.dirname, '../../../..');
+    expect(loadConfig({ ...ORIGINS, LOCAL_FILES_DIR: 'tmp/files' }).localFilesDir).toBe(
+      path.join(root, 'tmp', 'files'),
+    );
   });
 
   it('requires a long SESSION_SECRET and refuses the placeholder in production', () => {

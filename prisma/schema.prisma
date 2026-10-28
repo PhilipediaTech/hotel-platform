@@ -27,6 +27,12 @@ enum ApprovalStatus {
   FAILED
 }
 
+enum FileScan {
+  PENDING
+  CLEAN
+  INFECTED
+}
+
 enum PropertyStatus {
   SETUP
   LIVE
@@ -54,6 +60,7 @@ model Organisation {
   domainEvents     DomainEvent[]
   approvalPolicies ApprovalPolicy[]
   approvalRequests ApprovalRequest[]
+  files            FileObject[]
 
   @@map("organisations")
 }
@@ -87,6 +94,7 @@ model Property {
   domainEvents     DomainEvent[]
   approvalPolicies ApprovalPolicy[]
   approvalRequests ApprovalRequest[]
+  files            FileObject[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -189,6 +197,7 @@ model User {
   approvalsRequested ApprovalRequest[] @relation("RequestedBy")
   approvalsDecided   ApprovalRequest[] @relation("DecidedBy")
   invitationsSent    Invitation[]      @relation("InvitedBy")
+  filesUploaded      FileObject[]
   invitationsClaimed Invitation[]      @relation("AcceptedBy")
 
   @@map("users")
@@ -456,4 +465,28 @@ model ApprovalRequest {
 
   @@index([propertyId, status])
   @@map("approval_requests")
+}
+
+/// Stored file (tab 3; tab 2 "Files"; T-023). The row is created with the upload link; the
+/// worker scans the uploaded object and marks it CLEAN or INFECTED. Only CLEAN files get
+/// download links. `entityType` is the file kind (FILE_KINDS in @hotel/shared).
+model FileObject {
+  id             String       @id @default(uuid()) @db.Uuid
+  organisationId String       @map("organisation_id") @db.Uuid
+  propertyId     String?      @map("property_id") @db.Uuid
+  storageKey     String       @unique @map("storage_key")
+  contentType    String       @map("content_type")
+  sizeBytes      Int          @map("size_bytes")
+  scan           FileScan     @default(PENDING)
+  entityType     String?      @map("entity_type")
+  entityId       String?      @map("entity_id")
+  retentionClass String       @default("STANDARD") @map("retention_class")
+  uploadedById   String       @map("uploaded_by_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property       Property?    @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  uploadedBy     User         @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, entityType, entityId])
+  @@map("files")
 }

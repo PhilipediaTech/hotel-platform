@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { z } from 'zod';
 
 // Zod still runs the refinement when the URL check fails, so guard the parse.
@@ -22,6 +23,8 @@ const envSchema = z.object({
     .string()
     .regex(/^\.?[a-z0-9.-]+$/i, 'COOKIE_DOMAIN must be a domain like .example.com')
     .optional(),
+  // Local file store directory (T-023), shared by the API and the worker; never production.
+  LOCAL_FILES_DIR: z.string().min(1).optional(),
 });
 
 const PLACEHOLDER_SECRET = /^dev-only-/;
@@ -42,7 +45,12 @@ export interface Config {
   cookieDomain: string | undefined;
   /** `Secure` on the `sid` cookie. Off only outside production, where local HTTP is used. */
   cookieSecure: boolean;
+  /** Where the local (fake) file store keeps files; default `.data/files` in the repo. */
+  localFilesDir: string;
 }
+
+/** Repository root: config.ts lives in apps/api/src/core. */
+const REPO_ROOT = path.resolve(import.meta.dirname, '../../../..');
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const parsed = envSchema.safeParse(env);
@@ -72,5 +80,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     mfaKey,
     cookieDomain: e.COOKIE_DOMAIN,
     cookieSecure: e.NODE_ENV === 'production',
+    localFilesDir: path.resolve(REPO_ROOT, e.LOCAL_FILES_DIR ?? '.data/files'),
   };
 }

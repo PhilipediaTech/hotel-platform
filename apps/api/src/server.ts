@@ -1,7 +1,9 @@
 import { createApp } from './app.ts';
 import { loadConfig } from './core/config.ts';
 import { createDb } from './core/db.ts';
+import { systemClock } from './core/clock.ts';
 import { createFakeEmailProvider } from './core/email.ts';
+import { createLocalFileStore } from './core/files.ts';
 import { createLogger } from './core/logger.ts';
 
 let config;
@@ -19,9 +21,17 @@ if (config.nodeEnv === 'production') {
   logger.fatal('No email provider configured for production');
   process.exit(1);
 }
+// The R2 adapter arrives with the Cloudflare account; the local store never runs in production
+// (the check above already stops production).
 // Local development: emails are logged so verification and reset links can be opened.
 const email = createFakeEmailProvider(logger);
-const app = createApp({ config, logger, db, email });
+// Local development: files are kept in LOCAL_FILES_DIR and served by signed links.
+const files = createLocalFileStore({
+  dir: config.localFilesDir,
+  secret: config.sessionSecret,
+  clock: systemClock,
+});
+const app = createApp({ config, logger, db, email, files });
 
 const server = app.listen(config.port, (err?: Error) => {
   if (err) {

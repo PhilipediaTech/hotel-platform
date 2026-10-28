@@ -27,6 +27,7 @@ describe('migrations', () => {
       'departments',
       'domain_events',
       'feature_flags',
+      'files',
       'idempotency_keys',
       'invitations',
       'memberships',

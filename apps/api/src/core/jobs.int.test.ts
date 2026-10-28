@@ -4,7 +4,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { resetDb, testDatabaseUrl, testDb } from '../../test/db.ts';
 import { makeTenant, makeUser } from '../../test/factories.ts';
 import { TEST_CONFIG } from '../../test/helpers.ts';
-import { JOBS } from '../jobs.ts';
+import { workerJobs } from '../jobs.ts';
+import { createFakeFileScanner } from './file-scan.ts';
+import { createLocalFileStore } from './files.ts';
 import { createSession } from './auth.ts';
 import { cleanupJob, RETENTION } from './cleanup.ts';
 import { startWorker, type RunningWorker } from './jobs.ts';
@@ -74,7 +76,10 @@ beforeAll(async () => {
     db,
     clock,
     logger,
-    jobs: JOBS,
+    jobs: workerJobs({
+      files: createLocalFileStore({ dir: TEST_CONFIG.localFilesDir, secret: 'test', clock }),
+      scanner: createFakeFileScanner(),
+    }),
     handlers: HANDLERS,
     // Tests publish by hand.
     publishIntervalMs: 3_600_000,

@@ -11,6 +11,8 @@ import type { Config } from './core/config.ts';
 import { originCheck } from './core/csrf.ts';
 import type { Db } from './core/db.ts';
 import type { EmailProvider } from './core/email.ts';
+import { LOCAL_FILES_PATH, type FileStore, type LocalFileStore } from './core/files.ts';
+import { fileRoutes } from './modules/files/routes.ts';
 import { errorHandler, notFoundHandler } from './core/errors.ts';
 import { httpLogger } from './core/logger.ts';
 import { openApiDocument } from './core/openapi.ts';
@@ -33,6 +35,8 @@ export interface AppOptions {
   logger: Logger;
   db: Db;
   email: EmailProvider;
+  /** File storage (R2 in production); the local store also serves its signed links. */
+  files: FileStore | LocalFileStore;
   clock?: Clock;
   /** Extra routes mounted under /api/v1 after the modules (tests use this). */
   routes?: Router;
@@ -46,6 +50,7 @@ export function createApp({
   logger,
   db,
   email,
+  files,
   clock = systemClock,
   routes,
   approvalHandlers = APPROVAL_HANDLERS,
@@ -69,6 +74,10 @@ export function createApp({
       maxAge: 600,
     }),
   );
+  // Signed upload and download links of the local file store. They stand in for direct
+  // requests to storage, so they skip the session, tenancy and rate-limit steps below.
+  if ('router' in files) app.use(LOCAL_FILES_PATH, files.router());
+
   // 4. Body parser with size limit
   app.use(express.json({ limit: BODY_LIMIT }));
   // 5. Session load (cookie → sessions row)
@@ -106,6 +115,7 @@ export function createApp({
       otpSecret: config.sessionSecret,
     }),
   );
+  api.use(fileRoutes({ tenantDb, store: files, clock }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

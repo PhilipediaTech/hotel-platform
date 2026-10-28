@@ -12,4 +12,6 @@ test-results/
 !.env.example
 .DS_Store
 Thumbs.db
+# Local file store (T-023)
+.data/
 apps/api/src/generated/

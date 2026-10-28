@@ -27,6 +27,8 @@ export const ERROR_HTTP_STATUS = {
   FOLIO_BALANCE_OUTSTANDING: 409,
   CREDIT_LIMIT_EXCEEDED: 409,
   AUDIT_IN_PROGRESS: 409,
+  // Not in tab 4 (T-023): the file is still being scanned, or the scan blocked it.
+  FILE_NOT_READY: 409,
 
   RATE_BELOW_LIMIT: 422,
   RESTRICTION_VIOLATED: 422,

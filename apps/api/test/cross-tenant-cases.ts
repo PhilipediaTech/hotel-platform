@@ -120,6 +120,25 @@ const bRolesUnchanged = async (db: Db, world: TenantWorld) => {
   expect(names.some((n) => n.startsWith('Leak '))).toBe(false);
 };
 
+async function bFile(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  const id = crypto.randomUUID();
+  await db.fileObject.create({
+    data: {
+      id,
+      organisationId,
+      propertyId,
+      storageKey: `org/${organisationId}/property/${propertyId}/${id}`,
+      contentType: 'image/png',
+      sizeBytes: 100,
+      scan: 'CLEAN',
+      entityType: 'RoomType',
+      uploadedById: world.bStaff.id,
+    },
+  });
+  return { fileId: id };
+}
+
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
   createRole: {
@@ -184,6 +203,15 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     // Policies have no ID of their own; B's approver role must not show up.
     listIds: (body) =>
       (body as { data: { approverRoleIds: string[] }[] }).data.flatMap((p) => p.approverRoleIds),
+  },
+  getFileDownloadUrl: { seed: bFile },
+  createFileUploadUrl: {
+    seed: bFile,
+    creates: true,
+    body: () => ({ entityType: 'RoomType', contentType: 'image/png', sizeBytes: 100 }),
+    untouched: async (db, world) => {
+      expect(await db.fileObject.count({ where: { organisationId: world.orgB.id } })).toBe(1);
+    },
   },
   updateApprovalPolicies: {
     seed: bApproval,

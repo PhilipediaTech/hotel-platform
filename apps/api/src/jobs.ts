@@ -2,6 +2,8 @@ import type { Logger } from 'pino';
 import { cleanupJob } from './core/cleanup.ts';
 import type { Config } from './core/config.ts';
 import type { Db } from './core/db.ts';
+import type { FileScanner } from './core/file-scan.ts';
+import type { FileStore } from './core/files.ts';
 import type { JobDefinition } from './core/jobs.ts';
 import type { EventHandler } from './core/outbox.ts';
 import {
@@ -9,10 +11,16 @@ import {
   approvalOtpHandler,
   createLoggingOtpChannel,
 } from './modules/approvals/jobs.ts';
+import { fileScanJob } from './modules/files/jobs.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
 
-export const JOBS: readonly JobDefinition<never>[] = [cleanupJob, approvalExpiryJob];
+export function workerJobs(deps: {
+  files: FileStore;
+  scanner: FileScanner;
+}): readonly JobDefinition<never>[] {
+  return [cleanupJob, approvalExpiryJob, fileScanJob({ store: deps.files, scanner: deps.scanner })];
+}
 
 export function eventHandlers(deps: { db: Db; config: Config; logger: Logger }): EventHandler[] {
   return [

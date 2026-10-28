@@ -61,7 +61,7 @@ export function hotelClient(
   propertyId: string,
   extra: { routes?: Router; approvalHandlers?: readonly ApprovalActionHandler<never>[] } = {},
 ) {
-  const { app, email } = buildTestApp(extra.routes, {
+  const { app, email, files } = buildTestApp(extra.routes, {
     db,
     clock,
     ...(extra.approvalHandlers ? { approvalHandlers: extra.approvalHandlers } : {}),
@@ -85,5 +85,5 @@ export function hotelClient(
       return (cookie ? req.set('Cookie', cookie) : req).send(body);
     },
   };
-  return { app, email, as, anon };
+  return { app, email, files, as, anon };
 }

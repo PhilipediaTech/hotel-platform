@@ -1,14 +1,16 @@
 import type { RequestHandler } from 'express';
 import type { Config } from './config.ts';
 import { AppError } from './errors.ts';
+import { LOCAL_FILES_PATH } from './files.ts';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**
  * Paths called by servers, not browsers; they authenticate with signatures instead.
- * Payment and channel webhooks (T-062 onward) live here.
+ * Payment and channel webhooks (T-062 onward) live here, and the local file store's signed
+ * links (T-023), which stand in for direct uploads to storage.
  */
-export const ORIGIN_CHECK_EXEMPT = ['/api/v1/webhooks/'];
+export const ORIGIN_CHECK_EXEMPT = ['/api/v1/webhooks/', `${LOCAL_FILES_PATH}/`];
 
 /**
  * Middleware step 6, CSRF defence: every state-changing request must carry an `Origin` from

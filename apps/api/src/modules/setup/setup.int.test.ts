@@ -17,10 +17,14 @@ beforeEach(async () => {
   now = new Date();
 });
 
-/** A hotel whose first property already has a room type and a room (T-031 steps done). */
+/** A hotel whose first property has a room type, a room and confirmed taxes (T-031/T-032 steps). */
 async function hotel() {
   const h = await makeHotel(db, now);
   await makeRoom(db, await makeRoomType(db, h.p1));
+  await db.property.update({
+    where: { id: h.p1.id },
+    data: { settings: { taxes: { confirmedAt: now.toISOString(), confirmedById: h.owner.id } } },
+  });
   const c = hotelClient(db, clock, h.p1.id);
   const as = async (userId: string) => c.as(await sessionCookie(db, userId));
   return { ...h, c, as, path: `/properties/${h.p1.id}` };
@@ -69,7 +73,7 @@ describe('setup checklist', () => {
       organisation: 'DONE',
       details: 'TODO',
       region: 'DONE',
-      tax: 'LATER',
+      tax: 'DONE',
       'room-types': 'DONE',
       rooms: 'DONE',
       rates: 'LATER',
@@ -77,7 +81,6 @@ describe('setup checklist', () => {
       staff: 'DONE', // the hotel has a GM and a front-desk agent
     });
     const steps = body(res).checklist.steps;
-    expect(steps.find((s) => s.id === 'tax')?.ticket).toBe('T-032');
     expect(steps.find((s) => s.id === 'rates')?.ticket).toBe('T-033');
     expect(steps.find((s) => s.id === 'staff')?.required).toBe(false);
     expect(body(res).checklist.ready).toBe(false);
@@ -176,7 +179,7 @@ describe('go-live', () => {
       entityId: h.p1.id,
       actorUserId: h.owner.id,
       before: { status: 'SETUP' },
-      after: { status: 'LIVE', later: ['tax', 'rates'] },
+      after: { status: 'LIVE', later: ['rates'] },
     });
     const me = await owner.get('/me');
     expect(
@@ -309,8 +312,12 @@ describe('add a property', () => {
       'room-types': 'TODO',
       rooms: 'TODO',
       staff: 'TODO',
+      tax: 'TODO', // example taxes, not confirmed yet
     });
     const id = body(res).id;
+    // Nigerian organisation: the Lagos example taxes and the default revenue codes.
+    expect(await db.taxRule.count({ where: { propertyId: id } })).toBe(3);
+    expect(await db.revenueCode.count({ where: { propertyId: id } })).toBe(6);
     expect(await db.department.count({ where: { propertyId: id } })).toBe(5);
     expect(await db.approvalPolicy.count({ where: { propertyId: id } })).toBeGreaterThan(0);
     const [event] = await auditOf('property.created');

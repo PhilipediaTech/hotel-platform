@@ -100,6 +100,8 @@ model Property {
   roomTypes        RoomType[]
   rooms            Room[]
   roomBlocks       RoomBlock[]
+  revenueCodes     RevenueCode[]
+  taxRules         TaxRule[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -596,4 +598,82 @@ model RoomBlock {
 
   @@index([propertyId, startDate])
   @@map("room_blocks")
+}
+
+// ───────────────────────── Revenue codes and taxes (M4-17; T-032) ─────────────────────────
+
+enum RevenueGroup {
+  ROOM
+  FNB
+  OTHER
+  TAX
+  SERVICE_CHARGE
+  FX
+  FEE
+
+  @@map("revenue_group")
+}
+
+/// NET = rate × line net; NET_PLUS_PRIOR = rate × (net + taxes with a lower sequence).
+enum TaxBasis {
+  NET
+  NET_PLUS_PRIOR
+
+  @@map("tax_basis")
+}
+
+/// What a folio line is posted to. taxRuleIds are applied in TaxRuleVersion.sequence order;
+/// TAX and SERVICE_CHARGE codes carry the tax lines themselves and have no taxes of their own.
+model RevenueCode {
+  id         String       @id @default(uuid()) @db.Uuid
+  propertyId String       @map("property_id") @db.Uuid
+  code       String
+  name       String
+  group      RevenueGroup
+  taxRuleIds String[]     @map("tax_rule_ids") @db.Uuid
+  active     Boolean      @default(true)
+
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  taxRules TaxRule[] @relation("TaxLineCode")
+
+  @@unique([propertyId, code])
+  // Target of composite foreign keys: a tax rule posts to a code of its own property.
+  @@unique([propertyId, id])
+  @@map("revenue_codes")
+}
+
+/// A tax or service charge ("VAT", "Lagos consumption tax", "Service charge"). Its rate,
+/// basis, order and inclusiveness live in dated versions; lines store the version they used.
+model TaxRule {
+  id            String @id @default(uuid()) @db.Uuid
+  propertyId    String @map("property_id") @db.Uuid
+  name          String
+  authority     String
+  /// The code the tax line posts to.
+  revenueCodeId String @map("revenue_code_id") @db.Uuid
+
+  property    Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  revenueCode RevenueCode      @relation("TaxLineCode", fields: [propertyId, revenueCodeId], references: [propertyId, id], onDelete: Restrict)
+  versions    TaxRuleVersion[]
+
+  @@map("tax_rules")
+}
+
+/// Rate and stacking of a tax rule from effectiveFrom up to (not including) effectiveTo; the
+/// newest version is open-ended. Versions never change once written (M4 rule 1).
+model TaxRuleVersion {
+  id            String    @id @default(uuid()) @db.Uuid
+  taxRuleId     String    @map("tax_rule_id") @db.Uuid
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  rateBps       Int       @map("rate_bps")
+  basis         TaxBasis  @default(NET)
+  sequence      Int
+  inclusive     Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  taxRule TaxRule @relation(fields: [taxRuleId], references: [id], onDelete: Restrict)
+
+  @@index([taxRuleId, effectiveFrom])
+  @@map("tax_rule_versions")
 }

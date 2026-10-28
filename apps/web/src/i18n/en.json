@@ -583,5 +583,78 @@
       "caption": "{{property}} · scan to report a fault",
       "none": "Add rooms to print their QR codes."
     }
+  },
+  "finance": {
+    "title": "Tax, revenue codes and FX",
+    "tabs": {
+      "taxes": "Taxes",
+      "codes": "Revenue codes",
+      "fx": "Exchange rates"
+    },
+    "fxLater": "Exchange rates arrive with USD payments (T-065).",
+    "actions": "Actions",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "inactive": "Inactive",
+    "examplesTitle": "Example rates: check them with your accountant",
+    "examplesText": "These taxes were filled in as examples for Lagos: service charge 10% on the room price, VAT 7.5% on the price plus service charge, and Lagos consumption tax 5% on the price. Your rates, order or authorities may differ. Change anything that is wrong, then confirm.",
+    "confirmTitle": "Check your taxes",
+    "confirmText": "Set up the taxes your hotel charges, then confirm them to finish this setup step.",
+    "confirm": "I have checked these rates with my accountant",
+    "confirmed": "Rates checked by {{name}} on {{date}}.",
+    "basis": {
+      "NET": "The price",
+      "NET_PLUS_PRIOR": "The price plus earlier taxes"
+    },
+    "groups": {
+      "ROOM": "Room",
+      "FNB": "Food and beverage",
+      "OTHER": "Other",
+      "TAX": "Tax",
+      "SERVICE_CHARGE": "Service charge",
+      "FX": "Exchange difference",
+      "FEE": "Fee"
+    },
+    "taxes": {
+      "none": "No taxes yet.",
+      "add": "Add a tax or charge",
+      "order": "Order",
+      "orderHint": "Lower runs first",
+      "name": "Name",
+      "authority": "Paid to",
+      "authorityHint": "e.g. FIRS, LIRS; \"Hotel\" for a service charge",
+      "rate": "Rate today",
+      "ratePercent": "Rate (%)",
+      "basis": "Charged on",
+      "postsTo": "Posts to code",
+      "changes": "Coming changes",
+      "from": "From {{date}}: {{rate}}",
+      "notYet": "Not in force yet",
+      "included": "Included in the price",
+      "inclusive": "Included in the price (not added on top)",
+      "change": "Change",
+      "changeNamed": "Change {{name}}",
+      "effectiveFrom": "From",
+      "versionHint": "The new rate applies from the date you choose. Charges already posted keep the tax they had.",
+      "needCode": "Add a revenue code of group Tax or Service charge first."
+    },
+    "codes": {
+      "code": "Code",
+      "name": "Name",
+      "group": "Group",
+      "taxes": "Taxes",
+      "add": "Add revenue code",
+      "editNamed": "Edit {{name}}",
+      "active": "Active"
+    },
+    "example": {
+      "title": "Worked example",
+      "code": "Charge to",
+      "amount": "Price",
+      "net": "Price before tax",
+      "on": "on {{base}}",
+      "total": "Guest pays"
+    }
   }
 }

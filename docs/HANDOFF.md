@@ -65,6 +65,7 @@ apps/api        @hotel/api      Express 5 app
   src/modules/files/            upload-url / download-url, scanPendingFiles + file-scan job (every minute)
   src/modules/setup/            organisation, properties, setup checklist (checklistFor) and go-live
   src/modules/rooms/            room types, rooms (If-Match), blocks, room-block-status job (every 15 min)
+  src/modules/tax/              revenue codes, tax rules and versions, confirm; defaults.ts = Lagos EXAMPLE taxes
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
   scripts/openapi.ts            npm run openapi → apps/api/openapi.json (committed; test checks it)
   src/core/request-id.ts        X-Request-Id
@@ -92,6 +93,7 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/routes/approvals.tsx      Approvals inbox; src/routes/settings/approval-policies.tsx S26 policies tab
   src/routes/onboarding.tsx     S02 setup wizard: checklist, step forms, go-live
   src/routes/settings/rooms.tsx S24 rooms, room types (photos) and QR print sheet; rooms-tab, room-types-tab
+  src/routes/settings/finance.tsx S25 taxes (example banner, versions, worked example) and revenue codes
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -113,6 +115,7 @@ packages/shared @hotel/shared   errors.ts: ERROR_HTTP_STATUS, ErrorCode, ErrorEn
   src/files.ts                  FILE_KINDS catalogue (entity type → permission, types, max size), link lifetimes
   src/setup.ts                  SETUP_STEPS checklist, MANUAL_PAY_METHODS, LOCKED_WHEN_LIVE
   src/dates.ts                  localDate(instant, timeZone), addDays, daysBetween (YYYY-MM-DD)
+  src/tax.ts                    calculateTaxes, versionsOn, formatRate; tax.fixtures.ts worked examples
   src/permissions.ts            PERMISSIONS catalogue, HOTEL_PERMISSION_CODES, RoleLimits
 docs/           PROGRESS, HANDOFF, VERSIONS, adr/000–023
 ```
@@ -137,10 +140,11 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 - **Files:** a record that takes files adds its kind to `FILE_KINDS` (permission, types, size). The web app uploads with `uploadFile(entityType, file)` (`apps/web/src/lib/files.ts`) and stores the returned file ID on the record; the file opens once the scan job marks it CLEAN (`GET /files/{id}/download-url`, else 409 `FILE_NOT_READY`). Never serve a file any other way. Locally, files land in `.data/files`.
 - **Setup checklist:** a ticket that builds a checklist step (T-031 room types and rooms, T-032 tax, T-033 rates) removes `later` from its entry in `SETUP_STEPS` and adds its check to `stepDone` in `modules/setup/service.ts`. Booking routes (T-042) refuse a property that is not LIVE with 403 `PROPERTY_NOT_LIVE`.
 - **Rooms:** OUT_OF_ORDER/OUT_OF_SERVICE housekeeping status always comes from a `room_blocks` row (the `room-block-status` job keeps them in step); housekeeping (T-080) creates blocks rather than setting those statuses. Availability (T-040/T-041) counts unreleased OUT_OF_ORDER blocks; OUT_OF_SERVICE rooms stay counted but are not assignable. Versioned resources answer with `ETag` and take `If-Match: "<version>"` (see `modules/rooms/routes.ts`). Test sessions on a fixed clock: `sessionCookie(db, userId, clock)`.
+- **Taxes:** anything that prices or posts (quotes T-041, folios T-060, night audit T-073) uses `calculateTaxes` with `versionsOn(versions, businessDate)` of the revenue code’s `taxRuleIds`, and stores the version IDs and amounts on the line; never recalculate posted lines. Tax rule versions are written through their rule (`taxRule.update({ data: { versions: … } })`): the tenant client scopes rules, not versions.
 - **Local sign-in:** `npm run seed`, then any `<role-slug>@demo.hotel.test` (e.g. `owner@`, `front-desk@`) with `SEED_USER_PASSWORD` from `.env`. Verification and reset links are printed in the API log.
 - **MFA and PINs locally:** Owner, GM and Finance demo users must set up MFA at first sign-in; generate codes from the shown key with `node --input-type=module -e "import { generate } from 'otplib'; console.log(await generate({ secret: '<key>' }))"` (run in `apps/api`). For PIN switching: set a PIN at `/account/pin` (e.g. as `front-desk@`), sign in as `dept-manager@` with "shared device" ticked, then Account menu → Switch user. Integration tests for these flows use `test/auth.ts`.
 - **Lockfile:** never regenerate it with `node_modules` or the old lock present (npm/cli#4828 drops platform bindings); follow the procedure in PROGRESS decisions. After any dependency change, `grep -c "node_modules/@rolldown/binding-" package-lock.json` must print 15.
 
 ## Next step
 
-T-032 revenue codes, tax rules and versions, shared tax calculator. Stop and ask Philip first: the tax stack per state (VAT, state consumption taxes, service charge) is an open decision. Then T-033 rates (also turns the rates setup step into a real check). Still waiting for accounts: R2 and the scan engine (T-023 runs on a local store and fake scanner), T-024 notifications (SES, WhatsApp), T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-033 rate plans (BAR, derived, package, day-use), rate calendar API + UI, restrictions (M2-04–M2-08); it also turns the "rates" setup step into a real check. Packages post components to revenue codes (T-032). Philip still has to confirm the example tax rates in S25 (that closes the tax setup step). Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

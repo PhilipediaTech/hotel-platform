@@ -180,6 +180,34 @@ async function bRoomUnchanged(db: Db, _world: TenantWorld, theirs: Record<string
   expect([room.floor, room.version, room.hkStatus]).toEqual([null, 0, 'DIRTY']);
 }
 
+async function bTaxRule(db: Db, _world: TenantWorld, propertyId: string) {
+  const code = await db.revenueCode.create({
+    data: { propertyId, code: 'VAT', name: 'VAT', group: 'TAX' },
+  });
+  const rule = await db.taxRule.create({
+    data: {
+      propertyId,
+      name: 'VAT',
+      authority: 'FIRS',
+      revenueCodeId: code.id,
+      versions: {
+        create: { effectiveFrom: new Date('2020-01-01'), rateBps: 750, sequence: 1 },
+      },
+    },
+  });
+  return { taxRuleId: rule.id, revenueCodeId: code.id };
+}
+
+async function bTaxesUnchanged(db: Db, world: TenantWorld) {
+  expect(await db.revenueCode.count({ where: { propertyId: world.b1.id } })).toBe(1);
+  expect(await db.taxRule.count({ where: { propertyId: world.b1.id } })).toBe(1);
+  expect(await db.taxRuleVersion.count({ where: { taxRule: { propertyId: world.b1.id } } })).toBe(
+    1,
+  );
+  const code = await db.revenueCode.findFirstOrThrow({ where: { propertyId: world.b1.id } });
+  expect([code.name, code.taxRuleIds]).toEqual(['VAT', []]);
+}
+
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
   createRole: {
@@ -357,6 +385,56 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: async (db, world, theirs) => {
       expect(await db.roomBlock.count({ where: { propertyId: world.b1.id } })).toBe(0);
       await bRoomUnchanged(db, world, theirs);
+    },
+  },
+  listRevenueCodes: { seed: bTaxRule, listIds: ids },
+  createRevenueCode: {
+    // B's tax from A1: refused as unknown, and nothing is created in B.
+    seed: bTaxRule,
+    creates: true,
+    body: (theirs) => ({
+      code: 'LEAK',
+      name: 'Leak',
+      group: 'ROOM',
+      taxRuleIds: [theirs['taxRuleId']],
+    }),
+    untouched: bTaxesUnchanged,
+  },
+  updateRevenueCode: {
+    seed: bTaxRule,
+    body: () => ({ name: 'Leak' }),
+    untouched: bTaxesUnchanged,
+  },
+  listTaxRules: {
+    seed: bTaxRule,
+    listIds: (body) =>
+      (body as { data: { id: string; revenueCodeId: string }[] }).data.flatMap((r) => [
+        r.id,
+        r.revenueCodeId,
+      ]),
+  },
+  createTaxRule: {
+    seed: bTaxRule,
+    creates: true,
+    body: (theirs) => ({
+      name: 'Leak',
+      authority: 'X',
+      revenueCodeId: theirs['revenueCodeId'],
+      version: { effectiveFrom: '2099-01-01', rateBps: 100, sequence: 1 },
+    }),
+    untouched: bTaxesUnchanged,
+  },
+  addTaxRuleVersion: {
+    seed: bTaxRule,
+    body: () => ({ effectiveFrom: '2099-01-01', rateBps: 100, sequence: 1 }),
+    untouched: bTaxesUnchanged,
+  },
+  confirmTaxes: {
+    seed: bTaxRule,
+    creates: true,
+    untouched: async (db, world) => {
+      const b1 = await db.property.findUniqueOrThrow({ where: { id: world.b1.id } });
+      expect(b1.settings).toEqual({});
     },
   },
   releaseRoomBlock: {

@@ -30,6 +30,7 @@ describe('migrations', () => {
       'feature_flags',
       'files',
       'idempotency_keys',
+      'import_jobs',
       'invitations',
       'memberships',
       'mfa_recovery_codes',

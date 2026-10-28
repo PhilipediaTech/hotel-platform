@@ -777,5 +777,59 @@
       "remove": "Remove",
       "add": "Add item"
     }
+  },
+  "imports": {
+    "title": "Imports",
+    "intro": "Load rooms or rates from a spreadsheet. The file is checked first and nothing changes until you confirm.",
+    "what": "What are you importing?",
+    "kinds": {
+      "ROOMS": "Rooms and room types",
+      "RATES": "Rates"
+    },
+    "later": "Guests, companies and opening balances arrive with their own screens.",
+    "step1": "1. Get the template",
+    "step2": "2. Upload the filled file (CSV or Excel .xlsx)",
+    "help": {
+      "ROOMS": "One row per room. A new room type code needs its name on its first row; rooms already in the system are updated. Separate features with a semicolon.",
+      "RATES": "One row per rate plan, room type and date range (from and to included). Prices in naira; leave the price empty to change only restrictions. Dates as 2026-12-01 or 01/12/2026; restrictions as yes or no."
+    },
+    "template": "Download template",
+    "choose": "Choose file",
+    "uploading": "Uploading…",
+    "checking": "Checking the file…",
+    "fileType": "Use a CSV or Excel (.xlsx) file.",
+    "report": "{{kind}}: {{rows}} rows",
+    "ready": "No problems found. Nothing has changed yet.",
+    "failed_one": "{{count}} problem found. Fix it in the file and upload it again; nothing was imported.",
+    "failed_other": "{{count}} problems found. Fix them in the file and upload it again; nothing was imported.",
+    "applied": "Imported.",
+    "apply_one": "Import {{count}} row",
+    "apply_other": "Import {{count}} rows",
+    "errors": "Problems",
+    "row": "Row",
+    "column": "Column",
+    "problem": "Problem",
+    "rowProblem": "Row {{row}}: {{message}}",
+    "moreErrors": "Showing the first {{shown}} of {{count}} problems.",
+    "preview": "Preview",
+    "previewMore": "Showing the first {{shown}} of {{count}} rows.",
+    "summary": {
+      "roomTypesNew_one": "{{count}} new room type",
+      "roomTypesNew_other": "{{count}} new room types",
+      "roomTypesUpdated_one": "{{count}} room type updated",
+      "roomTypesUpdated_other": "{{count}} room types updated",
+      "roomsNew_one": "{{count}} new room",
+      "roomsNew_other": "{{count}} new rooms",
+      "roomsUpdated_one": "{{count}} room updated",
+      "roomsUpdated_other": "{{count}} rooms updated",
+      "roomsWritten_one": "{{count}} room saved",
+      "roomsWritten_other": "{{count}} rooms saved",
+      "rateLines_one": "{{count}} rate line",
+      "rateLines_other": "{{count}} rate lines",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "daysChanged_one": "{{count}} day changed",
+      "daysChanged_other": "{{count}} days changed"
+    }
   }
 }

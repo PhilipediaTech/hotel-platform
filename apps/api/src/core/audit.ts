@@ -50,7 +50,10 @@ export interface AuditInput {
   organisationId?: string;
   /** Defaults to the tenant's property; `null` records an organisation-level event. */
   propertyId?: string | null;
-  /** Defaults to the request's signed-in user, else SYSTEM. */
+  /**
+   * Defaults to the tenant context's user (the requester when an approved action runs), else
+   * the request's signed-in user, else SYSTEM.
+   */
   actorUserId?: string | null;
   actorType?: ActorType;
 }
@@ -94,7 +97,7 @@ export async function recordAudit(client: AuditClient, input: AuditInput): Promi
   if (!organisationId)
     throw new Error(`Audit ${input.action}: no organisation (pass organisationId)`);
   const actorUserId =
-    input.actorUserId === undefined ? (facts?.userId ?? tenant?.userId ?? null) : input.actorUserId;
+    input.actorUserId === undefined ? (tenant?.userId ?? facts?.userId ?? null) : input.actorUserId;
   const before = auditValue(input.before);
   const after = auditValue(input.after);
   await client.auditEvent.create({

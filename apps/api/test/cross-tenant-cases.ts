@@ -72,6 +72,44 @@ async function bAuditEvents(db: Db, world: TenantWorld, propertyId: string) {
   };
 }
 
+/** A pending refund request in B, with B's policy (approver: a B role). */
+async function bApproval(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  const role = await makeRole(db, organisationId);
+  await db.approvalPolicy.upsert({
+    where: { propertyId_action: { propertyId, action: 'payment.refund' } },
+    update: {},
+    create: {
+      organisationId,
+      propertyId,
+      action: 'payment.refund',
+      approverRoleIds: [role.id],
+      expiryMinutes: 2880,
+    },
+  });
+  const requester = organisationId === world.orgB.id ? world.bStaff : world.aStaff;
+  const request = await db.approvalRequest.create({
+    data: {
+      organisationId,
+      propertyId,
+      action: 'payment.refund',
+      payload: { amountMinor: '5000' },
+      payloadHash: 'h',
+      reason: 'Leak test',
+      requestedById: requester.id,
+      expiresAt: new Date(Date.now() + 3_600_000),
+    },
+  });
+  return { approvalId: request.id, roleId: role.id };
+}
+
+const bApprovalPending = async (db: Db, _w: TenantWorld, theirs: Record<string, string>) => {
+  const request = await db.approvalRequest.findUniqueOrThrow({
+    where: { id: theirs['approvalId'] ?? '' },
+  });
+  expect(request.status).toBe('PENDING');
+};
+
 const ids = (body: unknown) => (body as { data: { id: string }[] }).data.map((row) => row.id);
 
 /** B's organisation has exactly the roles it started with plus the seeded ones. */
@@ -81,6 +119,25 @@ const bRolesUnchanged = async (db: Db, world: TenantWorld) => {
   );
   expect(names.some((n) => n.startsWith('Leak '))).toBe(false);
 };
+
+async function bFile(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  const id = crypto.randomUUID();
+  await db.fileObject.create({
+    data: {
+      id,
+      organisationId,
+      propertyId,
+      storageKey: `org/${organisationId}/property/${propertyId}/${id}`,
+      contentType: 'image/png',
+      sizeBytes: 100,
+      scan: 'CLEAN',
+      entityType: 'RoomType',
+      uploadedById: world.bStaff.id,
+    },
+  });
+  return { fileId: id };
+}
 
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
@@ -135,6 +192,49 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
         where: { id: theirs['invitationId'] ?? '' },
       });
       expect(inv.revokedAt).toBeNull();
+    },
+  },
+  listApprovals: { seed: bApproval, listIds: ids },
+  getApproval: { seed: bApproval },
+  approveApproval: { seed: bApproval, body: () => ({}), untouched: bApprovalPending },
+  rejectApproval: { seed: bApproval, body: () => ({ note: 'No' }), untouched: bApprovalPending },
+  listApprovalPolicies: {
+    seed: bApproval,
+    // Policies have no ID of their own; B's approver role must not show up.
+    listIds: (body) =>
+      (body as { data: { approverRoleIds: string[] }[] }).data.flatMap((p) => p.approverRoleIds),
+  },
+  getFileDownloadUrl: { seed: bFile },
+  createFileUploadUrl: {
+    seed: bFile,
+    creates: true,
+    body: () => ({ entityType: 'RoomType', contentType: 'image/png', sizeBytes: 100 }),
+    untouched: async (db, world) => {
+      expect(await db.fileObject.count({ where: { organisationId: world.orgB.id } })).toBe(1);
+    },
+  },
+  updateApprovalPolicies: {
+    seed: bApproval,
+    creates: true,
+    body: (theirs) => ({
+      policies: [
+        {
+          action: 'payment.refund',
+          active: true,
+          thresholdMinor: null,
+          thresholdBps: null,
+          approverRoleIds: [theirs['roleId']],
+          expiryMinutes: 30,
+        },
+      ],
+    }),
+    untouched: async (db, world) => {
+      const policies = await db.approvalPolicy.findMany({
+        where: { organisationId: world.orgB.id },
+      });
+      expect(policies.map((p) => [p.action, p.active, p.expiryMinutes])).toEqual([
+        ['payment.refund', true, 2880],
+      ]);
     },
   },
 };

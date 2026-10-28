@@ -6,11 +6,11 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 
 ## Runtime and database
 
-| Tool               | Version                        | Status              | Notes                                                                                           |
-| ------------------ | ------------------------------ | ------------------- | ----------------------------------------------------------------------------------------------- |
-| Node.js            | 24.22.1 (Active LTS "Krypton") | `.nvmrc`, `engines` | Node 26 is "Current", not LTS. Local machine still has 22.15.0 — upgrade needed                 |
-| npm                | 11.x (bundled with Node 24)    | —                   |                                                                                                 |
-| PostgreSQL (local) | 18                             | Installed natively  | Spec minimum is 16. CI and Render must use the same major as production (decide at T-004/T-005) |
+| Tool               | Version                        | Status              | Notes                                                                                              |
+| ------------------ | ------------------------------ | ------------------- | -------------------------------------------------------------------------------------------------- |
+| Node.js            | 24.22.1 (Active LTS "Krypton") | `.nvmrc`, `engines` | Node 26 is "Current", not LTS. Local machine still has 22.15.0 — upgrade needed                    |
+| npm                | 11.x (bundled with Node 24)    | —                   |                                                                                                    |
+| PostgreSQL (local) | 18                             | Installed natively  | Spec minimum is 16. CI uses `postgres:18` (T-004); Render must run the same major (check at T-005) |
 
 ## Tooling (installed in T-001)
 
@@ -76,12 +76,12 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 | eslint-plugin-react-hooks                            | 7.1.1                                      | root dev                                                                          |
 | react-hook-form                                      | 7.90.0                                     | T-010; validated with the shared Zod schemas via `apps/web/src/lib/form.ts`       |
 | uqr                                                  | 0.1.3                                      | T-011; QR matrix for MFA set-up (MIT, no dependencies)                            |
+| pg-boss                                              | 12.38.0                                    | T-021; `apps/api` worker. Brings its peer `@opentelemetry/api` 1.10.0             |
 
 ## Stack (planned)
 
 | Package          | Version | Ticket              |
 | ---------------- | ------- | ------------------- |
 | dexie            | 4.4.6   | T-093               |
-| pg-boss          | 12.38.0 | T-021               |
 | @playwright/test | 1.64.1  | First E2E journey   |
 | astro            | 7.4.2   | V1.2 booking engine |

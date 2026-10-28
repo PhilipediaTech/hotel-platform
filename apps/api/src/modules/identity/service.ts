@@ -11,6 +11,7 @@ import { AppError } from '../../core/errors.ts';
 import { burnPasswordCheck, hashPassword, verifyPassword } from '../../core/passwords.ts';
 import { hashToken, newToken } from '../../core/tokens.ts';
 import { accountExistsMessage, passwordResetMessage, verifyEmailMessage } from './emails.ts';
+import { createDefaultApprovalPolicies } from '../approvals/defaults.ts';
 import { DEPARTMENT_TEMPLATES, ROLE_TEMPLATES, roleTemplate } from './role-templates.ts';
 
 export interface IdentityDeps {
@@ -197,6 +198,7 @@ export async function signUp(deps: IdentityDeps, input: SignUpInput): Promise<vo
           roleId: ownerRole.id,
         },
       });
+      await createDefaultApprovalPolicies(tx, organisation.id, property.id);
       await recordAudit(tx, {
         action: 'organisation.created',
         entityType: 'organisation',

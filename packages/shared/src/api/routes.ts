@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { ACCESS_ROUTES } from './access.ts';
+import { APPROVAL_ROUTES } from './approvals.ts';
 import { AUDIT_ROUTES } from './audit.ts';
 import { AUTH_ROUTES } from './auth.ts';
 import { defineRoute } from './contract.ts';
+import { FILE_ROUTES } from './files.ts';
 
 // The API surface, one entry per endpoint in spec tab 4. Modules add their routes here as
 // they are built; `npm run openapi` regenerates apps/api/openapi.json from this list.
@@ -22,6 +24,8 @@ export const API_ROUTES = {
   ...AUTH_ROUTES,
   ...ACCESS_ROUTES,
   ...AUDIT_ROUTES,
+  ...APPROVAL_ROUTES,
+  ...FILE_ROUTES,
 } as const;
 
 export type ApiRoutes = typeof API_ROUTES;

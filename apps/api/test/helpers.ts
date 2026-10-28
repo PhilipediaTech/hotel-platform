@@ -1,11 +1,16 @@
 import type { ErrorBody, ErrorEnvelope } from '@hotel/shared';
+import { mkdtempSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { Router } from 'express';
 import { createApp } from '../src/app.ts';
-import type { Clock } from '../src/core/clock.ts';
+import { systemClock, type Clock } from '../src/core/clock.ts';
 import type { Config } from '../src/core/config.ts';
 import { createDb, type Db } from '../src/core/db.ts';
 import { createFakeEmailProvider } from '../src/core/email.ts';
+import { createLocalFileStore } from '../src/core/files.ts';
 import { createLogger } from '../src/core/logger.ts';
+import type { ApprovalActionHandler } from '../src/core/approvals.ts';
 
 export const TEST_CONFIG: Config = {
   nodeEnv: 'test',
@@ -19,6 +24,7 @@ export const TEST_CONFIG: Config = {
   mfaKey: Buffer.alloc(32, 7),
   cookieDomain: undefined,
   cookieSecure: false,
+  localFilesDir: path.join(os.tmpdir(), 'hotel-test-files'),
 };
 
 /** `Origin` the API accepts on non-GET requests (middleware step 6). */
@@ -30,6 +36,8 @@ export interface TestAppOptions {
   /** Real database for integration tests (`testDb()`); omitted = never connects. */
   db?: Db;
   clock?: Clock;
+  /** Protected actions for approval tests. */
+  approvalHandlers?: readonly ApprovalActionHandler<never>[];
 }
 
 /** Builds the app with a fake email provider and a logger that captures JSON log lines. */
@@ -43,15 +51,23 @@ export function buildTestApp(routes?: Router, options: TestAppOptions = {}) {
   // PrismaClient connects lazily, so this one only fails if a test unexpectedly queries it.
   unusedDb ??= createDb(TEST_CONFIG.databaseUrl);
   const email = createFakeEmailProvider();
+  // A fresh directory per app, so tests never see each other's files.
+  const files = createLocalFileStore({
+    dir: mkdtempSync(path.join(os.tmpdir(), 'hotel-files-')),
+    secret: TEST_CONFIG.sessionSecret,
+    clock: options.clock ?? systemClock,
+  });
   const app = createApp({
     config: TEST_CONFIG,
     logger,
     db: options.db ?? unusedDb,
     email,
+    files,
     ...(options.clock ? { clock: options.clock } : {}),
     ...(routes ? { routes } : {}),
+    ...(options.approvalHandlers ? { approvalHandlers: options.approvalHandlers } : {}),
   });
-  return { app, logLines, logger, email };
+  return { app, logLines, logger, email, files };
 }
 
 /** Typed access to an error envelope in a Supertest response. */

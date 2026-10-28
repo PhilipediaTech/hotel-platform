@@ -30,6 +30,9 @@ export interface ShellSession {
 
 export type MeResponse = z.output<typeof Me>;
 
+/** Queries about approval requests start with this key (the inbox invalidates them all). */
+export const APPROVALS_QUERY_KEY = ['approvals'] as const;
+
 /** Query key of GET /me; sign-in seeds it, sign-out clears it. */
 export const ME_QUERY_KEY = ['me'] as const;
 
@@ -62,7 +65,7 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
     })),
     currentPropertyId: property?.id ?? null,
     businessDate: null, // business_days arrive with night audit (T-070s)
-    pendingApprovals: 0, // T-022
+    pendingApprovals: 0, // filled in by SessionGate from GET /approvals (T-022)
     openAlerts: 0, // T-090
     preview: false,
     pinSwitchAvailable: me.session.pinSwitchAvailable,

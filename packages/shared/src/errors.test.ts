@@ -19,6 +19,8 @@ const SPEC_TABLE: Record<number, string[]> = {
     'FOLIO_BALANCE_OUTSTANDING',
     'CREDIT_LIMIT_EXCEEDED',
     'AUDIT_IN_PROGRESS',
+    // Added in T-023 (not in tab 4): file not scanned yet, or blocked.
+    'FILE_NOT_READY',
   ],
   422: ['RATE_BELOW_LIMIT', 'RESTRICTION_VIOLATED', 'APPROVAL_EXPIRED'],
   429: ['RATE_LIMITED'],

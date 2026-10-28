@@ -1,4 +1,6 @@
+import type { Router } from 'express';
 import request from 'supertest';
+import type { ApprovalActionHandler } from '../src/core/approvals.ts';
 import type { Clock } from '../src/core/clock.ts';
 import type { Db } from '../src/core/db.ts';
 import { hashPassword } from '../src/core/passwords.ts';
@@ -53,8 +55,17 @@ export async function makeHotel(db: Db, now: Date) {
   return { org, p1, p2, roles, role, owner, gm, fd, person };
 }
 
-export function hotelClient(db: Db, clock: Clock, propertyId: string) {
-  const { app, email } = buildTestApp(undefined, { db, clock });
+export function hotelClient(
+  db: Db,
+  clock: Clock,
+  propertyId: string,
+  extra: { routes?: Router; approvalHandlers?: readonly ApprovalActionHandler<never>[] } = {},
+) {
+  const { app, email, files } = buildTestApp(extra.routes, {
+    db,
+    clock,
+    ...(extra.approvalHandlers ? { approvalHandlers: extra.approvalHandlers } : {}),
+  });
   const as = (cookie: string) => {
     const withHeaders = (req: request.Test) =>
       req.set('Cookie', cookie).set('X-Property-Id', propertyId).set('Origin', APP_ORIGIN);
@@ -64,6 +75,8 @@ export function hotelClient(db: Db, clock: Clock, propertyId: string) {
         withHeaders(request(app).post(`/api/v1${path}`)).send(body ?? {}),
       patch: (path: string, body: object) =>
         withHeaders(request(app).patch(`/api/v1${path}`)).send(body),
+      put: (path: string, body: object) =>
+        withHeaders(request(app).put(`/api/v1${path}`)).send(body),
     };
   };
   const anon = {
@@ -72,5 +85,5 @@ export function hotelClient(db: Db, clock: Clock, propertyId: string) {
       return (cookie ? req.set('Cookie', cookie) : req).send(body);
     },
   };
-  return { app, email, as, anon };
+  return { app, email, files, as, anon };
 }

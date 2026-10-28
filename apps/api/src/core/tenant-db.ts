@@ -29,6 +29,13 @@ export const TENANT_MODELS: Record<string, Scope> = {
   FeatureFlag: { kind: 'organisation' },
   // Events can name any property of the organisation, or none (organisation-level).
   AuditEvent: { kind: 'organisation' },
+  // Outbox rows: like audit events, any property of the organisation or none.
+  DomainEvent: { kind: 'organisation' },
+  ApprovalPolicy: { kind: 'property', organisationField: 'organisationId' },
+  ApprovalRequest: { kind: 'property', organisationField: 'organisationId' },
+  // Every file kind so far belongs to a property; organisation-level files (null property)
+  // would need their own scope.
+  FileObject: { kind: 'property', organisationField: 'organisationId' },
 };
 
 /** Fields (and values) that pin a row of `model` to `tenant`. */

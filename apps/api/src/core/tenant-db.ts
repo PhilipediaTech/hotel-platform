@@ -45,6 +45,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   CancellationPolicy: { kind: 'property' },
   RatePlan: { kind: 'property', organisationField: 'organisationId' },
   RateDay: { kind: 'property' },
+  ImportJob: { kind: 'property' },
   // Components have no property column: reach them through their (scoped) rate plan.
 };
 

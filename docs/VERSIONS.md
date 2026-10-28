@@ -30,18 +30,19 @@ Pinned on 2026-10-22 from the npm registry and nodejs.org. Exact versions only (
 
 ## API (installed in T-002, `apps/api`)
 
-| Package                                         | Version                | Notes                                                                                            |
-| ----------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------ |
-| express                                         | 5.3.0                  |                                                                                                  |
-| helmet                                          | 8.3.0                  |                                                                                                  |
-| pino / pino-http                                | 10.4.0 / 11.0.0        |                                                                                                  |
-| supertest                                       | 7.3.1                  | dev                                                                                              |
-| cors                                            | 2.8.6                  | Added; not in the spec's stack list                                                              |
-| zod                                             | 4.6.7                  | Env config; route contracts in `@hotel/shared` (also a dependency of shared and web since T-007) |
-| @asteasolutions/zod-to-openapi                  | 9.1.0                  | T-007; OpenAPI 3.1 generator, used only in `apps/api/src/core/openapi.ts` (brings `openapi3-ts`) |
-| otplib                                          | 13.5.0                 | T-011; TOTP (brings `@otplib/*` 13.5.0, noble crypto, scure base32)                              |
-| pino-pretty                                     | 13.2.0                 | dev; pretty logs when `NODE_ENV=development`                                                     |
-| @types/express / @types/cors / @types/supertest | 5.0.6 / 2.8.19 / 7.2.1 | dev                                                                                              |
+| Package                                         | Version                | Notes                                                                                                |
+| ----------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| express                                         | 5.3.0                  |                                                                                                      |
+| helmet                                          | 8.3.0                  |                                                                                                      |
+| pino / pino-http                                | 10.4.0 / 11.0.0        |                                                                                                      |
+| supertest                                       | 7.3.1                  | dev                                                                                                  |
+| cors                                            | 2.8.6                  | Added; not in the spec's stack list                                                                  |
+| zod                                             | 4.6.7                  | Env config; route contracts in `@hotel/shared` (also a dependency of shared and web since T-007)     |
+| @asteasolutions/zod-to-openapi                  | 9.1.0                  | T-007; OpenAPI 3.1 generator, used only in `apps/api/src/core/openapi.ts` (brings `openapi3-ts`)     |
+| otplib                                          | 13.5.0                 | T-011; TOTP (brings `@otplib/*` 13.5.0, noble crypto, scure base32)                                  |
+| read-excel-file                                 | 9.3.12                 | T-034; reads .xlsx imports (MIT; brings fflate, saxen, unzipper-esm, worker-f). 9.3.13 was a day old |
+| pino-pretty                                     | 13.2.0                 | dev; pretty logs when `NODE_ENV=development`                                                         |
+| @types/express / @types/cors / @types/supertest | 5.0.6 / 2.8.19 / 7.2.1 | dev                                                                                                  |
 
 `tsx` is no longer planned: Node 24 runs the TypeScript source directly (see PROGRESS decisions).
 

@@ -106,6 +106,7 @@ model Property {
   cancellationPolicies CancellationPolicy[]
   ratePlans            RatePlan[]
   rateDays             RateDay[]
+  importJobs           ImportJob[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -210,6 +211,7 @@ model User {
   invitationsSent    Invitation[]      @relation("InvitedBy")
   filesUploaded      FileObject[]
   roomBlocksCreated  RoomBlock[]
+  importJobs         ImportJob[]
   invitationsClaimed Invitation[]      @relation("AcceptedBy")
 
   @@map("users")
@@ -498,6 +500,7 @@ model FileObject {
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
   property       Property?    @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
   uploadedBy     User         @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  importJobs     ImportJob[]
 
   @@index([propertyId, entityType, entityId])
   @@map("files")
@@ -804,4 +807,28 @@ model PackageComponent {
 
   @@index([ratePlanId])
   @@map("package_components")
+}
+
+// ───────────────────────── Imports (M1-03; T-034) ─────────────────────────
+
+/// One uploaded spreadsheet checked and, once the user confirms, applied. kind: ROOMS |
+/// RATES (GUESTS | COMPANIES | BALANCES arrive with their tickets). status: VALIDATED (no
+/// errors, can be applied) | FAILED (errors listed in report) | APPLIED. report holds the
+/// errors, the counts and the checked rows that apply uses, so nothing is read twice.
+model ImportJob {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  kind        String
+  fileId      String   @map("file_id") @db.Uuid
+  status      String
+  report      Json
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property  Property   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  file      FileObject @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  createdBy User       @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, createdAt])
+  @@map("import_jobs")
 }

@@ -420,35 +420,34 @@ export function sellingPrice(
   });
 }
 
-export async function updateRateCalendar(
-  deps: RateDeps,
-  tenant: TenantContext,
-  body: z.output<typeof RateCalendarUpdateBody>,
-) {
-  const now = await today(deps, tenant);
-  if (body.from < now) throw invalid('from', 'Prices and restrictions change from today on');
-  if (daysBetween(body.from, body.to) + 1 > MAX_BULK_DAYS) {
-    throw invalid('to', `Change at most ${MAX_BULK_DAYS} days at once`);
-  }
-  return deps.tenantDb
-    .$transaction(async (tx) => {
-      const plan = await tx.ratePlan.findUnique({ where: { id: body.ratePlanId } });
-      if (!plan?.active) throw invalid('ratePlanId', 'Choose an active rate plan of this property');
-      if (plan.kind === 'DERIVED' && body.set.amountMinor !== undefined) {
-        throw invalid('set.amountMinor', 'A derived plan follows its parent’s prices');
-      }
-      const allowed = new Set(await planRoomTypes(tx, plan));
-      if (body.roomTypeIds.some((id) => !allowed.has(id))) {
-        throw invalid('roomTypeIds', 'Choose room types this plan sells');
-      }
-      const s = body.set;
-      const has = (field: keyof typeof s) => s[field] !== undefined;
-      // One statement for the whole range: new days are inserted, existing days change only the
-      // fields in `set`, and only days whose values really change get a new rule version.
-      const changedDays = await tx.$executeRaw`
+/** What a bulk edit writes: room types × dates (by weekday) × the fields in `set`. */
+export interface RateDaysWrite {
+  roomTypeIds: string[];
+  from: string;
+  /** Included. */
+  to: string;
+  weekdays: number[];
+  set: z.output<typeof RateCalendarUpdateBody>['set'];
+}
+
+/**
+ * Writes a range of rate days in one statement: new days are inserted, existing days change
+ * only the fields in `set`, and only days whose values really change get a new rule version.
+ * Returns how many days changed. The caller has checked the plan and room types (raw SQL is
+ * not tenant-scoped). Also used by imports (T-034).
+ */
+export async function writeRateDays(
+  tx: Tx,
+  propertyId: string,
+  ratePlanId: string,
+  body: RateDaysWrite,
+): Promise<number> {
+  const s = body.set;
+  const has = (field: keyof typeof s) => s[field] !== undefined;
+  return tx.$executeRaw`
       INSERT INTO rate_days AS r (property_id, rate_plan_id, room_type_id, date, amount_minor,
         min_stay, max_stay, closed_to_arrival, closed_to_departure, stop_sell, rule_version, updated_at)
-      SELECT ${tenant.propertyId}::uuid, ${plan.id}::uuid, rt, d::date,
+      SELECT ${propertyId}::uuid, ${ratePlanId}::uuid, rt, d::date,
         ${big(s.amountMinor)}::bigint, ${s.minStay ?? null}::int, ${s.maxStay ?? null}::int,
         ${s.closedToArrival ?? false}, ${s.closedToDeparture ?? false}, ${s.stopSell ?? false},
         1, now()
@@ -473,6 +472,31 @@ export async function updateRateCalendar(
         CASE WHEN ${has('stopSell')} THEN EXCLUDED.stop_sell ELSE r.stop_sell END
       ) IS DISTINCT FROM (r.amount_minor, r.min_stay, r.max_stay, r.closed_to_arrival,
         r.closed_to_departure, r.stop_sell)`;
+}
+
+export async function updateRateCalendar(
+  deps: RateDeps,
+  tenant: TenantContext,
+  body: z.output<typeof RateCalendarUpdateBody>,
+) {
+  const now = await today(deps, tenant);
+  if (body.from < now) throw invalid('from', 'Prices and restrictions change from today on');
+  if (daysBetween(body.from, body.to) + 1 > MAX_BULK_DAYS) {
+    throw invalid('to', `Change at most ${MAX_BULK_DAYS} days at once`);
+  }
+  return deps.tenantDb
+    .$transaction(async (tx) => {
+      const plan = await tx.ratePlan.findUnique({ where: { id: body.ratePlanId } });
+      if (!plan?.active) throw invalid('ratePlanId', 'Choose an active rate plan of this property');
+      if (plan.kind === 'DERIVED' && body.set.amountMinor !== undefined) {
+        throw invalid('set.amountMinor', 'A derived plan follows its parent’s prices');
+      }
+      const allowed = new Set(await planRoomTypes(tx, plan));
+      if (body.roomTypeIds.some((id) => !allowed.has(id))) {
+        throw invalid('roomTypeIds', 'Choose room types this plan sells');
+      }
+      const s = body.set;
+      const changedDays = await writeRateDays(tx, tenant.propertyId, plan.id, body);
       if (changedDays > 0) {
         await recordAudit(tx, {
           action: 'rates.updated',

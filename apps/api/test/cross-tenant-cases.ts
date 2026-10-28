@@ -245,6 +245,36 @@ async function bRatesUnchanged(db: Db, world: TenantWorld) {
   expect([plan.name, plan.version]).toEqual(['Best available', 0]);
 }
 
+/** B's checked import (VALIDATED) of an uploaded file of kind ImportJob. */
+async function bImport(db: Db, world: TenantWorld, propertyId: string) {
+  const { fileId } = await bFile(db, world, propertyId);
+  await db.fileObject.update({ where: { id: fileId }, data: { entityType: 'ImportJob' } });
+  const job = await db.importJob.create({
+    data: {
+      propertyId,
+      kind: 'ROOMS',
+      fileId,
+      status: 'VALIDATED',
+      report: {
+        total: 0,
+        errorCount: 0,
+        errors: [],
+        summary: {},
+        preview: [],
+        applied: null,
+        data: [],
+      },
+      createdById: world.bStaff.id,
+    },
+  });
+  return { importId: job.id, fileId };
+}
+
+async function bImportUnchanged(db: Db, world: TenantWorld) {
+  const jobs = await db.importJob.findMany({ where: { propertyId: world.b1.id } });
+  expect(jobs.map((j) => j.status)).toEqual(['VALIDATED']);
+}
+
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
   createRole: {
@@ -534,6 +564,15 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: (theirs) => ({ ratePlanId: theirs['ratePlanId'], components: [] }),
     untouched: bRatesUnchanged,
   },
+  validateImport: {
+    // B's file from A1: refused as unknown, and no import is created in B.
+    seed: bImport,
+    creates: true,
+    body: (theirs) => ({ kind: 'ROOMS', fileId: theirs['fileId'] }),
+    untouched: bImportUnchanged,
+  },
+  getImport: { seed: bImport },
+  applyImport: { seed: bImport, untouched: bImportUnchanged },
   releaseRoomBlock: {
     seed: bBlock,
     untouched: async (db, _w, theirs) => {

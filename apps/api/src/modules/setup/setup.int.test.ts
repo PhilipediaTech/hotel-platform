@@ -1,3 +1,4 @@
+import { localDate } from '@hotel/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDb, testDb } from '../../../test/db.ts';
 import { makeRoom, makeRoomType } from '../../../test/factories.ts';
@@ -17,10 +18,39 @@ beforeEach(async () => {
   now = new Date();
 });
 
-/** A hotel whose first property has a room type, a room and confirmed taxes (T-031/T-032 steps). */
+/** A hotel whose first property has rooms, confirmed taxes and a price (T-031–T-033 steps). */
 async function hotel() {
   const h = await makeHotel(db, now);
-  await makeRoom(db, await makeRoomType(db, h.p1));
+  const type = await makeRoomType(db, h.p1);
+  await makeRoom(db, type);
+  const policy = await db.cancellationPolicy.create({
+    data: {
+      propertyId: h.p1.id,
+      name: 'Flexible',
+      rules: [],
+      noShowFee: { feeType: 'NIGHTS', value: 1 },
+    },
+  });
+  const bar = await db.ratePlan.create({
+    data: {
+      organisationId: h.org.id,
+      propertyId: h.p1.id,
+      code: 'BAR',
+      name: 'Best available',
+      kind: 'BAR',
+      cancellationPolicyId: policy.id,
+      currency: 'NGN',
+    },
+  });
+  await db.rateDay.create({
+    data: {
+      propertyId: h.p1.id,
+      ratePlanId: bar.id,
+      roomTypeId: type.id,
+      date: new Date(`${localDate(now, 'Africa/Lagos')}T00:00:00Z`),
+      amountMinor: 5_000_000n,
+    },
+  });
   await db.property.update({
     where: { id: h.p1.id },
     data: { settings: { taxes: { confirmedAt: now.toISOString(), confirmedById: h.owner.id } } },
@@ -55,7 +85,7 @@ const auditOf = (action: string) =>
   db.auditEvent.findMany({ where: { action }, orderBy: { id: 'asc' } });
 
 describe('setup checklist', () => {
-  it('starts with details and payment methods to do, and later steps naming their ticket', async () => {
+  it('starts with details and payment methods to do', async () => {
     const h = await hotel();
     const res = await (await h.as(h.owner.id)).get(h.path);
     expect(res.status).toBe(200);
@@ -76,12 +106,11 @@ describe('setup checklist', () => {
       tax: 'DONE',
       'room-types': 'DONE',
       rooms: 'DONE',
-      rates: 'LATER',
+      rates: 'DONE',
       'payment-methods': 'TODO',
       staff: 'DONE', // the hotel has a GM and a front-desk agent
     });
     const steps = body(res).checklist.steps;
-    expect(steps.find((s) => s.id === 'rates')?.ticket).toBe('T-033');
     expect(steps.find((s) => s.id === 'staff')?.required).toBe(false);
     expect(body(res).checklist.ready).toBe(false);
   });
@@ -179,7 +208,7 @@ describe('go-live', () => {
       entityId: h.p1.id,
       actorUserId: h.owner.id,
       before: { status: 'SETUP' },
-      after: { status: 'LIVE', later: ['rates'] },
+      after: { status: 'LIVE', later: [] },
     });
     const me = await owner.get('/me');
     expect(

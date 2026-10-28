@@ -27,6 +27,7 @@ import { approvalRoutes } from './modules/approvals/routes.ts';
 import { APPROVAL_HANDLERS } from './approval-actions.ts';
 import type { ApprovalActionHandler } from './core/approvals.ts';
 import { identityRoutes } from './modules/identity/routes.ts';
+import { rateRoutes } from './modules/rates/routes.ts';
 import { roomRoutes } from './modules/rooms/routes.ts';
 import { setupRoutes } from './modules/setup/routes.ts';
 import { taxRoutes } from './modules/tax/routes.ts';
@@ -122,6 +123,7 @@ export function createApp({
   api.use(setupRoutes({ db, clock }));
   api.use(roomRoutes({ db, tenantDb, clock }));
   api.use(taxRoutes({ db, tenantDb, clock }));
+  api.use(rateRoutes({ db, tenantDb, clock }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

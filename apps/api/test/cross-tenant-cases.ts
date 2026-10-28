@@ -208,6 +208,43 @@ async function bTaxesUnchanged(db: Db, world: TenantWorld) {
   expect([code.name, code.taxRuleIds]).toEqual(['VAT', []]);
 }
 
+async function bPolicy(db: Db, _world: TenantWorld, propertyId: string) {
+  const policy = await db.cancellationPolicy.create({
+    data: { propertyId, name: 'Flexible', rules: [], noShowFee: { feeType: 'NIGHTS', value: 1 } },
+  });
+  return { cancellationPolicyId: policy.id };
+}
+
+async function bPlan(
+  db: Db,
+  world: TenantWorld,
+  propertyId: string,
+  kind: 'BAR' | 'PACKAGE' = 'BAR',
+) {
+  const { cancellationPolicyId } = await bPolicy(db, world, propertyId);
+  const type = await makeRoomType(db, { id: propertyId, organisationId: orgOf(world, propertyId) });
+  const plan = await db.ratePlan.create({
+    data: {
+      organisationId: orgOf(world, propertyId),
+      propertyId,
+      code: kind,
+      name: 'Best available',
+      kind,
+      cancellationPolicyId,
+      currency: 'NGN',
+    },
+  });
+  return { ratePlanId: plan.id, cancellationPolicyId, roomTypeId: type.id };
+}
+
+async function bRatesUnchanged(db: Db, world: TenantWorld) {
+  expect(await db.ratePlan.count({ where: { propertyId: world.b1.id } })).toBe(1);
+  expect(await db.cancellationPolicy.count({ where: { propertyId: world.b1.id } })).toBe(1);
+  expect(await db.rateDay.count({ where: { propertyId: world.b1.id } })).toBe(0);
+  const plan = await db.ratePlan.findFirstOrThrow({ where: { propertyId: world.b1.id } });
+  expect([plan.name, plan.version]).toEqual(['Best available', 0]);
+}
+
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
   createRole: {
@@ -436,6 +473,66 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       const b1 = await db.property.findUniqueOrThrow({ where: { id: world.b1.id } });
       expect(b1.settings).toEqual({});
     },
+  },
+  listCancellationPolicies: { seed: bPolicy, listIds: ids },
+  createCancellationPolicy: {
+    seed: bPlan,
+    creates: true,
+    body: () => ({ name: 'Leak', rules: [], noShowFee: { feeType: 'NIGHTS', value: 1 } }),
+    untouched: bRatesUnchanged,
+  },
+  listRatePlans: {
+    seed: bPlan,
+    listIds: (body) =>
+      (body as { data: { id: string; cancellationPolicyId: string }[] }).data.flatMap((p) => [
+        p.id,
+        p.cancellationPolicyId,
+      ]),
+  },
+  createRatePlan: {
+    // B's parent and policy from A1: refused as unknown, and nothing is created in B.
+    seed: bPlan,
+    creates: true,
+    body: (theirs) => ({
+      code: 'LEAK',
+      name: 'Leak',
+      kind: 'DERIVED',
+      parentRatePlanId: theirs['ratePlanId'],
+      derivationBps: -1000,
+      cancellationPolicyId: theirs['cancellationPolicyId'],
+    }),
+    untouched: bRatesUnchanged,
+  },
+  updateRatePlan: { seed: bPlan, body: () => ({ name: 'Leak' }), untouched: bRatesUnchanged },
+  getRateCalendar: {
+    seed: bPlan,
+    query: (theirs) => ({
+      ratePlanId: theirs['ratePlanId'] ?? '',
+      from: '2099-01-01',
+      to: '2099-01-07',
+    }),
+  },
+  updateRateCalendar: {
+    seed: bPlan,
+    creates: true,
+    body: (theirs) => ({
+      ratePlanId: theirs['ratePlanId'],
+      roomTypeIds: [theirs['roomTypeId']],
+      from: '2099-01-01',
+      to: '2099-01-02',
+      set: { amountMinor: '5000000' },
+    }),
+    untouched: bRatesUnchanged,
+  },
+  listPackages: {
+    seed: (db, world, propertyId) => bPlan(db, world, propertyId, 'PACKAGE'),
+    listIds: ids,
+  },
+  setPackageComponents: {
+    seed: (db, world, propertyId) => bPlan(db, world, propertyId, 'PACKAGE'),
+    creates: true,
+    body: (theirs) => ({ ratePlanId: theirs['ratePlanId'], components: [] }),
+    untouched: bRatesUnchanged,
   },
   releaseRoomBlock: {
     seed: bBlock,

@@ -34,7 +34,7 @@ export const SETUP_STEPS: readonly SetupStepDef[] = [
   { id: 'tax', required: true },
   { id: 'room-types', required: true },
   { id: 'rooms', required: true },
-  { id: 'rates', required: true, later: 'T-033' },
+  { id: 'rates', required: true },
   { id: 'payment-methods', required: true },
   { id: 'staff', required: false },
 ];

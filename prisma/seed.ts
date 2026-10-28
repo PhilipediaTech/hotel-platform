@@ -3,6 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { createDb, type Db } from '../apps/api/src/core/db.ts';
+import type { Prisma } from '../apps/api/src/generated/prisma/client.ts';
 import { hashPassword } from '../apps/api/src/core/passwords.ts';
 import {
   DEPARTMENT_TEMPLATES,
@@ -27,6 +28,10 @@ export const DEMO_ROOM_TYPES = [
   { code: 'DLX', name: 'Deluxe', baseOccupancy: 2, maxOccupancy: 3, floor: '2', rooms: 10 },
   { code: 'STE', name: 'Suite', baseOccupancy: 2, maxOccupancy: 4, floor: '3', rooms: 5 },
 ] as const;
+
+/** Demo BAR per night in kobo (T-033), set for the next DEMO_RATE_DAYS days. */
+export const DEMO_BAR = { STD: 4_500_000n, DLX: 6_500_000n, STE: 12_000_000n } as const;
+export const DEMO_RATE_DAYS = 90;
 
 export interface SeedOptions {
   /** Password for demo users that have none yet (local sign-in). Omit to leave them without. */
@@ -160,6 +165,91 @@ export async function seed(db: Db, options: SeedOptions = {}): Promise<void> {
       });
     }
   }
+
+  await seedRates(db, localDate(new Date(), property.timeZone));
+}
+
+/**
+ * Demo rates (T-033): a flexible policy, BAR with prices for the next 90 days, Corporate at
+ * 10% off BAR, and Bed and breakfast (BAR + ₦10,000 with breakfast for two posted to F&B).
+ * Plans already there are left alone; missing days are added.
+ */
+async function seedRates(db: Db, today: string): Promise<void> {
+  const existing = await db.cancellationPolicy.findFirst({
+    where: { propertyId: DEMO_PROPERTY_ID, name: 'Flexible' },
+  });
+  const policy =
+    existing ??
+    (await db.cancellationPolicy.create({
+      data: {
+        propertyId: DEMO_PROPERTY_ID,
+        name: 'Flexible',
+        rules: [{ daysBefore: 1, feeType: 'NIGHTS', value: 1 }],
+        noShowFee: { feeType: 'NIGHTS', value: 1 },
+      },
+    }));
+  const plan = (
+    code: string,
+    data: Omit<
+      Prisma.RatePlanUncheckedCreateInput,
+      'organisationId' | 'propertyId' | 'code' | 'cancellationPolicyId' | 'currency'
+    >,
+  ) =>
+    db.ratePlan.upsert({
+      where: { propertyId_code: { propertyId: DEMO_PROPERTY_ID, code } },
+      update: {},
+      create: {
+        organisationId: DEMO_ORG_ID,
+        propertyId: DEMO_PROPERTY_ID,
+        code,
+        cancellationPolicyId: policy.id,
+        currency: 'NGN',
+        ...data,
+      },
+    });
+  const bar = await plan('BAR', { name: 'Best available', kind: 'BAR', isPublic: true });
+  await plan('CORP', {
+    name: 'Corporate',
+    kind: 'DERIVED',
+    parentRatePlanId: bar.id,
+    derivationBps: -1000,
+  });
+  const bb = await plan('BB', {
+    name: 'Bed and breakfast',
+    kind: 'PACKAGE',
+    parentRatePlanId: bar.id,
+    derivationAmountMinor: 1_000_000n,
+    mealPlan: 'BREAKFAST',
+  });
+  const fnb = await db.revenueCode.findUnique({
+    where: { propertyId_code: { propertyId: DEMO_PROPERTY_ID, code: 'FNB' } },
+  });
+  if (fnb && (await db.packageComponent.count({ where: { ratePlanId: bb.id } })) === 0) {
+    await db.packageComponent.create({
+      data: {
+        ratePlanId: bb.id,
+        name: 'Breakfast',
+        revenueCodeId: fnb.id,
+        amountMinor: 500_000n,
+        perPerson: true,
+      },
+    });
+  }
+
+  const types = await db.roomType.findMany({ where: { propertyId: DEMO_PROPERTY_ID } });
+  const start = new Date(`${today}T00:00:00Z`);
+  await db.rateDay.createMany({
+    data: types.flatMap((type) =>
+      Array.from({ length: DEMO_RATE_DAYS }, (_, i) => ({
+        propertyId: DEMO_PROPERTY_ID,
+        ratePlanId: bar.id,
+        roomTypeId: type.id,
+        date: new Date(start.getTime() + i * 86_400_000),
+        amountMinor: DEMO_BAR[type.code as keyof typeof DEMO_BAR] ?? 5_000_000n,
+      })),
+    ),
+    skipDuplicates: true,
+  });
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

@@ -93,6 +93,8 @@ export interface CrossTenantCase {
   untouched?(db: Db, world: TenantWorld, theirs: Record<string, string>): Promise<void>;
   /** Request body for writes. */
   body?(params: Record<string, string>): object;
+  /** Query string for GETs that name the record there (e.g. ?ratePlanId=). */
+  query?(params: Record<string, string>): Record<string, string>;
 }
 
 function call(
@@ -102,12 +104,14 @@ function call(
   propertyId: string,
   cookie: string,
   body?: object,
+  query?: Record<string, string>,
 ) {
   const path = `/api/v1${route.path.replace(/\{(\w+)\}/g, (_, name: string) => params[name] ?? '')}`;
   const req = request(app)
     [route.method](path)
     .set('Cookie', cookie)
     .set('X-Property-Id', propertyId);
+  if (query) req.query(query);
   if (route.method !== 'get') req.set('Origin', APP_ORIGIN);
   if (route.idempotent) req.set('Idempotency-Key', crypto.randomUUID());
   if (route.ifMatch) req.set('If-Match', '"0"');
@@ -130,8 +134,9 @@ export async function expectCrossTenantSafe(
   const cookie = await sessionCookie(db, world.aStaff.id);
   const theirs = await testCase.seed(db, world, world.b1.id);
   const body = testCase.body?.(theirs);
+  const query = testCase.query?.(theirs);
 
-  const fromA1 = await call(app, route, theirs, world.a1.id, cookie, body);
+  const fromA1 = await call(app, route, theirs, world.a1.id, cookie, body, query);
   if (testCase.listIds) {
     expect(fromA1.status, `${route.operationId} list from A1`).toBe(200);
     const ids = testCase.listIds(fromA1.body);
@@ -146,9 +151,9 @@ export async function expectCrossTenantSafe(
     expect(fromA1.status, `${route.operationId} with B's record from A1`).toBe(404);
   }
 
-  const inB1 = await call(app, route, theirs, world.b1.id, cookie, body);
+  const inB1 = await call(app, route, theirs, world.b1.id, cookie, body, query);
   expect(inB1.status, `${route.operationId} in B1`).toBe(404);
-  const inA2 = await call(app, route, theirs, world.a2.id, cookie, body);
+  const inA2 = await call(app, route, theirs, world.a2.id, cookie, body, query);
   expect(inA2.status, `${route.operationId} in A2 without a role there`).toBe(404);
   await testCase.untouched?.(db, world, theirs);
 }

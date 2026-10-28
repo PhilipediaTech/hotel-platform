@@ -1961,6 +1961,45 @@
           "column",
           "message"
         ]
+      },
+      "InventoryDay": {
+        "type": "object",
+        "properties": {
+          "roomTypeId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "date": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "capacity": {
+            "type": "integer"
+          },
+          "outOfOrder": {
+            "type": "integer"
+          },
+          "sold": {
+            "type": "integer"
+          },
+          "held": {
+            "type": "integer"
+          },
+          "overbookLimit": {
+            "type": "integer"
+          },
+          "available": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "roomTypeId",
+          "date",
+          "capacity",
+          "outOfOrder",
+          "sold",
+          "held",
+          "overbookLimit",
+          "available"
+        ]
       }
     },
     "parameters": {}
@@ -10506,6 +10545,270 @@
           },
           "404": {
             "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inventory": {
+      "get": {
+        "operationId": "getInventory",
+        "summary": "Rooms left per room type and date",
+        "tags": [
+          "Availability"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "`to` is included; at most 62 days.",
+        "x-permission": "availability.read",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": true,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": true,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "days": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/InventoryDay"
+                      }
+                    }
+                  },
+                  "required": [
+                    "days"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inventory/overbooking": {
+      "put": {
+        "operationId": "setOverbooking",
+        "summary": "Set how many rooms may be sold above capacity (default 0)",
+        "tags": [
+          "Availability"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Lowering the limit below what is already sold answers 409 STATE_TRANSITION_INVALID with the dates.",
+        "x-permission": "rate.overbook",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roomTypeIds": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "minItems": 1,
+                    "maxItems": 50
+                  },
+                  "from": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "to": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 50
+                  }
+                },
+                "required": [
+                  "roomTypeIds",
+                  "from",
+                  "to",
+                  "limit"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "changedDays": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "changedDays"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
             "content": {
               "application/json": {
                 "schema": {

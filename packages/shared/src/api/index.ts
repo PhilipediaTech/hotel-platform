@@ -5,6 +5,7 @@ export * from './auth.ts';
 export * from './contract.ts';
 export * from './files.ts';
 export * from './imports.ts';
+export * from './inventory.ts';
 export * from './primitives.ts';
 export * from './properties.ts';
 export * from './rates.ts';

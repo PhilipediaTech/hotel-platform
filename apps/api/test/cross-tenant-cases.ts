@@ -275,6 +275,15 @@ async function bImportUnchanged(db: Db, world: TenantWorld) {
   expect(jobs.map((j) => j.status)).toEqual(['VALIDATED']);
 }
 
+/** B's room type with an inventory day (2099-01-01). */
+async function bInventory(db: Db, world: TenantWorld, propertyId: string) {
+  const { roomTypeId } = await bRoomType(db, world, propertyId);
+  await db.roomTypeInventory.create({
+    data: { propertyId, roomTypeId, date: new Date('2099-01-01'), capacity: 3 },
+  });
+  return { roomTypeId };
+}
+
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
   createRole: {
@@ -573,6 +582,25 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   getImport: { seed: bImport },
   applyImport: { seed: bImport, untouched: bImportUnchanged },
+  getInventory: {
+    seed: bInventory,
+    query: () => ({ from: '2099-01-01', to: '2099-01-02' }),
+    listIds: (body) => (body as { days: { roomTypeId: string }[] }).days.map((d) => d.roomTypeId),
+  },
+  setOverbooking: {
+    seed: bInventory,
+    creates: true,
+    body: (theirs) => ({
+      roomTypeIds: [theirs['roomTypeId']],
+      from: '2099-01-01',
+      to: '2099-01-01',
+      limit: 2,
+    }),
+    untouched: async (db, world) => {
+      const rows = await db.roomTypeInventory.findMany({ where: { propertyId: world.b1.id } });
+      expect(rows.map((r) => r.overbookLimit)).toEqual([0]);
+    },
+  },
   releaseRoomBlock: {
     seed: bBlock,
     untouched: async (db, _w, theirs) => {

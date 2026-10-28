@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Request, RequestHandler } from 'express';
+// req.id and req.log are declared by pino-http (also for programs that don't load logger.ts).
+import type {} from 'pino-http';
 
 /** Accept a caller's X-Request-Id only if it is short and log-safe; otherwise mint one. */
 const INCOMING_ID = /^[A-Za-z0-9_-]{8,64}$/;

@@ -19,7 +19,8 @@ import type { Clock } from '../../core/clock.ts';
 import { pgErrorInfo, type Db } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
-import type { TenantContext } from '../../core/tenancy.ts';
+import { requireTenant, type TenantContext } from '../../core/tenancy.ts';
+import { propertyToday, rebuildInventory } from '../availability/inventory.ts';
 
 // Room types, rooms and out-of-order/out-of-service blocks (PRD M2-01–M2-03; T-031).
 // Dates are the property's local calendar dates until business days arrive (T-054).
@@ -58,6 +59,14 @@ function taken(err: unknown, index: string, field: string, message: string): nev
   const info = pgErrorInfo(err);
   if (info?.sqlState === '23505' && info.constraint === index) throw invalid(field, message);
   throw err;
+}
+
+/** Rooms or blocks of these types changed: rewrite their inventory (T-040), same transaction. */
+async function refreshInventory(tx: Tx, deps: RoomDeps, roomTypeIds: string[]): Promise<void> {
+  const { propertyId } = requireTenant();
+  await rebuildInventory(tx, propertyId, await propertyToday(deps.db, propertyId, deps.clock), [
+    ...new Set(roomTypeIds),
+  ]);
 }
 
 // ── Room types ─────────────────────────────────────────────────────────────────────────
@@ -151,6 +160,7 @@ export async function createRoomType(
         entityId: created.id,
         after: auditType(created),
       });
+      await refreshInventory(tx, deps, [created.id]);
       return typeItem(created, 0);
     });
   } catch (err) {
@@ -203,6 +213,7 @@ export async function updateRoomType(
           after: Object.fromEntries(changed.map((k) => [k, now[k]])),
         });
       }
+      await refreshInventory(tx, deps, [after.id]);
       return typeItem(after, rooms);
     });
   } catch (err) {
@@ -348,6 +359,7 @@ export async function createRoom(
         entityId: room.id,
         after: auditRoom(room),
       });
+      await refreshInventory(tx, deps, [room.roomTypeId]);
       return roomItem(room);
     });
   } catch (err) {
@@ -408,6 +420,7 @@ export async function updateRoom(
           after: Object.fromEntries(changed.map((k) => [k, is[k]])),
         });
       }
+      await refreshInventory(tx, deps, [before.roomTypeId, after.roomTypeId]);
       return roomItem(after);
     });
   } catch (err) {
@@ -480,6 +493,8 @@ export async function createRoomBlock(
           endDate: body.endDate,
         },
       });
+      // Out of order leaves availability (M2 rule 2); refused if the rooms are sold.
+      if (body.kind === 'OUT_OF_ORDER') await refreshInventory(tx, deps, [room.roomTypeId]);
       return blockItem(block);
     });
   } catch (err) {
@@ -527,6 +542,7 @@ export async function releaseRoomBlock(
       before: { blockId: block.id, kind: block.kind, endDate: day(block.endDate) },
       after: { releasedOn: now, early: current },
     });
+    if (block.kind === 'OUT_OF_ORDER') await refreshInventory(tx, deps, [block.room.roomTypeId]);
     return blockItem(released);
   });
 }

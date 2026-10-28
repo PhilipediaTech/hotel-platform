@@ -107,6 +107,7 @@ model Property {
   ratePlans            RatePlan[]
   rateDays             RateDay[]
   importJobs           ImportJob[]
+  inventory            RoomTypeInventory[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -541,10 +542,11 @@ model RoomType {
   sortOrder      Int      @default(0) @map("sort_order")
   active         Boolean  @default(true)
 
-  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  property     Property     @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  organisation Organisation        @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property     Property            @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
   rooms        Room[]
   rateDays     RateDay[]
+  inventory    RoomTypeInventory[]
 
   @@unique([propertyId, code])
   // Target of composite foreign keys: a room can only have a type of its own property.
@@ -831,4 +833,28 @@ model ImportJob {
 
   @@index([propertyId, createdAt])
   @@map("import_jobs")
+}
+
+// ───────────────────────── Inventory (M2 rules 1–2, M2-09; T-040) ─────────────────────────
+
+/// Rooms of one type on one date (tab 2 "Inventory and concurrency"). capacity = active
+/// rooms of the type (out-of-service ones still count); outOfOrder = those with an
+/// out-of-order block that day. Both are rebuilt from rooms and blocks; sold and held are
+/// changed only by reservations, with a conditional update that never passes
+/// capacity + overbookLimit (CHECK in the migration).
+model RoomTypeInventory {
+  propertyId    String   @map("property_id") @db.Uuid
+  roomTypeId    String   @map("room_type_id") @db.Uuid
+  date          DateTime @db.Date
+  capacity      Int
+  outOfOrder    Int      @default(0) @map("out_of_order")
+  sold          Int      @default(0)
+  held          Int      @default(0)
+  overbookLimit Int      @default(0) @map("overbook_limit")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  roomType RoomType @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
+
+  @@id([propertyId, roomTypeId, date])
+  @@map("room_type_inventory")
 }

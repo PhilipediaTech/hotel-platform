@@ -1,6 +1,8 @@
 import { ERROR_HTTP_STATUS, type ErrorCode, type ErrorEnvelope } from '@hotel/shared';
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
 import { ZodError } from 'zod';
+// req.id and req.log are declared by pino-http (also for programs that don't load logger.ts).
+import type {} from 'pino-http';
 import { getRequestId } from './request-id.ts';
 
 /** Throw this from services and routes; the error handler turns it into the envelope. */

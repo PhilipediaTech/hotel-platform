@@ -12,6 +12,7 @@ import {
 } from '../apps/api/src/modules/identity/role-templates.ts';
 import { createDefaultApprovalPolicies } from '../apps/api/src/modules/approvals/defaults.ts';
 import { createDefaultTaxes } from '../apps/api/src/modules/tax/defaults.ts';
+import { rebuildInventory } from '../apps/api/src/modules/availability/inventory.ts';
 import { localDate } from '@hotel/shared';
 
 export const DEMO_ORG_ID = '0d0d0d0d-0000-4000-8000-000000000001';
@@ -167,6 +168,8 @@ export async function seed(db: Db, options: SeedOptions = {}): Promise<void> {
   }
 
   await seedRates(db, localDate(new Date(), property.timeZone));
+  // Rooms left per type and date (T-040).
+  await rebuildInventory(db, DEMO_PROPERTY_ID, localDate(new Date(), property.timeZone));
 }
 
 /**

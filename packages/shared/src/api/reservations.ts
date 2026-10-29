@@ -3,6 +3,8 @@ import { BOOKING_SOURCES, CANCEL_REASONS, RESERVATION_STATUSES } from '../reserv
 import { Email, Phone } from './auth.ts';
 import { defineRoute } from './contract.ts';
 import { AmountMinor, Instant, IsoDate, page, PageQuery, Uuid } from './primitives.ts';
+import { Violation } from './quotes.ts';
+import { TimeOfDay } from './properties.ts';
 import { GUARANTEES } from './rates.ts';
 import { HK_STATUSES } from './rooms.ts';
 import { ID_TYPES, STAY_PURPOSES } from '../registration.ts';
@@ -71,6 +73,9 @@ export const ReservationBody = z.object({
   approvalReason: z.string().trim().max(500).optional(),
 });
 
+/** Start and end of a day-use stay (M3-10). */
+export const DayUseTimes = z.object({ startsAt: Instant, endsAt: Instant });
+
 const GuestRef = z.object({
   id: Uuid,
   firstName: z.string(),
@@ -95,7 +100,9 @@ export const StayItem = z
     adults: z.number().int(),
     children: z.number().int(),
     folioId: Uuid.nullable(),
-    /** Nightly prices as quoted (M2 rule 4). */
+    /** A day-use stay (M3-10): when the room is the guest's; null for overnight stays. */
+    dayUse: DayUseTimes.nullable(),
+    /** Nightly prices as quoted (M2 rule 4); a day-use stay has one line for its date. */
     nights: z.array(z.object({ date: IsoDate, amountMinor: AmountMinor })),
     /** What the guest pays for this stay, taxes included (from its quote). */
     totalMinor: AmountMinor,
@@ -336,6 +343,7 @@ export const CalendarStay = z
     rooms: z.array(z.object({ roomId: Uuid, startDate: IsoDate, endDate: IsoDate })),
     arrival: IsoDate,
     departure: IsoDate,
+    dayUse: DayUseTimes.nullable(),
     guestName: z.string(),
     adults: z.number().int(),
     children: z.number().int(),
@@ -572,6 +580,127 @@ export const issueKeys = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+// ── Day-use (M3-10; T-052) ─────────────────────────────────────────────────────────────
+
+/** Shortest day-use stay; the plan sets the longest (rate_plans.day_use_max_minutes). */
+export const DAY_USE_MIN_MINUTES = 30;
+
+export const DayUseQuery = z.object({
+  date: IsoDate,
+  /** Local time at the property, 24-hour. */
+  start: TimeOfDay,
+  minutes: z.coerce.number().int().min(DAY_USE_MIN_MINUTES).max(1440),
+  adults: z.coerce.number().int().min(1).max(20),
+  children: z.coerce.number().int().min(0).max(20).default(0),
+});
+
+export const DayUseRoomType = z
+  .object({
+    roomTypeId: Uuid,
+    code: z.string(),
+    name: z.string(),
+    maxOccupancy: z.number().int(),
+    plans: z.array(
+      z.object({
+        ratePlanId: Uuid,
+        code: z.string(),
+        name: z.string(),
+        guarantee: z.enum(GUARANTEES),
+        /** Longest stay this plan sells. */
+        maxMinutes: z.number().int(),
+        /** What the guest pays, taxes included; null when the date has no price. */
+        totalMinor: AmountMinor.nullable(),
+        /** False when a restriction stops the sale, the stay is too long, or no room is free. */
+        sellable: z.boolean(),
+        violations: z.array(Violation),
+      }),
+    ),
+    /** Rooms of the type free for the whole time (no block, no guest staying through it). */
+    rooms: z.array(
+      z.object({
+        id: Uuid,
+        number: z.string(),
+        floor: z.string().nullable(),
+        hkStatus: z.enum(HK_STATUSES),
+      }),
+    ),
+  })
+  .meta({ id: 'DayUseRoomType' });
+
+export const getDayUseAvailability = defineRoute({
+  operationId: 'getDayUseAvailability',
+  method: 'get',
+  path: '/day-use/availability',
+  summary: 'Day-use plans, prices and free rooms for a start time and duration',
+  description:
+    'Day-use plans price one stay of up to their longest duration on the date. A day-use stay is not a room night: it takes no room-type inventory, only the room for its hours.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'availability.read',
+  query: DayUseQuery,
+  response: z.object({
+    date: IsoDate,
+    startsAt: Instant,
+    endsAt: Instant,
+    currency: z.string(),
+    roomTypes: z.array(DayUseRoomType),
+  }),
+});
+
+export const DayUseBody = DayUseQuery.extend({
+  roomTypeId: Uuid,
+  ratePlanId: Uuid,
+  /** The room is given at the sale: it is held for exactly these hours. */
+  roomId: Uuid,
+  adults: z.number().int().min(1).max(20),
+  children: z.number().int().min(0).max(20).default(0),
+  minutes: z.number().int().min(DAY_USE_MIN_MINUTES).max(1440),
+  source: z.enum(BOOKING_SOURCES).default('WALK_IN'),
+  guarantee: z.enum(GUARANTEES).default('NONE'),
+  booker: Booker,
+  notes: z.string().trim().max(2000).nullable().default(null),
+});
+
+export const createDayUse = defineRoute({
+  operationId: 'createDayUse',
+  method: 'post',
+  path: '/day-use',
+  summary: 'Sell a day-use stay: a room for a start time and duration',
+  description:
+    'Confirmed at once, with the room held from `start` for `minutes` (409 BOOKING_CONFLICT when another stay has it then, or a guest stays in it through that day). The same room can still be sold for the night. The guest checks in with /stays/{id}/check-in and the desk ends the stay with /stays/{id}/check-out, which sets the room to dirty.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.dayuse',
+  idempotent: true,
+  body: DayUseBody,
+  status: 201,
+  response: ReservationItem,
+  errors: ['BOOKING_CONFLICT', 'RESTRICTION_VIOLATED', 'PROPERTY_NOT_LIVE', 'FORBIDDEN'],
+});
+
+export const CheckOutBody = z.object({
+  /** The key cards came back (logged on the key issues). */
+  keysReturned: z.boolean().default(true),
+});
+
+export const checkOut = defineRoute({
+  operationId: 'checkOut',
+  method: 'post',
+  path: '/stays/{stayId}/check-out',
+  summary: 'Check a guest out; the room becomes dirty',
+  description:
+    'Day-use stays for now (M3-10): ends the stay, frees the room from now on and sets it to dirty. Overnight check-out, with the folio balance check, comes with folios. Send `If-Match` with the stay’s version.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.checkout',
+  idempotent: true,
+  ifMatch: true,
+  params: StayParams,
+  body: CheckOutBody,
+  response: ReservationItem,
+  errors: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
+});
+
 export const RESERVATION_ROUTES = {
   listReservations,
   createReservation,
@@ -588,4 +717,7 @@ export const RESERVATION_ROUTES = {
   getRegistrationCard,
   listKeys,
   issueKeys,
+  getDayUseAvailability,
+  createDayUse,
+  checkOut,
 } as const;

@@ -2865,6 +2865,24 @@
               }
             ]
           },
+          "dayUse": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "startsAt": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "endsAt": {
+                "$ref": "#/components/schemas/Instant"
+              }
+            },
+            "required": [
+              "startsAt",
+              "endsAt"
+            ]
+          },
           "nights": {
             "type": "array",
             "items": {
@@ -2905,6 +2923,7 @@
           "adults",
           "children",
           "folioId",
+          "dayUse",
           "nights",
           "totalMinor",
           "version"
@@ -3442,6 +3461,24 @@
           "departure": {
             "$ref": "#/components/schemas/IsoDate"
           },
+          "dayUse": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "startsAt": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "endsAt": {
+                "$ref": "#/components/schemas/Instant"
+              }
+            },
+            "required": [
+              "startsAt",
+              "endsAt"
+            ]
+          },
           "guestName": {
             "type": "string"
           },
@@ -3462,6 +3499,7 @@
           "rooms",
           "arrival",
           "departure",
+          "dayUse",
           "guestName",
           "adults",
           "children"
@@ -3769,6 +3807,119 @@
           "count",
           "issuedBy",
           "issuedAt"
+        ]
+      },
+      "DayUseRoomType": {
+        "type": "object",
+        "properties": {
+          "roomTypeId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "maxOccupancy": {
+            "type": "integer"
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ratePlanId": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "guarantee": {
+                  "type": "string",
+                  "enum": [
+                    "NONE",
+                    "DEPOSIT",
+                    "CARD_ON_FILE",
+                    "COMPANY"
+                  ]
+                },
+                "maxMinutes": {
+                  "type": "integer"
+                },
+                "totalMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "sellable": {
+                  "type": "boolean"
+                },
+                "violations": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RestrictionViolation"
+                  }
+                }
+              },
+              "required": [
+                "ratePlanId",
+                "code",
+                "name",
+                "guarantee",
+                "maxMinutes",
+                "totalMinor",
+                "sellable",
+                "violations"
+              ]
+            }
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "number": {
+                  "type": "string"
+                },
+                "floor": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "hkStatus": {
+                  "type": "string",
+                  "enum": [
+                    "DIRTY",
+                    "CLEANING",
+                    "CLEAN",
+                    "INSPECTED",
+                    "OUT_OF_ORDER",
+                    "OUT_OF_SERVICE"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "number",
+                "floor",
+                "hkStatus"
+              ]
+            }
+          }
+        },
+        "required": [
+          "roomTypeId",
+          "code",
+          "name",
+          "maxOccupancy",
+          "plans",
+          "rooms"
         ]
       }
     },
@@ -12799,7 +12950,7 @@
             "session": []
           }
         ],
-        "description": "Overnight stays from today, at most 60 nights. Day-use plans are quoted with day-use bookings (T-052).",
+        "description": "Overnight stays from today, at most 60 nights. Day-use plans are priced with GET /day-use/availability.",
         "x-permission": "availability.read",
         "parameters": [
           {
@@ -16905,6 +17056,584 @@
           },
           "409": {
             "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/day-use/availability": {
+      "get": {
+        "operationId": "getDayUseAvailability",
+        "summary": "Day-use plans, prices and free rooms for a start time and duration",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Day-use plans price one stay of up to their longest duration on the date. A day-use stay is not a room night: it takes no room-type inventory, only the room for its hours.",
+        "x-permission": "availability.read",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": true,
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/TimeOfDay"
+            },
+            "required": true,
+            "name": "start",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 1440
+            },
+            "required": true,
+            "name": "minutes",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "required": true,
+            "name": "adults",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 20,
+              "default": 0
+            },
+            "required": false,
+            "name": "children",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "startsAt": {
+                      "$ref": "#/components/schemas/Instant"
+                    },
+                    "endsAt": {
+                      "$ref": "#/components/schemas/Instant"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "roomTypes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DayUseRoomType"
+                      }
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "startsAt",
+                    "endsAt",
+                    "currency",
+                    "roomTypes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/day-use": {
+      "post": {
+        "operationId": "createDayUse",
+        "summary": "Sell a day-use stay: a room for a start time and duration",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Confirmed at once, with the room held from `start` for `minutes` (409 BOOKING_CONFLICT when another stay has it then, or a guest stays in it through that day). The same room can still be sold for the night. The guest checks in with /stays/{id}/check-in and the desk ends the stay with /stays/{id}/check-out, which sets the room to dirty.",
+        "x-permission": "reservation.dayuse",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "start": {
+                    "$ref": "#/components/schemas/TimeOfDay"
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 1440
+                  },
+                  "adults": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "children": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 20,
+                    "default": 0
+                  },
+                  "roomTypeId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "ratePlanId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "roomId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "WALK_IN",
+                      "PHONE",
+                      "EMAIL",
+                      "WHATSAPP",
+                      "DIRECT",
+                      "OTA_MANUAL",
+                      "OTA_CHANNEL",
+                      "CORPORATE",
+                      "TRAVEL_AGENT"
+                    ],
+                    "default": "WALK_IN"
+                  },
+                  "guarantee": {
+                    "type": "string",
+                    "enum": [
+                      "NONE",
+                      "DEPOSIT",
+                      "CARD_ON_FILE",
+                      "COMPANY"
+                    ],
+                    "default": "NONE"
+                  },
+                  "booker": {
+                    "type": "object",
+                    "properties": {
+                      "guestId": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/Uuid"
+                          },
+                          {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        ]
+                      },
+                      "firstName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "lastName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "phone": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "pattern": "^\\+[1-9]\\d{6,14}$",
+                        "default": null
+                      },
+                      "email": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "maxLength": 254,
+                        "default": null
+                      }
+                    }
+                  },
+                  "notes": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 2000,
+                    "default": null
+                  }
+                },
+                "required": [
+                  "date",
+                  "start",
+                  "minutes",
+                  "adults",
+                  "roomTypeId",
+                  "ratePlanId",
+                  "roomId",
+                  "booker"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reservation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`, `PROPERTY_NOT_LIVE`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `BOOKING_CONFLICT`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule violated: `RESTRICTION_VIOLATED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stays/{stayId}/check-out": {
+      "post": {
+        "operationId": "checkOut",
+        "summary": "Check a guest out; the room becomes dirty",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Day-use stays for now (M3-10): ends the stay, frees the room from now on and sets it to dirty. Overnight check-out, with the folio balance check, comes with folios. Send `If-Match` with the stay’s version.",
+        "x-permission": "reservation.checkout",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `ETag` from the last read."
+            },
+            "required": true,
+            "description": "The `ETag` from the last read.",
+            "name": "If-Match",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "keysReturned": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reservation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `VERSION_CONFLICT`, `STATE_TRANSITION_INVALID`",
             "content": {
               "application/json": {
                 "schema": {

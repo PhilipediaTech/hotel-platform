@@ -26,6 +26,7 @@ const BAR = '44444444-0000-4000-8000-000000000004';
 const CORP = '44444444-0000-4000-8000-000000000005';
 const GUEST = '44444444-0000-4000-8000-000000000006';
 const APPROVAL = '44444444-0000-4000-8000-000000000007';
+const STAY = '44444444-0000-4000-8000-000000000008';
 const TODAY = '2026-11-10';
 
 const plan = (id: string, code: string, name: string, total: string | null, extra = {}) => ({
@@ -114,7 +115,7 @@ beforeEach(() => {
         expiresAt: '2026-11-10T09:30:00Z',
       });
     },
-    'POST /reservations': () => json(201, { id: RES, version: 0 }),
+    'POST /reservations': () => json(201, { id: RES, version: 0, stays: [{ id: STAY }] }),
     [`GET /reservations/${RES}`]: () => failure(404, 'NOT_FOUND', 'Not found'),
     [`GET /reservations/${RES}/history`]: () => json(200, { data: [] }),
     'GET /guests': () =>
@@ -292,28 +293,118 @@ describe('New booking (S08)', () => {
     });
   });
 
-  it('walk-in mode books from today as a walk-in, confirmed', async () => {
+  it('walk-in: books from today and checks the guest in within six steps (M3-09)', async () => {
+    permissions = [...permissions, 'reservation.checkin', 'room.assign'];
+    const R101 = '44444444-0000-4000-8000-000000000301';
+    const walkInStay = (status: string) => ({
+      id: STAY,
+      status,
+      guest: { id: GUEST, firstName: 'Musa', lastName: 'Bello', phone: null, email: null },
+      roomTypeId: STD,
+      roomTypeName: 'Standard',
+      roomId: status === 'CHECKED_IN' ? R101 : null,
+      roomNumber: status === 'CHECKED_IN' ? '101' : null,
+      ratePlanId: BAR,
+      ratePlanCode: 'BAR',
+      arrival: TODAY,
+      departure: '2026-11-11',
+      adults: 2,
+      children: 0,
+      folioId: null,
+      dayUse: null,
+      nights: [],
+      totalMinor: '5546250',
+      version: status === 'CHECKED_IN' ? 1 : 0,
+    });
+    let status = 'CONFIRMED';
+    handlers[`GET /reservations/${RES}`] = () =>
+      json(200, {
+        id: RES,
+        confirmationNo: 'LAG-00002',
+        status,
+        source: 'WALK_IN',
+        guarantee: 'DEPOSIT',
+        holdExpiresAt: null,
+        booker: walkInStay(status).guest,
+        company: null,
+        notes: null,
+        cancelReason: null,
+        cancelledAt: null,
+        currency: 'NGN',
+        totalMinor: '5546250',
+        depositDueMinor: '0',
+        stays: [walkInStay(status)],
+        createdAt: '2026-11-10T09:00:00Z',
+        updatedAt: '2026-11-10T09:00:00Z',
+        version: 0,
+      });
+    handlers[`GET /stays/${STAY}/rooms`] = () =>
+      json(200, {
+        data: [{ id: R101, number: '101', floor: '1', hkStatus: 'CLEAN', problems: [] }],
+      });
+    handlers[`POST /stays/${STAY}/check-in`] = () => {
+      status = 'CHECKED_IN';
+      return json(200, {
+        stayId: STAY,
+        status: 'CHECKED_IN',
+        folioId: null,
+        roomId: R101,
+        version: 1,
+      });
+    };
+    handlers[`GET /stays/${STAY}/keys`] = () => json(200, { data: [] });
+
+    // A step is one thing the desk does on a screen; the test counts them as it goes.
+    let steps = 0;
     const user = userEvent.setup();
-    renderAt('/bookings/new?mode=walk-in');
+    const router = renderAt('/bookings/new?mode=walk-in');
     expect(await screen.findByRole('heading', { name: 'Walk-in' })).toBeInTheDocument();
     const arrival = screen.getByLabelText('Arrival');
     expect(arrival).toBeDisabled();
     expect(arrival).toHaveValue(TODAY);
+
+    // 1. Departure and guests, then search.
     await searchFor(user, '2026-11-11');
+    steps += 1;
     expect(sent('GET /availability')[0]?.url.searchParams.get('arrival')).toBe(TODAY);
+    // 2. Room type and plan.
     await user.click(await screen.findByRole('button', { name: 'Add Standard on Best available' }));
+    steps += 1;
     const details = screen.getByRole('form', { name: 'Booking details' });
     expect(within(details).queryByLabelText('Source')).not.toBeInTheDocument();
     expect(within(details).queryByLabelText('Tentative hold')).not.toBeInTheDocument();
+    // 3. The guest's name.
     await user.type(within(details).getByLabelText('First name'), 'Musa');
     await user.type(within(details).getByLabelText('Last name'), 'Bello');
+    steps += 1;
+    // 4. Book.
     await user.click(within(details).getByRole('button', { name: /^Book 1 room/ }));
+    steps += 1;
     await waitFor(() => expect(sent('POST /reservations')).toHaveLength(1));
     expect(sent('POST /reservations')[0]?.body).toMatchObject({
       source: 'WALK_IN',
       holdUntil: null,
     });
-  });
+
+    // The reservation opens with the check-in form already open: no extra click.
+    await waitFor(() => expect(router.state.location.search).toBe(`?checkIn=${STAY}`));
+    const form = await screen.findByRole('form', { name: 'Check in Musa Bello' });
+    // 5. Room and the registration fields the property requires.
+    await user.selectOptions(await within(form).findByLabelText('Room'), R101);
+    await user.type(within(form).getByLabelText('Nationality'), 'NG');
+    await user.selectOptions(within(form).getByLabelText('Purpose of stay'), 'LEISURE');
+    await user.selectOptions(within(form).getByLabelText('ID type'), 'NATIONAL_ID');
+    await user.type(within(form).getByLabelText('ID number'), '12345678901');
+    steps += 1;
+    // 6. Check in.
+    await user.click(within(form).getByRole('button', { name: 'Check in now' }));
+    steps += 1;
+
+    await waitFor(() => expect(sent(`POST /stays/${STAY}/check-in`)).toHaveLength(1));
+    expect(sent(`POST /stays/${STAY}/check-in`)[0]?.body).toMatchObject({ roomId: R101 });
+    expect(await screen.findByText('Room 101')).toBeInTheDocument();
+    expect(steps).toBeLessThanOrEqual(6);
+  }, 20_000);
 
   it('a do-not-rent guest needs a reason, then goes to a manager (M3 rule 8)', async () => {
     let attempt = 0;

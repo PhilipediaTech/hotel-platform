@@ -1090,17 +1090,21 @@ model Stay {
 
 /// A room given to a stay for a date range, endDate exclusive (M3-07, M3-11; T-050). A move ends
 /// one allocation and starts another; inactive rows are history. Active rows never overlap for a
-/// room (exclusion constraint in the migration).
+/// room (exclusion constraint in the migration). A day-use stay (T-052) holds the room for its
+/// hours: startsAt/endsAt set, dates = [its date, +1); day-use rows never overlap in time, and do
+/// not collide with overnight rows (the same room is sold for the day and for the night).
 model RoomAllocation {
-  id         String   @id @default(uuid()) @db.Uuid
-  propertyId String   @map("property_id") @db.Uuid
-  stayId     String   @map("stay_id") @db.Uuid
-  roomId     String   @map("room_id") @db.Uuid
-  startDate  DateTime @map("start_date") @db.Date
-  endDate    DateTime @map("end_date") @db.Date
-  active     Boolean  @default(true)
+  id         String    @id @default(uuid()) @db.Uuid
+  propertyId String    @map("property_id") @db.Uuid
+  stayId     String    @map("stay_id") @db.Uuid
+  roomId     String    @map("room_id") @db.Uuid
+  startDate  DateTime  @map("start_date") @db.Date
+  endDate    DateTime  @map("end_date") @db.Date
+  active     Boolean   @default(true)
   reason     String?
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  startsAt   DateTime? @map("starts_at") @db.Timestamptz(6)
+  endsAt     DateTime? @map("ends_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   stay Stay @relation(fields: [propertyId, stayId], references: [propertyId, id], onDelete: Restrict)
   room Room @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)

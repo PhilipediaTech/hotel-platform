@@ -19,7 +19,7 @@ import { Input } from '../components/ui/input.tsx';
 import { api, ApiError } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
-import { STATUS_TONE } from './reservations.tsx';
+import { STATUS_TONE, useFormats } from './reservations.tsx';
 import { BlockForm } from './settings/rooms-tab.tsx';
 import { useRoomData, type Room } from './settings/rooms.tsx';
 
@@ -118,7 +118,9 @@ function StayBar({
   onDragStart?: () => void;
 }) {
   const { t } = useTranslation();
+  const f = useFormats();
   const status = t(`reservations.status.${s.status}`);
+  const hours = s.dayUse ? ` · ${f.time(s.dayUse.startsAt)}–${f.time(s.dayUse.endsAt)}` : '';
   return (
     <Link
       to={`/reservations/${s.reservationId}`}
@@ -135,7 +137,8 @@ function StayBar({
       draggable={onDragStart ? true : undefined}
       onDragStart={onDragStart}
     >
-      {s.guestName} · {status}
+      {s.guestName}
+      {hours} · {status}
     </Link>
   );
 }
@@ -395,7 +398,8 @@ export function CalendarPage() {
           {types.data.map((type) => {
             const ofType = stays.data.filter((s) => s.roomTypeId === type.id);
             const unassigned = lanes(ofType.filter((s) => s.rooms.length === 0));
-            const drag = (s: Stay) => (canDrag ? () => setDragging(s) : undefined);
+            // A day-use stay keeps the room it was sold with.
+            const drag = (s: Stay) => (canDrag && !s.dayUse ? () => setDragging(s) : undefined);
             const typeRooms = activeRooms.filter((r) => r.roomTypeId === type.id);
             return (
               <div key={type.id} role="rowgroup" aria-label={type.name}>

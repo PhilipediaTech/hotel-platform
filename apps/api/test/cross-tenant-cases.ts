@@ -237,6 +237,25 @@ async function bPlan(
   return { ratePlanId: plan.id, cancellationPolicyId, roomTypeId: type.id };
 }
 
+/** B's day-use plan with a room of its type (T-052). */
+async function bDayUsePlan(db: Db, world: TenantWorld, propertyId: string) {
+  const { cancellationPolicyId } = await bPolicy(db, world, propertyId);
+  const { roomId, roomTypeId } = await bRoom(db, world, propertyId);
+  const plan = await db.ratePlan.create({
+    data: {
+      organisationId: orgOf(world, propertyId),
+      propertyId,
+      code: 'DAY',
+      name: 'Day use',
+      kind: 'DAY_USE',
+      dayUseMaxMinutes: 360,
+      cancellationPolicyId,
+      currency: 'NGN',
+    },
+  });
+  return { ratePlanId: plan.id, roomTypeId, roomId };
+}
+
 async function bRatesUnchanged(db: Db, world: TenantWorld) {
   expect(await db.ratePlan.count({ where: { propertyId: world.b1.id } })).toBe(1);
   expect(await db.cancellationPolicy.count({ where: { propertyId: world.b1.id } })).toBe(1);
@@ -808,6 +827,48 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
         s.id,
         s.reservationId,
       ]),
+  },
+  getDayUseAvailability: {
+    seed: bDayUsePlan,
+    query: () => ({ date: '2099-01-01', start: '10:00', minutes: '60', adults: '1' }),
+    listIds: (body) =>
+      (
+        body as {
+          roomTypes: {
+            roomTypeId: string;
+            plans: { ratePlanId: string }[];
+            rooms: { id: string }[];
+          }[];
+        }
+      ).roomTypes.flatMap((t) => [
+        t.roomTypeId,
+        ...t.plans.map((p) => p.ratePlanId),
+        ...t.rooms.map((r) => r.id),
+      ]),
+  },
+  createDayUse: {
+    // B's room type, plan and room from A1: refused, and nothing is sold in B.
+    seed: bDayUsePlan,
+    creates: true,
+    body: (theirs) => ({
+      date: '2099-01-01',
+      start: '10:00',
+      minutes: 60,
+      roomTypeId: theirs['roomTypeId'],
+      ratePlanId: theirs['ratePlanId'],
+      roomId: theirs['roomId'],
+      adults: 1,
+      booker: { firstName: 'Leak', lastName: 'Test' },
+    }),
+    untouched: async (db, world) => {
+      expect(await db.stay.count({ where: { propertyId: world.b1.id } })).toBe(0);
+      expect(await db.roomAllocation.count()).toBe(0);
+    },
+  },
+  checkOut: {
+    seed: bReservation,
+    body: () => ({}),
+    untouched: bReservationUnchanged,
   },
   releaseRoomBlock: {
     seed: bBlock,

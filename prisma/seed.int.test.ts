@@ -48,8 +48,8 @@ describe('seed', () => {
       memberships: DEMO_ROLES.length,
       roomTypes: 3,
       rooms: 30, // runbook: 30 rooms
-      ratePlans: 3, // BAR, Corporate (−10%), Bed and breakfast
-      rateDays: 3 * DEMO_RATE_DAYS,
+      ratePlans: 4, // BAR, Corporate (−10%), Bed and breakfast, Day use
+      rateDays: 2 * 3 * DEMO_RATE_DAYS, // BAR and day-use prices for 3 room types
       inventoryDays: 3 * INVENTORY_DAYS,
     });
     await expect(

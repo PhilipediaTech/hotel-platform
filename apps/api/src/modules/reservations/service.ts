@@ -103,6 +103,16 @@ function depositDue(r: Full): bigint {
   return live(r).reduce((sum, s) => sum + (s.nights[0]?.amountMinor ?? 0n), 0n);
 }
 
+/** A day-use stay's hours (M3-10); null for overnight stays. */
+export const dayUseOf = (s: {
+  isDayUse: boolean;
+  dayUseStart: Date | null;
+  dayUseEnd: Date | null;
+}) =>
+  s.isDayUse && s.dayUseStart && s.dayUseEnd
+    ? { startsAt: iso(s.dayUseStart), endsAt: iso(s.dayUseEnd) }
+    : null;
+
 function toItem(r: Full): ItemOut {
   return {
     id: r.id,
@@ -134,6 +144,7 @@ function toItem(r: Full): ItemOut {
       adults: s.adults,
       children: s.children,
       folioId: s.folioId,
+      dayUse: dayUseOf(s),
       nights: s.nights.map((n) => ({ date: day(n.date), amountMinor: n.amountMinor.toString() })),
       totalMinor: stayTotal(s).toString(),
       version: s.version,
@@ -231,13 +242,19 @@ export async function listReservations(
   };
 }
 
-/** S07: stays in the hotel on any night of the window (cancelled and no-shows left out). */
+/**
+ * S07: stays in the hotel on any night of the window, and day-use stays on its days
+ * (cancelled and no-shows left out).
+ */
 export async function getCalendar(deps: ReservationDeps, query: z.output<typeof CalendarQuery>) {
   const stays = await deps.tenantDb.stay.findMany({
     where: {
       status: { notIn: ['CANCELLED', 'NO_SHOW'] },
       arrival: { lt: dbDate(query.to) },
-      departure: { gt: dbDate(query.from) },
+      OR: [
+        { departure: { gt: dbDate(query.from) } },
+        { isDayUse: true, arrival: { gte: dbDate(query.from) } },
+      ],
     },
     include: {
       guest: true,
@@ -260,6 +277,7 @@ export async function getCalendar(deps: ReservationDeps, query: z.output<typeof 
     })),
     arrival: day(s.arrival),
     departure: day(s.departure),
+    dayUse: dayUseOf(s),
     guestName: `${s.guest.firstName} ${s.guest.lastName}`,
     adults: s.adults,
     children: s.children,
@@ -294,14 +312,14 @@ export async function getHistory(deps: ReservationDeps, reservationId: string) {
 // ── Shared checks ───────────────────────────────────────────────────────────────────────
 
 /** A guest of the organisation that can be booked (not a merged-away duplicate). */
-async function bookableGuest(tx: Tx, guestId: string, path: string): Promise<Guest> {
+export async function bookableGuest(tx: Tx, guestId: string, path: string): Promise<Guest> {
   const guest = await tx.guest.findUnique({ where: { id: guestId } });
   if (!guest) throw invalid(path, 'Guest not found');
   if (guest.mergedIntoId) throw invalid(path, 'This profile was merged; choose the one kept');
   return guest;
 }
 
-async function newGuest(
+export async function newGuest(
   tx: Tx,
   g: {
     firstName?: string | undefined;
@@ -666,6 +684,13 @@ export async function updateReservation(
       const data: Prisma.StayUncheckedUpdateInput = { version: { increment: 1 } };
       let quote = stay.quote;
       if (change.quoteId && change.quoteId !== stay.quoteId) {
+        if (stay.isDayUse) {
+          throw new AppError(
+            'STATE_TRANSITION_INVALID',
+            'A day-use stay keeps its time and price; cancel it and sell it again',
+            { reason: 'DAY_USE' },
+          );
+        }
         quote = await usableQuote(tx, change.quoteId, `${path}.quoteId`, {
           now,
           today,
@@ -885,6 +910,13 @@ export async function reinstateReservation(
     }
     const now = deps.clock();
     const today = await propertyToday(tx, tenant.propertyId, deps.clock);
+    if (before.stays.some((s) => s.isDayUse)) {
+      throw new AppError(
+        'STATE_TRANSITION_INVALID',
+        'A cancelled day-use stay is not reinstated; sell it again',
+        { reason: 'DAY_USE' },
+      );
+    }
     if (before.stays.some((s) => day(s.arrival) < today)) {
       throw new AppError(
         'STATE_TRANSITION_INVALID',

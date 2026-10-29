@@ -54,6 +54,7 @@ export function reservationRoutes(deps: reservations.ReservationDeps): Router {
   mountRoute(router, r.getReservationHistory, ({ params }) =>
     reservations.getHistory(deps, params.reservationId),
   );
+  mountRoute(router, r.getCalendar, ({ query }) => reservations.getCalendar(deps, query));
 
   return router;
 }

@@ -388,7 +388,7 @@ function SelectField({
   );
 }
 
-function BlockForm({ room, onDone }: { room: Room; onDone: () => void }) {
+export function BlockForm({ room, onDone }: { room: Room; onDone: () => void }) {
   const { t } = useTranslation();
   const session = useSession();
   const invalidate = useInvalidateRooms();

@@ -3,6 +3,8 @@ import {
   cancellationFee,
   inventoryFieldOf,
   MODIFIABLE_STATUSES,
+  type CalendarQuery,
+  type CalendarStay,
   type CancelBody,
   type FeeRule,
   type ReservationBody,
@@ -224,6 +226,33 @@ export async function listReservations(
     data,
     nextCursor: rows.length > query.limit ? encodeCursor(offset + query.limit) : null,
   };
+}
+
+/** S07: stays in the hotel on any night of the window (cancelled and no-shows left out). */
+export async function getCalendar(deps: ReservationDeps, query: z.output<typeof CalendarQuery>) {
+  const stays = await deps.tenantDb.stay.findMany({
+    where: {
+      status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+      arrival: { lt: dbDate(query.to) },
+      departure: { gt: dbDate(query.from) },
+    },
+    include: { guest: true, reservation: { select: { confirmationNo: true } } },
+    orderBy: [{ arrival: 'asc' }, { id: 'asc' }],
+  });
+  const data: z.input<typeof CalendarStay>[] = stays.map((s) => ({
+    id: s.id,
+    reservationId: s.reservationId,
+    confirmationNo: s.reservation.confirmationNo,
+    status: s.status,
+    roomTypeId: s.roomTypeId,
+    roomId: s.roomId,
+    arrival: day(s.arrival),
+    departure: day(s.departure),
+    guestName: `${s.guest.firstName} ${s.guest.lastName}`,
+    adults: s.adults,
+    children: s.children,
+  }));
+  return { data };
 }
 
 export async function getHistory(deps: ReservationDeps, reservationId: string) {

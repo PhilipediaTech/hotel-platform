@@ -29,7 +29,7 @@ type CancelReason = (typeof CANCEL_REASONS)[number];
 
 const reservationsKey = (propertyId: string | null) => ['reservations', propertyId ?? ''];
 
-function useFormats() {
+export function useFormats() {
   const { i18n } = useTranslation();
   const session = useSession();
   const property = session.properties.find((p) => p.id === session.currentPropertyId);
@@ -52,7 +52,7 @@ function useFormats() {
   };
 }
 
-const STATUS_TONE: Record<ReservationStatus, string> = {
+export const STATUS_TONE: Record<ReservationStatus, string> = {
   ENQUIRY: 'bg-surface-sunken text-text-muted',
   TENTATIVE: 'bg-warning-subtle text-warning',
   CONFIRMED: 'bg-brand-subtle text-brand-strong',

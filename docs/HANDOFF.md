@@ -105,6 +105,8 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/routes/rooms-left.tsx     S23 "Rooms left" view and overbooking form
   src/routes/guests.tsx         S13 guests: search, add, profile (details, flags, merge); companies.tsx
   src/routes/reservations.tsx   S09 reservations: find, detail (change, confirm hold, cancel, reinstate, history)
+  src/routes/new-booking.tsx    S08 new booking: search, plans, guests, guarantee, book (walk-in mode: ?mode=walk-in)
+  src/routes/calendar.tsx       S07 calendar: rooms × dates, unassigned rows per type, blocks, rooms left
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -166,4 +168,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-044 booking flow UI (S08 /bookings/new: dates and guests → room types with price per plan → guest → guarantee → confirm, using GET /availability, POST /quotes, POST /reservations; a 202 shows "Sent for approval" for do-not-rent guests; walk-in mode) and the reservation calendar (S07 tape chart). The import still needs GUESTS/COMPANIES (now possible) and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-050 room assignment (POST /stays/{id}/assign-room; M3-07: only clean or inspected vacant rooms of the type unless overridden with approval; an exclusion constraint so a room is never given to two overlapping stays; room moves M3-11). Then make the S07 calendar bars draggable onto rooms (assign/move) and show assigned stays on room rows (the calendar already reads `roomId`). The import still needs GUESTS/COMPANIES and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

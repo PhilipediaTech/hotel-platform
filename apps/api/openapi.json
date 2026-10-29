@@ -2718,6 +2718,96 @@
           "depositDueMinor": {
             "$ref": "#/components/schemas/AmountMinor"
           },
+          "deposit": {
+            "type": "object",
+            "properties": {
+              "heldMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "receivedMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "paymentMethods": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CASH",
+                    "BANK_TRANSFER",
+                    "POS_TERMINAL",
+                    "MOBILE_MONEY",
+                    "VOUCHER"
+                  ]
+                }
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "RECEIVED",
+                        "APPLIED",
+                        "REFUNDED",
+                        "FORFEITED"
+                      ]
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    "businessDate": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "paymentId": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "method": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "externalRef": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "amountMinor",
+                    "businessDate",
+                    "paymentId",
+                    "method",
+                    "externalRef"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "heldMinor",
+              "receivedMinor",
+              "paymentMethods",
+              "entries"
+            ]
+          },
           "stays": {
             "type": "array",
             "items": {
@@ -2749,6 +2839,7 @@
           "currency",
           "totalMinor",
           "depositDueMinor",
+          "deposit",
           "stays",
           "createdAt",
           "updatedAt",
@@ -3097,6 +3188,96 @@
           "depositDueMinor": {
             "$ref": "#/components/schemas/AmountMinor"
           },
+          "deposit": {
+            "type": "object",
+            "properties": {
+              "heldMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "receivedMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "paymentMethods": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CASH",
+                    "BANK_TRANSFER",
+                    "POS_TERMINAL",
+                    "MOBILE_MONEY",
+                    "VOUCHER"
+                  ]
+                }
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "RECEIVED",
+                        "APPLIED",
+                        "REFUNDED",
+                        "FORFEITED"
+                      ]
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    "businessDate": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "paymentId": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "method": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "externalRef": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "amountMinor",
+                    "businessDate",
+                    "paymentId",
+                    "method",
+                    "externalRef"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "heldMinor",
+              "receivedMinor",
+              "paymentMethods",
+              "entries"
+            ]
+          },
           "stays": {
             "type": "array",
             "items": {
@@ -3131,6 +3312,7 @@
           "currency",
           "totalMinor",
           "depositDueMinor",
+          "deposit",
           "stays",
           "createdAt",
           "updatedAt",
@@ -3280,6 +3462,96 @@
           "depositDueMinor": {
             "$ref": "#/components/schemas/AmountMinor"
           },
+          "deposit": {
+            "type": "object",
+            "properties": {
+              "heldMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "receivedMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "paymentMethods": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CASH",
+                    "BANK_TRANSFER",
+                    "POS_TERMINAL",
+                    "MOBILE_MONEY",
+                    "VOUCHER"
+                  ]
+                }
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "RECEIVED",
+                        "APPLIED",
+                        "REFUNDED",
+                        "FORFEITED"
+                      ]
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    "businessDate": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "paymentId": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "method": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "externalRef": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "amountMinor",
+                    "businessDate",
+                    "paymentId",
+                    "method",
+                    "externalRef"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "heldMinor",
+              "receivedMinor",
+              "paymentMethods",
+              "entries"
+            ]
+          },
           "stays": {
             "type": "array",
             "items": {
@@ -3314,6 +3586,7 @@
           "currency",
           "totalMinor",
           "depositDueMinor",
+          "deposit",
           "stays",
           "createdAt",
           "updatedAt",
@@ -21598,7 +21871,7 @@
     "/payments": {
       "post": {
         "operationId": "capturePayment",
-        "summary": "Take a payment at the desk onto a folio window",
+        "summary": "Take a payment at the desk onto a folio window, or a deposit on a booking",
         "tags": [
           "Payments"
         ],
@@ -21607,7 +21880,7 @@
             "session": []
           }
         ],
-        "description": "Recorded on the caller’s open shift (409 SHIFT_NOT_OPEN without one, M4 rule 4) and the business date. A reference is used once per property and method (409 PAYMENT_DUPLICATE). Append-only: corrections are refunds (T-072).",
+        "description": "Recorded on the caller’s open shift (409 SHIFT_NOT_OPEN without one, M4 rule 4) and the business date. With `reservationId` it is an advance deposit (M4-13): it goes into the booking’s deposit ledger and moves to the folio at check-in; `balanceMinor` is then the deposit held. Bookings that are cancelled, no-show or checked out take no deposits (409 STATE_TRANSITION_INVALID). A reference is used once per property and method (409 PAYMENT_DUPLICATE). Append-only: corrections are refunds (T-072).",
         "x-permission": "payment.capture",
         "x-idempotent": true,
         "parameters": [
@@ -21650,6 +21923,9 @@
                     "maximum": 8,
                     "default": 1
                   },
+                  "reservationId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
                   "method": {
                     "type": "string",
                     "enum": [
@@ -21688,7 +21964,6 @@
                   }
                 },
                 "required": [
-                  "folioId",
                   "method",
                   "amountMinor"
                 ]
@@ -22096,6 +22371,123 @@
           },
           "409": {
             "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reservations/{reservationId}/receipt.pdf": {
+      "get": {
+        "operationId": "getDepositReceipt",
+        "summary": "A receipt (PDF) for a deposit paid on a booking",
+        "tags": [
+          "Folios"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "folio.invoice",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "reservationId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "paymentId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
             "content": {
               "application/json": {
                 "schema": {

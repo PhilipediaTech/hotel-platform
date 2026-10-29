@@ -251,7 +251,7 @@ export async function checkIn(
       throw new AppError('VERSION_CONFLICT', 'Someone changed this stay; reload and try again');
     }
     // The guest's folio (M4; T-060).
-    const folioId = await openFolio(tx, stay);
+    const folioId = await openFolio(tx, stay, deps.clock);
     const reservation = await tx.reservation.findUniqueOrThrow({
       where: { id: stay.reservationId },
     });

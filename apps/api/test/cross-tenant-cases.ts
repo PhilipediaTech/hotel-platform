@@ -513,6 +513,26 @@ async function bFolioPaid(db: Db, world: TenantWorld, propertyId: string) {
   return { ...theirs, paymentId: payment.id };
 }
 
+/** B's booking with a ₦1 cash deposit on B's cashier's shift (T-063). */
+async function bDeposit(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bReservation(db, world, propertyId);
+  const shift = await db.cashierShift.create({ data: { propertyId, userId: world.bStaff.id } });
+  const payment = await db.payment.create({
+    data: {
+      propertyId,
+      reservationId: theirs.reservationId,
+      method: 'CASH',
+      amountMinor: 100n,
+      currency: 'NGN',
+      baseAmountMinor: 100n,
+      provider: 'MANUAL',
+      businessDate: new Date('2099-01-01'),
+      shiftId: shift.id,
+    },
+  });
+  return { ...theirs, paymentId: payment.id };
+}
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -1127,6 +1147,10 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     query: (theirs) => ({ paymentId: theirs['paymentId'] ?? '' }),
   },
   getProforma: { seed: bReservation },
+  getDepositReceipt: {
+    seed: bDeposit,
+    query: (theirs) => ({ paymentId: theirs['paymentId'] ?? '' }),
+  },
   releaseRoomBlock: {
     seed: bBlock,
     untouched: async (db, _w, theirs) => {

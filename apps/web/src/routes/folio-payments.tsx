@@ -1,4 +1,4 @@
-import type { FolioItem } from '@hotel/shared';
+import type { FolioItem, ReservationItem } from '@hotel/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,7 @@ import { useFormats } from './reservations.tsx';
 
 type Folio = z.output<typeof FolioItem>;
 type Window = Folio['windows'][number];
+type Reservation = z.output<typeof ReservationItem>;
 
 const selectClass = 'h-10 rounded-md border border-border bg-surface px-3 text-sm';
 
@@ -171,13 +172,30 @@ export function Payments({ folio, window: w }: { folio: Folio; window: Window })
   );
 }
 
-export function TakePayment({ folio, windowNumber }: { folio: Folio; windowNumber: number }) {
+type Method = Folio['paymentMethods'][number];
+type Target = { folioId: string; windowNumber: number } | { reservationId: string };
+
+/** The desk payment form: onto a folio window, or a deposit on a booking (T-063). */
+function PaymentForm({
+  target,
+  methods,
+  label,
+  heading,
+  placeholder,
+  doneText,
+  onPaid,
+}: {
+  target: Target;
+  methods: readonly Method[];
+  label: string;
+  heading: string;
+  placeholder: string;
+  doneText: (balance: string) => string;
+  onPaid: () => void;
+}) {
   const { t } = useTranslation();
   const f = useFormats();
-  const queryClient = useQueryClient();
-  const { currentPropertyId } = useSession();
-  const methods = folio.paymentMethods;
-  const [method, setMethod] = useState(methods[0] ?? 'CASH');
+  const [method, setMethod] = useState<Method>(methods[0] ?? 'CASH');
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
@@ -189,8 +207,7 @@ export function TakePayment({ folio, windowNumber }: { folio: Folio; windowNumbe
     mutationFn: () =>
       api.call('capturePayment', {
         body: {
-          folioId: folio.id,
-          windowNumber,
+          ...target,
           method,
           amountMinor: minor ?? '0',
           externalRef: needsRef ? reference.trim() : null,
@@ -198,15 +215,11 @@ export function TakePayment({ folio, windowNumber }: { folio: Folio; windowNumbe
         },
       }),
     onSuccess: (result) => {
-      setDone(t('payments.taken', { balance: f.money(result.balanceMinor) }));
+      setDone(doneText(f.money(result.balanceMinor)));
       setAmount('');
       setReference('');
       setNote('');
-      void queryClient.invalidateQueries({
-        queryKey: ['folios', currentPropertyId ?? '', folio.id],
-      });
-      void queryClient.invalidateQueries({ queryKey: ['front-desk'] });
-      void queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      onPaid();
     },
   });
   if (methods.length === 0) {
@@ -214,7 +227,7 @@ export function TakePayment({ folio, windowNumber }: { folio: Folio; windowNumbe
   }
   return (
     <form
-      aria-label={t('payments.take')}
+      aria-label={label}
       className="mt-6 grid items-end gap-3 rounded-md border border-border bg-surface p-4 sm:grid-cols-4"
       onSubmit={(e) => {
         e.preventDefault();
@@ -222,13 +235,13 @@ export function TakePayment({ folio, windowNumber }: { folio: Folio; windowNumbe
         if (ready) take.mutate();
       }}
     >
-      <h2 className="font-semibold sm:col-span-4">{t('payments.takeOn', { n: windowNumber })}</h2>
+      <h2 className="font-semibold sm:col-span-4">{heading}</h2>
       <Field id="pay-method" label={t('payments.method')}>
         <select
           id="pay-method"
           className={selectClass}
           value={method}
-          onChange={(e) => setMethod(e.target.value as typeof method)}
+          onChange={(e) => setMethod(e.target.value as Method)}
         >
           {methods.map((m) => (
             <option key={m} value={m}>
@@ -241,7 +254,7 @@ export function TakePayment({ folio, windowNumber }: { folio: Folio; windowNumbe
         <Input
           id="pay-amount"
           inputMode="decimal"
-          placeholder={f.money(folio.balanceMinor)}
+          placeholder={placeholder}
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
@@ -280,6 +293,124 @@ export function TakePayment({ folio, windowNumber }: { folio: Folio; windowNumbe
         </Alert>
       )}
     </form>
+  );
+}
+
+export function TakePayment({ folio, windowNumber }: { folio: Folio; windowNumber: number }) {
+  const { t } = useTranslation();
+  const f = useFormats();
+  const queryClient = useQueryClient();
+  const { currentPropertyId } = useSession();
+  return (
+    <PaymentForm
+      target={{ folioId: folio.id, windowNumber }}
+      methods={folio.paymentMethods}
+      label={t('payments.take')}
+      heading={t('payments.takeOn', { n: windowNumber })}
+      placeholder={f.money(folio.balanceMinor)}
+      doneText={(balance) => t('payments.taken', { balance })}
+      onPaid={() => {
+        void queryClient.invalidateQueries({
+          queryKey: ['folios', currentPropertyId ?? '', folio.id],
+        });
+        void queryClient.invalidateQueries({ queryKey: ['front-desk'] });
+        void queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      }}
+    />
+  );
+}
+
+/** The booking's advance deposit (M4-13; T-063): what is held, each entry, take a deposit. */
+export function BookingDeposit({
+  reservation,
+  onPaid,
+}: {
+  reservation: Reservation;
+  onPaid: () => void;
+}) {
+  const { t } = useTranslation();
+  const f = useFormats();
+  const queryClient = useQueryClient();
+  const { permissions } = useSession();
+  const pdf = usePdf();
+  const d = reservation.deposit;
+  const open = reservation.status === 'TENTATIVE' || reservation.status === 'CONFIRMED';
+  const due = BigInt(reservation.depositDueMinor) - BigInt(d.receivedMinor);
+  if (d.entries.length === 0 && !(open && permissions.includes('payment.capture'))) return null;
+  return (
+    <section aria-label={t('deposits.title')} className="mt-6">
+      <h2 className="font-semibold">{t('deposits.title')}</h2>
+      <p className="mt-1 text-sm">
+        {t('deposits.held', { amount: f.money(d.heldMinor) })}
+        {open && due > 0n && ` · ${t('deposits.stillDue', { amount: f.money(due.toString()) })}`}
+      </p>
+      {d.entries.length > 0 && (
+        <table aria-label={t('deposits.entries')} className="mt-2 w-full text-left text-sm">
+          <thead className="text-text-muted">
+            <tr>
+              <th className="py-2 pr-3 font-medium">{t('folios.cols.date')}</th>
+              <th className="py-2 pr-3 font-medium">{t('deposits.what')}</th>
+              <th className="py-2 pr-3 text-right font-medium">{t('folios.cols.amount')}</th>
+              <th className="py-2 font-medium">
+                <span className="sr-only">{t('frontDesk.cols.action')}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.entries.map((e) => (
+              <tr key={e.id} className="border-t border-border">
+                <td className="py-1.5 pr-3">{f.date(e.businessDate)}</td>
+                <td className="py-1.5 pr-3">
+                  {t(`deposits.kinds.${e.kind}`)}
+                  {e.method && ` · ${t(`shift.methods.${e.method}`)}`}
+                  {e.externalRef && ` · ${e.externalRef}`}
+                </td>
+                <td className="py-1.5 pr-3 text-right tabular-nums">{f.money(e.amountMinor)}</td>
+                <td className="py-1.5">
+                  {e.paymentId && permissions.includes('folio.invoice') && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={pdf.busy}
+                      aria-label={t('payments.receiptFor', { amount: f.money(e.amountMinor) })}
+                      onClick={() => {
+                        const paymentId = e.paymentId ?? '';
+                        void pdf.open(
+                          () =>
+                            api.download('getDepositReceipt', {
+                              params: { reservationId: reservation.id },
+                              query: { paymentId },
+                            }),
+                          `receipt-${paymentId.slice(0, 8)}.pdf`,
+                        );
+                      }}
+                    >
+                      {t('payments.receipt')}
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <PdfError error={pdf.error} />
+      {open && permissions.includes('payment.capture') && (
+        <PaymentForm
+          target={{ reservationId: reservation.id }}
+          methods={d.paymentMethods}
+          label={t('deposits.take')}
+          heading={t('deposits.take')}
+          placeholder={f.money((due > 0n ? due : 0n).toString())}
+          doneText={(balance) => t('deposits.taken', { balance })}
+          onPaid={() => {
+            onPaid();
+            void queryClient.invalidateQueries({ queryKey: ['front-desk'] });
+            void queryClient.invalidateQueries({ queryKey: ['shifts'] });
+          }}
+        />
+      )}
+    </section>
   );
 }
 

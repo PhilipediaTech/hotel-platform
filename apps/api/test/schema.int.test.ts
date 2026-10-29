@@ -31,6 +31,7 @@ describe('migrations', () => {
       'cashier_shifts',
       'companies',
       'departments',
+      'deposit_ledger_entries',
       'domain_events',
       'feature_flags',
       'files',

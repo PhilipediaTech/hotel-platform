@@ -333,6 +333,7 @@ describe('New booking (S08)', () => {
         currency: 'NGN',
         totalMinor: '5546250',
         depositDueMinor: '0',
+        deposit: { heldMinor: '0', receivedMinor: '0', paymentMethods: ['CASH'], entries: [] },
         stays: [walkInStay(status)],
         createdAt: '2026-11-10T09:00:00Z',
         updatedAt: '2026-11-10T09:00:00Z',

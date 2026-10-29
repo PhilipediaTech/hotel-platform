@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MANUAL_PAY_METHODS } from '../setup.ts';
 import { BOOKING_SOURCES, CANCEL_REASONS, RESERVATION_STATUSES } from '../reservations.ts';
 import { Email, Phone } from './auth.ts';
 import { defineRoute } from './contract.ts';
@@ -127,6 +128,27 @@ export const ReservationItem = z
     totalMinor: AmountMinor,
     /** First night of each stay when the guarantee is DEPOSIT, else 0. */
     depositDueMinor: AmountMinor,
+    /** The advance-deposit ledger (M4-13; T-063): what the hotel holds and how it moved. */
+    deposit: z.object({
+      /** Received minus applied, refunded and forfeited. */
+      heldMinor: AmountMinor,
+      /** Everything received, applied or not. */
+      receivedMinor: AmountMinor,
+      /** Desk payment methods the property switched on, for taking a deposit. */
+      paymentMethods: z.array(z.enum(MANUAL_PAY_METHODS)),
+      entries: z.array(
+        z.object({
+          id: Uuid,
+          kind: z.enum(['RECEIVED', 'APPLIED', 'REFUNDED', 'FORFEITED']),
+          /** Signed: received positive, the rest negative. */
+          amountMinor: AmountMinor,
+          businessDate: IsoDate,
+          paymentId: Uuid.nullable(),
+          method: z.string().nullable(),
+          externalRef: z.string().nullable(),
+        }),
+      ),
+    }),
     stays: z.array(StayItem),
     createdAt: Instant,
     updatedAt: Instant,

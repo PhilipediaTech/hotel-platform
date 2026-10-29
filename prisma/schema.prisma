@@ -119,6 +119,7 @@ model Property {
   folios               Folio[]
   cashierShifts        CashierShift[]
   payments             Payment[]
+  depositEntries       DepositLedgerEntry[]
   leakageAlerts        LeakageAlert[]
 
   @@unique([organisationId, code])
@@ -1042,15 +1043,16 @@ model Reservation {
   updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
   version        Int               @default(0)
 
-  organisation Organisation               @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  property     Property                   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  booker       Guest                      @relation("ReservationBooker", fields: [bookerGuestId], references: [id], onDelete: Restrict)
-  company      Company?                   @relation("ReservationCompany", fields: [companyId], references: [id], onDelete: Restrict)
-  travelAgent  Company?                   @relation("ReservationAgent", fields: [travelAgentId], references: [id], onDelete: Restrict)
-  stays        Stay[]
-  history      ReservationStatusHistory[]
-  folios       Folio[]
-  payments     Payment[]
+  organisation   Organisation               @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property       Property                   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  booker         Guest                      @relation("ReservationBooker", fields: [bookerGuestId], references: [id], onDelete: Restrict)
+  company        Company?                   @relation("ReservationCompany", fields: [companyId], references: [id], onDelete: Restrict)
+  travelAgent    Company?                   @relation("ReservationAgent", fields: [travelAgentId], references: [id], onDelete: Restrict)
+  stays          Stay[]
+  history        ReservationStatusHistory[]
+  folios         Folio[]
+  payments       Payment[]
+  depositEntries DepositLedgerEntry[]
 
   @@unique([propertyId, confirmationNo])
   @@unique([propertyId, source, channelRef])
@@ -1559,17 +1561,51 @@ model Payment {
   note              String?
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  folio       Folio?       @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
-  window      FolioWindow? @relation(fields: [windowId], references: [id], onDelete: Restrict)
-  reservation Reservation? @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
-  shift       CashierShift @relation(fields: [propertyId, shiftId], references: [propertyId, id], onDelete: Restrict)
-  receivedBy  User?        @relation(fields: [receivedById], references: [id], onDelete: SetNull)
-  refunds     Payment?     @relation("PaymentRefund", fields: [refundsPaymentId], references: [id], onDelete: Restrict)
-  refundedBy  Payment[]    @relation("PaymentRefund")
+  property       Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  folio          Folio?               @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
+  window         FolioWindow?         @relation(fields: [windowId], references: [id], onDelete: Restrict)
+  reservation    Reservation?         @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  shift          CashierShift         @relation(fields: [propertyId, shiftId], references: [propertyId, id], onDelete: Restrict)
+  receivedBy     User?                @relation(fields: [receivedById], references: [id], onDelete: SetNull)
+  refunds        Payment?             @relation("PaymentRefund", fields: [refundsPaymentId], references: [id], onDelete: Restrict)
+  refundedBy     Payment[]            @relation("PaymentRefund")
+  depositEntries DepositLedgerEntry[]
 
   @@index([propertyId, businessDate])
   @@index([folioId])
   @@index([shiftId])
   @@map("payments")
+}
+
+// ── Advance deposits (M4-13; tab 3; T-063) ──────────────────────────────────────────────
+
+enum DepositKind {
+  RECEIVED
+  APPLIED
+  REFUNDED
+  FORFEITED
+
+  @@map("deposit_kind")
+}
+
+/// The advance-deposit ledger of a booking (a liability until applied): RECEIVED with its
+/// payment (positive), then APPLIED to the folio at check-in, REFUNDED (T-072) or FORFEITED
+/// (negative). Its sum is what the hotel holds. Append-only.
+model DepositLedgerEntry {
+  id            String      @id @default(uuid()) @db.Uuid
+  propertyId    String      @map("property_id") @db.Uuid
+  reservationId String      @map("reservation_id") @db.Uuid
+  paymentId     String?     @map("payment_id") @db.Uuid
+  kind          DepositKind
+  /// Signed: received positive, applied, refunded and forfeited negative.
+  amountMinor   BigInt      @map("amount_minor")
+  businessDate  DateTime    @map("business_date") @db.Date
+
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation Reservation @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  payment     Payment?    @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId])
+  @@index([propertyId, businessDate])
+  @@map("deposit_ledger_entries")
 }

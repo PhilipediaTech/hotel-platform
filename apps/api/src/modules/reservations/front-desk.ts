@@ -4,6 +4,7 @@ import type { Prisma } from '../../generated/prisma/client.ts';
 import { businessDate } from '../../core/business-day.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { folioBalances } from '../folios/service.ts';
+import { depositsCovered } from '../payments/deposits.ts';
 import { dayUseOf, type ReservationDeps } from './service.ts';
 
 // Front desk lists (PRD M3-06; tab 4 GET /front-desk/arrivals · /departures · /in-house; S06;
@@ -42,6 +43,8 @@ interface Seen {
   occupied: Map<string, string>;
   /** Folio balances (T-060). */
   balances: Map<string, bigint>;
+  /** Deposit-guaranteed bookings whose deposits received cover what is due (T-063). */
+  depositPaid: Set<string>;
 }
 
 function flagsOf(s: StayRow, seen: Seen): FrontDeskFlag[] {
@@ -55,7 +58,9 @@ function flagsOf(s: StayRow, seen: Seen): FrontDeskFlag[] {
     const other = seen.occupied.get(s.room.id);
     if (!READY.has(s.room.hkStatus) || (other && other !== s.id)) flags.push('ROOM_NOT_READY');
   }
-  if (expected && s.reservation.guarantee === 'DEPOSIT') flags.push('DEPOSIT_DUE');
+  if (expected && s.reservation.guarantee === 'DEPOSIT' && !seen.depositPaid.has(s.reservationId)) {
+    flags.push('DEPOSIT_DUE');
+  }
   if (s.isDayUse) flags.push('DAY_USE');
   const late =
     seen.date === seen.today &&
@@ -98,7 +103,9 @@ function toRow(s: StayRow, seen: Seen): Row {
     checkedOutAt: s.checkedOutAt ? iso(s.checkedOutAt) : null,
     totalMinor: s.quote.totalMinor.toString(),
     depositDueMinor:
-      s.reservation.guarantee === 'DEPOSIT' ? (s.nights[0]?.amountMinor ?? 0n).toString() : '0',
+      s.reservation.guarantee === 'DEPOSIT' && !seen.depositPaid.has(s.reservationId)
+        ? (s.nights[0]?.amountMinor ?? 0n).toString()
+        : '0',
     balanceMinor: s.folioId ? (seen.balances.get(s.folioId) ?? 0n).toString() : null,
     flags: flagsOf(s, seen),
     notes: s.reservation.notes,
@@ -119,6 +126,29 @@ function ordered(rows: StayRow[], done: (s: StayRow) => boolean): StayRow[] {
   return [...rows].sort((a, b) => key(a).localeCompare(key(b)));
 }
 
+/** What each deposit-guaranteed booking in the list owes as deposit: the first night of each
+ * of its stays still counting (as on the reservation, T-042). */
+async function depositsDue(db: ReservationDeps['tenantDb'], stays: StayRow[]) {
+  const ids = [
+    ...new Set(
+      stays.filter((s) => s.reservation.guarantee === 'DEPOSIT').map((s) => s.reservationId),
+    ),
+  ];
+  if (ids.length === 0) return new Map<string, bigint>();
+  const all = await db.stay.findMany({
+    where: { reservationId: { in: ids }, status: { not: 'CANCELLED' } },
+    include: { nights: { orderBy: { date: 'asc' }, take: 1 } },
+  });
+  const due = new Map<string, bigint>(ids.map((id) => [id, 0n]));
+  for (const st of all) {
+    due.set(
+      st.reservationId,
+      (due.get(st.reservationId) ?? 0n) + (st.nights[0]?.amountMinor ?? 0n),
+    );
+  }
+  return due;
+}
+
 async function list(
   deps: ReservationDeps,
   tenant: TenantContext,
@@ -137,12 +167,14 @@ async function list(
     now: deps.clock(),
     occupied: new Map(inRooms.map((s) => [s.roomId ?? '', s.id])),
     balances: new Map(),
+    depositPaid: new Set(),
   };
   const stays = await deps.tenantDb.stay.findMany({ where: where(seen), include: ROW });
   seen.balances = await folioBalances(
     deps.tenantDb,
     stays.flatMap((s) => (s.folioId ? [s.folioId] : [])),
   );
+  seen.depositPaid = await depositsCovered(deps.tenantDb, await depositsDue(deps.tenantDb, stays));
   return { date: seen.date, data: ordered(stays, done).map((s) => toRow(s, seen)) };
 }
 

@@ -53,7 +53,7 @@ describe('createApiClient: requests', () => {
     expect(result).toEqual(folio);
     expectTypeOf(result.balance.amountMinor).toBeString();
     const { url, init, headers } = sent();
-    expect(url).toBe(`https://api.example.test/api/v1/folios/${FOLIO_ID}`);
+    expect(url).toBe(`https://api.example.test/api/v1/example-folios/${FOLIO_ID}`);
     expect(init?.method).toBe('GET');
     expect(init?.credentials).toBe('include');
     expect(init?.body).toBeUndefined();

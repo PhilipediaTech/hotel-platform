@@ -3,6 +3,7 @@ import type { z } from 'zod';
 import type { Prisma } from '../../generated/prisma/client.ts';
 import { businessDate } from '../../core/business-day.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import { folioBalances } from '../folios/service.ts';
 import { dayUseOf, type ReservationDeps } from './service.ts';
 
 // Front desk lists (PRD M3-06; tab 4 GET /front-desk/arrivals · /departures · /in-house; S06;
@@ -39,6 +40,8 @@ interface Seen {
   now: Date;
   /** Rooms with a checked-in guest in them: room → stay. */
   occupied: Map<string, string>;
+  /** Folio balances (T-060). */
+  balances: Map<string, bigint>;
 }
 
 function flagsOf(s: StayRow, seen: Seen): FrontDeskFlag[] {
@@ -96,7 +99,7 @@ function toRow(s: StayRow, seen: Seen): Row {
     totalMinor: s.quote.totalMinor.toString(),
     depositDueMinor:
       s.reservation.guarantee === 'DEPOSIT' ? (s.nights[0]?.amountMinor ?? 0n).toString() : '0',
-    balanceMinor: null,
+    balanceMinor: s.folioId ? (seen.balances.get(s.folioId) ?? 0n).toString() : null,
     flags: flagsOf(s, seen),
     notes: s.reservation.notes,
     version: s.version,
@@ -133,8 +136,13 @@ async function list(
     today,
     now: deps.clock(),
     occupied: new Map(inRooms.map((s) => [s.roomId ?? '', s.id])),
+    balances: new Map(),
   };
   const stays = await deps.tenantDb.stay.findMany({ where: where(seen), include: ROW });
+  seen.balances = await folioBalances(
+    deps.tenantDb,
+    stays.flatMap((s) => (s.folioId ? [s.folioId] : [])),
+  );
   return { date: seen.date, data: ordered(stays, done).map((s) => toRow(s, seen)) };
 }
 

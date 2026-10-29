@@ -116,6 +116,7 @@ model Property {
   stays                Stay[]
   idDocuments          IdDocument[]
   businessDays         BusinessDay[]
+  folios               Folio[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -224,6 +225,7 @@ model User {
   keysIssued         KeyIssue[]
   cardsSigned        RegistrationCard[]
   daysClosed         BusinessDay[]
+  folioLinesPosted   FolioLine[]
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -664,6 +666,8 @@ model RevenueCode {
   property          Property           @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   taxRules          TaxRule[]          @relation("TaxLineCode")
   packageComponents PackageComponent[]
+  folioLines        FolioLine[]
+  routingRules      RoutingRule[]
 
   @@unique([propertyId, code])
   // Target of composite foreign keys: a tax rule posts to a code of its own property.
@@ -701,7 +705,8 @@ model TaxRuleVersion {
   inclusive     Boolean   @default(false)
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  taxRule TaxRule @relation(fields: [taxRuleId], references: [id], onDelete: Restrict)
+  taxRule    TaxRule     @relation(fields: [taxRuleId], references: [id], onDelete: Restrict)
+  folioLines FolioLine[]
 
   @@index([taxRuleId, effectiveFrom])
   @@map("tax_rule_versions")
@@ -945,6 +950,7 @@ model Guest {
   bookings     Reservation[] @relation("ReservationBooker")
   stays        Stay[]
   idDocuments  IdDocument[]
+  folioWindows FolioWindow[]
 
   @@index([organisationId, phone])
   @@index([organisationId, email])
@@ -970,6 +976,7 @@ model Company {
   organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
   bookings     Reservation[] @relation("ReservationCompany")
   agentOf      Reservation[] @relation("ReservationAgent")
+  folioWindows FolioWindow[]
 
   @@index([organisationId, name])
   @@map("companies")
@@ -1034,6 +1041,7 @@ model Reservation {
   travelAgent  Company?                   @relation("ReservationAgent", fields: [travelAgentId], references: [id], onDelete: Restrict)
   stays        Stay[]
   history      ReservationStatusHistory[]
+  folios       Folio[]
 
   @@unique([propertyId, confirmationNo])
   @@unique([propertyId, source, channelRef])
@@ -1075,6 +1083,7 @@ model Stay {
   room        Room?             @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
   ratePlan    RatePlan          @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
   quote       Quote             @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  folio       Folio?            @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
   nights      StayNight[]
   allocations RoomAllocation[]
   keys        KeyIssue[]
@@ -1240,4 +1249,145 @@ model BusinessDay {
 
   @@id([propertyId, date])
   @@map("business_days")
+}
+
+enum FolioKind {
+  GUEST
+  HOUSE
+  PAYMASTER
+  EVENT
+  POS
+
+  @@map("folio_kind")
+}
+
+enum FolioStatus {
+  OPEN
+  SETTLED
+  TRANSFERRED
+  CLOSED
+
+  @@map("folio_status")
+}
+
+enum LineKind {
+  CHARGE
+  TAX
+  DISCOUNT
+  REVERSAL
+  TRANSFER_IN
+  TRANSFER_OUT
+  DEPOSIT_APPLY
+  WRITE_OFF
+
+  @@map("line_kind")
+}
+
+/// A guest's bill (M4-01; tab 3; T-060). A guest folio opens at check-in, one per stay; house
+/// and paymaster folios come with T-065. Its windows split who pays; lines are append-only.
+model Folio {
+  id               String      @id @default(uuid()) @db.Uuid
+  organisationId   String      @map("organisation_id") @db.Uuid
+  propertyId       String      @map("property_id") @db.Uuid
+  number           String
+  kind             FolioKind   @default(GUEST)
+  reservationId    String?     @map("reservation_id") @db.Uuid
+  name             String
+  currency         String      @db.Char(3)
+  status           FolioStatus @default(OPEN)
+  creditLimitMinor BigInt?     @map("credit_limit_minor")
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  version          Int         @default(0)
+
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation  Reservation?  @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  windows      FolioWindow[]
+  lines        FolioLine[]
+  routingRules RoutingRule[]
+  stays        Stay[]
+
+  @@unique([propertyId, number])
+  @@unique([propertyId, id])
+  @@index([reservationId])
+  @@map("folios")
+}
+
+/// Who pays a share of a folio (M4-05): window 1 is the guest; others e.g. the company.
+model FolioWindow {
+  id           String  @id @default(uuid()) @db.Uuid
+  folioId      String  @map("folio_id") @db.Uuid
+  number       Int
+  /// GUEST | COMPANY
+  payerType    String  @map("payer_type")
+  payerGuestId String? @map("payer_guest_id") @db.Uuid
+  companyId    String? @map("company_id") @db.Uuid
+
+  folio        Folio         @relation(fields: [folioId], references: [id], onDelete: Restrict)
+  payerGuest   Guest?        @relation(fields: [payerGuestId], references: [id], onDelete: Restrict)
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  lines        FolioLine[]
+  routingRules RoutingRule[]
+
+  @@unique([folioId, number])
+  @@map("folio_windows")
+}
+
+/// Sends a revenue group or code to a window (M4-05), e.g. room charges to the company.
+model RoutingRule {
+  id            String        @id @default(uuid()) @db.Uuid
+  folioId       String        @map("folio_id") @db.Uuid
+  revenueGroup  RevenueGroup? @map("revenue_group")
+  revenueCodeId String?       @map("revenue_code_id") @db.Uuid
+  windowId      String        @map("window_id") @db.Uuid
+
+  folio       Folio        @relation(fields: [folioId], references: [id], onDelete: Restrict)
+  window      FolioWindow  @relation(fields: [windowId], references: [id], onDelete: Restrict)
+  revenueCode RevenueCode? @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
+
+  @@index([folioId])
+  @@map("routing_rules")
+}
+
+/// A line on a folio (M4 rules 1–3): signed amount; a tax line points at its charge
+/// (parentLineId) with the tax version it used; a correction is a reversal line pointing at the
+/// original (reversesLineId). Never updated or deleted (trigger in the migration).
+model FolioLine {
+  id                String   @id @default(uuid()) @db.Uuid
+  propertyId        String   @map("property_id") @db.Uuid
+  folioId           String   @map("folio_id") @db.Uuid
+  windowId          String   @map("window_id") @db.Uuid
+  businessDate      DateTime @map("business_date") @db.Date
+  postedAt          DateTime @default(now()) @map("posted_at") @db.Timestamptz(6)
+  kind              LineKind
+  revenueCodeId     String   @map("revenue_code_id") @db.Uuid
+  description       String
+  quantity          Int      @default(1)
+  unitAmountMinor   BigInt   @map("unit_amount_minor")
+  amountMinor       BigInt   @map("amount_minor")
+  currency          String   @db.Char(3)
+  parentLineId      String?  @map("parent_line_id") @db.Uuid
+  reversesLineId    String?  @unique @map("reverses_line_id") @db.Uuid
+  taxRuleVersionId  String?  @map("tax_rule_version_id") @db.Uuid
+  /// STAY_NIGHT | POS_ORDER | MINIBAR | EVENT | MANUAL
+  sourceType        String?  @map("source_type")
+  sourceId          String?  @map("source_id")
+  postedById        String?  @map("posted_by_id") @db.Uuid
+  /// Cashier shifts arrive with T-061.
+  shiftId           String?  @map("shift_id") @db.Uuid
+  approvalRequestId String?  @map("approval_request_id") @db.Uuid
+  reason            String?
+
+  folio          Folio           @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
+  window         FolioWindow     @relation(fields: [windowId], references: [id], onDelete: Restrict)
+  revenueCode    RevenueCode     @relation(fields: [propertyId, revenueCodeId], references: [propertyId, id], onDelete: Restrict)
+  taxRuleVersion TaxRuleVersion? @relation(fields: [taxRuleVersionId], references: [id], onDelete: Restrict)
+  postedBy       User?           @relation(fields: [postedById], references: [id], onDelete: SetNull)
+  parentLine     FolioLine?      @relation("LineParent", fields: [parentLineId], references: [id], onDelete: Restrict)
+  children       FolioLine[]     @relation("LineParent")
+  reverses       FolioLine?      @relation("LineReversal", fields: [reversesLineId], references: [id], onDelete: Restrict)
+  reversedBy     FolioLine?      @relation("LineReversal")
+
+  @@index([folioId])
+  @@index([propertyId, businessDate])
+  @@map("folio_lines")
 }

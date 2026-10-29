@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pgErrorInfo } from './db.ts';
+import { pgErrorInfo, raisedBy } from './db.ts';
 
 function prismaLikeError(originalCode: string, originalMessage: string) {
   return { meta: { driverAdapterError: { cause: { originalCode, originalMessage } } } };
@@ -27,4 +27,16 @@ describe('pgErrorInfo', () => {
       expect(pgErrorInfo(err)).toBeUndefined();
     },
   );
+});
+
+describe('raisedBy', () => {
+  it('recognises a trigger exception by its exact text, nothing else', () => {
+    const raised = prismaLikeError('P0001', 'BUSINESS_DAY_CLOSED');
+    expect(raisedBy(raised, 'BUSINESS_DAY_CLOSED')).toBe(true);
+    expect(raisedBy(raised, 'OTHER')).toBe(false);
+    expect(raisedBy(prismaLikeError('23505', 'BUSINESS_DAY_CLOSED'), 'BUSINESS_DAY_CLOSED')).toBe(
+      false,
+    );
+    expect(raisedBy(new Error('BUSINESS_DAY_CLOSED'), 'BUSINESS_DAY_CLOSED')).toBe(false);
+  });
 });

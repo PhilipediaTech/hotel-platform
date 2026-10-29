@@ -8,7 +8,7 @@ import {
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import type { z } from 'zod';
 import { useSession } from '../app/session.ts';
 import { Alert } from '../components/ui/alert.tsx';
@@ -284,6 +284,7 @@ export function ReservationPage() {
                 startOpen={checkInNow === s.id}
               />
             )}
+            {(s.folioId || s.status === 'CHECKED_IN') && <StayFolio stay={s} queryKey={key} />}
             {s.status === 'CHECKED_IN' && <StayKeys stay={s} />}
             {s.status === 'CHECKED_IN' && !s.dayUse && can('reservation.modify') && (
               <ChangeDeparture stay={s} queryKey={key} />
@@ -415,6 +416,39 @@ function ChangeStay({ reservation, stay, queryKey }: Props & { stay: Stay }) {
         </Alert>
       )}
     </form>
+  );
+}
+
+/** The stay's folio (T-060); one opens for guests checked in before folios existed. */
+function StayFolio({ stay, queryKey }: { stay: Stay; queryKey: readonly string[] }) {
+  const { t } = useTranslation();
+  const { permissions } = useSession();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const open = useMutation({
+    mutationFn: () => api.call('openStayFolio', { params: { stayId: stay.id } }),
+    onSuccess: (folio) => {
+      void queryClient.invalidateQueries({ queryKey });
+      void navigate(`/folios/${folio.id}`);
+    },
+  });
+  if (stay.folioId) {
+    return permissions.includes('folio.read') ? (
+      <p className="mt-2">
+        <Link to={`/folios/${stay.folioId}`} className="text-brand underline">
+          {t('folios.openLink')}
+        </Link>
+      </p>
+    ) : null;
+  }
+  if (!permissions.includes('folio.charge')) return null;
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <Button size="sm" variant="secondary" disabled={open.isPending} onClick={() => open.mutate()}>
+        {t('folios.openNew')}
+      </Button>
+      {open.error && <span className="text-xs text-critical">{errorMessage(open.error)}</span>}
+    </div>
   );
 }
 

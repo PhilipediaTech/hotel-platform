@@ -44,7 +44,7 @@ describe('buildOpenApiDocument', () => {
   });
 
   it('declares path, query and header parameters', () => {
-    const charge = op('/folios/{folioId}/charges', 'post');
+    const charge = op('/example-folios/{folioId}/charges', 'post');
     expect(charge.parameters?.map((p) => [p.in, p.name, p.required])).toEqual([
       ['path', 'folioId', true],
       ['header', 'X-Property-Id', true],
@@ -63,7 +63,7 @@ describe('buildOpenApiDocument', () => {
   });
 
   it('groups error codes by HTTP status, all using the error envelope', () => {
-    const responses = op('/folios/{folioId}/charges', 'post').responses;
+    const responses = op('/example-folios/{folioId}/charges', 'post').responses;
     expect(Object.keys(responses)).toEqual([
       '201',
       '202',
@@ -88,7 +88,7 @@ describe('buildOpenApiDocument', () => {
   });
 
   it('records permission, idempotency and session security on the operation', () => {
-    const charge = op('/folios/{folioId}/charges', 'post');
+    const charge = op('/example-folios/{folioId}/charges', 'post');
     expect(charge['x-permission']).toBe('folio.post');
     expect(charge['x-idempotent']).toBe(true);
     expect(charge['security']).toEqual([{ session: [] }]);

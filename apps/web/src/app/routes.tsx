@@ -22,6 +22,7 @@ import { ReservationPage, ReservationsPage } from '../routes/reservations.tsx';
 import { CalendarPage } from '../routes/calendar.tsx';
 import { RegistrationCardPage } from '../routes/check-in.tsx';
 import { DayUsePage } from '../routes/day-use.tsx';
+import { FolioPage, FoliosPage } from '../routes/folios.tsx';
 import { FrontDeskPage } from '../routes/front-desk.tsx';
 import { NewBookingPage } from '../routes/new-booking.tsx';
 import { RatesPage } from '../routes/rates.tsx';
@@ -41,6 +42,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/guests': <GuestsPage />,
   '/companies': <CompaniesPage />,
   '/front-desk': <FrontDeskPage />,
+  '/folios': <FoliosPage />,
   '/reservations': <ReservationsPage />,
   '/calendar': <CalendarPage />,
   '/bookings/new': <NewBookingPage />,
@@ -102,6 +104,7 @@ export function buildRoutes(
             { path: 'companies/:companyId', element: <CompanyProfilePage /> },
             { path: 'reservations/:reservationId', element: <ReservationPage /> },
             { path: 'stays/:stayId/card', element: <RegistrationCardPage /> },
+            { path: 'folios/:folioId', element: <FolioPage /> },
             ...screenRoutes(),
             { path: '*', element: <NotFoundPage /> },
           ],

@@ -31,3 +31,14 @@ export function pgErrorInfo(err: unknown): PgErrorInfo | undefined {
     constraint: CONSTRAINT_IN_MESSAGE.exec(message)?.[1],
   };
 }
+
+/**
+ * True when the error is a trigger's `RAISE EXCEPTION '<text>'` (SQLSTATE P0001). Answers
+ * yes or no only, so the database's message (which may hold row data) is never passed on.
+ */
+export function raisedBy(err: unknown, text: string): boolean {
+  const cause = (
+    err as { meta?: { driverAdapterError?: { cause?: Record<string, unknown> } } } | null
+  )?.meta?.driverAdapterError?.cause;
+  return cause?.['originalCode'] === 'P0001' && cause['originalMessage'] === text;
+}

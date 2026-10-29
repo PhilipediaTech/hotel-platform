@@ -19,6 +19,7 @@ import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { businessDate } from '../../core/business-day.ts';
 import { registrationOf } from '../setup/service.ts';
+import { openFolio } from '../folios/service.ts';
 import { assign, loadStay, problemsOf } from './rooms.ts';
 import type { ReservationDeps } from './service.ts';
 
@@ -27,6 +28,7 @@ import type { ReservationDeps } from './service.ts';
 // the desk collects the registration fields the property requires — nothing else is kept —
 // and the card is signed on screen or on paper. ID details go to `id_documents`, the number
 // encrypted, and are deleted after the property's retention period. Key cards are logged.
+// The guest's folio opens with the check-in (T-060).
 
 export interface CheckInDeps extends ReservationDeps {
   /** AES-256-GCM key for ID numbers (config.idKey). */
@@ -248,6 +250,8 @@ export async function checkIn(
     if (claimed.count !== 1) {
       throw new AppError('VERSION_CONFLICT', 'Someone changed this stay; reload and try again');
     }
+    // The guest's folio (M4; T-060).
+    const folioId = await openFolio(tx, stay);
     const reservation = await tx.reservation.findUniqueOrThrow({
       where: { id: stay.reservationId },
     });
@@ -301,7 +305,7 @@ export async function checkIn(
     return {
       stayId: stay.id,
       status: 'CHECKED_IN',
-      folioId: stay.folioId,
+      folioId,
       roomId: room.id,
       version: stay.version + 1,
     };

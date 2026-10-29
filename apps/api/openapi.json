@@ -224,6 +224,9 @@
                       "idExpiry"
                     ]
                   }
+                },
+                "businessDate": {
+                  "$ref": "#/components/schemas/IsoDate"
                 }
               },
               "required": [
@@ -235,7 +238,8 @@
                 "timeZone",
                 "baseCurrency",
                 "locale",
-                "registrationFields"
+                "registrationFields",
+                "businessDate"
               ]
             }
           },
@@ -313,6 +317,14 @@
         "type": "string",
         "format": "date-time",
         "example": "2026-11-12T09:30:00Z"
+      },
+      "IsoDate": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date",
+        "example": "2026-11-12"
       },
       "PermissionInfo": {
         "type": "object",
@@ -1405,11 +1417,6 @@
           "releasedAt"
         ]
       },
-      "IsoDate": {
-        "type": "string",
-        "format": "date",
-        "example": "2026-11-12"
-      },
       "RevenueCode": {
         "type": "object",
         "properties": {
@@ -1507,17 +1514,7 @@
             "$ref": "#/components/schemas/IsoDate"
           },
           "effectiveTo": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/IsoDate"
-              },
-              {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            ]
+            "$ref": "#/components/schemas/IsoDate"
           },
           "rateBps": {
             "type": "integer"
@@ -3714,17 +3711,7 @@
             ]
           },
           "idExpiry": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/IsoDate"
-              },
-              {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            ]
+            "$ref": "#/components/schemas/IsoDate"
           },
           "signature": {
             "type": "string",
@@ -4157,6 +4144,40 @@
           "flags",
           "notes",
           "version"
+        ]
+      },
+      "BusinessDay": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "AUDITING",
+              "CLOSED"
+            ]
+          },
+          "openedAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "date",
+          "status",
+          "openedAt"
         ]
       }
     },
@@ -17902,6 +17923,183 @@
         }
       }
     },
+    "/stays/{stayId}/extend": {
+      "post": {
+        "operationId": "extendStay",
+        "summary": "Extend or shorten a checked-in guest’s stay",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "The nights already priced keep their price (M2 rule 4); added nights are priced on the stay’s plan at today’s rates (409 BOOKING_CONFLICT when no room of the type is left, or the guest’s room is taken on them; 422 RESTRICTION_VIOLATED when a night has no price or is stop-sell). Shortening gives the nights back; the new departure is the business date or later. Before check-in, change the dates on the reservation instead. Send `If-Match` with the stay’s version.",
+        "x-permission": "reservation.modify",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `ETag` from the last read."
+            },
+            "required": true,
+            "description": "The `ETag` from the last read.",
+            "name": "If-Match",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "departure": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "default": null
+                  }
+                },
+                "required": [
+                  "departure"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationChange"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `VERSION_CONFLICT`, `BOOKING_CONFLICT`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule violated: `RESTRICTION_VIOLATED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/front-desk/arrivals": {
       "get": {
         "operationId": "listArrivals",
@@ -18178,6 +18376,86 @@
                     "date",
                     "data"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/business-day": {
+      "get": {
+        "operationId": "getBusinessDay",
+        "summary": "The property’s current business day",
+        "tags": [
+          "Night audit"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "audit.run",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessDay"
                 }
               }
             }

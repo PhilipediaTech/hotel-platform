@@ -1773,3 +1773,216 @@ describe('Front desk lists (M3-06; T-053)', () => {
     }
   });
 });
+
+describe('Business day (T-054)', () => {
+  type Day = { date: string; status: string; openedAt: string | null };
+
+  it('opens on first use, rolls over with the date, and is on /me', async () => {
+    const h = await hotel();
+    const res = await h.gm.get('/business-day');
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toEqual({ date: TODAY, status: 'OPEN', openedAt: '2026-11-10T09:00:00Z' });
+    const me = (await h.gm.get('/me')).body as {
+      properties: { id: string; businessDate: string | null }[];
+    };
+    expect(me.properties.find((p) => p.id === h.p1.id)?.businessDate).toBe(TODAY);
+    // A property still in setup has no business day.
+    expect(me.properties.find((p) => p.id === h.p2.id)?.businessDate ?? null).toBeNull();
+
+    // Until night audit (T-073), the day rolls over when the local date changes:
+    // 23:30 UTC is already the 11th in Lagos.
+    now = new Date('2026-11-10T23:30:00Z');
+    const gmId = (await db.membership.findFirstOrThrow({ where: { roleId: h.role('gm') } })).userId;
+    const gm = await h.as(gmId);
+    expect(((await gm.get('/business-day')).body as Day).date).toBe('2026-11-11');
+    const days = await db.businessDay.findMany({ orderBy: { date: 'asc' } });
+    expect(days.map((d) => [d.date.toISOString().slice(0, 10), d.status])).toEqual([
+      [TODAY, 'CLOSED'],
+      ['2026-11-11', 'OPEN'],
+    ]);
+    expect(days[0]?.closedAt).toEqual(now);
+    // Reading it again changes nothing.
+    await gm.get('/business-day');
+    expect(await db.businessDay.count()).toBe(2);
+  });
+
+  it('needs audit.run', async () => {
+    const h = await hotel();
+    expect((await h.fd.get('/business-day')).status).toBe(403);
+  });
+});
+
+describe('Extend and shorten (M3-12; T-054)', () => {
+  type Item = Reservation & {
+    differenceMinor: string;
+    stays: (Stay & { version: number; roomNumber: string | null })[];
+  };
+  const registration = {
+    nationality: 'NG',
+    purpose: 'BUSINESS',
+    idType: 'PASSPORT',
+    idNumber: 'A12345678',
+  };
+
+  /** Ada in 101 from today for two nights, checked in. */
+  async function inHouse(h: Awaited<ReturnType<typeof hotel>>) {
+    const room = Object.fromEntries((await db.room.findMany()).map((r) => [r.number, r.id]));
+    const r = await h.book([await h.quote({ arrival: TODAY, departure: ARRIVE })]);
+    const stayId = r.stays[0]?.id ?? '';
+    await db.room.update({ where: { id: room['101'] }, data: { hkStatus: 'CLEAN' } });
+    await h.ok(h.fd.post(`/stays/${stayId}/assign-room`, { roomId: room['101'] }));
+    const v = (await db.stay.findUniqueOrThrow({ where: { id: stayId } })).version;
+    await h.ok(
+      h.fd
+        .post(`/stays/${stayId}/check-in`, { registration })
+        .set('Idempotency-Key', randomUUID())
+        .set('If-Match', `"${v}"`),
+    );
+    const version = async () =>
+      (await db.stay.findUniqueOrThrow({ where: { id: stayId } })).version;
+    const extend = async (departure: string, v?: number, reason?: string) =>
+      h.fd
+        .post(`/stays/${stayId}/extend`, { departure, ...(reason ? { reason } : {}) })
+        .set('Idempotency-Key', randomUUID())
+        .set('If-Match', `"${v ?? (await version())}"`);
+    return { r, stayId, room, extend, version };
+  }
+  const sold = async (roomTypeId: string, from: string, to: string) =>
+    (
+      await db.roomTypeInventory.findMany({
+        where: { roomTypeId, date: { gte: new Date(from), lt: new Date(to) } },
+        orderBy: { date: 'asc' },
+      })
+    ).map((i) => i.sold);
+
+  it('extends: kept nights keep their price, added nights at today’s rate, room and inventory follow', async () => {
+    const h = await hotel();
+    const a = await inHouse(h);
+    // The rate goes up after check-in: only the added nights pay it.
+    await h.ok(
+      h.gm.put('/rate-calendar', {
+        ratePlanId: h.bar.id,
+        roomTypeIds: [h.std.id],
+        from: TODAY,
+        to: '2026-12-31',
+        set: { amountMinor: '5000000' },
+      }),
+    );
+    const res = await a.extend(LEAVE, undefined, 'Meeting moved');
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const r = res.body as Item;
+    expect(r.stays[0]).toMatchObject({
+      departure: LEAVE,
+      status: 'CHECKED_IN',
+      roomNumber: '101',
+      nights: [
+        { date: TODAY, amountMinor: '4500000' },
+        { date: '2026-11-11', amountMinor: '4500000' },
+        { date: '2026-11-12', amountMinor: '5000000' },
+        { date: '2026-11-13', amountMinor: '5000000' },
+      ],
+    });
+    // ₦50,000 a night with service, VAT and consumption tax is ₦61,625; two of them.
+    expect(r.differenceMinor).toBe('12325000');
+    expect(r.stays[0]?.totalMinor).toBe('23417500');
+    expect(await sold(h.std.id, TODAY, LEAVE)).toEqual([1, 1, 1, 1]);
+    const held = await db.roomAllocation.findMany({ where: { stayId: a.stayId, active: true } });
+    expect(
+      held.map((x) => [
+        x.startDate.toISOString().slice(0, 10),
+        x.endDate.toISOString().slice(0, 10),
+      ]),
+    ).toEqual([[TODAY, LEAVE]]);
+    const audit = await db.auditEvent.findFirstOrThrow({ where: { action: 'stay.extended' } });
+    expect(audit).toMatchObject({
+      reason: 'Meeting moved',
+      before: { departure: ARRIVE },
+      after: { departure: LEAVE },
+    });
+  });
+
+  it('refuses to extend into a night the room or the hotel is taken', async () => {
+    const h = await hotel(1);
+    const a = await inHouse(h);
+    // The only Standard room is booked from the 12th by someone else.
+    const next = await h.book([await h.quote({ arrival: ARRIVE, departure: LEAVE })]);
+    await h.ok(
+      h.fd.post(`/stays/${next.stays[0]?.id ?? ''}/assign-room`, { roomId: a.room['101'] }),
+    );
+    expect(errorOf(await a.extend(LEAVE))).toMatchObject({ code: 'BOOKING_CONFLICT' });
+    // Nothing was taken.
+    expect(await sold(h.std.id, ARRIVE, LEAVE)).toEqual([1, 1]);
+    expect((await db.stay.findUniqueOrThrow({ where: { id: a.stayId } })).departure).toEqual(
+      new Date(ARRIVE),
+    );
+  });
+
+  it('shortens: gives the nights back and the room from then on', async () => {
+    const h = await hotel();
+    const a = await inHouse(h);
+    await h.ok(a.extend(LEAVE));
+    const res = await a.extend('2026-11-11');
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const r = res.body as Item;
+    expect(r.stays[0]?.nights).toEqual([{ date: TODAY, amountMinor: '4500000' }]);
+    expect(r.stays[0]?.totalMinor).toBe('5546250');
+    expect(r.differenceMinor).toBe('-16638750');
+    expect(await sold(h.std.id, TODAY, LEAVE)).toEqual([1, 0, 0, 0]);
+    const held = await db.roomAllocation.findMany({ where: { stayId: a.stayId, active: true } });
+    expect(held.map((x) => x.endDate.toISOString().slice(0, 10))).toEqual(['2026-11-11']);
+    expect(await db.auditEvent.count({ where: { action: 'stay.shortened' } })).toBe(1);
+  });
+
+  it('keeps to the rules: in-house only, at least a night, not before the business date, prices, version', async () => {
+    const h = await hotel();
+    const booked = await h.book([await h.quote()]);
+    const notIn = await h.fd
+      .post(`/stays/${booked.stays[0]?.id ?? ''}/extend`, { departure: LEAVE })
+      .set('Idempotency-Key', randomUUID())
+      .set('If-Match', '"0"');
+    expect(errorOf(notIn)).toMatchObject({ code: 'STATE_TRANSITION_INVALID' });
+
+    const a = await inHouse(h);
+    expect(errorOf(await a.extend(TODAY)).details).toMatchObject({
+      issues: [{ path: 'body.departure' }],
+    });
+    expect(errorOf(await a.extend(ARRIVE)).code).toBe('VALIDATION_ERROR');
+    expect(errorOf(await a.extend(LEAVE, (await a.version()) - 1))).toMatchObject({
+      code: 'VERSION_CONFLICT',
+    });
+    await h.ok(
+      h.gm.put('/rate-calendar', {
+        ratePlanId: h.bar.id,
+        roomTypeIds: [h.std.id],
+        from: '2026-11-13',
+        to: '2026-11-13',
+        set: { stopSell: true },
+      }),
+    );
+    expect(errorOf(await a.extend(LEAVE))).toMatchObject({ code: 'RESTRICTION_VIOLATED' });
+
+    // A day later the guest can't be shortened into the past.
+    now = new Date('2026-11-11T09:00:00Z');
+    const fd = await h.as(h.fdId);
+    const past = await fd
+      .post(`/stays/${a.stayId}/extend`, { departure: '2026-11-10' })
+      .set('Idempotency-Key', randomUUID())
+      .set('If-Match', `"${await a.version()}"`);
+    expect(errorOf(past).code).toBe('VALIDATION_ERROR');
+    // Leaving today (the business date) is fine.
+    await h.ok(
+      fd
+        .post(`/stays/${a.stayId}/extend`, { departure: '2026-11-11' })
+        .set('Idempotency-Key', randomUUID())
+        .set('If-Match', `"${await a.version()}"`),
+    );
+
+    const hk = await h.person('hk-attendant', h.p1.id);
+    const attendant = await h.as(hk.id);
+    const refused = await attendant
+      .post(`/stays/${a.stayId}/extend`, { departure: LEAVE })
+      .set('Idempotency-Key', randomUUID())
+      .set('If-Match', `"${await a.version()}"`);
+    expect(refused.status).toBe(403);
+  });
+});

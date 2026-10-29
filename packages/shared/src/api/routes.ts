@@ -9,6 +9,7 @@ import { FRONT_DESK_ROUTES } from './front-desk.ts';
 import { GUEST_ROUTES } from './guests.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
+import { NIGHT_AUDIT_ROUTES } from './night-audit.ts';
 import { QUOTE_ROUTES } from './quotes.ts';
 import { PROPERTY_ROUTES } from './properties.ts';
 import { RATE_ROUTES } from './rates.ts';
@@ -46,6 +47,7 @@ export const API_ROUTES = {
   ...GUEST_ROUTES,
   ...RESERVATION_ROUTES,
   ...FRONT_DESK_ROUTES,
+  ...NIGHT_AUDIT_ROUTES,
 } as const;
 
 export type ApiRoutes = typeof API_ROUTES;

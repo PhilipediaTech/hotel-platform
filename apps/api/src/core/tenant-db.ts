@@ -58,6 +58,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   RoomAllocation: { kind: 'property' },
   IdDocument: { kind: 'property' },
   KeyIssue: { kind: 'property' },
+  BusinessDay: { kind: 'property' },
   RegistrationCard: { kind: 'property' },
   // Components have no property column: reach them through their (scoped) rate plan.
 };

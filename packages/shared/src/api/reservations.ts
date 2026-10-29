@@ -580,6 +580,37 @@ export const issueKeys = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+// ── Extend and shorten (M3-12; T-054) ──────────────────────────────────────────────────
+
+export const ExtendBody = z.object({
+  /** The new departure: later extends the stay, earlier shortens it. */
+  departure: IsoDate,
+  reason: z.string().trim().max(500).nullable().default(null),
+});
+
+export const extendStay = defineRoute({
+  operationId: 'extendStay',
+  method: 'post',
+  path: '/stays/{stayId}/extend',
+  summary: 'Extend or shorten a checked-in guest’s stay',
+  description:
+    'The nights already priced keep their price (M2 rule 4); added nights are priced on the stay’s plan at today’s rates (409 BOOKING_CONFLICT when no room of the type is left, or the guest’s room is taken on them; 422 RESTRICTION_VIOLATED when a night has no price or is stop-sell). Shortening gives the nights back; the new departure is the business date or later. Before check-in, change the dates on the reservation instead. Send `If-Match` with the stay’s version.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.modify',
+  idempotent: true,
+  ifMatch: true,
+  params: StayParams,
+  body: ExtendBody,
+  response: ReservationChange,
+  errors: [
+    'BOOKING_CONFLICT',
+    'RESTRICTION_VIOLATED',
+    'VERSION_CONFLICT',
+    'STATE_TRANSITION_INVALID',
+  ],
+});
+
 // ── Day-use (M3-10; T-052) ─────────────────────────────────────────────────────────────
 
 /** Shortest day-use stay; the plan sets the longest (rate_plans.day_use_max_minutes). */
@@ -720,4 +751,5 @@ export const RESERVATION_ROUTES = {
   getDayUseAvailability,
   createDayUse,
   checkOut,
+  extendStay,
 } as const;

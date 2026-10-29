@@ -547,7 +547,8 @@ function Choice(props: {
 }
 
 /** Today at the current property, for the check-in button. */
+/** The property's business date (T-054), or its local date until it goes live. */
 export function usePropertyToday(): string {
   const property = useProperty();
-  return localDate(new Date(), property?.timeZone ?? 'Africa/Lagos');
+  return property?.businessDate ?? localDate(new Date(), property?.timeZone ?? 'Africa/Lagos');
 }

@@ -102,7 +102,7 @@ export async function loadStay(db: Client, stayId: string) {
  * Rooms of the type with no block and no other stay on any night of [from, to), and no day-use
  * on a day the guest stays through (after the arrival date, before the departure date).
  */
-async function freeRooms(
+export async function freeRooms(
   db: Client,
   stay: { id: string; roomTypeId: string },
   from: string,

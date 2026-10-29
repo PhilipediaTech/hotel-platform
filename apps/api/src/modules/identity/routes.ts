@@ -62,6 +62,7 @@ export function identityRoutes(deps: identity.IdentityDeps): Router {
   ) =>
     identity.buildMe(deps.db, user, session, {
       pinSwitchAvailable: deviceJustOpened || (await activeDevice(req)) !== null,
+      clock: deps.clock,
     });
 
   mountRoute(router, r.signUp, async ({ body }) => {

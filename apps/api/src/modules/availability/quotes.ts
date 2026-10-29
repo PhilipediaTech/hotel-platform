@@ -483,3 +483,31 @@ export async function dayUseOffers(
   }
   return { offers, hasRoomCode: ctx.roomCode !== null };
 }
+
+// ── Extending a stay (M3-12; T-054) ─────────────────────────────────────────────────────
+
+/** Rules that stop nights being added to a stay; arrival and stay-length rules don't apply. */
+const EXTENSION_RULES = new Set(['STOP_SELL', 'NO_PRICE']);
+
+/**
+ * Prices nights `from` to `to` (exclusive) on a stay's plan and room type at today's rates,
+ * for adding them to a stay. Null nights: the plan is no longer sold.
+ */
+export async function priceExtension(
+  db: TenantDb,
+  args: { ratePlanId: string; roomTypeId: string; from: string; to: string; guests: number },
+): Promise<{ nights: QuoteNight[] | null; violations: ViolationOut[] }> {
+  const stay = { arrival: args.from, departure: args.to };
+  const ctx = await load(db, stay);
+  const plan = ctx.plans.get(args.ratePlanId);
+  if (!plan) return { nights: null, violations: [] };
+  const p = price(ctx, plan, args.roomTypeId, stay, args.guests);
+  const violations = p.violations.filter((v) => v.date < args.to && EXTENSION_RULES.has(v.rule));
+  return {
+    nights:
+      violations.length === 0 && p.nights
+        ? p.nights.map((n) => ({ ...n, guests: args.guests }))
+        : null,
+    violations,
+  };
+}

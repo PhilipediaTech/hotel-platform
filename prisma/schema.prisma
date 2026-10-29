@@ -115,6 +115,7 @@ model Property {
   reservations         Reservation[]
   stays                Stay[]
   idDocuments          IdDocument[]
+  businessDays         BusinessDay[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -222,6 +223,7 @@ model User {
   importJobs         ImportJob[]
   keysIssued         KeyIssue[]
   cardsSigned        RegistrationCard[]
+  daysClosed         BusinessDay[]
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -1211,4 +1213,31 @@ model RegistrationCard {
 
   @@unique([propertyId, stayId])
   @@map("registration_cards")
+}
+
+enum DayStatus {
+  OPEN
+  AUDITING
+  CLOSED
+
+  @@map("day_status")
+}
+
+/// A property's business day (tab 3; T-054): the date the hotel is trading on. One is OPEN at a
+/// time; night audit (T-073) closes it and opens the next. Until night audit exists, the day
+/// rolls over when the property's local date changes. Days are only created once live.
+model BusinessDay {
+  propertyId String    @map("property_id") @db.Uuid
+  date       DateTime  @db.Date
+  status     DayStatus @default(OPEN)
+  openedAt   DateTime  @default(now()) @map("opened_at") @db.Timestamptz(6)
+  closedAt   DateTime? @map("closed_at") @db.Timestamptz(6)
+  /// Null when closed by the automatic rollover.
+  closedById String?   @map("closed_by_id") @db.Uuid
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  closedBy User?    @relation(fields: [closedById], references: [id], onDelete: SetNull)
+
+  @@id([propertyId, date])
+  @@map("business_days")
 }

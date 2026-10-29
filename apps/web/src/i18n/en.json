@@ -1017,7 +1017,12 @@
       "askManager": "Ask a manager",
       "moveNow": "Move now",
       "sentForApproval": "Sent to a manager for approval. The room changes once they approve."
-    }
+    },
+    "changeDeparture": "Change departure",
+    "newDeparture": "New departure",
+    "departureReason": "Reason (optional)",
+    "extend": "Extend stay",
+    "shorten": "Shorten stay"
   },
   "booking": {
     "title": "New booking",

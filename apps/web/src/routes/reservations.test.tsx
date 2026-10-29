@@ -495,6 +495,45 @@ describe('Check-in (M3-08, M3-19; T-051)', () => {
     expect(sent(`POST /stays/${STAY}/keys`)[0]?.body).toEqual({ count: 1 });
   });
 
+  it('extends a checked-in stay and shows how much the total changed (M3-12)', async () => {
+    permissions = [...permissions, 'reservation.checkin'];
+    let current: unknown = staying('CHECKED_IN');
+    handlers[`GET /reservations/${RES}`] = () => json(200, current);
+    handlers[`GET /stays/${STAY}/keys`] = () => json(200, { data: [] });
+    handlers[`POST /stays/${STAY}/extend`] = () => {
+      const longer = staying('CHECKED_IN');
+      current = {
+        ...longer,
+        stays: [{ ...longer.stays[0], departure: addDays(today, 3), version: 1 }],
+      };
+      return json(200, { ...(current as object), differenceMinor: '5546250' });
+    };
+    const user = userEvent.setup();
+    renderAt(`/reservations/${RES}`);
+    await user.click(await screen.findByRole('button', { name: 'Change departure' }));
+    const form = screen.getByRole('form', { name: 'Change departure' });
+    const date = within(form).getByLabelText('New departure');
+    expect(date).toHaveValue(addDays(today, 2));
+    // Same date: nothing to save.
+    expect(within(form).getByRole('button', { name: 'Shorten stay' })).toBeDisabled();
+    await user.clear(date);
+    await user.type(date, addDays(today, 3));
+    await user.type(within(form).getByLabelText('Reason (optional)'), 'Meeting moved');
+    await user.click(within(form).getByRole('button', { name: 'Extend stay' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('₦55,462.50');
+    const call = sent(`POST /stays/${STAY}/extend`)[0];
+    expect(call?.body).toEqual({ departure: addDays(today, 3), reason: 'Meeting moved' });
+    expect(call?.headers.get('If-Match')).toBe('"0"');
+  }, 15_000);
+
+  it('offers no departure change before check-in or without reservation.modify', async () => {
+    handlers[`GET /reservations/${RES}`] = () => json(200, staying('CONFIRMED'));
+    renderAt(`/reservations/${RES}`);
+    await screen.findByText('Room 101');
+    expect(screen.queryByRole('button', { name: 'Change departure' })).not.toBeInTheDocument();
+  });
+
   it('prints the registration card with the ID number masked', async () => {
     handlers[`GET /stays/${STAY}/registration-card`] = () =>
       json(200, {

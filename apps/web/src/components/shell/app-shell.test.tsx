@@ -128,6 +128,7 @@ describe('top bar', () => {
           baseCurrency: 'NGN',
           locale: 'en-NG',
           registrationFields: [],
+          businessDate: null,
         },
         {
           id: 'p2',
@@ -138,6 +139,7 @@ describe('top bar', () => {
           baseCurrency: 'NGN',
           locale: 'en-NG',
           registrationFields: [],
+          businessDate: null,
         },
       ],
       currentPropertyId: 'p1',

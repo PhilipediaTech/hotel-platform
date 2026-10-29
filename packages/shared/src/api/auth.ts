@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { SIGN_UP_COUNTRY_CODES } from '../countries.ts';
 import { REGISTRATION_FIELDS } from '../registration.ts';
 import { defineRoute } from './contract.ts';
-import { Instant, Uuid } from './primitives.ts';
+import { Instant, IsoDate, Uuid } from './primitives.ts';
 
 // Auth and "me" endpoints (tab 4 rows Auth and Me; PRD M1-01, M1-06). MFA, PIN switch and
 // MFA enrolment arrive with T-011.
@@ -103,6 +103,8 @@ const MeProperty = z.object({
   locale: z.string(),
   /** What the desk must collect at check-in (T-051). */
   registrationFields: z.array(z.enum(REGISTRATION_FIELDS)),
+  /** The business date the property trades on (T-054); null until it goes live. */
+  businessDate: IsoDate.nullable(),
 });
 
 const MeMembership = z.object({

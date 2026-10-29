@@ -3,6 +3,7 @@ import type { Logger } from 'pino';
 import type { AuthTokenPurpose, Session, User } from '../../generated/prisma/client.ts';
 import { recordAudit, recordUserEvent } from '../../core/audit.ts';
 import { createSession, isSessionOver, type AuthContext } from '../../core/auth.ts';
+import { businessDate } from '../../core/business-day.ts';
 import type { Clock } from '../../core/clock.ts';
 import type { Config } from '../../core/config.ts';
 import { pgErrorInfo, type Db, type DbClient } from '../../core/db.ts';
@@ -459,7 +460,7 @@ export async function buildMe(
   db: Db,
   user: User,
   session: Session,
-  options: { pinSwitchAvailable: boolean },
+  options: { pinSwitchAvailable: boolean; clock: Clock },
 ) {
   const memberships = await db.membership.findMany({
     where: { userId: user.id, active: true },
@@ -476,6 +477,10 @@ export async function buildMe(
     orderBy: { name: 'asc' },
   });
   const organisations = new Map(memberships.map((m) => [m.organisation.id, m.organisation]));
+  const businessDates = new Map<string, string>();
+  for (const p of properties.filter((x) => x.status === 'LIVE')) {
+    businessDates.set(p.id, await businessDate(db, p.id, options.clock));
+  }
 
   return {
     user: {
@@ -503,6 +508,7 @@ export async function buildMe(
       baseCurrency: p.baseCurrency,
       locale: p.locale,
       registrationFields: registrationOf(p).requiredFields,
+      businessDate: businessDates.get(p.id) ?? null,
     })),
     memberships: memberships.map((m) => ({
       organisationId: m.organisationId,

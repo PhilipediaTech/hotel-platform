@@ -285,6 +285,9 @@ export function ReservationPage() {
               />
             )}
             {s.status === 'CHECKED_IN' && <StayKeys stay={s} />}
+            {s.status === 'CHECKED_IN' && !s.dayUse && can('reservation.modify') && (
+              <ChangeDeparture stay={s} queryKey={key} />
+            )}
             {s.dayUse && s.status === 'CHECKED_IN' && can('reservation.checkout') && (
               <EndDayUse stay={s} onDone={refresh} />
             )}
@@ -408,6 +411,95 @@ function ChangeStay({ reservation, stay, queryKey }: Props & { stay: Stay }) {
       </div>
       {change.error && (
         <Alert tone="critical" className="sm:col-span-5">
+          {errorMessage(change.error)}
+        </Alert>
+      )}
+    </form>
+  );
+}
+
+/**
+ * M3-12 (T-054): a checked-in guest stays longer or leaves earlier. Kept nights keep their
+ * price; added nights are priced at today's rates; the answer says how much the total changed.
+ */
+function ChangeDeparture({ stay, queryKey }: { stay: Stay; queryKey: readonly string[] }) {
+  const { t } = useTranslation();
+  const f = useFormats();
+  const saved = useSaved(queryKey);
+  const [editing, setEditing] = useState(false);
+  const [departure, setDeparture] = useState(stay.departure);
+  const [reason, setReason] = useState('');
+  const [difference, setDifference] = useState<string | null>(null);
+  const change = useMutation({
+    mutationFn: () =>
+      api.call(
+        'extendStay',
+        {
+          params: { stayId: stay.id },
+          body: { departure, reason: reason.trim() || null },
+        },
+        { ifMatch: `"${stay.version}"` },
+      ),
+    onSuccess: (result) => {
+      setDifference(result.differenceMinor);
+      setEditing(false);
+      saved(result);
+    },
+  });
+  if (!editing) {
+    return (
+      <div className="mt-2 flex items-center gap-3">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            setDeparture(stay.departure);
+            setEditing(true);
+          }}
+        >
+          {t('reservations.changeDeparture')}
+        </Button>
+        {difference !== null && (
+          <span role="status" className="text-sm">
+            {t('reservations.difference', { amount: f.money(difference) })}
+          </span>
+        )}
+      </div>
+    );
+  }
+  return (
+    <form
+      aria-label={t('reservations.changeDeparture')}
+      className="mt-2 grid items-end gap-3 sm:grid-cols-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        change.mutate();
+      }}
+    >
+      <DateField label={t('reservations.newDeparture')} value={departure} onChange={setDeparture} />
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={`dep-reason-${stay.id}`}>{t('reservations.departureReason')}</Label>
+        <Input
+          id={`dep-reason-${stay.id}`}
+          value={reason}
+          maxLength={500}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button
+          type="submit"
+          size="sm"
+          disabled={change.isPending || !departure || departure === stay.departure}
+        >
+          {departure > stay.departure ? t('reservations.extend') : t('reservations.shorten')}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+          {t('guests.cancel')}
+        </Button>
+      </div>
+      {change.error && (
+        <Alert tone="critical" className="sm:col-span-3">
           {errorMessage(change.error)}
         </Alert>
       )}

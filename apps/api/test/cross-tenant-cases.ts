@@ -907,6 +907,20 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bInHouse,
     listIds: frontDeskIds,
   },
+  getBusinessDay: {
+    // No record in the path: A1 gets its own day; asking for B1 is refused like any route.
+    seed: bProperty,
+    listIds: () => [],
+  },
+  extendStay: {
+    seed: bInHouse,
+    body: () => ({ departure: '2099-01-05' }),
+    untouched: async (db, world, theirs) => {
+      const stay = await db.stay.findUniqueOrThrow({ where: { id: theirs['stayId'] ?? '' } });
+      expect(stay.departure).toEqual(new Date('2099-01-02'));
+      await bReservationUnchanged(db, world);
+    },
+  },
   releaseRoomBlock: {
     seed: bBlock,
     untouched: async (db, _w, theirs) => {

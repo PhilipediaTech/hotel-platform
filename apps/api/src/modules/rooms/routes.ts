@@ -45,6 +45,18 @@ export function roomRoutes(deps: rooms.RoomDeps): Router {
       ),
     ),
   );
+  mountRoute(router, r.setHkStatus, async ({ params, body }, { tenant, req, res }) =>
+    withEtag(
+      res,
+      await rooms.setHkStatus(
+        deps,
+        tenantFrom(tenant),
+        params.roomId,
+        req.get('If-Match') ?? '',
+        body.hkStatus,
+      ),
+    ),
+  );
 
   mountRoute(router, r.createRoomBlock, ({ body }, { tenant }) =>
     rooms.createRoomBlock(deps, tenantFrom(tenant), body),

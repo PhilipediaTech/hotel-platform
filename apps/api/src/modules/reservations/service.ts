@@ -31,6 +31,7 @@ import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { propertyToday, releaseInventory, takeInventory } from '../availability/inventory.ts';
 import type { QuoteNight } from '../availability/quotes.ts';
+import { followRoom, releaseAllocations } from './rooms.ts';
 
 // Reservations (PRD M3-01–M3-05, M3 rules 1 and 8; tab 4 row "Reservations"; T-042).
 // A stay is booked from a quote, so it keeps the quoted nights and prices (M2 rule 4). Every
@@ -69,6 +70,7 @@ const FULL = {
     include: {
       guest: true,
       roomType: true,
+      room: true,
       ratePlan: { include: { cancellationPolicy: true } },
       quote: true,
       nights: { orderBy: { date: 'asc' } },
@@ -124,6 +126,7 @@ function toItem(r: Full): ItemOut {
       roomTypeId: s.roomTypeId,
       roomTypeName: s.roomType.name,
       roomId: s.roomId,
+      roomNumber: s.room?.number ?? null,
       ratePlanId: s.ratePlanId,
       ratePlanCode: s.ratePlan.code,
       arrival: day(s.arrival),
@@ -236,7 +239,11 @@ export async function getCalendar(deps: ReservationDeps, query: z.output<typeof 
       arrival: { lt: dbDate(query.to) },
       departure: { gt: dbDate(query.from) },
     },
-    include: { guest: true, reservation: { select: { confirmationNo: true } } },
+    include: {
+      guest: true,
+      reservation: { select: { confirmationNo: true } },
+      allocations: { where: { active: true }, orderBy: { startDate: 'asc' } },
+    },
     orderBy: [{ arrival: 'asc' }, { id: 'asc' }],
   });
   const data: z.input<typeof CalendarStay>[] = stays.map((s) => ({
@@ -246,6 +253,11 @@ export async function getCalendar(deps: ReservationDeps, query: z.output<typeof 
     status: s.status,
     roomTypeId: s.roomTypeId,
     roomId: s.roomId,
+    rooms: s.allocations.map((a) => ({
+      roomId: a.roomId,
+      startDate: day(a.startDate),
+      endDate: day(a.endDate),
+    })),
     arrival: day(s.arrival),
     departure: day(s.departure),
     guestName: `${s.guest.firstName} ${s.guest.lastName}`,
@@ -670,6 +682,12 @@ export async function updateReservation(
           arrival: quote.arrival,
           departure: quote.departure,
           nights: { deleteMany: {}, create: nightRows(quote) },
+          // The room stays with the booking when it is still free on the new nights.
+          roomId: await followRoom(tx, stay, {
+            roomTypeId: quote.roomTypeId,
+            arrival: day(quote.arrival),
+            departure: day(quote.departure),
+          }),
         });
       }
       if (change.quoteId || change.adults !== undefined || change.children !== undefined) {
@@ -804,6 +822,10 @@ export async function cancelReservation(
         ).feeMinor;
       }
     }
+    await releaseAllocations(
+      tx,
+      before.stays.map((s) => s.id),
+    );
     await tx.stay.updateMany({
       where: { reservationId, status: { not: 'CANCELLED' } },
       data: { status: 'CANCELLED', roomId: null, version: { increment: 1 } },
@@ -939,9 +961,13 @@ export async function expireHolds(db: Db, clock: Clock): Promise<number> {
       for (const stay of r.stays.filter((s) => s.status === 'TENTATIVE')) {
         await releaseInventory(tx, { propertyId: r.propertyId, ...stayRange(stay), field: 'held' });
       }
+      await releaseAllocations(
+        tx,
+        r.stays.map((s) => s.id),
+      );
       await tx.stay.updateMany({
         where: { reservationId: r.id, status: 'TENTATIVE' },
-        data: { status: 'CANCELLED', version: { increment: 1 } },
+        data: { status: 'CANCELLED', roomId: null, version: { increment: 1 } },
       });
       await tx.reservationStatusHistory.create({
         data: {

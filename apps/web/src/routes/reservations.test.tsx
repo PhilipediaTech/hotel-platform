@@ -48,6 +48,7 @@ const reservation = (extra: object = {}) => ({
       roomTypeId: TYPE,
       roomTypeName: 'Standard',
       roomId: null,
+      roomNumber: null,
       ratePlanId: PLAN,
       ratePlanCode: 'BAR',
       arrival: '2026-11-12',
@@ -262,5 +263,102 @@ describe('Reservation detail', () => {
     expect(screen.queryByRole('button', { name: 'Change dates or guests' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Cancel reservation' })).toBeNull();
     expect(screen.queryByRole('form', { name: 'Details' })).toBeNull();
+  });
+});
+
+describe('Rooms for a stay (M3-07, M3-11; T-050)', () => {
+  const R101 = '33333333-0000-4000-8000-000000000101';
+  const R102 = '33333333-0000-4000-8000-000000000102';
+  const withRoom = (status: string) =>
+    reservation({
+      status,
+      stays: [{ ...reservation().stays[0], status, roomId: R101, roomNumber: '101' }],
+    });
+  beforeEach(() => {
+    handlers[`GET /stays/${STAY}/rooms`] = () =>
+      json(200, {
+        data: [
+          { id: R101, number: '101', floor: '1', hkStatus: 'CLEAN', problems: [] },
+          { id: R102, number: '102', floor: '1', hkStatus: 'DIRTY', problems: ['NOT_CLEAN'] },
+        ],
+      });
+  });
+
+  it('gives a room, and sends a room that is not ready to a manager', async () => {
+    permissions = [...permissions, 'room.assign'];
+    // The server's state: the page reads it again after a change.
+    let current = reservation();
+    handlers[`GET /reservations/${RES}`] = () => json(200, current);
+    handlers[`POST /stays/${STAY}/assign-room`] = (body) => {
+      if ((body as { overrideReason?: string }).overrideReason) {
+        return json(202, {
+          approvalRequestId: '33333333-0000-4000-8000-000000000099',
+          status: 'PENDING',
+          expiresAt: '2026-11-10T09:30:00Z',
+          approverRoles: ['General Manager'],
+        });
+      }
+      current = withRoom('CONFIRMED');
+      return json(200, current);
+    };
+    const user = userEvent.setup();
+    renderAt(`/reservations/${RES}`);
+    expect(await screen.findByText('No room yet')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Choose a room' }));
+    const form = await screen.findByRole('form', { name: 'Choose a room' });
+    const select = within(form).getByLabelText('Room');
+    await within(form).findByRole('option', { name: '102 · Dirty · not clean yet' });
+    await user.selectOptions(select, R101);
+    expect(within(form).queryByLabelText(/A manager approves/)).not.toBeInTheDocument();
+    await user.click(within(form).getByRole('button', { name: 'Give this room' }));
+    expect(await screen.findByText('Room 101')).toBeInTheDocument();
+    expect(sent(`POST /stays/${STAY}/assign-room`)[0]?.body).toEqual({ roomId: R101 });
+
+    await user.click(screen.getByRole('button', { name: 'Change room' }));
+    const again = await screen.findByRole('form', { name: 'Choose a room' });
+    await within(again).findByRole('option', { name: /^102/ });
+    await user.selectOptions(within(again).getByLabelText('Room'), R102);
+    const ask = within(again).getByRole('button', { name: 'Ask a manager' });
+    expect(ask).toBeDisabled();
+    await user.type(within(again).getByLabelText(/A manager approves/), 'VIP arriving now');
+    await user.click(ask);
+    expect(await screen.findByText(/Sent to a manager for approval/)).toBeInTheDocument();
+    expect(sent(`POST /stays/${STAY}/assign-room`)[1]?.body).toEqual({
+      roomId: R102,
+      overrideReason: 'VIP arriving now',
+    });
+  });
+
+  it('moves a checked-in guest with a reason', async () => {
+    permissions = [...permissions, 'room.move'];
+    let current: unknown = withRoom('CHECKED_IN');
+    handlers[`GET /reservations/${RES}`] = () => json(200, current);
+    handlers[`GET /stays/${STAY}/rooms`] = () =>
+      json(200, {
+        data: [{ id: R102, number: '102', floor: '1', hkStatus: 'CLEAN', problems: [] }],
+      });
+    handlers[`POST /stays/${STAY}/move`] = () => {
+      current = reservation({
+        status: 'CHECKED_IN',
+        stays: [
+          { ...reservation().stays[0], status: 'CHECKED_IN', roomId: R102, roomNumber: '102' },
+        ],
+      });
+      return json(200, current);
+    };
+    const user = userEvent.setup();
+    renderAt(`/reservations/${RES}`);
+    expect(await screen.findByText('Room 101')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Take the room back' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Move guest' }));
+    const form = await screen.findByRole('form', { name: 'Move guest' });
+    await within(form).findByRole('option', { name: /^102/ });
+    await user.selectOptions(within(form).getByLabelText('Room'), R102);
+    await user.type(within(form).getByLabelText('Reason for the move'), 'Noisy air conditioner');
+    await user.click(within(form).getByRole('button', { name: 'Move now' }));
+    expect(await screen.findByText('Room 102')).toBeInTheDocument();
+    const move = sent(`POST /stays/${STAY}/move`)[0];
+    expect(move?.body).toEqual({ roomId: R102, reason: 'Noisy air conditioner' });
+    expect(move?.headers.get('Idempotency-Key')).toBeTruthy();
   });
 });

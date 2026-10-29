@@ -234,6 +234,25 @@ export const updateRoom = defineRoute({
   response: RoomItem,
 });
 
+/** Statuses staff set by hand; out of order/service come from blocks (M2 rule 2). */
+export const SETTABLE_HK_STATUSES = ['DIRTY', 'CLEANING', 'CLEAN', 'INSPECTED'] as const;
+
+export const setHkStatus = defineRoute({
+  operationId: 'setHkStatus',
+  method: 'patch',
+  path: '/rooms/{roomId}/hk-status',
+  summary: 'Set a room’s housekeeping status',
+  description:
+    'hk.work or hk.inspect for dirty, cleaning and clean; hk.inspect for inspected. A room under an out-of-order or out-of-service block keeps that status until the block ends (409 STATE_TRANSITION_INVALID). The housekeeping board arrives with T-080.',
+  tags: ['Rooms'],
+  propertyScoped: true,
+  ifMatch: true,
+  params: z.object({ roomId: Uuid }),
+  body: z.object({ hkStatus: z.enum(SETTABLE_HK_STATUSES) }),
+  response: RoomItem,
+  errors: ['STATE_TRANSITION_INVALID', 'VERSION_CONFLICT'],
+});
+
 // ── Blocks ─────────────────────────────────────────────────────────────────────────────
 
 export const RoomBlockBody = z
@@ -264,6 +283,7 @@ export const createRoomBlock = defineRoute({
   body: RoomBlockBody,
   status: 201,
   response: RoomBlockItem,
+  errors: ['BOOKING_CONFLICT'],
 });
 
 export const releaseRoomBlock = defineRoute({
@@ -286,6 +306,7 @@ export const ROOM_ROUTES = {
   listRooms,
   createRoom,
   updateRoom,
+  setHkStatus,
   createRoomBlock,
   releaseRoomBlock,
 } as const;

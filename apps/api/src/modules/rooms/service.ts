@@ -3,6 +3,7 @@ import {
   daysBetween,
   localDate,
   MAX_BLOCK_DAYS,
+  type SETTABLE_HK_STATUSES,
   type RoomBlockBody,
   type RoomBlockItem,
   type RoomBody,
@@ -428,6 +429,55 @@ export async function updateRoom(
   }
 }
 
+/**
+ * Housekeeping status by hand (tab 4 PATCH /rooms/{id}/hk-status; the board is T-080):
+ * cleaners mark rooms dirty, cleaning or clean; inspectors also inspected. Blocks own the
+ * out-of-order and out-of-service statuses.
+ */
+export async function setHkStatus(
+  deps: RoomDeps,
+  tenant: TenantContext,
+  roomId: string,
+  ifMatch: string,
+  hkStatus: (typeof SETTABLE_HK_STATUSES)[number],
+): Promise<RoomOut> {
+  const can = (p: string) => tenant.permissions.has(p);
+  if (hkStatus === 'INSPECTED' ? !can('hk.inspect') : !can('hk.work') && !can('hk.inspect')) {
+    throw new AppError('FORBIDDEN', 'You cannot set this housekeeping status', { hkStatus });
+  }
+  const now = await today(deps, tenant);
+  return deps.tenantDb.$transaction(async (tx) => {
+    const before = await loadRoom(tx, roomId, now);
+    if (versionFrom(ifMatch) !== before.version) {
+      throw new AppError('VERSION_CONFLICT', 'Someone changed this room; reload and try again', {
+        version: before.version,
+      });
+    }
+    if (before.hkStatus === 'OUT_OF_ORDER' || before.hkStatus === 'OUT_OF_SERVICE') {
+      throw new AppError(
+        'STATE_TRANSITION_INVALID',
+        `Room ${before.number} is blocked; release the block first`,
+        { hkStatus: before.hkStatus },
+      );
+    }
+    const claimed = await tx.room.updateMany({
+      where: { id: before.id, version: before.version },
+      data: { hkStatus, hkStatusAt: deps.clock(), version: { increment: 1 } },
+    });
+    if (claimed.count === 0) {
+      throw new AppError('VERSION_CONFLICT', 'Someone changed this room; reload and try again');
+    }
+    await recordAudit(tx, {
+      action: 'room.hk_status_changed',
+      entityType: 'room',
+      entityId: before.id,
+      before: { hkStatus: before.hkStatus },
+      after: { hkStatus },
+    });
+    return roomItem(await loadRoom(tx, before.id, now));
+  });
+}
+
 // ── Blocks ─────────────────────────────────────────────────────────────────────────────
 
 const blockOverlap = (err: unknown) =>
@@ -460,6 +510,23 @@ export async function createRoomBlock(
         throw invalid(
           'startDate',
           `Room ${room.number} is already blocked from ${day(clash.startDate)} to ${day(clash.endDate)}`,
+        );
+      }
+      // A guest has the room on some of those nights (T-050): move them first.
+      const guest = await tx.roomAllocation.findFirst({
+        where: {
+          roomId: room.id,
+          active: true,
+          startDate: { lt: dbDate(body.endDate) },
+          endDate: { gt: dbDate(body.startDate) },
+        },
+        orderBy: { startDate: 'asc' },
+      });
+      if (guest) {
+        throw new AppError(
+          'BOOKING_CONFLICT',
+          `Room ${room.number} is given to a guest from ${day(guest.startDate)} to ${day(guest.endDate)}: give them another room first`,
+          { stayId: guest.stayId },
         );
       }
       const block = await tx.roomBlock.create({

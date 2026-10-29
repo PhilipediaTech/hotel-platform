@@ -2,6 +2,7 @@ import { RESERVATION_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as rooms from './rooms.ts';
 import * as reservations from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -55,6 +56,17 @@ export function reservationRoutes(deps: reservations.ReservationDeps): Router {
     reservations.getHistory(deps, params.reservationId),
   );
   mountRoute(router, r.getCalendar, ({ query }) => reservations.getCalendar(deps, query));
+  mountRoute(router, r.listAssignableRooms, ({ params }) =>
+    rooms.listAssignableRooms(deps, params.stayId),
+  );
+  mountRoute(router, r.assignRoom, async ({ params, body }, { tenant, res }) => {
+    const result = await rooms.assignRoom(deps, tenantFrom(tenant), params.stayId, body);
+    return 'version' in result ? etag(res, result) : result;
+  });
+  mountRoute(router, r.moveStay, async ({ params, body }, { tenant, res }) => {
+    const result = await rooms.moveStay(deps, tenantFrom(tenant), params.stayId, body);
+    return 'version' in result ? etag(res, result) : result;
+  });
 
   return router;
 }

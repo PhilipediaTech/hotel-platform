@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -39,6 +39,7 @@ const stay = (
   status: 'CONFIRMED',
   roomTypeId: STD,
   roomId: null,
+  rooms: [],
   arrival,
   departure,
   guestName: `Guest ${n}`,
@@ -63,7 +64,7 @@ const room = (id: string, number: string, blocks: object[] = []) => ({
 
 let permissions: string[];
 let handlers: Record<string, (body: unknown, url: URL) => Response>;
-const calls: { key: string; url: URL }[] = [];
+const calls: { key: string; url: URL; body: unknown; headers: Headers }[] = [];
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -144,10 +145,11 @@ beforeEach(() => {
     vi.fn((input: string, init: RequestInit) => {
       const url = new URL(input, 'http://app.test');
       const key = `${init.method} ${url.pathname.replace('/api/v1', '')}`;
-      calls.push({ key, url });
+      const body = typeof init.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined;
+      calls.push({ key, url, body, headers: new Headers(init.headers) });
       const handler = handlers[key];
       if (!handler) return Promise.reject(new Error(`Unexpected request ${key}`));
-      return Promise.resolve(handler(undefined, url));
+      return Promise.resolve(handler(body, url));
     }),
   );
 });
@@ -242,5 +244,121 @@ describe('Calendar (S07)', () => {
     await user.selectOptions(screen.getByLabelText('Block a room'), R101);
     await user.click(screen.getByRole('button', { name: 'Block' }));
     expect(screen.getByRole('form', { name: /101/ })).toBeInTheDocument();
+  });
+});
+
+describe('Calendar rooms (T-050)', () => {
+  const assignCalls = () => calls.filter((c) => c.key.endsWith('/assign-room'));
+  let bodies: unknown[];
+  beforeEach(() => {
+    bodies = [];
+    permissions = [...permissions, 'room.assign'];
+  });
+
+  it('assigns by dragging a booking onto a room; a room not ready goes to a manager', async () => {
+    const stayId = '55555555-0000-4000-8000-000000000101';
+    handlers[`POST /stays/${stayId}/assign-room`] = (body) => {
+      bodies.push(body);
+      return (body as { overrideReason?: string }).overrideReason
+        ? json(202, {
+            approvalRequestId: '55555555-0000-4000-8000-000000000999',
+            status: 'PENDING',
+            expiresAt: '2026-11-10T09:30:00Z',
+            approverRoles: ['General Manager'],
+          })
+        : json(409, {
+            error: {
+              code: 'ROOM_NOT_READY',
+              message: 'Room 101 is not ready for a guest yet',
+              requestId: 'r',
+              details: { problems: ['NOT_CLEAN'] },
+            },
+          });
+    };
+    const user = userEvent.setup();
+    renderAt('/calendar');
+    const grid = await screen.findByRole('grid', { name: 'Reservation calendar' });
+    const rows = within(within(grid).getByRole('rowgroup', { name: 'Standard' })).getAllByRole(
+      'row',
+    );
+    const bar = within(rows[1] as HTMLElement).getByRole('link', { name: /Guest 1/ });
+    fireEvent.dragStart(bar);
+    fireEvent.dragOver(rows[3] as HTMLElement);
+    fireEvent.drop(rows[3] as HTMLElement);
+    expect(await screen.findByText('Room 101 is not ready for a guest yet')).toBeInTheDocument();
+    expect(bodies[0]).toEqual({ roomId: R101 });
+
+    const form = screen.getByRole('form', { name: 'Give room 101 although it is not ready' });
+    await user.type(within(form).getByLabelText(/A manager approves/), 'Guest waits in lounge');
+    await user.click(within(form).getByRole('button', { name: 'Ask a manager' }));
+    expect(await screen.findByText(/Sent to a manager: room 101/)).toBeInTheDocument();
+    expect(bodies[1]).toEqual({ roomId: R101, overrideReason: 'Guest waits in lounge' });
+    expect(assignCalls()).toHaveLength(2);
+  });
+
+  it('shows a moved guest on both rooms and drags a booking back to Unassigned', async () => {
+    handlers['GET /calendar'] = () =>
+      json(200, {
+        data: [
+          stay(1, RES_A, '2026-11-12', '2026-11-16', {
+            status: 'CHECKED_IN',
+            roomId: R102,
+            rooms: [
+              { roomId: R101, startDate: '2026-11-12', endDate: '2026-11-14' },
+              { roomId: R102, startDate: '2026-11-14', endDate: '2026-11-16' },
+            ],
+          }),
+          stay(2, RES_B, '2026-11-13', '2026-11-15', {
+            roomId: R101,
+            rooms: [{ roomId: R101, startDate: '2026-11-14', endDate: '2026-11-15' }],
+          }),
+        ],
+      });
+    const stayId = '55555555-0000-4000-8000-000000000102';
+    handlers[`POST /stays/${stayId}/assign-room`] = (body) => {
+      bodies.push(body);
+      return json(200, { id: RES_B, version: 1 });
+    };
+    renderAt('/calendar');
+    const grid = await screen.findByRole('grid', { name: 'Reservation calendar' });
+    const rows = within(within(grid).getByRole('rowgroup', { name: 'Standard' })).getAllByRole(
+      'row',
+    );
+    // Type row, room 101, room 102: nobody is unassigned.
+    expect(rows).toHaveLength(3);
+    const in101 = within(rows[1] as HTMLElement).getAllByRole('link');
+    expect(in101.map((l) => l.textContent)).toEqual([
+      'Guest 1 · Checked in',
+      'Guest 2 · Confirmed',
+    ]);
+    expect(in101[0]?.style.gridColumnEnd).toBe('6');
+    expect(within(rows[2] as HTMLElement).getByRole('link').style.gridColumnStart).toBe('6');
+
+    // A checked-in guest is moved on the reservation page, not by dragging.
+    fireEvent.dragStart(in101[0] as HTMLElement);
+    fireEvent.drop(rows[2] as HTMLElement);
+    expect(await screen.findByText(/move them from the reservation page/)).toBeInTheDocument();
+
+    fireEvent.dragStart(in101[1] as HTMLElement);
+    const unassigned = await within(grid).findByRole('rowheader', { name: 'Unassigned' });
+    fireEvent.drop(unassigned.parentElement as HTMLElement);
+    expect(await screen.findByText('Guest 2 is unassigned again.')).toBeInTheDocument();
+    expect(bodies).toEqual([{ roomId: null }]);
+  });
+
+  it('housekeeping sets a room’s status from its row', async () => {
+    permissions = ['frontdesk.read', 'hk.work'];
+    handlers[`PATCH /rooms/${R101}/hk-status`] = () => json(200, room(R101, '101'));
+    const user = userEvent.setup();
+    renderAt('/calendar');
+    const select = await screen.findByLabelText('Housekeeping status of room 101');
+    expect(within(select).queryByRole('option', { name: 'Inspected' })).not.toBeInTheDocument();
+    await user.selectOptions(select, 'DIRTY');
+    await waitFor(() =>
+      expect(calls.find((c) => c.key === `PATCH /rooms/${R101}/hk-status`)).toBeTruthy(),
+    );
+    const patch = calls.find((c) => c.key === `PATCH /rooms/${R101}/hk-status`);
+    expect(patch?.headers.get('If-Match')).toBe('"0"');
+    expect(patch?.body).toEqual({ hkStatus: 'DIRTY' });
   });
 });

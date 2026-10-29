@@ -695,3 +695,310 @@ describe('Calendar (S07; T-044)', () => {
     expect((await attendant.get(`/calendar?from=${TODAY}&to=${LEAVE}`)).status).toBe(403);
   });
 });
+
+describe('Rooms for stays (M3-07, M3-11; T-050)', () => {
+  type Item = Reservation & { stays: (Stay & { roomId: string | null; version: number })[] };
+  const roomsOf = async () =>
+    Object.fromEntries((await db.room.findMany()).map((r) => [r.number, r.id])) as Record<
+      string,
+      string
+    >;
+  const setRoom = (id: string | undefined, hkStatus: 'CLEAN' | 'DIRTY' | 'INSPECTED') =>
+    db.room.update({ where: { id: id ?? '' }, data: { hkStatus } });
+  const assign = (h: Awaited<ReturnType<typeof hotel>>, stayId: string, body: object, as = h.fd) =>
+    as.post(`/stays/${stayId}/assign-room`, body);
+  const stayOf = (r: Reservation) => r.stays[0]?.id ?? '';
+
+  it('gives a booking a room, lists only free rooms, and never double-books a room', async () => {
+    const h = await hotel(3);
+    const room = await roomsOf();
+    const a = await h.book([await h.quote()]);
+    const b = await h.book([await h.quote()]);
+    const c = await h.book([await h.quote()]);
+
+    const free = await h.ok<{ data: { number: string; problems: string[] }[] }>(
+      h.fd.get(`/stays/${stayOf(a)}/rooms`),
+    );
+    // Arriving in two days: housekeeping status does not matter yet.
+    expect(free.data).toEqual([
+      expect.objectContaining({ number: '101', problems: [] }),
+      expect.objectContaining({ number: '102', problems: [] }),
+      expect.objectContaining({ number: '103', problems: [] }),
+    ]);
+    const given = await h.ok<Item>(assign(h, stayOf(a), { roomId: room['101'] }));
+    expect(given.stays[0]?.roomId).toBe(room['101']);
+    expect(given.version).toBe(a.version + 1);
+
+    // 101 is no longer offered to the others, and can't be given to them.
+    const left = await h.ok<{ data: { number: string }[] }>(h.fd.get(`/stays/${stayOf(b)}/rooms`));
+    expect(left.data.map((r) => r.number)).toEqual(['102', '103']);
+    expect(errorOf(await assign(h, stayOf(b), { roomId: room['101'] }))).toMatchObject({
+      code: 'BOOKING_CONFLICT',
+    });
+
+    // Two desks give 102 to two stays at the same instant: exactly one wins.
+    const race = await Promise.all([
+      assign(h, stayOf(b), { roomId: room['102'] }),
+      assign(h, stayOf(c), { roomId: room['102'] }),
+    ]);
+    expect(race.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(await db.roomAllocation.count({ where: { roomId: room['102'], active: true } })).toBe(1);
+
+    const calendar = await h.ok<{
+      data: { reservationId: string; rooms: { roomId: string; startDate: string }[] }[];
+    }>(h.fd.get(`/calendar?from=${TODAY}&to=2026-11-20`));
+    expect(calendar.data.find((s) => s.reservationId === a.id)?.rooms).toEqual([
+      { roomId: room['101'], startDate: ARRIVE, endDate: LEAVE },
+    ]);
+    const audit = await db.auditEvent.findFirstOrThrow({
+      where: { action: 'stay.room_assigned', entityId: stayOf(a) },
+    });
+    expect(audit.after).toEqual({ roomId: room['101'] });
+  });
+
+  it('refuses rooms of another type, blocked rooms, and blocking a room a guest has', async () => {
+    const h = await hotel();
+    const room = await roomsOf();
+    const a = await h.book([await h.quote()]);
+    expect(errorOf(await assign(h, stayOf(a), { roomId: room['201'] }))).toMatchObject({
+      code: 'VALIDATION_ERROR',
+    });
+    await h.ok(
+      h.gm.post('/room-blocks', {
+        roomId: room['102'],
+        kind: 'OUT_OF_SERVICE',
+        startDate: '2026-11-13',
+        endDate: '2026-11-15',
+        reason: 'Painting',
+      }),
+    );
+    expect(errorOf(await assign(h, stayOf(a), { roomId: room['102'] }))).toMatchObject({
+      code: 'BOOKING_CONFLICT',
+    });
+    await h.ok(assign(h, stayOf(a), { roomId: room['101'] }));
+    const block = await h.gm.post('/room-blocks', {
+      roomId: room['101'],
+      kind: 'OUT_OF_ORDER',
+      startDate: '2026-11-13',
+      endDate: '2026-11-14',
+      reason: 'Leak',
+    });
+    expect(errorOf(block)).toMatchObject({
+      code: 'BOOKING_CONFLICT',
+      details: { stayId: stayOf(a) },
+    });
+  });
+
+  it('a guest arriving today gets a clean, empty room unless a manager approves', async () => {
+    const h = await hotel();
+    const room = await roomsOf();
+    const a = await h.book([await h.quote({ arrival: TODAY, departure: ARRIVE })]);
+    // New rooms start dirty.
+    const free = await h.ok<{ data: { number: string; problems: string[] }[] }>(
+      h.fd.get(`/stays/${stayOf(a)}/rooms`),
+    );
+    expect(free.data.map((r) => [r.number, r.problems])).toEqual([
+      ['101', ['NOT_CLEAN']],
+      ['102', ['NOT_CLEAN']],
+    ]);
+    expect(errorOf(await assign(h, stayOf(a), { roomId: room['101'] }))).toMatchObject({
+      code: 'ROOM_NOT_READY',
+      details: { problems: ['NOT_CLEAN'], hkStatus: 'DIRTY' },
+    });
+    await setRoom(room['102'], 'INSPECTED');
+    await h.ok(assign(h, stayOf(a), { roomId: room['102'] }));
+
+    // Override: the desk asks, a manager approves, the room is given.
+    const b = await h.book([await h.quote({ arrival: TODAY, departure: ARRIVE })]);
+    const asked = await assign(h, stayOf(b), {
+      roomId: room['101'],
+      overrideReason: 'Guest will wait in the lounge while it is cleaned',
+    });
+    expect(asked.status, JSON.stringify(asked.body)).toBe(202);
+    expect((await db.stay.findUniqueOrThrow({ where: { id: stayOf(b) } })).roomId).toBeNull();
+    const { approvalRequestId } = asked.body as { approvalRequestId: string };
+    await h.gm.post(`/approvals/${approvalRequestId}/approve`, {}).expect(200);
+    expect((await db.stay.findUniqueOrThrow({ where: { id: stayOf(b) } })).roomId).toBe(
+      room['101'],
+    );
+    const allocation = await db.roomAllocation.findFirstOrThrow({
+      where: { stayId: stayOf(b), active: true },
+    });
+    expect(allocation.reason).toBe('Guest will wait in the lounge while it is cleaned');
+  });
+
+  it('a requote keeps the room when it is free; cancelling and taking it back free it', async () => {
+    const h = await hotel();
+    const room = await roomsOf();
+    const a = await h.book([await h.quote()]);
+    const given = await h.ok<Item>(assign(h, stayOf(a), { roomId: room['101'] }));
+    // One more night: 101 is free, so it stays.
+    const longer = await h.ok<Item>(
+      h.fd.change(`/reservations/${a.id}`, given.version, {
+        stays: [{ stayId: stayOf(a), quoteId: await h.quote({ departure: '2026-11-15' }) }],
+      }),
+    );
+    expect(longer.stays[0]?.roomId).toBe(room['101']);
+    const allocation = await db.roomAllocation.findFirstOrThrow({
+      where: { stayId: stayOf(a), active: true },
+    });
+    expect(allocation.endDate.toISOString().slice(0, 10)).toBe('2026-11-15');
+
+    // Someone else has 101 on the 16th: moving there drops the room.
+    const b = await h.book([await h.quote({ arrival: '2026-11-16', departure: '2026-11-17' })]);
+    await h.ok(assign(h, stayOf(b), { roomId: room['101'] }));
+    const moved = await h.ok<Item>(
+      h.fd.change(`/reservations/${a.id}`, longer.version, {
+        stays: [
+          {
+            stayId: stayOf(a),
+            quoteId: await h.quote({ arrival: '2026-11-15', departure: '2026-11-17' }),
+          },
+        ],
+      }),
+    );
+    expect(moved.stays[0]?.roomId).toBeNull();
+
+    // Taking the room back, and cancelling, free it for others.
+    const c = await h.book([await h.quote()]);
+    await h.ok(assign(h, stayOf(c), { roomId: room['101'] }));
+    await h.ok(assign(h, stayOf(c), { roomId: null }));
+    expect(await db.roomAllocation.count({ where: { stayId: stayOf(c), active: true } })).toBe(0);
+    await h.ok(assign(h, stayOf(c), { roomId: room['102'] }));
+    await h.ok(h.fd.send(`/reservations/${c.id}/cancel`, { reason: 'DUPLICATE' }));
+    expect(await db.roomAllocation.count({ where: { stayId: stayOf(c), active: true } })).toBe(0);
+    const d = await h.book([await h.quote()]);
+    await h.ok(assign(h, stayOf(d), { roomId: room['102'] }));
+  });
+
+  it('an expired hold gives its room back', async () => {
+    const h = await hotel();
+    const room = await roomsOf();
+    const held = await h.book([await h.quote()], { holdUntil: '2026-11-10T10:00:00Z' });
+    await h.ok(assign(h, stayOf(held), { roomId: room['101'] }));
+    now = new Date('2026-11-10T10:01:00Z');
+    await expireHolds(db, clock);
+    expect(await db.roomAllocation.count({ where: { active: true } })).toBe(0);
+    expect((await db.stay.findUniqueOrThrow({ where: { id: stayOf(held) } })).roomId).toBeNull();
+  });
+
+  /** A stay from today to LEAVE in 101, checked in, two days on (check-in itself is T-051). */
+  async function inHouse(h: Awaited<ReturnType<typeof hotel>>) {
+    const room = await roomsOf();
+    const a = await h.book([await h.quote({ arrival: TODAY })]);
+    await setRoom(room['101'], 'CLEAN');
+    await h.ok(assign(h, stayOf(a), { roomId: room['101'] }));
+    await db.stay.update({ where: { id: stayOf(a) }, data: { status: 'CHECKED_IN' } });
+    await db.reservation.update({ where: { id: a.id }, data: { status: 'CHECKED_IN' } });
+    now = new Date('2026-11-12T09:00:00Z');
+    // Two days on: sign in again (sessions end when idle).
+    const gmId = (await db.membership.findFirstOrThrow({ where: { roleId: h.role('gm') } })).userId;
+    return { a, room, fd: await h.as(h.fdId), gm: await h.as(gmId) };
+  }
+
+  it('moves a checked-in guest from today on; the old room becomes dirty', async () => {
+    const h0 = await hotel();
+    const { a, room, fd, gm } = await inHouse(h0);
+    const h = { ...h0, fd, gm };
+    expect(errorOf(await assign(h, stayOf(a), { roomId: room['102'] }))).toMatchObject({
+      code: 'STATE_TRANSITION_INVALID',
+    });
+    const dirty = await h.fd.send(`/stays/${stayOf(a)}/move`, {
+      roomId: room['102'],
+      reason: 'Noisy air conditioner',
+    });
+    expect(errorOf(dirty)).toMatchObject({ code: 'ROOM_NOT_READY' });
+
+    await setRoom(room['102'], 'CLEAN');
+    const moved = await h.ok<Item>(
+      h.fd.send(`/stays/${stayOf(a)}/move`, {
+        roomId: room['102'],
+        reason: 'Noisy air conditioner',
+      }),
+    );
+    expect(moved.stays[0]?.roomId).toBe(room['102']);
+    const allocations = await db.roomAllocation.findMany({
+      where: { stayId: stayOf(a), active: true },
+      orderBy: { startDate: 'asc' },
+    });
+    expect(
+      allocations.map((x) => [
+        x.roomId,
+        x.startDate.toISOString().slice(0, 10),
+        x.endDate.toISOString().slice(0, 10),
+      ]),
+    ).toEqual([
+      [room['101'], TODAY, '2026-11-12'],
+      [room['102'], '2026-11-12', LEAVE],
+    ]);
+    expect((await db.room.findUniqueOrThrow({ where: { id: room['101'] } })).hkStatus).toBe(
+      'DIRTY',
+    );
+    expect(
+      await db.auditEvent.count({ where: { action: 'stay.moved', entityId: stayOf(a) } }),
+    ).toBe(1);
+    // Only checked-in guests are moved.
+    const quote = await h.ok<{ quoteId: string }>(
+      fd.post('/quotes', {
+        roomTypeId: h.std.id,
+        ratePlanId: h.bar.id,
+        arrival: '2026-11-13',
+        departure: LEAVE,
+        adults: 1,
+      }),
+    );
+    const b = await h.ok<Reservation>(fd.send('/reservations', h.booking([quote.quoteId])));
+    const notIn = await h.fd.send(`/stays/${stayOf(b)}/move`, {
+      roomId: room['101'],
+      reason: 'Wrong room',
+    });
+    expect(errorOf(notIn)).toMatchObject({ code: 'STATE_TRANSITION_INVALID' });
+  });
+
+  it('a move between midnight and 05:00 needs approval unless the caller is a manager', async () => {
+    const h0 = await hotel();
+    const { a, room, fd, gm } = await inHouse(h0);
+    const h = { ...h0, fd, gm };
+    await setRoom(room['102'], 'CLEAN');
+    now = new Date('2026-11-12T00:30:00Z'); // 01:30 in Lagos
+    const asked = await h.fd.send(`/stays/${stayOf(a)}/move`, {
+      roomId: room['102'],
+      reason: 'Leaking ceiling',
+    });
+    expect(asked.status, JSON.stringify(asked.body)).toBe(202);
+    expect((await db.stay.findUniqueOrThrow({ where: { id: stayOf(a) } })).roomId).toBe(
+      room['101'],
+    );
+    const { approvalRequestId } = asked.body as { approvalRequestId: string };
+    await h.gm.post(`/approvals/${approvalRequestId}/approve`, {}).expect(200);
+    expect((await db.stay.findUniqueOrThrow({ where: { id: stayOf(a) } })).roomId).toBe(
+      room['102'],
+    );
+    await setRoom(room['101'], 'CLEAN');
+    const direct = await h.gm.send(`/stays/${stayOf(a)}/move`, {
+      roomId: room['101'],
+      reason: 'Back after the repair',
+    });
+    expect(direct.status, JSON.stringify(direct.body)).toBe(200);
+  });
+
+  it('sets housekeeping status with hk.work or hk.inspect', async () => {
+    const h = await hotel();
+    const room = await roomsOf();
+    const r101 = await db.room.findUniqueOrThrow({ where: { id: room['101'] } });
+    const status = (as: typeof h.fd, hkStatus: string, version: number) =>
+      as.patch(`/rooms/${r101.id}/hk-status`, { hkStatus }).set('If-Match', `"${version}"`);
+    expect((await status(h.fd, 'CLEAN', r101.version)).status).toBe(403);
+    const attendant = await h.as((await h.person('hk-attendant', h.p1.id)).id);
+    const clean = await h.ok<{ hkStatus: string; version: number }>(
+      status(attendant, 'CLEAN', r101.version),
+    );
+    expect(clean.hkStatus).toBe('CLEAN');
+    expect((await status(attendant, 'INSPECTED', clean.version)).status).toBe(403);
+    expect(errorOf(await status(h.gm, 'INSPECTED', r101.version))).toMatchObject({
+      code: 'VERSION_CONFLICT',
+    });
+    const inspected = await h.ok<{ hkStatus: string }>(status(h.gm, 'INSPECTED', clean.version));
+    expect(inspected.hkStatus).toBe('INSPECTED');
+  });
+});

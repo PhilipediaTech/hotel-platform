@@ -47,8 +47,8 @@ function appWith(
 
 describe('toExpressPath', () => {
   it('turns OpenAPI parameters into Express parameters', () => {
-    expect(toExpressPath('/folios/{folioId}/charges/{chargeId}')).toBe(
-      '/folios/:folioId/charges/:chargeId',
+    expect(toExpressPath('/example-folios/{folioId}/charges/{chargeId}')).toBe(
+      '/example-folios/:folioId/charges/:chargeId',
     );
   });
 });
@@ -62,7 +62,7 @@ describe('mountRoute: input', () => {
     }));
     const app = appWith((r) => mountRoute(r, EXAMPLE_ROUTES.getFolio, handler));
     const res = await request(app)
-      .get(`/api/v1/folios/${FOLIO_ID}`)
+      .get(`/api/v1/example-folios/${FOLIO_ID}`)
       .set('X-Property-Id', PROPERTY_ID);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ id: FOLIO_ID, number: 'F-1001', balance: NGN('4500000') });
@@ -92,7 +92,7 @@ describe('mountRoute: input', () => {
     const handler = vi.fn();
     const app = appWith((r) => mountRoute(r, EXAMPLE_ROUTES.postCharge, handler));
     const res = await request(app)
-      .post('/api/v1/folios/not-a-uuid/charges')
+      .post('/api/v1/example-folios/not-a-uuid/charges')
       .set('Origin', APP_ORIGIN)
       .send({ amount: { amountMinor: 4500000, currency: 'NGN' }, description: '' });
     expect(res.status).toBe(400);
@@ -135,7 +135,7 @@ describe('mountRoute: sign-in', () => {
     const handler = vi.fn();
     const app = appWith((r) => mountRoute(r, EXAMPLE_ROUTES.postCharge, handler), false);
     const res = await request(app)
-      .post('/api/v1/folios/not-a-uuid/charges')
+      .post('/api/v1/example-folios/not-a-uuid/charges')
       .set('Origin', APP_ORIGIN)
       .send({});
     expect(res.status).toBe(401);
@@ -184,7 +184,7 @@ describe('mountRoute: tenancy and permissions', () => {
       }),
     );
     await request(app)
-      .get(`/api/v1/folios/${FOLIO_ID}`)
+      .get(`/api/v1/example-folios/${FOLIO_ID}`)
       .set('X-Property-Id', PROPERTY_ID)
       .expect(200);
     expect(seen).toBe(PROPERTY_ID);
@@ -194,7 +194,7 @@ describe('mountRoute: tenancy and permissions', () => {
     const handler = vi.fn(folio);
     const app = appWith((r) => mountRoute(r, EXAMPLE_ROUTES.getFolio, handler), SIGNED_IN, null);
     const res = await request(app)
-      .get(`/api/v1/folios/${FOLIO_ID}`)
+      .get(`/api/v1/example-folios/${FOLIO_ID}`)
       .set('X-Property-Id', PROPERTY_ID);
     expect(res.status).toBe(404);
     expect(handler).not.toHaveBeenCalled();
@@ -209,7 +209,7 @@ describe('mountRoute: tenancy and permissions', () => {
       readOnly,
     );
     const res = await request(app)
-      .get(`/api/v1/folios/${FOLIO_ID}`)
+      .get(`/api/v1/example-folios/${FOLIO_ID}`)
       .set('X-Property-Id', PROPERTY_ID);
     expect(res.status).toBe(403);
     expect(errorOf(res)).toMatchObject({
@@ -238,7 +238,7 @@ describe('mountRoute: output', () => {
       mountRoute(r, EXAMPLE_ROUTES.deleteNote, () => undefined);
     });
     await request(app)
-      .post(`/api/v1/folios/${FOLIO_ID}/charges`)
+      .post(`/api/v1/example-folios/${FOLIO_ID}/charges`)
       .set('Origin', APP_ORIGIN)
       .set('X-Property-Id', PROPERTY_ID)
       .set('Idempotency-Key', KEY)
@@ -259,7 +259,7 @@ describe('mountRoute: output', () => {
       })),
     );
     const res = await request(app)
-      .get(`/api/v1/folios/${FOLIO_ID}`)
+      .get(`/api/v1/example-folios/${FOLIO_ID}`)
       .set('X-Property-Id', PROPERTY_ID);
     expect(res.body).not.toHaveProperty('internalNote');
   });
@@ -274,7 +274,7 @@ describe('mountRoute: output', () => {
       })),
     );
     const res = await request(app)
-      .get(`/api/v1/folios/${FOLIO_ID}`)
+      .get(`/api/v1/example-folios/${FOLIO_ID}`)
       .set('X-Property-Id', PROPERTY_ID);
     expect(res.status).toBe(500);
     expect(errorOf(res).code).toBe('INTERNAL');

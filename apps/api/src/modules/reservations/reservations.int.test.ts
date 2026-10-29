@@ -1047,11 +1047,12 @@ describe('Check-in (M3-08, M3-19, M3 rules 2 and 6; T-051)', () => {
     const a = await arriving(h);
     const res = await a.checkIn({ registration, keysIssued: 2 });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
-    // The tab 4 example's answer.
-    expect(res.body).toEqual({
+    // The tab 4 example's answer, with the folio opened (T-060).
+    const { folioId, ...rest } = res.body as { folioId: string };
+    expect(folioId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(rest).toEqual({
       stayId: a.stayId,
       status: 'CHECKED_IN',
-      folioId: null,
       roomId: a.room['101'],
       version: a.version + 1,
     });

@@ -399,6 +399,50 @@ async function bInHouse(db: Db, world: TenantWorld, propertyId: string) {
   return theirs;
 }
 
+/** B's in-house guest with a folio holding one charge (T-060). */
+async function bFolio(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bInHouse(db, world, propertyId);
+  const folio = await db.folio.create({
+    data: {
+      organisationId: orgOf(world, propertyId),
+      propertyId,
+      number: 'F00001',
+      reservationId: theirs.reservationId,
+      name: 'B Guest',
+      currency: 'NGN',
+      windows: { create: { number: 1, payerType: 'GUEST' } },
+    },
+    include: { windows: true },
+  });
+  await db.stay.update({ where: { id: theirs.stayId }, data: { folioId: folio.id } });
+  const code = await db.revenueCode.create({
+    data: { propertyId, code: 'MISC', name: 'Other', group: 'OTHER' },
+  });
+  const line = await db.folioLine.create({
+    data: {
+      propertyId,
+      folioId: folio.id,
+      windowId: folio.windows[0]?.id ?? '',
+      businessDate: new Date('2099-01-01'),
+      kind: 'CHARGE',
+      revenueCodeId: code.id,
+      description: 'B charge',
+      unitAmountMinor: 100n,
+      amountMinor: 100n,
+      currency: 'NGN',
+    },
+  });
+  return { ...theirs, folioId: folio.id, lineId: line.id };
+}
+
+async function bFolioUnchanged(db: Db, world: TenantWorld) {
+  const folio = await db.folio.findFirstOrThrow({
+    where: { propertyId: world.b1.id },
+    include: { windows: true, routingRules: true, lines: true },
+  });
+  expect([folio.windows.length, folio.routingRules.length, folio.lines.length]).toEqual([1, 0, 1]);
+}
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -920,6 +964,34 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       expect(stay.departure).toEqual(new Date('2099-01-02'));
       await bReservationUnchanged(db, world);
     },
+  },
+  listFolios: {
+    seed: bFolio,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((f) => f.id),
+  },
+  getFolio: { seed: bFolio },
+  openStayFolio: {
+    seed: bInHouse,
+    untouched: async (db, world) => {
+      expect(await db.folio.count({ where: { propertyId: world.b1.id } })).toBe(0);
+    },
+  },
+  postCharge: {
+    seed: bFolio,
+    body: () => ({ revenueCode: 'MISC', description: 'Leak', unitAmountMinor: '1' }),
+    untouched: bFolioUnchanged,
+  },
+  reverseLine: { seed: bFolio, body: () => ({ reason: 'Leak' }), untouched: bFolioUnchanged },
+  addDiscount: {
+    seed: bFolio,
+    body: (theirs) => ({ lineId: theirs['lineId'], percent: 10, reason: 'Leak' }),
+    untouched: bFolioUnchanged,
+  },
+  addWindow: { seed: bFolio, body: () => ({ payerType: 'GUEST' }), untouched: bFolioUnchanged },
+  addRoutingRule: {
+    seed: bFolio,
+    body: () => ({ revenueGroup: 'OTHER', windowNumber: 1 }),
+    untouched: bFolioUnchanged,
   },
   releaseRoomBlock: {
     seed: bBlock,

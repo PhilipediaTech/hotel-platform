@@ -12,7 +12,7 @@ export const EXAMPLE_ROUTES = {
   getFolio: defineRoute({
     operationId: 'getFolio',
     method: 'get',
-    path: '/folios/{folioId}',
+    path: '/example-folios/{folioId}',
     summary: 'Get a folio',
     tags: ['Folios'],
     propertyScoped: true,
@@ -36,7 +36,7 @@ export const EXAMPLE_ROUTES = {
   postCharge: defineRoute({
     operationId: 'postCharge',
     method: 'post',
-    path: '/folios/{folioId}/charges',
+    path: '/example-folios/{folioId}/charges',
     summary: 'Post a charge',
     tags: ['Folios'],
     propertyScoped: true,

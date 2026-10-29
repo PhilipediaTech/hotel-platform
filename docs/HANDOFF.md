@@ -75,6 +75,7 @@ apps/api        @hotel/api      Express 5 app
                                 day-use.ts: day-use availability and sale (hourly room holds), check-out of day-use
                                 front-desk.ts: arrivals, departures and in-house lists with flags (S06)
                                 extend.ts: extend / shorten a checked-in stay (new quote of its nights)
+  src/modules/folios/          folios: open at check-in, post with taxes, reverse, discount, windows, routing
   src/modules/availability/     inventory.ts: rebuildInventory, takeInventory/releaseInventory, daily job; inventory API;
                                 quotes.ts: GET /availability, POST /quotes (live pricing, restrictions, taxes per night)
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
@@ -115,6 +116,7 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/routes/check-in.tsx       check-in form (on S09), key log, printable registration card (/stays/:id/card)
   src/routes/day-use.tsx        day-use sale (/bookings/day-use), day-use times and "End day-use" on S09
   src/routes/front-desk.tsx     S06 front desk: arrivals / departures / in-house tabs, quick check-in and day-use end
+  src/routes/folios.tsx         S11 folio (/folios/:id) and the folio list (/folios)
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -176,4 +178,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-060 folios (M4): windows, routing, charge posting with taxes per line (tax versions in force on the business date, M4 rule 1), reversal, discounts; open the folio at check-in (check-in answers `folioId: null` until then) and post day-use and extension nights from `stay_nights`. Business days exist (`apps/api/src/core/business-day.ts`): folio lines carry the business date, and the closed-day trigger (tab 3 constraint 5) comes with folio_lines. The rollover is automatic at the property’s midnight until night audit (T-073). Overnight check-out waits for T-064. The import still needs GUESTS/COMPANIES and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-061 cashier shifts (M4 rule 4 and the shift acceptance: open with a float, blind close, variance above tolerance (default ₦500) needs supervisor sign-off and raises a leakage alert, handover, sign-off; tab 3 `cashier_shifts`, `cash_counts`, `cash_handovers`). Then T-062 manual payments (SHIFT_NOT_OPEN, PAYMENT_DUPLICATE — see open issue 19) reduce folio balances; `folio_lines.shift_id` waits for shifts. `postChargeLines()` in apps/api/src/modules/folios/service.ts is the posting entry point for night audit and POS. The import still needs GUESTS/COMPANIES and BALANCES. Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

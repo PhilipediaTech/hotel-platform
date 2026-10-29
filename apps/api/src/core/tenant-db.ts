@@ -59,6 +59,8 @@ export const TENANT_MODELS: Record<string, Scope> = {
   IdDocument: { kind: 'property' },
   KeyIssue: { kind: 'property' },
   BusinessDay: { kind: 'property' },
+  Folio: { kind: 'property', organisationField: 'organisationId' },
+  FolioLine: { kind: 'property' },
   RegistrationCard: { kind: 'property' },
   // Components have no property column: reach them through their (scoped) rate plan.
 };

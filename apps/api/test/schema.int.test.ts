@@ -48,6 +48,7 @@ describe('migrations', () => {
       'mfa_recovery_codes',
       'organisations',
       'package_components',
+      'payments',
       'properties',
       'property_counters',
       'quotes',

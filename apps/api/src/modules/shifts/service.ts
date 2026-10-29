@@ -21,7 +21,7 @@ import type { TenantDb } from '../../core/tenant-db.ts';
 // one shift at a time with a counted float. Cash leaves the drawer by handover: to the safe
 // (confirmed at once) or to a colleague, who confirms it into their open shift. The close is
 // blind: the cashier counts each method and only the response reveals what was expected.
-// Expected cash = float + handovers confirmed in − handovers out (+ payments, T-062). A
+// Expected = float + handovers confirmed in − handovers out (cash) + payments taken per method. A
 // variance above the property's tolerance keeps the shift in CLOSING: the cashier gives a
 // reason, a leakage alert is raised, and a supervisor other than the cashier signs it off.
 
@@ -102,7 +102,13 @@ async function expected(db: Client, shift: FullShift, currency: string) {
   add('CASH', currency, shift.floatMinor);
   for (const h of shift.handovers) add('CASH', h.currency, -h.amountMinor);
   for (const h of await handoversIn(db, shift)) add('CASH', h.currency, h.amountMinor);
-  // Payments taken on the shift join here with T-062.
+  // Payments taken on the shift (T-062), at what was received in each currency.
+  const payments = await db.payment.groupBy({
+    by: ['method', 'currency'],
+    where: { shiftId: shift.id },
+    _sum: { amountMinor: true },
+  });
+  for (const p of payments) add(p.method, p.currency, p._sum.amountMinor ?? 0n);
   return out;
 }
 
@@ -222,7 +228,14 @@ export async function currentShift(
           handoversIn: (await handoversIn(db, shift)).map((h) =>
             handoverItem(h, cashierName(h.fromShift)),
           ),
-          paymentCounts: [],
+          paymentCounts: (
+            await db.payment.groupBy({
+              by: ['method'],
+              where: { shiftId: shift.id },
+              _count: { _all: true },
+              orderBy: { method: 'asc' },
+            })
+          ).map((p) => ({ method: p.method, count: p._count._all })),
         }
       : null,
     awaitingSignOff: await Promise.all(waiting.map((s) => shiftItem(db, s))),

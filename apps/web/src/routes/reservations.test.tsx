@@ -570,3 +570,29 @@ describe('Check-in (M3-08, M3-19; T-051)', () => {
     expect(print).toHaveBeenCalled();
   });
 });
+
+describe('Proforma invoice (T-062)', () => {
+  it('opens the booking’s proforma as a PDF for holders of folio.invoice', async () => {
+    permissions = [...permissions, 'folio.invoice'];
+    handlers[`GET /reservations/${RES}/proforma.pdf`] = () =>
+      new Response('%PDF-1.3', { status: 200, headers: { 'Content-Type': 'application/pdf' } });
+    const tab = { location: { href: '' }, close: vi.fn() };
+    vi.stubGlobal(
+      'open',
+      vi.fn(() => tab),
+    );
+    URL.createObjectURL = vi.fn(() => 'blob:proforma');
+    URL.revokeObjectURL = vi.fn();
+    const user = userEvent.setup();
+    renderAt(`/reservations/${RES}`);
+    await user.click(await screen.findByRole('button', { name: 'Proforma invoice' }));
+    await waitFor(() => expect(tab.location.href).toBe('blob:proforma'));
+    expect(sent(`GET /reservations/${RES}/proforma.pdf`)).toHaveLength(1);
+  });
+
+  it('offers no proforma without folio.invoice', async () => {
+    renderAt(`/reservations/${RES}`);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: 'Proforma invoice' })).not.toBeInTheDocument();
+  });
+});

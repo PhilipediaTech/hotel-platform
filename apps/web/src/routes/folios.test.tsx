@@ -82,6 +82,7 @@ const folio = (windows: object[] = [], extra: object = {}) => ({
           amountMinor: '500000',
         }),
       ],
+      payments: [],
     },
     ...windows,
   ],
@@ -92,6 +93,7 @@ const folio = (windows: object[] = [], extra: object = {}) => ({
     { code: 'ROOM', name: 'Room revenue', group: 'ROOM' },
   ],
   balanceMinor: '12325000',
+  paymentMethods: ['CASH', 'POS_TERMINAL'],
   version: 0,
   ...extra,
 });
@@ -110,6 +112,8 @@ beforeEach(() => {
     'folio.discount',
     'folio.reverse',
     'folio.route',
+    'folio.invoice',
+    'payment.capture',
   ];
   handlers = {
     'GET /me': () => json(200, makeMe({ memberships: [membership(LAGOS, permissions)] })),
@@ -269,6 +273,7 @@ describe('Folios (S11)', () => {
             payerName: 'Dangote Group',
             balanceMinor: '0',
             lines: [],
+            payments: [],
           },
         ]),
       );
@@ -299,5 +304,110 @@ describe('Folios (S11)', () => {
     await screen.findByRole('table', { name: 'Folio lines' });
     expect(screen.queryByRole('form', { name: 'Post a charge' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Reverse/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Payments and documents (M4-08; T-062)', () => {
+  const paid = () =>
+    folio([], {
+      windows: [
+        {
+          number: 1,
+          payerType: 'GUEST',
+          payerName: 'Ada Obi',
+          balanceMinor: '7325000',
+          lines: [],
+          payments: [
+            {
+              id: id(40),
+              windowNumber: 1,
+              method: 'CASH',
+              amountMinor: '5000000',
+              currency: 'NGN',
+              externalRef: null,
+              businessDate: '2026-11-10',
+              receivedAt: '2026-11-10T10:00:00Z',
+              receivedBy: 'Bola Desk',
+              note: 'Part payment',
+            },
+          ],
+        },
+      ],
+      balanceMinor: '7325000',
+    });
+
+  it('takes a payment with a reference for anything but cash', async () => {
+    handlers['POST /payments'] = () =>
+      json(201, { paymentId: id(41), shiftId: id(42), balanceMinor: '0' });
+    const user = userEvent.setup();
+    renderAt(`/folios/${FOLIO}`);
+    const form = await screen.findByRole('form', { name: 'Take a payment' });
+    expect(within(form).queryByLabelText('Reference')).not.toBeInTheDocument();
+    await user.selectOptions(within(form).getByLabelText('Method'), 'POS_TERMINAL');
+    await user.type(within(form).getByLabelText('Amount (₦)'), '123,250');
+    const take = within(form).getByRole('button', { name: 'Take payment' });
+    // A POS payment needs its slip number.
+    expect(take).toBeDisabled();
+    await user.type(within(form).getByLabelText('Reference'), 'MPT-77812');
+    await user.click(take);
+    await waitFor(() => expect(sent('POST /payments')).toHaveLength(1));
+    expect(sent('POST /payments')[0]?.body).toEqual({
+      folioId: FOLIO,
+      windowNumber: 1,
+      method: 'POS_TERMINAL',
+      amountMinor: '12325000',
+      externalRef: 'MPT-77812',
+      note: null,
+    });
+    expect(
+      await within(form).findByText('Payment recorded. Balance now ₦0.00.'),
+    ).toBeInTheDocument();
+  }, 15_000);
+
+  it('lists payments, and opens the receipt and the invoice as PDFs', async () => {
+    handlers[`GET /folios/${FOLIO}`] = () => json(200, paid());
+    handlers[`GET /folios/${FOLIO}/receipt.pdf`] = () =>
+      new Response('%PDF-1.3', { status: 200, headers: { 'Content-Type': 'application/pdf' } });
+    handlers[`GET /folios/${FOLIO}/invoice.pdf`] = () =>
+      new Response('%PDF-1.3', { status: 200, headers: { 'Content-Type': 'application/pdf' } });
+    const tab = { location: { href: '' }, close: vi.fn() };
+    vi.stubGlobal(
+      'open',
+      vi.fn(() => tab),
+    );
+    URL.createObjectURL = vi.fn(() => 'blob:pdf');
+    URL.revokeObjectURL = vi.fn();
+    const user = userEvent.setup();
+    renderAt(`/folios/${FOLIO}`);
+    const table = await screen.findByRole('table', { name: 'Payments' });
+    expect(table).toHaveTextContent('Cash');
+    expect(table).toHaveTextContent('Part payment');
+    expect(table).toHaveTextContent('−₦50,000.00');
+
+    await user.click(within(table).getByRole('button', { name: 'Receipt for ₦50,000.00' }));
+    await waitFor(() => expect(tab.location.href).toBe('blob:pdf'));
+    const receipt = sent(`GET /folios/${FOLIO}/receipt.pdf`)[0];
+    expect(receipt?.url.searchParams.get('paymentId')).toBe(id(40));
+
+    tab.location.href = '';
+    await user.click(screen.getByRole('button', { name: 'Print invoice' }));
+    await waitFor(() => expect(tab.location.href).toBe('blob:pdf'));
+    expect(sent(`GET /folios/${FOLIO}/invoice.pdf`)).toHaveLength(1);
+  });
+
+  it('offers no payment form or documents without the permissions', async () => {
+    permissions = ['folio.read'];
+    handlers[`GET /folios/${FOLIO}`] = () => json(200, paid());
+    renderAt(`/folios/${FOLIO}`);
+    const table = await screen.findByRole('table', { name: 'Payments' });
+    expect(within(table).queryByRole('button', { name: /^Receipt/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Take a payment' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Print invoice' })).not.toBeInTheDocument();
+  });
+
+  it('says where to switch payment methods on when none are', async () => {
+    handlers[`GET /folios/${FOLIO}`] = () => json(200, folio([], { paymentMethods: [] }));
+    renderAt(`/folios/${FOLIO}`);
+    expect(await screen.findByText(/No payment methods are switched on/)).toBeInTheDocument();
   });
 });

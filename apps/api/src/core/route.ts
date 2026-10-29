@@ -148,6 +148,16 @@ export function mountRoute<R extends RouteContract>(
       res.status(204).end();
       return;
     }
+    if (route.produces) {
+      const file = out as { filename: string; content: Uint8Array };
+      res
+        .status(status)
+        .type(route.produces)
+        .set('Content-Disposition', `inline; filename="${file.filename.replace(/[^\w.-]/g, '_')}"`)
+        .set('Cache-Control', 'no-store')
+        .send(Buffer.from(file.content));
+      return;
+    }
     res.status(status).json(out);
   });
 }

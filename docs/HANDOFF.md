@@ -77,6 +77,7 @@ apps/api        @hotel/api      Express 5 app
                                 extend.ts: extend / shorten a checked-in stay (new quote of its nights)
   src/modules/folios/          folios: open at check-in, post with taxes, reverse, discount, windows, routing
   src/modules/shifts/          cashier shifts: open with float, blind close, variance and leakage alert, sign-off, handovers
+  src/modules/payments/        service.ts: desk payments on the open shift; documents.ts: invoice, receipt, proforma PDFs (pdfkit)
   src/modules/availability/     inventory.ts: rebuildInventory, takeInventory/releaseInventory, daily job; inventory API;
                                 quotes.ts: GET /availability, POST /quotes (live pricing, restrictions, taxes per night)
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
@@ -119,6 +120,7 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/routes/front-desk.tsx     S06 front desk: arrivals / departures / in-house tabs, quick check-in and day-use end
   src/routes/folios.tsx         S11 folio (/folios/:id) and the folio list (/folios)
   src/routes/shift.tsx          S14 cashier shift (/shift): open, hand over, blind close, reason; supervisor sign-off
+  src/routes/folio-payments.tsx payments on the folio, take payment, invoice / receipt / proforma PDF buttons (usePdf)
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -180,4 +182,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-062 manual payments (M4-08; `payments` in tab 3; 409 SHIFT_NOT_OPEN without an open shift, 409 PAYMENT_DUPLICATE — see open issue 19): a payment records method, reference and the open shift, reduces the folio balance, and joins the shift’s expected amounts and payment counts in `expected()` / `currentShift()` in apps/api/src/modules/shifts/service.ts (the system shift for webhooks has `user_id` null; its unique index is in place). `postChargeLines()` in apps/api/src/modules/folios/service.ts is the posting entry point for night audit and POS. The import still needs GUESTS/COMPANIES and BALANCES. Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-063 advance-deposit ledger (`deposit_ledger_entries` in tab 3; trial-balance sign per open issue 13): deposits taken before arrival are payments with `reservation_id` and no folio (the `payments_target_check` already allows it), recorded RECEIVED in the ledger and applied to the folio at check-in (DEPOSIT_APPLY). `capturePayment()` in apps/api/src/modules/payments/service.ts and `openFolio()` in apps/api/src/modules/folios/service.ts are the places to extend. PDFs: routes with `produces: 'application/pdf'` and `api.download()`. Bundle is at 294 KB of 300 KB: make the next big screen lazy. The import still needs GUESTS/COMPANIES and BALANCES. Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

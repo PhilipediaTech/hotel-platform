@@ -68,6 +68,11 @@ export interface ApiClient<Routes extends RouteTable = ApiRoutes> {
     operationId: K,
     ...args: CallArgs<Routes[K]>
   ): Promise<RouteResponse<Routes[K]>>;
+  /** A `produces` route (a PDF): the file, to open or save. */
+  download<K extends keyof Routes & string>(
+    operationId: K,
+    ...args: CallArgs<Routes[K]>
+  ): Promise<Blob>;
 }
 
 /** URL values must be scalars; an object here is a caller bug, not "[object Object]". */
@@ -143,7 +148,7 @@ export function createApiClient<Routes extends RouteTable = ApiRoutes>(
       buildPath(route.path, input.params as Record<string, unknown> | undefined) +
       buildQuery(input.query as Record<string, unknown> | undefined);
 
-    const headers = new Headers({ Accept: 'application/json' });
+    const headers = new Headers({ Accept: route.produces ?? 'application/json' });
     if (route.body) headers.set('Content-Type', 'application/json');
     if (route.propertyScoped) {
       const propertyId = options.propertyId?.();
@@ -170,6 +175,7 @@ export function createApiClient<Routes extends RouteTable = ApiRoutes>(
     const response = await doFetch(url, init);
     if (!response.ok) throw await toApiError(response);
     if (response.status === 204) return undefined;
+    if (route.produces) return response.blob();
     // 202 ApprovalPending is a success the caller checks for (tab 4, "Approvals").
     return response.json();
   }
@@ -183,6 +189,15 @@ export function createApiClient<Routes extends RouteTable = ApiRoutes>(
         CallOptions | undefined,
       ];
       return request(route, input, callOptions) as never;
+    },
+    download(operationId, ...args) {
+      const route = routes[operationId];
+      if (!route?.produces) throw new Error(`${operationId} does not produce a file`);
+      const [input, callOptions] = args as [
+        { params?: unknown; query?: unknown; body?: unknown } | undefined,
+        CallOptions | undefined,
+      ];
+      return request(route, input, callOptions) as Promise<Blob>;
     },
   };
 }

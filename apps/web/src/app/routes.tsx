@@ -1,4 +1,5 @@
-import type { ComponentType, ReactElement, ReactNode } from 'react';
+import { lazy, Suspense, type ComponentType, type ReactElement, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { RouteObject } from 'react-router';
 import { AppShell } from '../components/shell/app-shell.tsx';
 import {
@@ -13,9 +14,6 @@ import { SignInPage } from '../routes/auth/sign-in.tsx';
 import { SignUpPage } from '../routes/auth/sign-up.tsx';
 import { AcceptInvitationPage } from '../routes/auth/accept-invitation.tsx';
 import { ApprovalsPage } from '../routes/approvals.tsx';
-import { AuditLogPage } from '../routes/audit.tsx';
-import { SetupWizardPage } from '../routes/onboarding.tsx';
-import { UsersAndRolesPage } from '../routes/settings/access.tsx';
 import { CompaniesPage, CompanyProfilePage } from '../routes/companies.tsx';
 import { GuestProfilePage, GuestsPage } from '../routes/guests.tsx';
 import { ReservationPage, ReservationsPage } from '../routes/reservations.tsx';
@@ -25,13 +23,29 @@ import { DayUsePage } from '../routes/day-use.tsx';
 import { FolioPage, FoliosPage } from '../routes/folios.tsx';
 import { FrontDeskPage } from '../routes/front-desk.tsx';
 import { NewBookingPage } from '../routes/new-booking.tsx';
-import { RatesPage } from '../routes/rates.tsx';
-import { FinanceSettingsPage } from '../routes/settings/finance.tsx';
-import { ImportsPage } from '../routes/settings/imports.tsx';
 import { RoomsSettingsPage } from '../routes/settings/rooms.tsx';
 import { HomeRedirect, NotFoundPage, PlaceholderPage, RouteErrorPage } from '../routes/pages.tsx';
 import { NAV_ITEMS, type NavItem } from './navigation.ts';
 import { SessionGate } from './session-gate.tsx';
+
+// Back-office screens load when first opened, so the front desk's first load stays within
+// the NFR budget (300 KB gzipped; `npm run size`).
+const AuditLogPage = lazy(() =>
+  import('../routes/audit.tsx').then((m) => ({ default: m.AuditLogPage })),
+);
+const SetupWizardPage = lazy(() =>
+  import('../routes/onboarding.tsx').then((m) => ({ default: m.SetupWizardPage })),
+);
+const UsersAndRolesPage = lazy(() =>
+  import('../routes/settings/access.tsx').then((m) => ({ default: m.UsersAndRolesPage })),
+);
+const RatesPage = lazy(() => import('../routes/rates.tsx').then((m) => ({ default: m.RatesPage })));
+const FinanceSettingsPage = lazy(() =>
+  import('../routes/settings/finance.tsx').then((m) => ({ default: m.FinanceSettingsPage })),
+);
+const ImportsPage = lazy(() =>
+  import('../routes/settings/imports.tsx').then((m) => ({ default: m.ImportsPage })),
+);
 
 /** Screens that exist; every other navigation path shows its placeholder. */
 const SCREENS: Record<string, ReactElement> = {
@@ -53,6 +67,11 @@ const SCREENS: Record<string, ReactElement> = {
   '/onboarding': <SetupWizardPage />,
 };
 
+function Loading() {
+  const { t } = useTranslation();
+  return <p className="text-sm text-text-muted">{t('shell.loading')}</p>;
+}
+
 /** One route per distinct screen path (tab-style items share their screen's route). */
 function screenRoutes(): RouteObject[] {
   const byPath = new Map<string, NavItem>();
@@ -62,7 +81,11 @@ function screenRoutes(): RouteObject[] {
   }
   return [...byPath.entries()].map(([path, item]) => ({
     path: path.replace(/^\//, ''),
-    element: SCREENS[path] ?? <PlaceholderPage item={item} />,
+    element: SCREENS[path] ? (
+      <Suspense fallback={<Loading />}>{SCREENS[path]}</Suspense>
+    ) : (
+      <PlaceholderPage item={item} />
+    ),
   }));
 }
 

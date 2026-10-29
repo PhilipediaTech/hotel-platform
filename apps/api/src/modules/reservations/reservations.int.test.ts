@@ -1482,7 +1482,7 @@ describe('Day-use (M3-10, M2-08; T-052)', () => {
     await h.ok(fd.send('/day-use', h.body({ start: '12:00', minutes: 60 })));
   });
 
-  it('closes check-in after the time, and leaves overnight check-out for folios', async () => {
+  it('closes check-in after the time; an overnight guest can still leave early', async () => {
     const h = await dayUseHotel();
     const stay = await h.sold({ minutes: 60 });
     now = new Date('2026-11-10T10:30:00Z'); // 11:30 local; it ended at 11:00
@@ -1503,11 +1503,11 @@ describe('Day-use (M3-10, M2-08; T-052)', () => {
         .set('Idempotency-Key', randomUUID())
         .set('If-Match', `"${v}"`),
     );
-    const refused = await fd
+    const left = await fd
       .post(`/stays/${o?.id ?? ''}/check-out`, {})
       .set('Idempotency-Key', randomUUID())
       .set('If-Match', `"${v + 1}"`);
-    expect(errorOf(refused).details).toMatchObject({ reason: 'NEEDS_FOLIO' });
+    expect(left.status).toBe(200);
   });
 
   it('keeps its room and time: no assign or re-quote; cancel frees it, no reinstate', async () => {

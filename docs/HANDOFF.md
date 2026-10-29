@@ -75,6 +75,8 @@ apps/api        @hotel/api      Express 5 app
                                 day-use.ts: day-use availability and sale (hourly room holds), check-out of day-use
                                 front-desk.ts: arrivals, departures and in-house lists with flags (S06)
                                 extend.ts: extend / shorten a checked-in stay (new quote of its nights)
+
+                                check-out.ts: check-out preview and check-out (balance per window, settle folio, room dirty)
   src/modules/folios/          folios: open at check-in, post with taxes, reverse, discount, windows, routing
   src/modules/shifts/          cashier shifts: open with float, blind close, variance and leakage alert, sign-off, handovers
   src/modules/payments/        service.ts: desk payments and deposits on the open shift; deposits.ts: deposit ledger, apply at folio
@@ -122,6 +124,7 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/routes/folios.tsx         S11 folio (/folios/:id) and the folio list (/folios)
   src/routes/shift.tsx          S14 cashier shift (/shift): open, hand over, blind close, reason; supervisor sign-off
   src/routes/folio-payments.tsx payments on the folio, take payment, invoice / receipt / proforma PDF buttons (usePdf)
+  src/routes/check-out.tsx      S12 check-out (/stays/:id/check-out): bill per window, warnings, blockers, print, check out
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -183,4 +186,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-064 check-out with warnings and folio send (FOLIO_BALANCE_OUTSTANDING in tab 4’s error list; the day-use check-out `POST /stays/{id}/check-out` in apps/api/src/modules/reservations/day-use.ts is the starting point; settle and close the folio, room to dirty, invoice PDF from apps/api/src/modules/payments/documents.ts; "send" needs T-024 notifications, still waiting for accounts). Lockfile: after any dependency change, check that npm on Windows kept the other platforms’ bindings (see the T-062 fix). Bundle is at 294.8 KB of 300 KB: make the next big screen lazy. The import still needs GUESTS/COMPANIES and BALANCES. Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-065 house and paymaster accounts (`POST /folios` for HOUSE / PAYMASTER kinds, folio transfer `POST /folios/{id}/transfer` ● with TRANSFER_IN / TRANSFER_OUT lines and the `folio.route` / transfer approval), exchange rates (`exchange_rates` in tab 3, locked by night audit step 7) and USD payments (`currency` on `POST /payments`, `rate_micros` and `base_amount_minor` already in `payments`; FX differences to an FX revenue code, M4 rule 6). The tax rates in S25 still need Philip’s confirmation. Lockfile: after any dependency change, check npm kept the other platforms’ bindings. First load 294.0 KB of 300 KB: new screens load on first use (React.lazy in apps/web/src/app/routes.tsx). Still waiting for accounts: R2 and the scan engine, T-024 notifications (also folio send at check-out), T-025 nightly dump, T-005 staging (paid: stop and ask).

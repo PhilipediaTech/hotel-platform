@@ -304,7 +304,18 @@ function Action({ row, tab, today, name }: { row: Row; tab: Tab; today: string; 
         </div>
       );
     }
-    return <span className="text-xs text-text-muted">{t('frontDesk.checkOutLater')}</span>;
+    if (permissions.includes('reservation.checkout')) {
+      return (
+        <Link
+          to={`/stays/${row.stayId}/check-out`}
+          aria-label={t('frontDesk.checkOutNamed', { name })}
+          className="inline-flex h-8 items-center rounded-md bg-brand px-3 text-on-brand hover:bg-brand-strong"
+        >
+          {t('checkOut.open')}
+        </Link>
+      );
+    }
+    return status;
   }
   if (row.status === 'CHECKED_OUT' && row.checkedOutAt) {
     return (

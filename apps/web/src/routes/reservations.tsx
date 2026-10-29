@@ -301,6 +301,11 @@ export function ReservationPage() {
             {s.dayUse && s.status === 'CHECKED_IN' && can('reservation.checkout') && (
               <EndDayUse stay={s} onDone={refresh} />
             )}
+            {!s.dayUse && s.status === 'CHECKED_IN' && can('reservation.checkout') && (
+              <Link to={`/stays/${s.id}/check-out`} className="text-sm text-brand underline">
+                {t('checkOut.open')}
+              </Link>
+            )}
             {open && !s.dayUse && s.status !== 'CANCELLED' && can('reservation.modify') && (
               <ChangeStay reservation={r} stay={s} queryKey={key} />
             )}

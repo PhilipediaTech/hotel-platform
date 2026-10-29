@@ -5,6 +5,7 @@ import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as checkIns from './check-in.ts';
 import * as dayUse from './day-use.ts';
+import * as checkOuts from './check-out.ts';
 import * as extend from './extend.ts';
 import * as frontDesk from './front-desk.ts';
 import * as rooms from './rooms.ts';
@@ -90,10 +91,13 @@ export function reservationRoutes(deps: checkIns.CheckInDeps): Router {
   mountRoute(router, r.createDayUse, async ({ body }, { tenant, res }) =>
     etag(res, await dayUse.createDayUse(deps, tenantFrom(tenant), body)),
   );
+  mountRoute(router, r.getCheckOut, ({ params }, { tenant }) =>
+    checkOuts.getCheckOut(deps, tenantFrom(tenant), params.stayId),
+  );
   mountRoute(router, r.checkOut, async ({ params, body }, { tenant, req, res }) =>
     etag(
       res,
-      await dayUse.checkOut(
+      await checkOuts.checkOut(
         deps,
         tenantFrom(tenant),
         params.stayId,

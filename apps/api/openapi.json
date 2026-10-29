@@ -4182,6 +4182,160 @@
           "rooms"
         ]
       },
+      "CheckOutPreview": {
+        "type": "object",
+        "properties": {
+          "stayId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ENQUIRY",
+              "TENTATIVE",
+              "CONFIRMED",
+              "CHECKED_IN",
+              "CHECKED_OUT",
+              "NO_SHOW",
+              "CANCELLED"
+            ]
+          },
+          "guestName": {
+            "type": "string"
+          },
+          "roomNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arrival": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "departure": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "dayUse": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "startsAt": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "endsAt": {
+                "$ref": "#/components/schemas/Instant"
+              }
+            },
+            "required": [
+              "startsAt",
+              "endsAt"
+            ]
+          },
+          "businessDate": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "leavesOn": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "folio": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "number": {
+                "type": "string"
+              },
+              "balanceMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "windows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer"
+                    },
+                    "payerName": {
+                      "type": "string"
+                    },
+                    "balanceMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "payerName",
+                    "balanceMinor"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "number",
+              "balanceMinor",
+              "windows"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "KEYS_NOT_RETURNED",
+                    "EARLY_DEPARTURE"
+                  ]
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "code",
+                "count"
+              ]
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "FOLIO_BALANCE_OUTSTANDING",
+                "NOT_CHECKED_IN"
+              ]
+            }
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stayId",
+          "status",
+          "guestName",
+          "roomNumber",
+          "arrival",
+          "departure",
+          "dayUse",
+          "businessDate",
+          "leavesOn",
+          "folio",
+          "warnings",
+          "blockers",
+          "version"
+        ]
+      },
       "FrontDeskRow": {
         "type": "object",
         "properties": {
@@ -18886,6 +19040,112 @@
       }
     },
     "/stays/{stayId}/check-out": {
+      "get": {
+        "operationId": "getCheckOut",
+        "summary": "Before checking a guest out: the bill, warnings and anything that blocks it",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "reservation.checkout",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckOutPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "checkOut",
         "summary": "Check a guest out; the room becomes dirty",
@@ -18897,7 +19157,7 @@
             "session": []
           }
         ],
-        "description": "Day-use stays for now (M3-10): ends the stay, frees the room from now on and sets it to dirty. Overnight check-out, with the folio balance check, comes with folios. Send `If-Match` with the stay’s version.",
+        "description": "Needs every window of the guest’s folio at zero (409 FOLIO_BALANCE_OUTSTANDING, M3 rule 3; transfers to a company account come with the city ledger). The folio is then settled, the room set to dirty (housekeeping rule 2) and the keys logged as returned when they are. An overnight guest leaving early has the stay shortened to the business date (at least one night; M3-12) as part of the check-out, releasing the later nights; a day-use stay frees its room from now on. Send `If-Match` with the stay’s version.",
         "x-permission": "reservation.checkout",
         "x-idempotent": true,
         "parameters": [
@@ -19010,7 +19270,7 @@
             }
           },
           "409": {
-            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `VERSION_CONFLICT`, `STATE_TRANSITION_INVALID`",
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `VERSION_CONFLICT`, `STATE_TRANSITION_INVALID`, `FOLIO_BALANCE_OUTSTANDING`",
             "content": {
               "application/json": {
                 "schema": {

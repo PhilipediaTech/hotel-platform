@@ -59,6 +59,134 @@ async function totalsOf(tx: Tx, nights: QuoteNight[]) {
   };
 }
 
+/**
+ * Moves a checked-in stay's departure to `to` inside a transaction (M3-12): inventory, the
+ * room's allocation, the nights and a new quote of them follow. Extending passes the added
+ * nights, priced beforehand; shortening passes none. Check-out uses it for an early departure.
+ */
+export async function applyDeparture(
+  tx: Tx,
+  args: {
+    propertyId: string;
+    stayId: string;
+    /** The version the caller saw; null when the caller holds the stay locked already. */
+    version: number | null;
+    to: string;
+    added: QuoteNight[];
+    reason: string | null;
+    now: Date;
+  },
+) {
+  const stay = await tx.stay.findUniqueOrThrow({
+    where: { id: args.stayId },
+    include: { quote: true, room: true },
+  });
+  if (args.version !== null && stay.version !== args.version) {
+    throw new AppError('VERSION_CONFLICT', 'Someone changed this stay; reload and try again');
+  }
+  const from = day(stay.departure);
+  const { to, added, now } = args;
+  const range = { propertyId: args.propertyId, roomTypeId: stay.roomTypeId };
+  const kept = (stay.quote.nights as unknown as QuoteNight[]).filter((n) => n.date < to);
+
+  if (to > from) {
+    await takeInventory(tx, { ...range, arrival: from, departure: to, field: 'sold' });
+    if (stay.room) {
+      await lockRoom(tx, stay.room.id);
+      const free = await freeRooms(tx, stay, from, to);
+      if (!free.some((r) => r.id === stay.room?.id)) {
+        throw new AppError(
+          'BOOKING_CONFLICT',
+          `Room ${stay.room.number} is taken or blocked on some of the added nights; move the guest first`,
+          { roomId: stay.room.id },
+        );
+      }
+      const last = await tx.roomAllocation.findFirst({
+        where: { stayId: stay.id, active: true, endDate: dbDate(from) },
+      });
+      if (last) {
+        await guarded(() =>
+          tx.roomAllocation.update({ where: { id: last.id }, data: { endDate: dbDate(to) } }),
+        );
+      }
+    }
+  } else {
+    await releaseInventory(tx, { ...range, arrival: to, departure: from, field: 'sold' });
+    const allocations = await tx.roomAllocation.findMany({
+      where: { stayId: stay.id, active: true },
+    });
+    for (const a of allocations) {
+      if (day(a.startDate) >= to) {
+        await tx.roomAllocation.update({ where: { id: a.id }, data: { active: false } });
+      } else if (day(a.endDate) > to) {
+        await tx.roomAllocation.update({ where: { id: a.id }, data: { endDate: dbDate(to) } });
+      }
+    }
+  }
+
+  // The stay's price record: the nights it keeps and the ones added.
+  const nights = [...kept, ...added];
+  const totals = await totalsOf(tx, nights);
+  const quote = await tx.quote.create({
+    data: {
+      ratePlanId: stay.ratePlanId,
+      roomTypeId: stay.roomTypeId,
+      arrival: stay.arrival,
+      departure: dbDate(to),
+      nights: nights as unknown as object,
+      taxes: totals.taxes,
+      totalMinor: totals.totalMinor,
+      currency: stay.quote.currency,
+      expiresAt: now,
+      createdAt: now,
+    } as never,
+  });
+  // Nights go in through the stay (stay_nights have no property column).
+  await tx.stay.update({
+    where: { id: stay.id },
+    data: {
+      departure: dbDate(to),
+      quoteId: quote.id,
+      version: { increment: 1 },
+      nights:
+        to > from
+          ? {
+              create: added.map((n) => ({
+                date: dbDate(n.date),
+                amountMinor: BigInt(n.amountMinor),
+                ratePlanId: n.pricedBy,
+                ruleVersion: n.ruleVersion,
+              })),
+            }
+          : { deleteMany: { date: { gte: dbDate(to) } } },
+    },
+  });
+  await tx.reservation.update({
+    where: { id: stay.reservationId },
+    data: { version: { increment: 1 } },
+  });
+  const differenceMinor = totals.totalMinor - stay.quote.totalMinor;
+  await recordAudit(tx, {
+    action: to > from ? 'stay.extended' : 'stay.shortened',
+    entityType: 'stay',
+    entityId: stay.id,
+    reason: args.reason ?? undefined,
+    before: { departure: from, totalMinor: stay.quote.totalMinor.toString() },
+    after: { departure: to, totalMinor: totals.totalMinor.toString() },
+  });
+  await recordEvent(tx, {
+    type: 'stay.departure_changed',
+    payload: {
+      stayId: stay.id,
+      reservationId: stay.reservationId,
+      from,
+      to,
+      differenceMinor: differenceMinor.toString(),
+    },
+  });
+  return { reservationId: stay.reservationId, differenceMinor };
+}
+
 export async function extendStay(
   deps: ReservationDeps,
   tenant: TenantContext,
@@ -119,114 +247,17 @@ export async function extendStay(
   }
 
   const now = deps.clock();
-  const result = await deps.tenantDb.$transaction(async (tx) => {
-    const stay = await tx.stay.findUniqueOrThrow({
-      where: { id: stayId },
-      include: { quote: true, room: true },
-    });
-    if (stay.version !== before.version) {
-      throw new AppError('VERSION_CONFLICT', 'Someone changed this stay; reload and try again');
-    }
-    const range = { propertyId: tenant.propertyId, roomTypeId: stay.roomTypeId };
-    const kept = (stay.quote.nights as unknown as QuoteNight[]).filter((n) => n.date < to);
-
-    if (to > from) {
-      await takeInventory(tx, { ...range, arrival: from, departure: to, field: 'sold' });
-      if (stay.room) {
-        await lockRoom(tx, stay.room.id);
-        const free = await freeRooms(tx, stay, from, to);
-        if (!free.some((r) => r.id === stay.room?.id)) {
-          throw new AppError(
-            'BOOKING_CONFLICT',
-            `Room ${stay.room.number} is taken or blocked on some of the added nights; move the guest first`,
-            { roomId: stay.room.id },
-          );
-        }
-        const last = await tx.roomAllocation.findFirst({
-          where: { stayId: stay.id, active: true, endDate: dbDate(from) },
-        });
-        if (last) {
-          await guarded(() =>
-            tx.roomAllocation.update({ where: { id: last.id }, data: { endDate: dbDate(to) } }),
-          );
-        }
-      }
-    } else {
-      await releaseInventory(tx, { ...range, arrival: to, departure: from, field: 'sold' });
-      const allocations = await tx.roomAllocation.findMany({
-        where: { stayId: stay.id, active: true },
-      });
-      for (const a of allocations) {
-        if (day(a.startDate) >= to) {
-          await tx.roomAllocation.update({ where: { id: a.id }, data: { active: false } });
-        } else if (day(a.endDate) > to) {
-          await tx.roomAllocation.update({ where: { id: a.id }, data: { endDate: dbDate(to) } });
-        }
-      }
-    }
-
-    // The stay's price record: the nights it keeps and the ones added.
-    const nights = [...kept, ...added];
-    const totals = await totalsOf(tx, nights);
-    const quote = await tx.quote.create({
-      data: {
-        ratePlanId: stay.ratePlanId,
-        roomTypeId: stay.roomTypeId,
-        arrival: stay.arrival,
-        departure: dbDate(to),
-        nights: nights as unknown as object,
-        taxes: totals.taxes,
-        totalMinor: totals.totalMinor,
-        currency: stay.quote.currency,
-        expiresAt: now,
-        createdAt: now,
-      } as never,
-    });
-    // Nights go in through the stay (stay_nights have no property column).
-    await tx.stay.update({
-      where: { id: stay.id },
-      data: {
-        departure: dbDate(to),
-        quoteId: quote.id,
-        version: { increment: 1 },
-        nights:
-          to > from
-            ? {
-                create: added.map((n) => ({
-                  date: dbDate(n.date),
-                  amountMinor: BigInt(n.amountMinor),
-                  ratePlanId: n.pricedBy,
-                  ruleVersion: n.ruleVersion,
-                })),
-              }
-            : { deleteMany: { date: { gte: dbDate(to) } } },
-      },
-    });
-    await tx.reservation.update({
-      where: { id: stay.reservationId },
-      data: { version: { increment: 1 } },
-    });
-    const differenceMinor = totals.totalMinor - stay.quote.totalMinor;
-    await recordAudit(tx, {
-      action: to > from ? 'stay.extended' : 'stay.shortened',
-      entityType: 'stay',
-      entityId: stay.id,
-      reason: body.reason ?? undefined,
-      before: { departure: from, totalMinor: stay.quote.totalMinor.toString() },
-      after: { departure: to, totalMinor: totals.totalMinor.toString() },
-    });
-    await recordEvent(tx, {
-      type: 'stay.departure_changed',
-      payload: {
-        stayId: stay.id,
-        reservationId: stay.reservationId,
-        from,
-        to,
-        differenceMinor: differenceMinor.toString(),
-      },
-    });
-    return { reservationId: stay.reservationId, differenceMinor };
-  });
+  const result = await deps.tenantDb.$transaction((tx) =>
+    applyDeparture(tx, {
+      propertyId: tenant.propertyId,
+      stayId,
+      version: before.version,
+      to,
+      added,
+      reason: body.reason ?? null,
+      now,
+    }),
+  );
   return {
     ...(await getReservation(deps, result.reservationId)),
     differenceMinor: result.differenceMinor.toString(),

@@ -66,6 +66,16 @@ export const ErrorEnvelopeSchema = z
     description: 'Every error response. Clients branch on `code`, never on `message`.',
   });
 
+/** What a `produces: 'application/pdf'` handler returns; the client receives the file. */
+export const PdfDocument = z.custom<{ filename: string; content: Uint8Array }>(
+  (v) =>
+    typeof v === 'object' &&
+    v !== null &&
+    typeof (v as { filename?: unknown }).filename === 'string' &&
+    (v as { content?: unknown }).content instanceof Uint8Array,
+  'Expected a PDF document',
+);
+
 /**
  * Body of a 202 when an action needs approval (tab 4, "Approvals"). Tab 5 rule: the screen
  * shows "Sent for approval" with the approver and the expiry, hence the two extra fields.

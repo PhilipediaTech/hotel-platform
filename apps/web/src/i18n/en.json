@@ -1376,5 +1376,22 @@
       "VOUCHER": "Voucher",
       "AR_TRANSFER": "Company account"
     }
+  },
+  "payments": {
+    "title": "Payments",
+    "take": "Take a payment",
+    "takeOn": "Take a payment on window {{n}}",
+    "method": "Method",
+    "amount": "Amount (₦)",
+    "reference": "Reference",
+    "note": "Note",
+    "takeButton": "Take payment",
+    "taken": "Payment recorded. Balance now {{balance}}.",
+    "noMethods": "No payment methods are switched on. A manager can switch them on in Setup → Payment methods.",
+    "receipt": "Receipt",
+    "receiptFor": "Receipt for {{amount}}",
+    "printInvoice": "Print invoice",
+    "printWindowInvoice": "Invoice for window {{n}}",
+    "proforma": "Proforma invoice"
   }
 }

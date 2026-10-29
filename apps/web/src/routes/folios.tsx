@@ -17,6 +17,7 @@ import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
+import { Payments, PrintInvoice, TakePayment } from './folio-payments.tsx';
 import { useFormats } from './reservations.tsx';
 
 // S11 Folio (PRD M4-01–M4-05; T-060): windows as tabs, lines with their taxes, balance; post a
@@ -188,6 +189,11 @@ export function FolioPage() {
         <dt className="text-text-muted">{t('folios.balance')}</dt>
         <dd className="font-semibold tabular-nums">{f.money(data.balanceMinor)}</dd>
       </dl>
+      {can('folio.invoice') && current && (
+        <div className="mt-3">
+          <PrintInvoice folio={data} windowNumber={current.number} />
+        </div>
+      )}
 
       {message && (
         <Alert tone="success" className="mt-3">
@@ -223,6 +229,11 @@ export function FolioPage() {
         />
       )}
 
+      {current && <Payments folio={data} window={current} />}
+
+      {open && can('payment.capture') && current && (
+        <TakePayment folio={data} windowNumber={current.number} />
+      )}
       {open && can('folio.charge') && (
         <PostCharge folio={data} onPending={() => setMessage(t('folios.sentForApproval'))} />
       )}

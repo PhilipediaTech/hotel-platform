@@ -4413,6 +4413,19 @@
           "balanceMinor": {
             "$ref": "#/components/schemas/AmountMinor"
           },
+          "paymentMethods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "CASH",
+                "BANK_TRANSFER",
+                "POS_TERMINAL",
+                "MOBILE_MONEY",
+                "VOUCHER"
+              ]
+            }
+          },
           "version": {
             "type": "integer"
           }
@@ -4432,6 +4445,7 @@
           "routingRules",
           "revenueCodes",
           "balanceMinor",
+          "paymentMethods",
           "version"
         ]
       },
@@ -4459,6 +4473,12 @@
             "items": {
               "$ref": "#/components/schemas/FolioLine"
             }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FolioPayment"
+            }
           }
         },
         "required": [
@@ -4466,7 +4486,8 @@
           "payerType",
           "payerName",
           "balanceMinor",
-          "lines"
+          "lines",
+          "payments"
         ]
       },
       "FolioLine": {
@@ -4584,6 +4605,72 @@
           "reversedByLineId",
           "postedBy",
           "reason"
+        ]
+      },
+      "FolioPayment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "windowNumber": {
+            "type": "integer"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "POS_TERMINAL",
+              "CARD_ONLINE",
+              "VIRTUAL_ACCOUNT",
+              "MOBILE_MONEY",
+              "VOUCHER",
+              "AR_TRANSFER"
+            ]
+          },
+          "amountMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "externalRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "businessDate": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "receivedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "receivedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "windowNumber",
+          "method",
+          "amountMinor",
+          "currency",
+          "externalRef",
+          "businessDate",
+          "receivedAt",
+          "receivedBy",
+          "note"
         ]
       },
       "PostedLines": {
@@ -4918,6 +5005,25 @@
           "expectedMinor",
           "countedMinor",
           "varianceMinor"
+        ]
+      },
+      "PaymentCaptured": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "shiftId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "balanceMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          }
+        },
+        "required": [
+          "paymentId",
+          "shiftId",
+          "balanceMinor"
         ]
       }
     },
@@ -21458,6 +21564,538 @@
           },
           "409": {
             "description": "Conflict: `SHIFT_NOT_OPEN`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments": {
+      "post": {
+        "operationId": "capturePayment",
+        "summary": "Take a payment at the desk onto a folio window",
+        "tags": [
+          "Payments"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Recorded on the caller’s open shift (409 SHIFT_NOT_OPEN without one, M4 rule 4) and the business date. A reference is used once per property and method (409 PAYMENT_DUPLICATE). Append-only: corrections are refunds (T-072).",
+        "x-permission": "payment.capture",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "folioId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "windowNumber": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8,
+                    "default": 1
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "CASH",
+                      "BANK_TRANSFER",
+                      "POS_TERMINAL",
+                      "MOBILE_MONEY",
+                      "VOUCHER"
+                    ]
+                  },
+                  "amountMinor": {
+                    "type": "string",
+                    "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                    "example": "4500000"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "externalRef": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "default": null
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "default": null
+                  }
+                },
+                "required": [
+                  "folioId",
+                  "method",
+                  "amountMinor"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentCaptured"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `SHIFT_NOT_OPEN`, `PAYMENT_DUPLICATE`, `BUSINESS_DAY_CLOSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/folios/{folioId}/invoice.pdf": {
+      "get": {
+        "operationId": "getFolioInvoice",
+        "summary": "The folio’s invoice (PDF): charges with their taxes, payments and balance",
+        "tags": [
+          "Folios"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "One window, or the whole folio when `window` is left out.",
+        "x-permission": "folio.invoice",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "folioId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "required": false,
+            "name": "window",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/folios/{folioId}/receipt.pdf": {
+      "get": {
+        "operationId": "getFolioReceipt",
+        "summary": "A receipt (PDF) for one payment on the folio",
+        "tags": [
+          "Folios"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "folio.invoice",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "folioId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "paymentId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reservations/{reservationId}/proforma.pdf": {
+      "get": {
+        "operationId": "getProforma",
+        "summary": "A proforma invoice (PDF) for a booking: its stays’ nights and taxes, before arrival",
+        "tags": [
+          "Folios"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "From the stays’ quotes, so the amounts are what the guest was quoted. Cancelled and no-show stays are left out.",
+        "x-permission": "folio.invoice",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "reservationId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
             "content": {
               "application/json": {
                 "schema": {

@@ -491,6 +491,28 @@ async function bShiftsUnchanged(db: Db, world: TenantWorld) {
   expect(await db.leakageAlert.count({ where: { propertyId: world.b1.id } })).toBe(0);
 }
 
+/** B's folio with a ₦1 cash payment on B's cashier's shift (T-062). */
+async function bFolioPaid(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bFolio(db, world, propertyId);
+  const shift = await db.cashierShift.create({ data: { propertyId, userId: world.bStaff.id } });
+  const window = await db.folioWindow.findFirstOrThrow({ where: { folioId: theirs.folioId } });
+  const payment = await db.payment.create({
+    data: {
+      propertyId,
+      folioId: theirs.folioId,
+      windowId: window.id,
+      method: 'CASH',
+      amountMinor: 100n,
+      currency: 'NGN',
+      baseAmountMinor: 100n,
+      provider: 'MANUAL',
+      businessDate: new Date('2099-01-01'),
+      shiftId: shift.id,
+    },
+  });
+  return { ...theirs, paymentId: payment.id };
+}
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -1091,6 +1113,20 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bShiftsUnchanged,
   },
   confirmHandover: { seed: bShifts, body: () => ({}), untouched: bShiftsUnchanged },
+  capturePayment: {
+    seed: bFolio,
+    creates: true,
+    body: (theirs) => ({ folioId: theirs['folioId'], method: 'CASH', amountMinor: '100' }),
+    untouched: async (db, world) => {
+      expect(await db.payment.count({ where: { propertyId: world.b1.id } })).toBe(0);
+    },
+  },
+  getFolioInvoice: { seed: bFolio },
+  getFolioReceipt: {
+    seed: bFolioPaid,
+    query: (theirs) => ({ paymentId: theirs['paymentId'] ?? '' }),
+  },
+  getProforma: { seed: bReservation },
   releaseRoomBlock: {
     seed: bBlock,
     untouched: async (db, _w, theirs) => {

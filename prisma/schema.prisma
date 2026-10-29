@@ -118,6 +118,7 @@ model Property {
   businessDays         BusinessDay[]
   folios               Folio[]
   cashierShifts        CashierShift[]
+  payments             Payment[]
   leakageAlerts        LeakageAlert[]
 
   @@unique([organisationId, code])
@@ -232,6 +233,7 @@ model User {
   shiftsSignedOff    CashierShift[]     @relation("ShiftSignedOff")
   cashReceived       CashHandover[]
   leakageAlerts      LeakageAlert[]
+  paymentsReceived   Payment[]
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -1048,6 +1050,7 @@ model Reservation {
   stays        Stay[]
   history      ReservationStatusHistory[]
   folios       Folio[]
+  payments     Payment[]
 
   @@unique([propertyId, confirmationNo])
   @@unique([propertyId, source, channelRef])
@@ -1311,6 +1314,7 @@ model Folio {
   lines        FolioLine[]
   routingRules RoutingRule[]
   stays        Stay[]
+  payments     Payment[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, id])
@@ -1333,6 +1337,7 @@ model FolioWindow {
   company      Company?      @relation(fields: [companyId], references: [id], onDelete: Restrict)
   lines        FolioLine[]
   routingRules RoutingRule[]
+  payments     Payment[]
 
   @@unique([folioId, number])
   @@map("folio_windows")
@@ -1445,6 +1450,7 @@ model CashierShift {
   counts      CashCount[]
   handovers   CashHandover[]
   folioLines  FolioLine[]
+  payments    Payment[]
 
   @@unique([propertyId, id])
   @@index([propertyId, status])
@@ -1520,4 +1526,50 @@ model LeakageAlert {
   @@unique([propertyId, dedupeKey])
   @@index([propertyId, status])
   @@map("leakage_alerts")
+}
+
+// ── Payments (M4-08, M4 rules 1, 4, 5; tab 3; T-062) ───────────────────────────────────
+
+/// Money received (or, from T-072, refunded: negative). Append-only. Every payment belongs to
+/// a cashier shift. Duplicate references are refused by two partial unique indexes in the
+/// migration (open issue 19): (provider, external_ref) for providers, and (property, method,
+/// external_ref) for manual payments (provider MANUAL).
+model Payment {
+  id                String    @id @default(uuid()) @db.Uuid
+  propertyId        String    @map("property_id") @db.Uuid
+  folioId           String?   @map("folio_id") @db.Uuid
+  windowId          String?   @map("window_id") @db.Uuid
+  /// Deposits before a folio exists (T-063).
+  reservationId     String?   @map("reservation_id") @db.Uuid
+  method            PayMethod
+  /// Signed: refunds negative (T-072).
+  amountMinor       BigInt    @map("amount_minor")
+  currency          String    @db.Char(3)
+  /// Foreign-currency payments (T-065).
+  rateMicros        BigInt?   @map("rate_micros")
+  baseAmountMinor   BigInt    @map("base_amount_minor")
+  /// MANUAL for desk payments; the gateway's name for webhook payments.
+  provider          String?
+  externalRef       String?   @map("external_ref")
+  businessDate      DateTime  @map("business_date") @db.Date
+  shiftId           String    @map("shift_id") @db.Uuid
+  receivedById      String?   @map("received_by_id") @db.Uuid
+  refundsPaymentId  String?   @map("refunds_payment_id") @db.Uuid
+  approvalRequestId String?   @map("approval_request_id") @db.Uuid
+  note              String?
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  folio       Folio?       @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
+  window      FolioWindow? @relation(fields: [windowId], references: [id], onDelete: Restrict)
+  reservation Reservation? @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  shift       CashierShift @relation(fields: [propertyId, shiftId], references: [propertyId, id], onDelete: Restrict)
+  receivedBy  User?        @relation(fields: [receivedById], references: [id], onDelete: SetNull)
+  refunds     Payment?     @relation("PaymentRefund", fields: [refundsPaymentId], references: [id], onDelete: Restrict)
+  refundedBy  Payment[]    @relation("PaymentRefund")
+
+  @@index([propertyId, businessDate])
+  @@index([folioId])
+  @@index([shiftId])
+  @@map("payments")
 }

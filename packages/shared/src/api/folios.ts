@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { defineRoute } from './contract.ts';
 import { AmountMinor, Instant, IsoDate, Uuid } from './primitives.ts';
+import { MANUAL_PAY_METHODS } from '../setup.ts';
+import { PAY_METHODS } from './shifts.ts';
 import { REVENUE_GROUPS } from './tax.ts';
 
 // Folios (PRD M4-01–M4-05, M4 rules 1–3; tab 4 row "Folios" and the POST /folios/{id}/lines
@@ -48,14 +50,31 @@ export const FolioLineItem = z
   })
   .meta({ id: 'FolioLine' });
 
+/** Money received on a window (M4-08; T-062). */
+export const FolioPaymentItem = z
+  .object({
+    id: Uuid,
+    windowNumber: z.number().int(),
+    method: z.enum(PAY_METHODS),
+    amountMinor: AmountMinor,
+    currency: z.string(),
+    externalRef: z.string().nullable(),
+    businessDate: IsoDate,
+    receivedAt: Instant,
+    receivedBy: z.string().nullable(),
+    note: z.string().nullable(),
+  })
+  .meta({ id: 'FolioPayment' });
+
 export const FolioWindowItem = z
   .object({
     number: z.number().int(),
     payerType: z.enum(['GUEST', 'COMPANY']),
     payerName: z.string(),
-    /** Lines minus payments (payments arrive with T-062). */
+    /** Lines minus payments. */
     balanceMinor: AmountMinor,
     lines: z.array(FolioLineItem),
+    payments: z.array(FolioPaymentItem),
   })
   .meta({ id: 'FolioWindow' });
 
@@ -94,6 +113,8 @@ export const FolioItem = z
       z.object({ code: z.string(), name: z.string(), group: z.enum(REVENUE_GROUPS) }),
     ),
     balanceMinor: AmountMinor,
+    /** Desk payment methods the property switched on in setup. */
+    paymentMethods: z.array(z.enum(MANUAL_PAY_METHODS)),
     version: z.number().int(),
   })
   .meta({ id: 'Folio' });

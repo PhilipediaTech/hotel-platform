@@ -107,6 +107,7 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
       'folio.charge',
       'folio.discount',
       'folio.route',
+      'folio.invoice',
       'payment.capture',
       'payment.request',
       'shift.open',

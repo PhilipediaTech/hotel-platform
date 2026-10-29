@@ -17,6 +17,7 @@ import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
+import { PrintProforma } from './folio-payments.tsx';
 import { canCheckIn, CheckInPanel, StayKeys, usePropertyToday } from './check-in.tsx';
 import { DayUseTimes, EndDayUse } from './day-use.tsx';
 
@@ -224,6 +225,12 @@ export function ReservationPage() {
       <h1 className="mt-1 flex flex-wrap items-center gap-2 text-xl font-semibold">
         {r.confirmationNo} <StatusBadge status={r.status} />
       </h1>
+      {can('folio.invoice') &&
+        r.stays.some((s) => s.status !== 'CANCELLED' && s.status !== 'NO_SHOW') && (
+          <div className="mt-2">
+            <PrintProforma reservationId={r.id} confirmationNo={r.confirmationNo} />
+          </div>
+        )}
       <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
         <dt className="text-text-muted">{t('reservations.booker')}</dt>
         <dd>

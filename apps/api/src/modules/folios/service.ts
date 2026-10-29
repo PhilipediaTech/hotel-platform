@@ -1,5 +1,8 @@
 import {
+  MANUAL_PAY_METHODS,
   calculateTaxes,
+  type FolioPaymentItem,
+  type ManualPayMethod,
   versionsOn,
   type ChargeBody,
   type DiscountBody,
@@ -77,8 +80,13 @@ const FOLIO = {
       taxRuleVersion: { select: { sequence: true } },
     },
   },
+  payments: {
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    include: { window: true, receivedBy: { select: { name: true } } },
+  },
   reservation: { include: { company: true } },
   stays: { include: { room: true } },
+  property: true,
 } satisfies Prisma.FolioInclude;
 
 type Full = Prisma.FolioGetPayload<{ include: typeof FOLIO }>;
@@ -109,17 +117,26 @@ function lineItem(l: FullLine): LineOut {
  * Posting order, each line followed by what belongs to it: its taxes in their stacking order
  * (M4 rule 3), then its discounts. A line whose parent is not in the list leads its own group.
  */
-function ordered(lines: FullLine[]): FullLine[] {
+/** A line as ordering needs it: its parent and its tax version's stacking order. */
+interface Orderable {
+  id: string;
+  parentLineId: string | null;
+  postedAt: Date;
+  taxRuleVersion: { sequence: number } | null;
+}
+
+/** Lines in posting order, each followed by its own lines (taxes in stacking order). */
+export function ordered<L extends Orderable>(lines: L[]): L[] {
   const present = new Set(lines.map((l) => l.id));
-  const children = new Map<string, FullLine[]>();
+  const children = new Map<string, L[]>();
   for (const l of lines) {
     if (l.parentLineId && present.has(l.parentLineId)) {
       children.set(l.parentLineId, [...(children.get(l.parentLineId) ?? []), l]);
     }
   }
-  const rank = (l: FullLine) => l.taxRuleVersion?.sequence ?? Number.MAX_SAFE_INTEGER;
-  const out: FullLine[] = [];
-  const add = (l: FullLine) => {
+  const rank = (l: L) => l.taxRuleVersion?.sequence ?? Number.MAX_SAFE_INTEGER;
+  const out: L[] = [];
+  const add = (l: L) => {
     out.push(l);
     const mine = [...(children.get(l.id) ?? [])].sort(
       (a, b) => rank(a) - rank(b) || a.postedAt.getTime() - b.postedAt.getTime(),
@@ -131,6 +148,26 @@ function ordered(lines: FullLine[]): FullLine[] {
 }
 
 const sum = (lines: { amountMinor: bigint }[]) => lines.reduce((s, l) => s + l.amountMinor, 0n);
+/** Payments count at their base-currency value. */
+const paid = (payments: { baseAmountMinor: bigint }[]) =>
+  payments.reduce((s, x) => s + x.baseAmountMinor, 0n);
+/** Charges minus payments. */
+const balanceOf = (f: Pick<Full, 'lines' | 'payments'>) => sum(f.lines) - paid(f.payments);
+
+function paymentItem(x: Full['payments'][number]): z.input<typeof FolioPaymentItem> {
+  return {
+    id: x.id,
+    windowNumber: x.window?.number ?? 1,
+    method: x.method,
+    amountMinor: x.amountMinor.toString(),
+    currency: x.currency,
+    externalRef: x.externalRef,
+    businessDate: day(x.businessDate),
+    receivedAt: iso(x.createdAt),
+    receivedBy: x.receivedBy?.name ?? null,
+    note: x.note,
+  };
+}
 
 async function loadFolio(db: Client, folioId: string): Promise<Full> {
   const folio = await db.folio.findUnique({ where: { id: folioId }, include: FOLIO });
@@ -168,6 +205,7 @@ async function toItem(db: Client, f: Full): Promise<z.input<typeof FolioItem>> {
       : null,
     windows: f.windows.map((w) => {
       const mine = lines.filter((l) => l.windowId === w.id);
+      const payments = f.payments.filter((x) => x.windowId === w.id);
       return {
         number: w.number,
         payerType: w.payerType as 'GUEST' | 'COMPANY',
@@ -176,8 +214,9 @@ async function toItem(db: Client, f: Full): Promise<z.input<typeof FolioItem>> {
           : w.payerGuest
             ? `${w.payerGuest.firstName} ${w.payerGuest.lastName}`
             : f.name,
-        balanceMinor: sum(mine).toString(),
+        balanceMinor: (sum(mine) - paid(payments)).toString(),
         lines: mine.map(lineItem),
+        payments: payments.map(paymentItem),
       };
     }),
     routingRules: f.routingRules.map((r) => ({
@@ -187,7 +226,8 @@ async function toItem(db: Client, f: Full): Promise<z.input<typeof FolioItem>> {
       windowNumber: r.window.number,
     })),
     revenueCodes: codes.map((c) => ({ code: c.code, name: c.name, group: c.group })),
-    balanceMinor: sum(f.lines).toString(),
+    balanceMinor: balanceOf(f).toString(),
+    paymentMethods: enabledMethods(f.property.settings),
     version: f.version,
   };
 }
@@ -215,12 +255,10 @@ export async function listFolios(deps: FolioDeps, query: z.output<typeof FolioQu
     orderBy: { createdAt: 'desc' },
     take: 200,
   });
-  const totals = await deps.tenantDb.folioLine.groupBy({
-    by: ['folioId'],
-    where: { folioId: { in: folios.map((f) => f.id) } },
-    _sum: { amountMinor: true },
-  });
-  const balance = new Map(totals.map((t) => [t.folioId, t._sum.amountMinor ?? 0n]));
+  const balance = await folioBalances(
+    deps.tenantDb,
+    folios.map((f) => f.id),
+  );
   const data: z.input<typeof FolioSummary>[] = folios.map((f) => ({
     id: f.id,
     number: f.number,
@@ -233,15 +271,35 @@ export async function listFolios(deps: FolioDeps, query: z.output<typeof FolioQu
   return { data };
 }
 
-/** Balance of each folio by ID (the front desk lists, T-053). */
+/** Desk payment methods the property switched on in setup (T-030). */
+export function enabledMethods(settings: unknown): ManualPayMethod[] {
+  const methods = (settings as { paymentMethods?: unknown } | null)?.paymentMethods;
+  return Array.isArray(methods)
+    ? MANUAL_PAY_METHODS.filter((m) => (methods as unknown[]).includes(m))
+    : [];
+}
+
+/** Balance of each folio by ID: charges minus payments (the front desk lists, T-053). */
 export async function folioBalances(db: Client, folioIds: string[]) {
   if (folioIds.length === 0) return new Map<string, bigint>();
-  const totals = await db.folioLine.groupBy({
-    by: ['folioId'],
-    where: { folioId: { in: folioIds } },
-    _sum: { amountMinor: true },
-  });
-  return new Map(totals.map((t) => [t.folioId, t._sum.amountMinor ?? 0n]));
+  const [charges, payments] = await Promise.all([
+    db.folioLine.groupBy({
+      by: ['folioId'],
+      where: { folioId: { in: folioIds } },
+      _sum: { amountMinor: true },
+    }),
+    db.payment.groupBy({
+      by: ['folioId'],
+      where: { folioId: { in: folioIds } },
+      _sum: { baseAmountMinor: true },
+    }),
+  ]);
+  const out = new Map(charges.map((t) => [t.folioId, t._sum.amountMinor ?? 0n]));
+  for (const t of payments) {
+    if (!t.folioId) continue;
+    out.set(t.folioId, (out.get(t.folioId) ?? 0n) - (t._sum.baseAmountMinor ?? 0n));
+  }
+  return out;
 }
 
 // ── Opening ─────────────────────────────────────────────────────────────────────────────
@@ -442,7 +500,7 @@ async function postedLines(db: Client, folioId: string, ids: string[]) {
   const folio = await loadFolio(db, folioId);
   return {
     lines: ordered(folio.lines.filter((l) => ids.includes(l.id))).map(lineItem),
-    balanceMinor: sum(folio.lines).toString(),
+    balanceMinor: balanceOf(folio).toString(),
   };
 }
 

@@ -16,5 +16,6 @@ export * from './quotes.ts';
 export * from './rates.ts';
 export * from './reservations.ts';
 export * from './rooms.ts';
+export * from './shifts.ts';
 export * from './tax.ts';
 export * from './routes.ts';

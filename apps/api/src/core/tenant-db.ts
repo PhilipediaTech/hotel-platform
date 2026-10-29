@@ -61,6 +61,9 @@ export const TENANT_MODELS: Record<string, Scope> = {
   BusinessDay: { kind: 'property' },
   Folio: { kind: 'property', organisationField: 'organisationId' },
   FolioLine: { kind: 'property' },
+  // Counts and handovers are written through their shift.
+  CashierShift: { kind: 'property' },
+  LeakageAlert: { kind: 'property' },
   RegistrationCard: { kind: 'property' },
   // Components have no property column: reach them through their (scoped) rate plan.
 };

@@ -16,6 +16,7 @@ import { PROPERTY_ROUTES } from './properties.ts';
 import { RATE_ROUTES } from './rates.ts';
 import { RESERVATION_ROUTES } from './reservations.ts';
 import { ROOM_ROUTES } from './rooms.ts';
+import { SHIFT_ROUTES } from './shifts.ts';
 import { TAX_ROUTES } from './tax.ts';
 
 // The API surface, one entry per endpoint in spec tab 4. Modules add their routes here as
@@ -50,6 +51,7 @@ export const API_ROUTES = {
   ...FRONT_DESK_ROUTES,
   ...NIGHT_AUDIT_ROUTES,
   ...FOLIO_ROUTES,
+  ...SHIFT_ROUTES,
 } as const;
 
 export type ApiRoutes = typeof API_ROUTES;

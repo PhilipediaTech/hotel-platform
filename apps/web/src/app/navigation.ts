@@ -122,7 +122,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     id: 'shift',
     path: '/shift',
-    anyOf: ['shift.open'],
+    anyOf: ['shift.open', 'shift.signoff'],
     group: 'revenue',
     screen: 'S14',
     ticket: 'T-061',

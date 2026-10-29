@@ -22,6 +22,7 @@ import { ReservationPage, ReservationsPage } from '../routes/reservations.tsx';
 import { CalendarPage } from '../routes/calendar.tsx';
 import { RegistrationCardPage } from '../routes/check-in.tsx';
 import { DayUsePage } from '../routes/day-use.tsx';
+import { FrontDeskPage } from '../routes/front-desk.tsx';
 import { NewBookingPage } from '../routes/new-booking.tsx';
 import { RatesPage } from '../routes/rates.tsx';
 import { FinanceSettingsPage } from '../routes/settings/finance.tsx';
@@ -39,6 +40,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/rates': <RatesPage />,
   '/guests': <GuestsPage />,
   '/companies': <CompaniesPage />,
+  '/front-desk': <FrontDeskPage />,
   '/reservations': <ReservationsPage />,
   '/calendar': <CalendarPage />,
   '/bookings/new': <NewBookingPage />,

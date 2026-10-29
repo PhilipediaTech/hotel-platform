@@ -1188,5 +1188,50 @@
     "overdue": "Overdue",
     "end": "End day-use",
     "endHint": "Keys come back and the room is set to dirty."
+  },
+  "frontDesk": {
+    "lists": "Front desk lists",
+    "tabs": {
+      "arrivals": "Arrivals",
+      "departures": "Departures",
+      "in-house": "In-house"
+    },
+    "date": "Business date",
+    "today": "Today",
+    "find": "Find",
+    "findHint": "Name, room or confirmation number",
+    "empty": {
+      "arrivals": "No arrivals on this date.",
+      "departures": "No departures on this date.",
+      "in-house": "No guests in the house."
+    },
+    "cols": {
+      "guest": "Guest",
+      "room": "Room",
+      "stay": "Stay",
+      "total": "Total",
+      "balance": "Balance",
+      "action": "Action"
+    },
+    "noRoom": "No room yet",
+    "nights_one": "{{count}} night",
+    "nights_other": "{{count}} nights",
+    "balanceLater": "Balances show once guest bills (folios) arrive",
+    "flagsFor": "Flags for {{name}}",
+    "flags": {
+      "VIP": "VIP",
+      "DO_NOT_RENT": "Do not rent",
+      "TENTATIVE": "Hold",
+      "NO_ROOM": "No room",
+      "ROOM_NOT_READY": "Room not ready",
+      "DEPOSIT_DUE": "Deposit due",
+      "DAY_USE": "Day-use",
+      "OVERDUE": "Overdue",
+      "NOTES": "Notes"
+    },
+    "checkInNamed": "Check in {{name}}",
+    "endNamed": "End day-use for {{name}}",
+    "checkOutLater": "Check-out comes with guest bills",
+    "left": "Left at {{time}}"
   }
 }

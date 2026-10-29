@@ -1,9 +1,10 @@
-import { RESERVATION_ROUTES } from '@hotel/shared';
+import { FRONT_DESK_ROUTES, RESERVATION_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as checkIns from './check-in.ts';
 import * as dayUse from './day-use.ts';
+import * as frontDesk from './front-desk.ts';
 import * as rooms from './rooms.ts';
 import * as reservations from './service.ts';
 
@@ -98,6 +99,17 @@ export function reservationRoutes(deps: checkIns.CheckInDeps): Router {
         body,
       ),
     ),
+  );
+
+  const fd = FRONT_DESK_ROUTES;
+  mountRoute(router, fd.listArrivals, ({ query }, { tenant }) =>
+    frontDesk.listArrivals(deps, tenantFrom(tenant), query),
+  );
+  mountRoute(router, fd.listDepartures, ({ query }, { tenant }) =>
+    frontDesk.listDepartures(deps, tenantFrom(tenant), query),
+  );
+  mountRoute(router, fd.listInHouse, (_input, { tenant }) =>
+    frontDesk.listInHouse(deps, tenantFrom(tenant)),
   );
 
   return router;

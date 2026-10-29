@@ -736,13 +736,58 @@ export const CheckOutBody = z.object({
   keysReturned: z.boolean().default(true),
 });
 
+/** What the desk checks before a guest leaves (S12; T-064). */
+export const CheckOutPreview = z
+  .object({
+    stayId: Uuid,
+    status: z.enum(RESERVATION_STATUSES),
+    guestName: z.string(),
+    roomNumber: z.string().nullable(),
+    arrival: IsoDate,
+    departure: IsoDate,
+    dayUse: DayUseTimes.nullable(),
+    businessDate: IsoDate,
+    /** The departure after check-out: earlier than `departure` for an early departure. */
+    leavesOn: IsoDate,
+    folio: z
+      .object({
+        id: Uuid,
+        number: z.string(),
+        balanceMinor: AmountMinor,
+        windows: z.array(
+          z.object({ number: z.number().int(), payerName: z.string(), balanceMinor: AmountMinor }),
+        ),
+      })
+      .nullable(),
+    /** Things to look at; they don't stop the check-out (M3 rule 4). */
+    warnings: z.array(
+      z.object({ code: z.enum(['KEYS_NOT_RETURNED', 'EARLY_DEPARTURE']), count: z.number().int() }),
+    ),
+    /** What stops it: a balance on the bill (M3 rule 3). */
+    blockers: z.array(z.enum(['FOLIO_BALANCE_OUTSTANDING', 'NOT_CHECKED_IN'])),
+    version: z.number().int(),
+  })
+  .meta({ id: 'CheckOutPreview' });
+
+export const getCheckOut = defineRoute({
+  operationId: 'getCheckOut',
+  method: 'get',
+  path: '/stays/{stayId}/check-out',
+  summary: 'Before checking a guest out: the bill, warnings and anything that blocks it',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.checkout',
+  params: StayParams,
+  response: CheckOutPreview,
+});
+
 export const checkOut = defineRoute({
   operationId: 'checkOut',
   method: 'post',
   path: '/stays/{stayId}/check-out',
   summary: 'Check a guest out; the room becomes dirty',
   description:
-    'Day-use stays for now (M3-10): ends the stay, frees the room from now on and sets it to dirty. Overnight check-out, with the folio balance check, comes with folios. Send `If-Match` with the stay’s version.',
+    'Needs every window of the guest’s folio at zero (409 FOLIO_BALANCE_OUTSTANDING, M3 rule 3; transfers to a company account come with the city ledger). The folio is then settled, the room set to dirty (housekeeping rule 2) and the keys logged as returned when they are. An overnight guest leaving early has the stay shortened to the business date (at least one night; M3-12) as part of the check-out, releasing the later nights; a day-use stay frees its room from now on. Send `If-Match` with the stay’s version.',
   tags: ['Reservations'],
   propertyScoped: true,
   permission: 'reservation.checkout',
@@ -751,7 +796,7 @@ export const checkOut = defineRoute({
   params: StayParams,
   body: CheckOutBody,
   response: ReservationItem,
-  errors: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
+  errors: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'FOLIO_BALANCE_OUTSTANDING'],
 });
 
 export const RESERVATION_ROUTES = {
@@ -772,6 +817,7 @@ export const RESERVATION_ROUTES = {
   issueKeys,
   getDayUseAvailability,
   createDayUse,
+  getCheckOut,
   checkOut,
   extendStay,
 } as const;

@@ -24,7 +24,6 @@ import { FolioPage, FoliosPage } from '../routes/folios.tsx';
 import { FrontDeskPage } from '../routes/front-desk.tsx';
 import { NewBookingPage } from '../routes/new-booking.tsx';
 import { RoomsSettingsPage } from '../routes/settings/rooms.tsx';
-import { ShiftPage } from '../routes/shift.tsx';
 import { HomeRedirect, NotFoundPage, PlaceholderPage, RouteErrorPage } from '../routes/pages.tsx';
 import { NAV_ITEMS, type NavItem } from './navigation.ts';
 import { SessionGate } from './session-gate.tsx';
@@ -43,6 +42,10 @@ const UsersAndRolesPage = lazy(() =>
 const RatesPage = lazy(() => import('../routes/rates.tsx').then((m) => ({ default: m.RatesPage })));
 const FinanceSettingsPage = lazy(() =>
   import('../routes/settings/finance.tsx').then((m) => ({ default: m.FinanceSettingsPage })),
+);
+const ShiftPage = lazy(() => import('../routes/shift.tsx').then((m) => ({ default: m.ShiftPage })));
+const CheckOutPage = lazy(() =>
+  import('../routes/check-out.tsx').then((m) => ({ default: m.CheckOutPage })),
 );
 const ImportsPage = lazy(() =>
   import('../routes/settings/imports.tsx').then((m) => ({ default: m.ImportsPage })),
@@ -129,6 +132,14 @@ export function buildRoutes(
             { path: 'companies/:companyId', element: <CompanyProfilePage /> },
             { path: 'reservations/:reservationId', element: <ReservationPage /> },
             { path: 'stays/:stayId/card', element: <RegistrationCardPage /> },
+            {
+              path: 'stays/:stayId/check-out',
+              element: (
+                <Suspense fallback={<Loading />}>
+                  <CheckOutPage />
+                </Suspense>
+              ),
+            },
             { path: 'folios/:folioId', element: <FolioPage /> },
             ...screenRoutes(),
             { path: '*', element: <NotFoundPage /> },

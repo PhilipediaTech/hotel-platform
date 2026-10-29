@@ -1021,6 +1021,7 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       expect(await db.roomAllocation.count()).toBe(0);
     },
   },
+  getCheckOut: { seed: bInHouse },
   checkOut: {
     seed: bReservation,
     body: () => ({}),

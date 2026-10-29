@@ -225,13 +225,16 @@ describe('Front desk (S06)', () => {
     // Much typing: slow when the whole suite runs at once.
   }, 15_000);
 
-  it('ends a day-use from departures; overnight check-out waits for bills', async () => {
+  it('ends a day-use from departures; overnight guests get a check-out link', async () => {
     const user = userEvent.setup();
     renderAt('/front-desk?tab=departures');
     const table = await screen.findByRole('table', { name: 'Departures' });
     const kemi = rowOf(table, 'Kemi Test');
     expect(kemi).toHaveTextContent('10:00–14:00');
-    expect(rowOf(table, 'Musa Test')).toHaveTextContent('Check-out comes with guest bills');
+    const link = within(rowOf(table, 'Musa Test')).getByRole('link', {
+      name: 'Check out Musa Test',
+    });
+    expect(link.getAttribute('href')).toMatch(/^\/stays\/.+\/check-out$/);
     expect(rowOf(table, 'Ngozi Test')).toHaveTextContent('Left at 09:00');
 
     await user.click(within(kemi).getByRole('button', { name: 'End day-use for Kemi Test' }));

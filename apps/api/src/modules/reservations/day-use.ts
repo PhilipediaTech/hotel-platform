@@ -3,7 +3,6 @@ import {
   localDate,
   QUOTE_MINUTES,
   zonedInstant,
-  type CheckOutBody,
   type DayUseBody,
   type DayUseQuery,
   type DayUseRoomType,
@@ -16,7 +15,7 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { dayUseOffers, type DayUseOffer } from '../availability/quotes.ts';
-import { dayUseFreeRooms, guarded, loadStay, lockRoom } from './rooms.ts';
+import { dayUseFreeRooms, guarded, lockRoom } from './rooms.ts';
 import { bookableGuest, getReservation, newGuest, type ReservationDeps } from './service.ts';
 
 // Day-use stays (PRD M3-10, M2-08, housekeeping rule 2 "a day-use end sets the room to dirty"; tab 4
@@ -255,106 +254,6 @@ export async function createDayUse(deps: ReservationDeps, tenant: TenantContext,
       payload: { reservationId: reservation.id, confirmationNo, status: 'CONFIRMED' },
     });
     return reservation.id;
-  });
-  return getReservation(deps, reservationId);
-}
-
-// ── Check-out (day-use; overnight check-out comes with folios, T-064) ───────────────────
-
-export async function checkOut(
-  deps: ReservationDeps,
-  tenant: TenantContext,
-  stayId: string,
-  ifMatch: string,
-  body: z.output<typeof CheckOutBody>,
-) {
-  const now = deps.clock();
-  const reservationId = await deps.tenantDb.$transaction(async (tx) => {
-    const stay = await loadStay(tx, stayId);
-    if (Number(/^(?:W\/)?"?(\d+)"?$/.exec(ifMatch.trim())?.[1] ?? -1) !== stay.version) {
-      throw new AppError('VERSION_CONFLICT', 'Someone changed this stay; reload and try again', {
-        version: stay.version,
-      });
-    }
-    if (stay.status !== 'CHECKED_IN' || !stay.roomId) {
-      throw new AppError('STATE_TRANSITION_INVALID', 'Only a checked-in guest is checked out', {
-        from: stay.status,
-        to: 'CHECKED_OUT',
-      });
-    }
-    if (!stay.isDayUse) {
-      throw new AppError(
-        'STATE_TRANSITION_INVALID',
-        'Overnight guests are checked out with their bill, which is not available yet',
-        { reason: 'NEEDS_FOLIO' },
-      );
-    }
-    // The room is free from now on (or was never used, when it ends before its start).
-    const allocations = await tx.roomAllocation.findMany({
-      where: { stayId: stay.id, active: true },
-    });
-    for (const a of allocations) {
-      if (a.startsAt && a.startsAt < now) {
-        if (a.endsAt && a.endsAt > now) {
-          await tx.roomAllocation.update({ where: { id: a.id }, data: { endsAt: now } });
-        }
-      } else {
-        await tx.roomAllocation.update({ where: { id: a.id }, data: { active: false } });
-      }
-    }
-    // Housekeeping rule 2: a day-use end sets the room to dirty.
-    await tx.room.update({
-      where: { id: stay.roomId },
-      data: { hkStatus: 'DIRTY', hkStatusAt: now, version: { increment: 1 } },
-    });
-    if (body.keysReturned) {
-      await tx.keyIssue.updateMany({
-        where: { stayId: stay.id, returnedAt: null },
-        data: { returnedAt: now },
-      });
-    }
-    const claimed = await tx.stay.updateMany({
-      where: { id: stay.id, version: stay.version },
-      data: { status: 'CHECKED_OUT', checkedOutAt: now, version: { increment: 1 } },
-    });
-    if (claimed.count !== 1) {
-      throw new AppError('VERSION_CONFLICT', 'Someone changed this stay; reload and try again');
-    }
-    // The reservation is checked out once none of its guests is still in or to come.
-    const left = await tx.stay.count({
-      where: {
-        reservationId: stay.reservationId,
-        status: { notIn: ['CHECKED_OUT', 'CANCELLED', 'NO_SHOW'] },
-      },
-    });
-    await tx.reservation.update({
-      where: { id: stay.reservationId },
-      data: {
-        ...(left === 0 ? { status: 'CHECKED_OUT' as const } : {}),
-        version: { increment: 1 },
-        history: {
-          create: {
-            stayId: stay.id,
-            fromStatus: 'CHECKED_IN',
-            toStatus: 'CHECKED_OUT',
-            byUserId: tenant.userId,
-            at: now,
-          },
-        },
-      },
-    });
-    await recordAudit(tx, {
-      action: 'stay.checked_out',
-      entityType: 'stay',
-      entityId: stay.id,
-      before: { status: 'CHECKED_IN' },
-      after: { status: 'CHECKED_OUT', roomId: stay.roomId, keysReturned: body.keysReturned },
-    });
-    await recordEvent(tx, {
-      type: 'stay.checked_out',
-      payload: { stayId: stay.id, reservationId: stay.reservationId, roomId: stay.roomId },
-    });
-    return stay.reservationId;
   });
   return getReservation(deps, reservationId);
 }

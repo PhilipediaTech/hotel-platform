@@ -1236,8 +1236,8 @@
     },
     "checkInNamed": "Check in {{name}}",
     "endNamed": "End day-use for {{name}}",
-    "checkOutLater": "Check-out comes with guest bills",
-    "left": "Left at {{time}}"
+    "left": "Left at {{time}}",
+    "checkOutNamed": "Check out {{name}}"
   },
   "folios": {
     "title": "Folios",
@@ -1408,5 +1408,25 @@
       "REFUNDED": "Refunded",
       "FORFEITED": "Kept (forfeited)"
     }
+  },
+  "checkOut": {
+    "open": "Check out",
+    "title": "Check out {{name}}",
+    "bill": "Bill {{number}}",
+    "openFolio": "Open the folio to take payment",
+    "balances": "Balance per window",
+    "window": "Window {{n}}: {{payer}}",
+    "noFolio": "This guest has no folio: nothing to settle.",
+    "sendLater": "Sending the bill by email or WhatsApp comes with notifications.",
+    "keysOut_one": "{{count}} key card has not been returned.",
+    "keysOut_other": "{{count}} key cards have not been returned.",
+    "keysReturned": "The keys came back",
+    "confirm": "Check out",
+    "done": "{{name}} has checked out. The room is now dirty.",
+    "blockers": {
+      "FOLIO_BALANCE_OUTSTANDING": "The bill has a balance. Take payment on the folio first (every window must be at zero)."
+    },
+    "early_one": "Leaving {{count}} night early (booked until {{booked}}): the stay ends on {{leaves}} and that night is given back.",
+    "early_other": "Leaving {{count}} nights early (booked until {{booked}}): the stay ends on {{leaves}} and those nights are given back."
   }
 }

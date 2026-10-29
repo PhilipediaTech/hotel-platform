@@ -107,6 +107,7 @@ describe('top bar', () => {
           timeZone: 'Africa/Lagos',
           baseCurrency: 'NGN',
           locale: 'en-NG',
+          registrationFields: [],
         },
         {
           id: 'p2',
@@ -116,6 +117,7 @@ describe('top bar', () => {
           timeZone: 'Africa/Lagos',
           baseCurrency: 'NGN',
           locale: 'en-NG',
+          registrationFields: [],
         },
       ],
       currentPropertyId: 'p1',

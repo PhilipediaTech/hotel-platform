@@ -6,6 +6,7 @@ import { hotelClient, makeHotel } from '../../../test/hotel.ts';
 import { sessionCookie } from '../../../test/tenancy.ts';
 import { createDefaultApprovalPolicies } from '../approvals/defaults.ts';
 import { createDefaultTaxes } from '../tax/defaults.ts';
+import { idPurgeJob } from './check-in.ts';
 import { expireHolds } from './service.ts';
 
 // Reservations (PRD M3-01–M3-05, M3 rules 1 and 8, M3 acceptance on double booking and
@@ -888,7 +889,10 @@ describe('Rooms for stays (M3-07, M3-11; T-050)', () => {
     const a = await h.book([await h.quote({ arrival: TODAY })]);
     await setRoom(room['101'], 'CLEAN');
     await h.ok(assign(h, stayOf(a), { roomId: room['101'] }));
-    await db.stay.update({ where: { id: stayOf(a) }, data: { status: 'CHECKED_IN' } });
+    await db.stay.update({
+      where: { id: stayOf(a) },
+      data: { status: 'CHECKED_IN', checkedInAt: now },
+    });
     await db.reservation.update({ where: { id: a.id }, data: { status: 'CHECKED_IN' } });
     now = new Date('2026-11-12T09:00:00Z');
     // Two days on: sign in again (sessions end when idle).
@@ -1000,5 +1004,252 @@ describe('Rooms for stays (M3-07, M3-11; T-050)', () => {
     });
     const inspected = await h.ok<{ hkStatus: string }>(status(h.gm, 'INSPECTED', clean.version));
     expect(inspected.hkStatus).toBe('INSPECTED');
+  });
+});
+
+describe('Check-in (M3-08, M3-19, M3 rules 2 and 6; T-051)', () => {
+  type Card = {
+    idNumberMasked: string | null;
+    idType: string | null;
+    nationality: string | null;
+    purpose: string | null;
+    address: string | null;
+    roomNumber: string;
+    signature: string;
+    checkedInBy: string | null;
+  };
+  const registration = {
+    nationality: 'ng',
+    purpose: 'BUSINESS',
+    idType: 'PASSPORT',
+    idNumber: 'A12345678',
+    address: '12 Marina Road, Lagos',
+  };
+
+  /** Booked for today in 101 (clean); returns what check-in needs. */
+  async function arriving(h: Awaited<ReturnType<typeof hotel>>, clean = true) {
+    const room = Object.fromEntries((await db.room.findMany()).map((r) => [r.number, r.id]));
+    const r = await h.book([await h.quote({ arrival: TODAY })]);
+    const stayId = r.stays[0]?.id ?? '';
+    if (clean) await db.room.update({ where: { id: room['101'] }, data: { hkStatus: 'CLEAN' } });
+    await h.ok(h.fd.post(`/stays/${stayId}/assign-room`, { roomId: room['101'] }));
+    const version = (await db.stay.findUniqueOrThrow({ where: { id: stayId } })).version;
+    const checkIn = (body: object, v = version, key = randomUUID()) =>
+      h.fd
+        .post(`/stays/${stayId}/check-in`, body)
+        .set('Idempotency-Key', key)
+        .set('If-Match', `"${v}"`);
+    return { r, stayId, room, version, checkIn };
+  }
+
+  it('checks a guest in: room, registration, encrypted ID, card, keys and history', async () => {
+    const h = await hotel();
+    const a = await arriving(h);
+    const res = await a.checkIn({ registration, keysIssued: 2 });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    // The tab 4 example's answer.
+    expect(res.body).toEqual({
+      stayId: a.stayId,
+      status: 'CHECKED_IN',
+      folioId: null,
+      roomId: a.room['101'],
+      version: a.version + 1,
+    });
+    const reservation = await h.ok<Reservation>(h.fd.get(`/reservations/${a.r.id}`));
+    expect(reservation.status).toBe('CHECKED_IN');
+    expect(reservation.stays[0]?.status).toBe('CHECKED_IN');
+    const history = await h.ok<{ data: { toStatus: string; stayId: string | null }[] }>(
+      h.fd.get(`/reservations/${a.r.id}/history`),
+    );
+    expect(history.data.at(-1)).toMatchObject({ toStatus: 'CHECKED_IN', stayId: a.stayId });
+
+    // The ID number is stored encrypted only; the card shows its last four characters.
+    const doc = await db.idDocument.findFirstOrThrow();
+    expect(doc.docType).toBe('PASSPORT');
+    expect(Buffer.from(doc.numberEnc ?? []).toString('latin1')).not.toContain('A12345678');
+    expect(doc.purgeAfter.toISOString().slice(0, 10)).toBe('2027-11-10');
+    const card = await h.ok<Card>(h.fd.get(`/stays/${a.stayId}/registration-card`));
+    expect(card).toMatchObject({
+      idNumberMasked: '•••• 5678',
+      idType: 'PASSPORT',
+      nationality: 'NG',
+      purpose: 'BUSINESS',
+      // Not required by default, so not kept.
+      address: null,
+      roomNumber: '101',
+      signature: 'PAPER',
+    });
+    expect((await db.guest.findFirstOrThrow({ where: { firstName: 'Ada' } })).nationality).toBe(
+      'NG',
+    );
+    const keys = await h.ok<{ data: { count: number; roomNumber: string }[] }>(
+      h.fd.get(`/stays/${a.stayId}/keys`),
+    );
+    expect(keys.data).toEqual([expect.objectContaining({ count: 2, roomNumber: '101' })]);
+    const audit = await db.auditEvent.findFirstOrThrow({ where: { action: 'stay.checked_in' } });
+    expect(JSON.stringify(audit.after)).not.toContain('A12345678');
+  });
+
+  it('needs every required field and keeps only those the property requires', async () => {
+    const h = await hotel();
+    const a = await arriving(h);
+    const missing = await a.checkIn({ registration: { nationality: 'NG' } });
+    expect(errorOf(missing)).toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(
+      (errorOf(missing).details as { issues: { path: string }[] }).issues.map((i) => i.path),
+    ).toEqual([
+      'body.registration.purpose',
+      'body.registration.idType',
+      'body.registration.idNumber',
+    ]);
+
+    // The property only asks for the address now, and keeps ID details 6 months.
+    await h.ok(
+      h.gm.patch(`/properties/${h.p1.id}`, {
+        registration: { requiredFields: ['address'], idRetentionMonths: 6 },
+      }),
+    );
+    const done = await a.checkIn({ registration });
+    expect(done.status, JSON.stringify(done.body)).toBe(200);
+    expect(await db.idDocument.count()).toBe(0);
+    const card = await h.ok<Card>(h.fd.get(`/stays/${a.stayId}/registration-card`));
+    expect(card).toMatchObject({
+      address: '12 Marina Road, Lagos',
+      nationality: null,
+      purpose: null,
+      idNumberMasked: null,
+    });
+  });
+
+  it('refuses a room that is not ready, unless a manager approved it', async () => {
+    const h = await hotel();
+    const a = await arriving(h);
+    await db.room.update({ where: { id: a.room['101'] }, data: { hkStatus: 'DIRTY' } });
+    expect(errorOf(await a.checkIn({ registration }))).toMatchObject({
+      code: 'ROOM_NOT_READY',
+      details: { problems: ['NOT_CLEAN'] },
+    });
+    // Another, clean room in the same request.
+    await db.room.update({ where: { id: a.room['102'] }, data: { hkStatus: 'INSPECTED' } });
+    const moved = await a.checkIn({ registration, roomId: a.room['102'] });
+    expect(moved.status, JSON.stringify(moved.body)).toBe(200);
+    expect((moved.body as { roomId: string }).roomId).toBe(a.room['102']);
+
+    // A dirty room a manager approved giving: the guest checks in.
+    const b = await h.book([await h.quote({ arrival: TODAY })]);
+    const stayId = b.stays[0]?.id ?? '';
+    await h.ok(
+      h.gm.post(`/stays/${stayId}/assign-room`, {
+        roomId: a.room['101'],
+        overrideReason: 'Guest accepts, cleaning now',
+      }),
+    );
+    const v = (await db.stay.findUniqueOrThrow({ where: { id: stayId } })).version;
+    const res = await h.fd
+      .post(`/stays/${stayId}/check-in`, { registration })
+      .set('Idempotency-Key', randomUUID())
+      .set('If-Match', `"${v}"`);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+  });
+
+  it('only confirmed guests on their arrival day, at the current version, once', async () => {
+    const h = await hotel(3);
+    const a = await arriving(h);
+    expect(errorOf(await a.checkIn({ registration }, a.version - 1))).toMatchObject({
+      code: 'VERSION_CONFLICT',
+    });
+    const key = randomUUID();
+    const first = await a.checkIn({ registration }, a.version, key);
+    expect(first.status).toBe(200);
+    // The same request again answers the same (idempotency), and nothing is done twice.
+    const again = await a.checkIn({ registration }, a.version, key);
+    expect(again.body).toEqual(first.body);
+    expect(await db.registrationCard.count()).toBe(1);
+    expect(errorOf(await a.checkIn({ registration }, a.version + 1))).toMatchObject({
+      code: 'STATE_TRANSITION_INVALID',
+    });
+
+    const later = await h.book([await h.quote()]);
+    const stayId = later.stays[0]?.id ?? '';
+    const early = await h.fd
+      .post(`/stays/${stayId}/check-in`, { registration, roomId: a.room['102'] })
+      .set('Idempotency-Key', randomUUID())
+      .set('If-Match', '"0"');
+    expect(errorOf(early)).toMatchObject({ code: 'STATE_TRANSITION_INVALID' });
+
+    const held = await h.book([await h.quote({ arrival: TODAY })], {
+      holdUntil: '2026-11-10T18:00:00Z',
+    });
+    const hold = await h.fd
+      .post(`/stays/${held.stays[0]?.id ?? ''}/check-in`, { registration })
+      .set('Idempotency-Key', randomUUID())
+      .set('If-Match', '"0"');
+    expect(errorOf(hold)).toMatchObject({ code: 'STATE_TRANSITION_INVALID' });
+  });
+
+  it('logs more keys for a checked-in guest only', async () => {
+    const h = await hotel();
+    const a = await arriving(h);
+    expect(errorOf(await h.fd.post(`/stays/${a.stayId}/keys`, { count: 1 }))).toMatchObject({
+      code: 'STATE_TRANSITION_INVALID',
+    });
+    await h.ok(a.checkIn({ registration, keysIssued: 1 }));
+    // Front desk holds key.issue.
+    await h.ok(h.fd.post(`/stays/${a.stayId}/keys`, { count: 1 }));
+    const keys = await h.ok<{ data: { count: number }[] }>(h.fd.get(`/stays/${a.stayId}/keys`));
+    expect(keys.data.map((k) => k.count)).toEqual([1, 1]);
+    expect(await db.auditEvent.count({ where: { action: 'stay.keys_issued' } })).toBe(1);
+  });
+
+  it('keeps an on-screen signature and an ID scan, and purges ID details after retention', async () => {
+    const h = await hotel();
+    const a = await arriving(h);
+    const file = (entityType: string, contentType: string) =>
+      db.fileObject.create({
+        data: {
+          organisationId: h.org.id,
+          propertyId: h.p1.id,
+          storageKey: `org/${h.org.id}/property/${h.p1.id}/${randomUUID()}`,
+          contentType,
+          sizeBytes: 100,
+          scan: 'CLEAN',
+          entityType,
+          uploadedById: h.fdId,
+        },
+      });
+    const signature = await file('RegistrationCard', 'image/png');
+    const scan = await file('IdDocument', 'image/jpeg');
+    // A file of another kind is refused.
+    const wrong = await a.checkIn({ registration, signatureFileId: scan.id });
+    expect(errorOf(wrong)).toMatchObject({ code: 'VALIDATION_ERROR' });
+    await h.ok(
+      a.checkIn({
+        registration: { ...registration, idFileId: scan.id },
+        signatureFileId: signature.id,
+      }),
+    );
+    const card = await h.ok<Card & { signatureFileId: string }>(
+      h.fd.get(`/stays/${a.stayId}/registration-card`),
+    );
+    expect(card).toMatchObject({ signature: 'SCREEN', signatureFileId: signature.id });
+    const doc = await db.idDocument.findFirstOrThrow();
+    expect(doc.fileId).toBe(scan.id);
+
+    const deleted: string[] = [];
+    const job = idPurgeJob({
+      store: { delete: (key: string) => Promise.resolve(void deleted.push(key)) } as never,
+    });
+    const logger = { info: () => undefined } as never;
+    await job.run({}, { db, clock: () => new Date('2027-11-09T12:00:00Z'), logger });
+    expect(await db.idDocument.count()).toBe(1);
+    await job.run({}, { db, clock: () => new Date('2027-11-10T12:00:00Z'), logger });
+    expect(await db.idDocument.count()).toBe(0);
+    expect(await db.fileObject.count({ where: { id: scan.id } })).toBe(0);
+    expect(deleted).toEqual([scan.storageKey]);
+    // The card stays, without the ID details.
+    now = new Date('2027-11-10T12:00:00Z');
+    const fd = await h.as(h.fdId);
+    const after = await h.ok<Card>(fd.get(`/stays/${a.stayId}/registration-card`));
+    expect(after).toMatchObject({ idNumberMasked: null, idType: null, nationality: 'NG' });
   });
 });

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_REGISTRATION,
   localDate,
   LOCKED_WHEN_LIVE,
   SETUP_STEPS,
@@ -8,6 +9,7 @@ import {
   type PropertyCreateBody,
   type PropertyDetail,
   type PropertyPatchBody,
+  type RegistrationSettings,
   type SetupChecklist,
   type SetupStepId,
 } from '@hotel/shared';
@@ -37,9 +39,14 @@ type Checklist = z.input<typeof SetupChecklist>;
 
 interface Settings {
   paymentMethods?: ManualPayMethod[];
+  registration?: z.output<typeof RegistrationSettings>;
 }
 
 const settingsOf = (p: Property): Settings => (p.settings ?? {}) as Settings;
+
+/** What the desk collects at check-in (T-051); the defaults until the property chooses. */
+export const registrationOf = (p: Pick<Property, 'settings'>) =>
+  ((p.settings ?? {}) as Settings).registration ?? DEFAULT_REGISTRATION;
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -109,6 +116,9 @@ async function stepDone(
       return Boolean(p.timeZone && p.baseCurrency && p.locale);
     case 'payment-methods':
       return (settingsOf(p).paymentMethods ?? []).length > 0;
+    case 'registration':
+      // The defaults are a complete choice.
+      return true;
     case 'staff':
       return hasStaff(db, p, now);
     case 'room-types':
@@ -168,6 +178,7 @@ async function toDetail(db: DbClient, p: Property, now: Date): Promise<Detail> {
     checkOutTime: p.checkOutTime,
     nightAuditTime: p.nightAuditTime,
     paymentMethods: settingsOf(p).paymentMethods ?? [],
+    registration: registrationOf(p),
     checklist: await checklistFor(db, p, now),
   };
 }
@@ -344,6 +355,7 @@ function editable(p: Property): Record<string, unknown> {
     checkOutTime: p.checkOutTime,
     nightAuditTime: p.nightAuditTime,
     paymentMethods: settingsOf(p).paymentMethods ?? [],
+    registration: registrationOf(p),
   };
 }
 
@@ -373,15 +385,19 @@ export async function updateProperty(
         );
       }
 
-      const { paymentMethods, address, taxRegistration, ...columns } = body;
+      const { paymentMethods, registration, address, taxRegistration, ...columns } = body;
       const data: Prisma.PropertyUpdateInput = {};
       for (const [key, value] of Object.entries(columns)) {
         if (value !== undefined) (data as Record<string, unknown>)[key] = value;
       }
       if (address) data.address = address;
       if (taxRegistration) data.taxRegistration = taxRegistration;
-      if (paymentMethods) {
-        data.settings = { ...settingsOf(current), paymentMethods };
+      if (paymentMethods || registration) {
+        data.settings = {
+          ...settingsOf(current),
+          ...(paymentMethods ? { paymentMethods } : {}),
+          ...(registration ? { registration } : {}),
+        };
       }
       const after = await tx.property.update({ where: { id: current.id }, data });
 

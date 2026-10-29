@@ -12,6 +12,7 @@ import { burnPasswordCheck, hashPassword, verifyPassword } from '../../core/pass
 import { hashToken, newToken } from '../../core/tokens.ts';
 import { accountExistsMessage, passwordResetMessage, verifyEmailMessage } from './emails.ts';
 import { createDefaultApprovalPolicies } from '../approvals/defaults.ts';
+import { registrationOf } from '../setup/service.ts';
 import { createDefaultTaxes } from '../tax/defaults.ts';
 import { DEPARTMENT_TEMPLATES, ROLE_TEMPLATES, roleTemplate } from './role-templates.ts';
 
@@ -501,6 +502,7 @@ export async function buildMe(
       timeZone: p.timeZone,
       baseCurrency: p.baseCurrency,
       locale: p.locale,
+      registrationFields: registrationOf(p).requiredFields,
     })),
     memberships: memberships.map((m) => ({
       organisationId: m.organisationId,

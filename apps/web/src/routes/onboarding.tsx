@@ -1,5 +1,7 @@
 import {
   MANUAL_PAY_METHODS,
+  REGISTRATION_FIELDS,
+  type RegistrationField,
   OrganisationPatchBody,
   Phone,
   PropertyAddressBody,
@@ -190,6 +192,8 @@ function StepPanel({ step, property }: { step: StepId; property: Property }) {
       return <RegionStep property={property} />;
     case 'payment-methods':
       return <PaymentMethodsStep property={property} />;
+    case 'registration':
+      return <RegistrationStep property={property} />;
     case 'staff':
       return (
         <div className="text-sm">
@@ -501,6 +505,72 @@ function RegionStep({ property: p }: { property: Property }) {
         />
       </div>
       <SaveRow pending={save.isPending} saved={save.isSuccess} error={save.error} />
+    </form>
+  );
+}
+
+/** T-051, M3 rule 6: only what is ticked is collected at check-in; ID details are purged. */
+function RegistrationStep({ property: p }: { property: Property }) {
+  const { t } = useTranslation();
+  const [fields, setFields] = useState<RegistrationField[] | null>(null);
+  const [months, setMonths] = useState<string | null>(null);
+  const selected = fields ?? p.registration.requiredFields;
+  const retention = months ?? String(p.registration.idRetentionMonths);
+  const save = useSaveProperty();
+  return (
+    <form
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        save.mutate(
+          {
+            registration: {
+              requiredFields: REGISTRATION_FIELDS.filter((f) => selected.includes(f)),
+              idRetentionMonths: Number(retention),
+            },
+          },
+          {
+            onSuccess: () => {
+              setFields(null);
+              setMonths(null);
+            },
+          },
+        );
+      }}
+    >
+      <fieldset className="mb-4">
+        <legend className="mb-2 text-sm">{t('setup.registrationIntro')}</legend>
+        <div className="flex flex-col gap-2">
+          {REGISTRATION_FIELDS.map((field) => (
+            <label key={field} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={selected.includes(field)}
+                onChange={(e) =>
+                  setFields(
+                    e.target.checked ? [...selected, field] : selected.filter((f) => f !== field),
+                  )
+                }
+              />
+              {t(`checkIn.fields.${field}`)}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <Field
+        label={t('setup.idRetention')}
+        hint={t('setup.idRetentionHint')}
+        type="number"
+        min={1}
+        max={120}
+        value={retention}
+        onChange={(e) => setMonths(e.target.value)}
+      />
+      <SaveRow
+        pending={save.isPending}
+        saved={save.isSuccess && fields === null && months === null}
+        error={save.error}
+      />
     </form>
   );
 }

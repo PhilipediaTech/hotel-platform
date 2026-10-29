@@ -131,7 +131,7 @@ export function createApp({
   api.use(importRoutes({ db, tenantDb, store: files, clock }));
   api.use(availabilityRoutes({ db, tenantDb, clock }));
   api.use(guestRoutes({ tenantDb, clock }));
-  api.use(reservationRoutes({ db, tenantDb, clock }));
+  api.use(reservationRoutes({ db, tenantDb, clock, idKey: config.idKey }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

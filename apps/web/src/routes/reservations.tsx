@@ -17,6 +17,7 @@ import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
+import { canCheckIn, CheckInPanel, StayKeys, usePropertyToday } from './check-in.tsx';
 
 // S09 Reservations (PRD M3-01–M3-05; T-042): find reservations; a reservation's stays,
 // details, history; change dates or guests (requoted), confirm a hold, cancel with a reason
@@ -193,6 +194,10 @@ export function ReservationPage() {
   const { currentPropertyId, permissions } = useSession();
   const f = useFormats();
   const key = [...reservationsKey(currentPropertyId), 'one', reservationId];
+  const queryClient = useQueryClient();
+  const today = usePropertyToday();
+  const refresh = () =>
+    void queryClient.invalidateQueries({ queryKey: reservationsKey(currentPropertyId) });
   const reservation = useQuery({
     queryKey: key,
     queryFn: () => api.call('getReservation', { params: { reservationId } }),
@@ -253,6 +258,10 @@ export function ReservationPage() {
               {t('reservations.guestsCount', { adults: s.adults, children: s.children })}
             </p>
             <StayRoom reservation={r} stay={s} queryKey={key} />
+            {canCheckIn(s, today, permissions) && (
+              <CheckInPanel reservation={r} stay={s} onDone={refresh} />
+            )}
+            {s.status === 'CHECKED_IN' && <StayKeys stay={s} />}
             {open && s.status !== 'CANCELLED' && can('reservation.modify') && (
               <ChangeStay reservation={r} stay={s} queryKey={key} />
             )}

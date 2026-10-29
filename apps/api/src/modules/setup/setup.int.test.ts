@@ -75,6 +75,7 @@ type Detail = {
   status: string;
   legalName?: string | null;
   checklist: { steps: Step[]; ready: boolean };
+  registration?: { requiredFields: string[]; idRetentionMonths: number };
 };
 /** The response body as a property (or organisation) detail. */
 const body = (res: { body: unknown }) => res.body as Detail;
@@ -108,11 +109,34 @@ describe('setup checklist', () => {
       rooms: 'DONE',
       rates: 'DONE',
       'payment-methods': 'TODO',
+      registration: 'DONE', // the defaults are a complete choice
       staff: 'DONE', // the hotel has a GM and a front-desk agent
     });
     const steps = body(res).checklist.steps;
     expect(steps.find((s) => s.id === 'staff')?.required).toBe(false);
     expect(body(res).checklist.ready).toBe(false);
+  });
+
+  it('keeps what to collect at check-in (T-051): defaults, changes, limits', async () => {
+    const h = await hotel();
+    const owner = await h.as(h.owner.id);
+    const before = await owner.get(h.path);
+    expect(body(before).registration).toEqual({
+      requiredFields: ['nationality', 'purpose', 'idType', 'idNumber'],
+      idRetentionMonths: 12,
+    });
+    const changed = await owner.patch(h.path, {
+      registration: { requiredFields: ['address', 'idNumber'], idRetentionMonths: 24 },
+    });
+    expect(changed.status).toBe(200);
+    expect(body(changed).registration).toEqual({
+      requiredFields: ['address', 'idNumber'],
+      idRetentionMonths: 24,
+    });
+    const bad = await owner.patch(h.path, {
+      registration: { requiredFields: ['shoeSize'], idRetentionMonths: 0 },
+    });
+    expect(bad.status).toBe(400);
   });
 
   it('becomes ready once details and payment methods are saved; edits are audited', async () => {

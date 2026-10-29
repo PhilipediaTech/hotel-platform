@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createQueryClient } from '../app/query-client.ts';
 import { routes } from '../app/routes.tsx';
 import { setApiPropertyId } from '../lib/api.ts';
+import { addDays, localDate } from '@hotel/shared';
 import { LAGOS, makeMe, membership } from '../test/me-fixture.ts';
 
 // S09 Reservations (PRD M3-01–M3-05; T-042).
@@ -360,5 +361,173 @@ describe('Rooms for a stay (M3-07, M3-11; T-050)', () => {
     const move = sent(`POST /stays/${STAY}/move`)[0];
     expect(move?.body).toEqual({ roomId: R102, reason: 'Noisy air conditioner' });
     expect(move?.headers.get('Idempotency-Key')).toBeTruthy();
+  });
+});
+
+describe('Check-in (M3-08, M3-19; T-051)', () => {
+  const today = localDate(new Date(), 'Africa/Lagos');
+  const R101 = '33333333-0000-4000-8000-000000000101';
+  const staying = (status: string) =>
+    reservation({
+      status,
+      stays: [
+        {
+          ...reservation().stays[0],
+          status,
+          arrival: today,
+          departure: addDays(today, 2),
+          roomId: R101,
+          roomNumber: '101',
+        },
+      ],
+    });
+
+  it('checks a guest in with the fields the property requires', async () => {
+    permissions = [...permissions, 'reservation.checkin'];
+    let current: unknown = staying('CONFIRMED');
+    handlers[`GET /reservations/${RES}`] = () => json(200, current);
+    handlers[`POST /stays/${STAY}/check-in`] = () => {
+      current = staying('CHECKED_IN');
+      return json(200, {
+        stayId: STAY,
+        status: 'CHECKED_IN',
+        folioId: null,
+        roomId: R101,
+        version: 1,
+      });
+    };
+    handlers[`GET /stays/${STAY}/keys`] = () =>
+      json(200, {
+        data: [
+          {
+            id: '33333333-0000-4000-8000-000000000201',
+            roomNumber: '101',
+            count: 1,
+            issuedBy: 'Bola Desk',
+            issuedAt: '2026-11-10T14:00:00Z',
+          },
+        ],
+      });
+    const user = userEvent.setup();
+    renderAt(`/reservations/${RES}`);
+    await user.click(await screen.findByRole('button', { name: 'Check in' }));
+    const form = screen.getByRole('form', { name: 'Check in Ada Obi' });
+    expect(within(form).getByText('Room 101')).toBeInTheDocument();
+    // The property asks for nationality, purpose, ID type and number (the fixture's fields).
+    expect(within(form).queryByLabelText('Home address')).not.toBeInTheDocument();
+    const submit = within(form).getByRole('button', { name: 'Check in now' });
+    expect(submit).toBeDisabled();
+    await user.type(within(form).getByLabelText('Nationality'), 'NG');
+    await user.selectOptions(within(form).getByLabelText('Purpose of stay'), 'BUSINESS');
+    await user.selectOptions(within(form).getByLabelText('ID type'), 'PASSPORT');
+    await user.type(within(form).getByLabelText('ID number'), 'A12345678');
+    await user.clear(within(form).getByLabelText('Key cards given'));
+    await user.type(within(form).getByLabelText('Key cards given'), '2');
+    await user.click(submit);
+
+    expect(await screen.findByText('1 key card issued')).toBeInTheDocument();
+    const call = sent(`POST /stays/${STAY}/check-in`)[0];
+    expect(call?.body).toEqual({
+      registration: {
+        nationality: 'NG',
+        purpose: 'BUSINESS',
+        idType: 'PASSPORT',
+        idNumber: 'A12345678',
+      },
+      keysIssued: 2,
+    });
+    expect(call?.headers.get('If-Match')).toBe('"0"');
+    expect(call?.headers.get('Idempotency-Key')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Registration card' })).toHaveAttribute(
+      'href',
+      `/stays/${STAY}/card`,
+    );
+  });
+
+  it('does not offer check-in before the arrival day or without the permission', async () => {
+    handlers[`GET /reservations/${RES}`] = () => json(200, staying('CONFIRMED'));
+    renderAt(`/reservations/${RES}`);
+    await screen.findByText('Room 101');
+    expect(screen.queryByRole('button', { name: 'Check in' })).not.toBeInTheDocument();
+  });
+
+  it('opens check-in only on the arrival day', async () => {
+    permissions = [...permissions, 'reservation.checkin'];
+    const tomorrow = reservation({
+      stays: [
+        {
+          ...reservation().stays[0],
+          arrival: addDays(today, 1),
+          departure: addDays(today, 3),
+        },
+      ],
+    });
+    handlers[`GET /reservations/${RES}`] = () => json(200, tomorrow);
+    renderAt(`/reservations/${RES}`);
+    await screen.findByText('No room yet');
+    expect(screen.queryByRole('button', { name: 'Check in' })).not.toBeInTheDocument();
+  });
+
+  it('issues another key to a checked-in guest', async () => {
+    permissions = [...permissions, 'key.issue'];
+    handlers[`GET /reservations/${RES}`] = () => json(200, staying('CHECKED_IN'));
+    const log: object[] = [];
+    handlers[`GET /stays/${STAY}/keys`] = () => json(200, { data: log });
+    handlers[`POST /stays/${STAY}/keys`] = () => {
+      const k = {
+        id: `33333333-0000-4000-8000-00000000030${log.length}`,
+        roomNumber: '101',
+        count: 1,
+        issuedBy: 'Bola Desk',
+        issuedAt: '2026-11-10T15:00:00Z',
+      };
+      log.unshift(k);
+      return json(201, k);
+    };
+    const user = userEvent.setup();
+    renderAt(`/reservations/${RES}`);
+    expect(await screen.findByText('0 key cards issued')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Issue another key' }));
+    expect(await screen.findByText('1 key card issued')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Key log' })).toHaveTextContent(
+      '1 card for room 101 by Bola Desk',
+    );
+    expect(sent(`POST /stays/${STAY}/keys`)[0]?.body).toEqual({ count: 1 });
+  });
+
+  it('prints the registration card with the ID number masked', async () => {
+    handlers[`GET /stays/${STAY}/registration-card`] = () =>
+      json(200, {
+        stayId: STAY,
+        confirmationNo: 'LAG-00001',
+        property: { name: 'Lagos Hotel', address: '12 Admiralty Way, Lekki, Lagos' },
+        guest: { firstName: 'Ada', lastName: 'Obi', phone: '+2348000000000', email: null },
+        roomNumber: '101',
+        roomTypeName: 'Standard',
+        arrival: '2026-11-12',
+        departure: '2026-11-14',
+        adults: 2,
+        children: 0,
+        nationality: 'NG',
+        address: null,
+        purpose: 'BUSINESS',
+        idType: 'PASSPORT',
+        idNumberMasked: '•••• 5678',
+        idExpiry: null,
+        signature: 'PAPER',
+        signatureFileId: null,
+        checkedInAt: '2026-11-12T14:00:00Z',
+        checkedInBy: 'Bola Desk',
+      });
+    const print = vi.fn();
+    vi.stubGlobal('print', print);
+    const user = userEvent.setup();
+    renderAt(`/stays/${STAY}/card`);
+    expect(await screen.findByText('Confirmation LAG-00001 · Room 101')).toBeInTheDocument();
+    expect(screen.getByText('•••• 5678')).toBeInTheDocument();
+    expect(screen.getByText('Passport')).toBeInTheDocument();
+    expect(screen.queryByText('Home address')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Print' }));
+    expect(print).toHaveBeenCalled();
   });
 });

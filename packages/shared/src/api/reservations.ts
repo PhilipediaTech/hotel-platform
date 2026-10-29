@@ -5,6 +5,7 @@ import { defineRoute } from './contract.ts';
 import { AmountMinor, Instant, IsoDate, page, PageQuery, Uuid } from './primitives.ts';
 import { GUARANTEES } from './rates.ts';
 import { HK_STATUSES } from './rooms.ts';
+import { ID_TYPES, STAY_PURPOSES } from '../registration.ts';
 
 // Reservations (tab 4 row "Reservations" and the POST /reservations example; PRD M3-01–M3-05,
 // M3 rules 1 and 8; S09; T-042). A booking is made from quotes (one per room), so it charges
@@ -433,6 +434,144 @@ export const moveStay = defineRoute({
   errors: ['BOOKING_CONFLICT', 'ROOM_NOT_READY', 'STATE_TRANSITION_INVALID'],
 });
 
+// ── Check-in, registration card and keys (M3-08, M3-19, M3 rules 2 and 6; T-051) ─────
+
+export const RegistrationBody = z.object({
+  nationality: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{2}$/, 'Two-letter country code, e.g. NG')
+    .optional(),
+  address: z.string().trim().min(1).max(300).optional(),
+  purpose: z.enum(STAY_PURPOSES).optional(),
+  idType: z.enum(ID_TYPES).optional(),
+  idNumber: z.string().trim().min(3).max(40).optional(),
+  idExpiry: IsoDate.optional(),
+  /** A scan or photo of the ID (an uploaded IdDocument file). */
+  idFileId: Uuid.optional(),
+});
+
+export const CheckInBody = z.object({
+  /** The room, when the stay has none yet or gets another one now; else its assigned room. */
+  roomId: Uuid.optional(),
+  /** Only the fields the property requires are kept; the others are ignored. */
+  registration: RegistrationBody.default({}),
+  /** The guest's signature drawn on screen (a RegistrationCard file); none = signed on paper. */
+  signatureFileId: Uuid.optional(),
+  keysIssued: z.number().int().min(0).max(10).default(0),
+});
+
+export const CheckInResult = z
+  .object({
+    stayId: Uuid,
+    status: z.enum(RESERVATION_STATUSES),
+    /** The stay's folio; folios arrive with T-060. */
+    folioId: Uuid.nullable(),
+    roomId: Uuid,
+    version: z.number().int(),
+  })
+  .meta({ id: 'CheckInResult' });
+
+export const checkIn = defineRoute({
+  operationId: 'checkIn',
+  method: 'post',
+  path: '/stays/{stayId}/check-in',
+  summary: 'Check a guest in: room, registration details, signature and keys',
+  description:
+    'The stay must be confirmed and arriving today (or overdue). The room must be clean or inspected and empty, unless it was given with an approved override (409 ROOM_NOT_READY). Every registration field the property requires must be filled (400). ID details are stored encrypted and deleted after the property’s retention period. Send `If-Match` with the stay’s version.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.checkin',
+  idempotent: true,
+  ifMatch: true,
+  params: StayParams,
+  body: CheckInBody,
+  response: CheckInResult,
+  errors: ['ROOM_NOT_READY', 'BOOKING_CONFLICT', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
+});
+
+export const RegistrationCardItem = z
+  .object({
+    stayId: Uuid,
+    confirmationNo: z.string(),
+    property: z.object({ name: z.string(), address: z.string() }),
+    guest: z.object({
+      firstName: z.string(),
+      lastName: z.string(),
+      phone: z.string().nullable(),
+      email: z.string().nullable(),
+    }),
+    roomNumber: z.string(),
+    roomTypeName: z.string(),
+    arrival: IsoDate,
+    departure: IsoDate,
+    adults: z.number().int(),
+    children: z.number().int(),
+    nationality: z.string().nullable(),
+    address: z.string().nullable(),
+    purpose: z.enum(STAY_PURPOSES).nullable(),
+    idType: z.enum(ID_TYPES).nullable(),
+    /** Only the last four characters, e.g. "•••• 4567"; null once purged or not collected. */
+    idNumberMasked: z.string().nullable(),
+    idExpiry: IsoDate.nullable(),
+    /** Signed on screen (a signature image) or on the printed card. */
+    signature: z.enum(['SCREEN', 'PAPER']),
+    signatureFileId: Uuid.nullable(),
+    checkedInAt: Instant,
+    checkedInBy: z.string().nullable(),
+  })
+  .meta({ id: 'RegistrationCard' });
+
+export const getRegistrationCard = defineRoute({
+  operationId: 'getRegistrationCard',
+  method: 'get',
+  path: '/stays/{stayId}/registration-card',
+  summary: 'The registration card of a checked-in stay, for printing',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'frontdesk.read',
+  params: StayParams,
+  response: RegistrationCardItem,
+});
+
+export const KeyIssueItem = z
+  .object({
+    id: Uuid,
+    roomNumber: z.string(),
+    count: z.number().int(),
+    issuedBy: z.string().nullable(),
+    issuedAt: Instant,
+  })
+  .meta({ id: 'KeyIssue' });
+
+export const listKeys = defineRoute({
+  operationId: 'listKeys',
+  method: 'get',
+  path: '/stays/{stayId}/keys',
+  summary: 'Key cards issued for a stay, newest first',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'frontdesk.read',
+  params: StayParams,
+  response: z.object({ data: z.array(KeyIssueItem) }),
+});
+
+export const issueKeys = defineRoute({
+  operationId: 'issueKeys',
+  method: 'post',
+  path: '/stays/{stayId}/keys',
+  summary: 'Log key cards issued to a checked-in guest (M3-19)',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'key.issue',
+  params: StayParams,
+  body: z.object({ count: z.number().int().min(1).max(10) }),
+  status: 201,
+  response: KeyIssueItem,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
 export const RESERVATION_ROUTES = {
   listReservations,
   createReservation,
@@ -445,4 +584,8 @@ export const RESERVATION_ROUTES = {
   listAssignableRooms,
   assignRoom,
   moveStay,
+  checkIn,
+  getRegistrationCard,
+  listKeys,
+  issueKeys,
 } as const;

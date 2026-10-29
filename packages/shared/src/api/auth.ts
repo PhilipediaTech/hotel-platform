@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SIGN_UP_COUNTRY_CODES } from '../countries.ts';
+import { REGISTRATION_FIELDS } from '../registration.ts';
 import { defineRoute } from './contract.ts';
 import { Instant, Uuid } from './primitives.ts';
 
@@ -100,6 +101,8 @@ const MeProperty = z.object({
   timeZone: z.string(),
   baseCurrency: z.string(),
   locale: z.string(),
+  /** What the desk must collect at check-in (T-051). */
+  registrationFields: z.array(z.enum(REGISTRATION_FIELDS)),
 });
 
 const MeMembership = z.object({

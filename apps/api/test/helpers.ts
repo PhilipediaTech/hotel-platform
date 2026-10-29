@@ -22,6 +22,7 @@ export const TEST_CONFIG: Config = {
   databaseUrl: 'postgresql://unused@localhost:5432/unused',
   sessionSecret: 'test-session-secret-0123456789abcdef',
   mfaKey: Buffer.alloc(32, 7),
+  idKey: Buffer.alloc(32, 9),
   cookieDomain: undefined,
   cookieSecure: false,
   localFilesDir: path.join(os.tmpdir(), 'hotel-test-files'),

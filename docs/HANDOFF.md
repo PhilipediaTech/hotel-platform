@@ -71,6 +71,7 @@ apps/api        @hotel/api      Express 5 app
   src/modules/guests/           guests (search, flags, merge → moveGuestReferences) and companies
   src/modules/reservations/     book from quotes, change, cancel, reinstate; hold-expiry job; do-not-rent approval
                                 rooms.ts: room allocations, assign (room.not_ready approval), move (room.move approval)
+                                check-in.ts: check-in, registration card, key log, ID purge job
   src/modules/availability/     inventory.ts: rebuildInventory, takeInventory/releaseInventory, daily job; inventory API;
                                 quotes.ts: GET /availability, POST /quotes (live pricing, restrictions, taxes per night)
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
@@ -108,6 +109,7 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/routes/reservations.tsx   S09 reservations: find, detail (change, confirm hold, cancel, reinstate, history)
   src/routes/new-booking.tsx    S08 new booking: search, plans, guests, guarantee, book (walk-in mode: ?mode=walk-in)
   src/routes/calendar.tsx       S07 calendar: rooms × dates, unassigned rows per type, blocks, rooms left
+  src/routes/check-in.tsx       check-in form (on S09), key log, printable registration card (/stays/:id/card)
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -169,4 +171,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-051 check-in (POST /stays/{id}/check-in ●, tab 4 example: room, registration fields, signature file, keys; M3 rule 2: business date = arrival, room vacant and clean/inspected or approved override → else 409 ROOM_NOT_READY; ID fields encrypted, only the ones the property requires, purge after retention; registration card; key log M3-19). Use `rooms.ts` (allocations, `problemsOf`) for the room checks; check-in then makes moves testable by hand. The import still needs GUESTS/COMPANIES and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-052 walk-in and day-use flows (M3-09 walk-in in under 2 minutes / ≤ 6 steps in the E2E test: today the walk-in books on S08 and checks in on S09 — consider one screen that books and checks in; M3-10 day-use: start time and duration, DAY_USE plans priced per stay (quotes say "Day-use plans are quoted with day-use bookings (T-052)"), a day-use allocation covers [arrival, arrival + 1), the room returns to dirty at the end; M3 acceptance on day-use revenue vs room nights). The import still needs GUESTS/COMPANIES and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

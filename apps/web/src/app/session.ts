@@ -1,4 +1,4 @@
-import type { Me } from '@hotel/shared';
+import type { Me, RegistrationField } from '@hotel/shared';
 import { createContext, useContext } from 'react';
 import type { z } from 'zod';
 
@@ -12,6 +12,8 @@ export interface ShellProperty {
   baseCurrency: string;
   /** BCP 47 locale for dates, numbers and money (tab 5 rule 8), e.g. en-NG. */
   locale: string;
+  /** What the desk must collect at check-in (T-051). */
+  registrationFields: readonly RegistrationField[];
 }
 
 /** What the shell needs to render: from GET /me; business date and counts arrive later. */
@@ -57,15 +59,18 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
   return {
     userName: me.user.name,
     permissions: [...permissions].sort(),
-    properties: me.properties.map(({ id, code, name, status, timeZone, baseCurrency, locale }) => ({
-      id,
-      code,
-      name,
-      status,
-      timeZone,
-      baseCurrency,
-      locale,
-    })),
+    properties: me.properties.map(
+      ({ id, code, name, status, timeZone, baseCurrency, locale, registrationFields }) => ({
+        id,
+        code,
+        name,
+        status,
+        timeZone,
+        baseCurrency,
+        locale,
+        registrationFields,
+      }),
+    ),
     currentPropertyId: property?.id ?? null,
     businessDate: null, // business_days arrive with night audit (T-070s)
     pendingApprovals: 0, // filled in by SessionGate from GET /approvals (T-022)
@@ -134,6 +139,7 @@ export const PREVIEW_SESSION: ShellSession = {
       timeZone: 'Africa/Lagos',
       baseCurrency: 'NGN',
       locale: 'en-NG',
+      registrationFields: [],
     },
   ],
   currentPropertyId: '0d0d0d0d-0000-4000-8000-000000000002',

@@ -210,6 +210,20 @@
                 },
                 "locale": {
                   "type": "string"
+                },
+                "registrationFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "nationality",
+                      "address",
+                      "purpose",
+                      "idType",
+                      "idNumber",
+                      "idExpiry"
+                    ]
+                  }
                 }
               },
               "required": [
@@ -220,7 +234,8 @@
                 "status",
                 "timeZone",
                 "baseCurrency",
-                "locale"
+                "locale",
+                "registrationFields"
               ]
             }
           },
@@ -973,6 +988,9 @@
               "$ref": "#/components/schemas/ManualPayMethod"
             }
           },
+          "registration": {
+            "$ref": "#/components/schemas/RegistrationSettings"
+          },
           "checklist": {
             "$ref": "#/components/schemas/SetupChecklist"
           }
@@ -994,6 +1012,7 @@
           "checkOutTime",
           "nightAuditTime",
           "paymentMethods",
+          "registration",
           "checklist"
         ]
       },
@@ -1074,6 +1093,34 @@
           "VOUCHER"
         ]
       },
+      "RegistrationSettings": {
+        "type": "object",
+        "properties": {
+          "requiredFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "nationality",
+                "address",
+                "purpose",
+                "idType",
+                "idNumber",
+                "idExpiry"
+              ]
+            }
+          },
+          "idRetentionMonths": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 120
+          }
+        },
+        "required": [
+          "requiredFields",
+          "idRetentionMonths"
+        ]
+      },
       "SetupChecklist": {
         "type": "object",
         "properties": {
@@ -1106,6 +1153,7 @@
               "rooms",
               "rates",
               "payment-methods",
+              "registration",
               "staff"
             ]
           },
@@ -3462,6 +3510,265 @@
           "floor",
           "hkStatus",
           "problems"
+        ]
+      },
+      "CheckInResult": {
+        "type": "object",
+        "properties": {
+          "stayId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ENQUIRY",
+              "TENTATIVE",
+              "CONFIRMED",
+              "CHECKED_IN",
+              "CHECKED_OUT",
+              "NO_SHOW",
+              "CANCELLED"
+            ]
+          },
+          "folioId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "roomId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stayId",
+          "status",
+          "folioId",
+          "roomId",
+          "version"
+        ]
+      },
+      "RegistrationCard": {
+        "type": "object",
+        "properties": {
+          "stayId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "confirmationNo": {
+            "type": "string"
+          },
+          "property": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "address": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "address"
+            ]
+          },
+          "guest": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "firstName",
+              "lastName",
+              "phone",
+              "email"
+            ]
+          },
+          "roomNumber": {
+            "type": "string"
+          },
+          "roomTypeName": {
+            "type": "string"
+          },
+          "arrival": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "departure": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "adults": {
+            "type": "integer"
+          },
+          "children": {
+            "type": "integer"
+          },
+          "nationality": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purpose": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "BUSINESS",
+              "LEISURE",
+              "CONFERENCE",
+              "FAMILY",
+              "OTHER",
+              null
+            ]
+          },
+          "idType": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "PASSPORT",
+              "NATIONAL_ID",
+              "DRIVERS_LICENCE",
+              "VOTERS_CARD",
+              "OTHER",
+              null
+            ]
+          },
+          "idNumberMasked": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idExpiry": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "signature": {
+            "type": "string",
+            "enum": [
+              "SCREEN",
+              "PAPER"
+            ]
+          },
+          "signatureFileId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "checkedInAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "checkedInBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "stayId",
+          "confirmationNo",
+          "property",
+          "guest",
+          "roomNumber",
+          "roomTypeName",
+          "arrival",
+          "departure",
+          "adults",
+          "children",
+          "nationality",
+          "address",
+          "purpose",
+          "idType",
+          "idNumberMasked",
+          "idExpiry",
+          "signature",
+          "signatureFileId",
+          "checkedInAt",
+          "checkedInBy"
+        ]
+      },
+      "KeyIssue": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "roomNumber": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "issuedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issuedAt": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "required": [
+          "id",
+          "roomNumber",
+          "count",
+          "issuedBy",
+          "issuedAt"
         ]
       }
     },
@@ -7281,7 +7588,9 @@
                     "type": "string",
                     "enum": [
                       "ImportJob",
-                      "RoomType"
+                      "RoomType",
+                      "IdDocument",
+                      "RegistrationCard"
                     ]
                   },
                   "contentType": {
@@ -8222,6 +8531,9 @@
                     "items": {
                       "$ref": "#/components/schemas/ManualPayMethod"
                     }
+                  },
+                  "registration": {
+                    "$ref": "#/components/schemas/RegistrationSettings"
                   }
                 }
               }
@@ -16019,6 +16331,580 @@
           },
           "422": {
             "description": "Business rule violated: `APPROVAL_EXPIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stays/{stayId}/check-in": {
+      "post": {
+        "operationId": "checkIn",
+        "summary": "Check a guest in: room, registration details, signature and keys",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "The stay must be confirmed and arriving today (or overdue). The room must be clean or inspected and empty, unless it was given with an approved override (409 ROOM_NOT_READY). Every registration field the property requires must be filled (400). ID details are stored encrypted and deleted after the property’s retention period. Send `If-Match` with the stay’s version.",
+        "x-permission": "reservation.checkin",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `ETag` from the last read."
+            },
+            "required": true,
+            "description": "The `ETag` from the last read.",
+            "name": "If-Match",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roomId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "registration": {
+                    "type": "object",
+                    "properties": {
+                      "nationality": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{2}$"
+                      },
+                      "address": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "purpose": {
+                        "type": "string",
+                        "enum": [
+                          "BUSINESS",
+                          "LEISURE",
+                          "CONFERENCE",
+                          "FAMILY",
+                          "OTHER"
+                        ]
+                      },
+                      "idType": {
+                        "type": "string",
+                        "enum": [
+                          "PASSPORT",
+                          "NATIONAL_ID",
+                          "DRIVERS_LICENCE",
+                          "VOTERS_CARD",
+                          "OTHER"
+                        ]
+                      },
+                      "idNumber": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 40
+                      },
+                      "idExpiry": {
+                        "$ref": "#/components/schemas/IsoDate"
+                      },
+                      "idFileId": {
+                        "$ref": "#/components/schemas/Uuid"
+                      }
+                    },
+                    "default": {}
+                  },
+                  "signatureFileId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "keysIssued": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `VERSION_CONFLICT`, `ROOM_NOT_READY`, `BOOKING_CONFLICT`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stays/{stayId}/registration-card": {
+      "get": {
+        "operationId": "getRegistrationCard",
+        "summary": "The registration card of a checked-in stay, for printing",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "frontdesk.read",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationCard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stays/{stayId}/keys": {
+      "get": {
+        "operationId": "listKeys",
+        "summary": "Key cards issued for a stay, newest first",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "frontdesk.read",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/KeyIssue"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "issueKeys",
+        "summary": "Log key cards issued to a checked-in guest (M3-19)",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "key.issue",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  }
+                },
+                "required": [
+                  "count"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyIssue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
             "content": {
               "application/json": {
                 "schema": {

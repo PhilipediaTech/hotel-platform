@@ -114,6 +114,7 @@ model Property {
   quotes               Quote[]
   reservations         Reservation[]
   stays                Stay[]
+  idDocuments          IdDocument[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -213,13 +214,15 @@ model User {
   mfaRecoveryCodes   MfaRecoveryCode[]
   auditEvents        AuditEvent[]
   idempotencyKeys    IdempotencyKey[]
-  approvalsRequested ApprovalRequest[] @relation("RequestedBy")
-  approvalsDecided   ApprovalRequest[] @relation("DecidedBy")
-  invitationsSent    Invitation[]      @relation("InvitedBy")
+  approvalsRequested ApprovalRequest[]  @relation("RequestedBy")
+  approvalsDecided   ApprovalRequest[]  @relation("DecidedBy")
+  invitationsSent    Invitation[]       @relation("InvitedBy")
   filesUploaded      FileObject[]
   roomBlocksCreated  RoomBlock[]
   importJobs         ImportJob[]
-  invitationsClaimed Invitation[]      @relation("AcceptedBy")
+  keysIssued         KeyIssue[]
+  cardsSigned        RegistrationCard[]
+  invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
 }
@@ -492,22 +495,24 @@ model ApprovalRequest {
 /// worker scans the uploaded object and marks it CLEAN or INFECTED. Only CLEAN files get
 /// download links. `entityType` is the file kind (FILE_KINDS in @hotel/shared).
 model FileObject {
-  id             String       @id @default(uuid()) @db.Uuid
-  organisationId String       @map("organisation_id") @db.Uuid
-  propertyId     String?      @map("property_id") @db.Uuid
-  storageKey     String       @unique @map("storage_key")
-  contentType    String       @map("content_type")
-  sizeBytes      Int          @map("size_bytes")
-  scan           FileScan     @default(PENDING)
-  entityType     String?      @map("entity_type")
-  entityId       String?      @map("entity_id")
-  retentionClass String       @default("STANDARD") @map("retention_class")
-  uploadedById   String       @map("uploaded_by_id") @db.Uuid
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  property       Property?    @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
-  uploadedBy     User         @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  id             String             @id @default(uuid()) @db.Uuid
+  organisationId String             @map("organisation_id") @db.Uuid
+  propertyId     String?            @map("property_id") @db.Uuid
+  storageKey     String             @unique @map("storage_key")
+  contentType    String             @map("content_type")
+  sizeBytes      Int                @map("size_bytes")
+  scan           FileScan           @default(PENDING)
+  entityType     String?            @map("entity_type")
+  entityId       String?            @map("entity_id")
+  retentionClass String             @default("STANDARD") @map("retention_class")
+  uploadedById   String             @map("uploaded_by_id") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  organisation   Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property       Property?          @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  uploadedBy     User               @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
   importJobs     ImportJob[]
+  idDocuments    IdDocument[]
+  cards          RegistrationCard[]
 
   @@index([propertyId, entityType, entityId])
   @@map("files")
@@ -590,6 +595,7 @@ model Room {
   blocks         RoomBlock[]
   stays          Stay[]
   allocations    RoomAllocation[]
+  keyIssues      KeyIssue[]
 
   @@unique([propertyId, number])
   // Target of composite foreign keys: blocks and connecting rooms stay within the property.
@@ -936,6 +942,7 @@ model Guest {
   mergedFrom   Guest[]       @relation("GuestMerge")
   bookings     Reservation[] @relation("ReservationBooker")
   stays        Stay[]
+  idDocuments  IdDocument[]
 
   @@index([organisationId, phone])
   @@index([organisationId, email])
@@ -1059,15 +1066,17 @@ model Stay {
   checkedOutAt  DateTime?         @map("checked_out_at") @db.Timestamptz(6)
   version       Int               @default(0)
 
-  property    Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  reservation Reservation      @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
-  guest       Guest            @relation(fields: [guestId], references: [id], onDelete: Restrict)
-  roomType    RoomType         @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
-  room        Room?            @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
-  ratePlan    RatePlan         @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
-  quote       Quote            @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  property    Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation Reservation       @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  guest       Guest             @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  roomType    RoomType          @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
+  room        Room?             @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+  ratePlan    RatePlan          @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
+  quote       Quote             @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   nights      StayNight[]
   allocations RoomAllocation[]
+  keys        KeyIssue[]
+  card        RegistrationCard?
 
   // Target of the composite foreign key from room allocations.
   @@unique([propertyId, id])
@@ -1131,4 +1140,71 @@ model ReservationStatusHistory {
 
   @@index([reservationId, at])
   @@map("reservation_status_history")
+}
+
+// ───────────────────────── Check-in (M3-08, M3-19, M3 rule 6; T-051) ─────────────────────────
+
+/// A guest's ID details as collected at check-in, only the fields the property requires
+/// (M3 rule 6). The number is AES-256-GCM encrypted (ID_ENCRYPTION_KEY); the row and its scan
+/// are deleted once `purgeAfter` has passed.
+model IdDocument {
+  id         String    @id @default(uuid()) @db.Uuid
+  propertyId String    @map("property_id") @db.Uuid
+  guestId    String    @map("guest_id") @db.Uuid
+  docType    String?   @map("doc_type")
+  numberEnc  Bytes?    @map("number_enc")
+  expiry     DateTime? @db.Date
+  fileId     String?   @map("file_id") @db.Uuid
+  purgeAfter DateTime  @map("purge_after") @db.Date
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property          Property           @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  guest             Guest              @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  file              FileObject?        @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  registrationCards RegistrationCard[]
+
+  @@index([propertyId, purgeAfter])
+  @@index([guestId])
+  @@map("id_documents")
+}
+
+/// Key cards issued for a stay (M3-19). Returns are logged at check-out.
+model KeyIssue {
+  id         String    @id @default(uuid()) @db.Uuid
+  propertyId String    @map("property_id") @db.Uuid
+  stayId     String    @map("stay_id") @db.Uuid
+  roomId     String    @map("room_id") @db.Uuid
+  count      Int       @default(1)
+  issuedById String    @map("issued_by_id") @db.Uuid
+  issuedAt   DateTime  @default(now()) @map("issued_at") @db.Timestamptz(6)
+  returnedAt DateTime? @map("returned_at") @db.Timestamptz(6)
+
+  stay     Stay @relation(fields: [propertyId, stayId], references: [propertyId, id], onDelete: Restrict)
+  room     Room @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+  issuedBy User @relation(fields: [issuedById], references: [id], onDelete: Restrict)
+
+  @@index([stayId])
+  @@map("key_issues")
+}
+
+/// The registration card of a stay (M3-08): what the guest confirmed at check-in, without ID
+/// data (that stays in id_documents). `fileId` is the on-screen signature; none = signed on
+/// the printed card.
+model RegistrationCard {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @map("property_id") @db.Uuid
+  stayId       String   @unique @map("stay_id") @db.Uuid
+  idDocumentId String?  @map("id_document_id") @db.Uuid
+  data         Json
+  fileId       String?  @map("file_id") @db.Uuid
+  signedAt     DateTime @map("signed_at") @db.Timestamptz(6)
+  signedById   String?  @map("signed_by_id") @db.Uuid
+
+  stay       Stay        @relation(fields: [propertyId, stayId], references: [propertyId, id], onDelete: Restrict)
+  idDocument IdDocument? @relation(fields: [idDocumentId], references: [id], onDelete: SetNull)
+  file       FileObject? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  signedBy   User?       @relation(fields: [signedById], references: [id], onDelete: SetNull)
+
+  @@unique([propertyId, stayId])
+  @@map("registration_cards")
 }

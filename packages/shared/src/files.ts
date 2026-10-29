@@ -48,6 +48,23 @@ export const FILE_KINDS = [
     maxBytes: 5 * MB,
     retentionClass: 'STANDARD',
   }),
+  // ID document scans (M3 rule 6; T-051): encrypted fields elsewhere, purged with them.
+  k({
+    entityType: 'IdDocument',
+    permission: 'reservation.checkin',
+    contentTypes: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+    maxBytes: 5 * MB,
+    retentionClass: 'STANDARD',
+  }),
+  // Registration card signatures drawn on screen (M3-08; T-051).
+  k({
+    entityType: 'RegistrationCard',
+    permission: 'reservation.checkin',
+    readPermission: 'frontdesk.read',
+    contentTypes: ['image/png'],
+    maxBytes: 1 * MB,
+    retentionClass: 'STANDARD',
+  }),
 ] as const;
 
 export const FILE_ENTITY_TYPES = FILE_KINDS.map((kind) => kind.entityType) as [

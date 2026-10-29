@@ -12,7 +12,6 @@ import {
   type ExecuteContext,
 } from '../../core/approvals.ts';
 import { recordAudit } from '../../core/audit.ts';
-import type { DbClient } from '../../core/db.ts';
 import { pgErrorInfo } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
@@ -28,11 +27,21 @@ import { getReservation, type ReservationDeps } from './service.ts';
 // before check-in; a move changes the room of a checked-in guest from today on.
 
 type Tx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
-type Client = Tx | DbClient;
+/** Reads go through the tenant client or one of its transactions. */
+type Client = Tx | TenantDb;
+/** Anything that can end allocations: a tenant transaction or the base client's (hold expiry). */
+interface AllocationWriter {
+  roomAllocation: {
+    updateMany(args: {
+      where: { stayId: { in: string[] }; active: boolean };
+      data: { active: boolean };
+    }): Promise<unknown>;
+  };
+}
 type Assign = z.output<typeof AssignRoomBody>;
 type Move = z.output<typeof MoveBody>;
 /** The approval context plus the time the action runs. */
-type Ctx = ExecuteContext & { now: Date };
+export type Ctx = ExecuteContext & { now: Date };
 
 const READY = new Set(['CLEAN', 'INSPECTED']);
 /** M1 rule 2 "room move after 00:00": moves from midnight until 05:00 at the property. */
@@ -57,7 +66,7 @@ async function guarded<T>(work: () => Promise<T>): Promise<T> {
   }
 }
 
-async function loadStay(db: Client, stayId: string) {
+export async function loadStay(db: Client, stayId: string) {
   const stay = await db.stay.findUnique({ where: { id: stayId } });
   if (!stay) throw new AppError('NOT_FOUND', 'Stay not found');
   return stay;
@@ -91,7 +100,7 @@ async function freeRooms(
 }
 
 /** M3-07: why a room is not ready for a guest moving in today (empty when it is). */
-async function problemsOf(db: Client, room: Room, stayId: string) {
+export async function problemsOf(db: Client, room: Room, stayId: string) {
   const problems: z.input<typeof AssignableRoom>['problems'] = [];
   if (!READY.has(room.hkStatus)) problems.push('NOT_CLEAN');
   const occupant = await db.stay.count({
@@ -121,7 +130,7 @@ export async function listAssignableRooms(deps: ReservationDeps, stayId: string)
 }
 
 /** Ends a stay's room allocations (cancellation, hold expiry, room taken back). */
-export async function releaseAllocations(db: Client, stayIds: string[]): Promise<void> {
+export async function releaseAllocations(db: AllocationWriter, stayIds: string[]): Promise<void> {
   if (stayIds.length === 0) return;
   await db.roomAllocation.updateMany({
     where: { stayId: { in: stayIds }, active: true },
@@ -180,7 +189,7 @@ const AssignStored = z.object({
 type AssignPayload = z.output<typeof AssignStored>;
 
 /** Gives the stay the room, or takes it back (roomId null). `override` skips readiness. */
-async function assign(
+export async function assign(
   ctx: Ctx,
   stayId: string,
   roomId: string | null,

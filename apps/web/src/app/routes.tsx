@@ -20,6 +20,7 @@ import { CompaniesPage, CompanyProfilePage } from '../routes/companies.tsx';
 import { GuestProfilePage, GuestsPage } from '../routes/guests.tsx';
 import { ReservationPage, ReservationsPage } from '../routes/reservations.tsx';
 import { CalendarPage } from '../routes/calendar.tsx';
+import { RegistrationCardPage } from '../routes/check-in.tsx';
 import { NewBookingPage } from '../routes/new-booking.tsx';
 import { RatesPage } from '../routes/rates.tsx';
 import { FinanceSettingsPage } from '../routes/settings/finance.tsx';
@@ -96,6 +97,7 @@ export function buildRoutes(
             { path: 'guests/:guestId', element: <GuestProfilePage /> },
             { path: 'companies/:companyId', element: <CompanyProfilePage /> },
             { path: 'reservations/:reservationId', element: <ReservationPage /> },
+            { path: 'stays/:stayId/card', element: <RegistrationCardPage /> },
             ...screenRoutes(),
             { path: '*', element: <NotFoundPage /> },
           ],

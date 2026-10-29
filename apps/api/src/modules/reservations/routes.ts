@@ -2,6 +2,7 @@ import { RESERVATION_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as checkIns from './check-in.ts';
 import * as rooms from './rooms.ts';
 import * as reservations from './service.ts';
 
@@ -12,7 +13,7 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
 }
 
 /** Reservations (tab 4 row "Reservations"; T-042). */
-export function reservationRoutes(deps: reservations.ReservationDeps): Router {
+export function reservationRoutes(deps: checkIns.CheckInDeps): Router {
   const router = express.Router();
   const r = RESERVATION_ROUTES;
   const etag = <T extends { version: number }>(res: express.Response, item: T) => {
@@ -67,6 +68,17 @@ export function reservationRoutes(deps: reservations.ReservationDeps): Router {
     const result = await rooms.moveStay(deps, tenantFrom(tenant), params.stayId, body);
     return 'version' in result ? etag(res, result) : result;
   });
+
+  mountRoute(router, r.checkIn, ({ params, body }, { tenant, req }) =>
+    checkIns.checkIn(deps, tenantFrom(tenant), params.stayId, req.get('If-Match') ?? '', body),
+  );
+  mountRoute(router, r.getRegistrationCard, ({ params }) =>
+    checkIns.getRegistrationCard(deps, params.stayId),
+  );
+  mountRoute(router, r.listKeys, ({ params }) => checkIns.listKeys(deps, params.stayId));
+  mountRoute(router, r.issueKeys, ({ params, body }, { tenant }) =>
+    checkIns.issueKeys(deps, tenantFrom(tenant), params.stayId, body.count),
+  );
 
   return router;
 }

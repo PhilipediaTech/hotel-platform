@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MANUAL_PAY_METHODS, SETUP_STEP_IDS } from '../setup.ts';
+import { RegistrationSettings } from '../registration.ts';
 import { Phone } from './auth.ts';
 import { defineRoute } from './contract.ts';
 import { CurrencyCode, Uuid } from './primitives.ts';
@@ -159,6 +160,8 @@ export const PropertyDetail = z
     checkOutTime: z.string(),
     nightAuditTime: z.string(),
     paymentMethods: z.array(PayMethodManual),
+    /** What to collect at check-in and how long ID details are kept (T-051). */
+    registration: RegistrationSettings,
     checklist: SetupChecklist,
   })
   .meta({ id: 'Property' });
@@ -246,6 +249,7 @@ export const PropertyPatchBody = z.object({
     .array(PayMethodManual)
     .refine((m) => new Set(m).size === m.length, 'Each method once')
     .optional(),
+  registration: RegistrationSettings.optional(),
 });
 
 export const updateProperty = defineRoute({

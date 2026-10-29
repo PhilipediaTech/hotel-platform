@@ -7,6 +7,7 @@ export * from './files.ts';
 export * from './imports.ts';
 export * from './permissions.ts';
 export * from './rates.ts';
+export * from './registration.ts';
 export * from './reservations.ts';
 export * from './setup.ts';
 export * from './tax.ts';

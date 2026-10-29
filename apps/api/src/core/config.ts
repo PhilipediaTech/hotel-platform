@@ -19,6 +19,14 @@ const envSchema = z.object({
   MFA_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, 'base64url').length === 32, {
     message: 'MFA_ENCRYPTION_KEY must be 32 bytes, base64url-encoded',
   }),
+  // Encrypts guest ID numbers (T-051). Required in production; development and tests use a
+  // fixed key when it is not set.
+  ID_ENCRYPTION_KEY: z
+    .string()
+    .refine((v) => Buffer.from(v, 'base64url').length === 32, {
+      message: 'ID_ENCRYPTION_KEY must be 32 bytes, base64url-encoded',
+    })
+    .optional(),
   COOKIE_DOMAIN: z
     .string()
     .regex(/^\.?[a-z0-9.-]+$/i, 'COOKIE_DOMAIN must be a domain like .example.com')
@@ -41,6 +49,8 @@ export interface Config {
   sessionSecret: string;
   /** AES-256-GCM key for TOTP secrets at rest (T-011). */
   mfaKey: Buffer;
+  /** AES-256-GCM key for guest ID numbers at rest (T-051). */
+  idKey: Buffer;
   /** Domain of the `sid` cookie, e.g. `.example.com`; host-only when unset. */
   cookieDomain: string | undefined;
   /** `Secure` on the `sid` cookie. Off only outside production, where local HTTP is used. */
@@ -69,6 +79,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       'Invalid environment configuration:\n✖ SESSION_SECRET is the .env.example placeholder',
     );
   }
+  if (e.NODE_ENV === 'production' && !e.ID_ENCRYPTION_KEY) {
+    throw new Error(
+      'Invalid environment configuration:\n✖ ID_ENCRYPTION_KEY is required in production',
+    );
+  }
   return {
     nodeEnv: e.NODE_ENV,
     port: e.PORT,
@@ -78,6 +93,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     databaseUrl: e.DATABASE_URL,
     sessionSecret: e.SESSION_SECRET,
     mfaKey,
+    idKey: e.ID_ENCRYPTION_KEY
+      ? Buffer.from(e.ID_ENCRYPTION_KEY, 'base64url')
+      : Buffer.from('dev-only-id-key-not-for-production', 'latin1').subarray(0, 32),
     cookieDomain: e.COOKIE_DOMAIN,
     cookieSecure: e.NODE_ENV === 'production',
     localFilesDir: path.resolve(REPO_ROOT, e.LOCAL_FILES_DIR ?? '.data/files'),

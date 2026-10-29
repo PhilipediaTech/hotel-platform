@@ -13,6 +13,12 @@ const property = (id: string, name: string, code: string) => ({
   timeZone: 'Africa/Lagos',
   baseCurrency: 'NGN',
   locale: 'en-NG',
+  registrationFields: [
+    'nationality',
+    'purpose',
+    'idType',
+    'idNumber',
+  ] as MeResponse['properties'][number]['registrationFields'],
 });
 
 export const LAGOS_PROPERTY = property(LAGOS, 'Lagos Hotel', 'LAG');

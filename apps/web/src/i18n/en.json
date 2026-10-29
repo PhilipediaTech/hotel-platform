@@ -441,7 +441,8 @@
       "rates": "Rates",
       "payment-methods": "Payment methods",
       "staff": "Invite staff",
-      "go-live": "Go live"
+      "go-live": "Go live",
+      "registration": "Guest registration"
     },
     "laterText": {
       "tax": "Here you will set VAT and the state consumption tax for this property.",
@@ -497,7 +498,10 @@
     "goLiveRefused": "Some steps are not finished yet. Check the list and try again.",
     "goLive": "Go live",
     "isLive": "This property is live and taking bookings.",
-    "notInSetup": "This property is not in setup, so it cannot go live from here."
+    "notInSetup": "This property is not in setup, so it cannot go live from here.",
+    "registrationIntro": "What the front desk must collect when a guest checks in. Only these are kept; ID details are encrypted.",
+    "idRetention": "Keep ID details for (months)",
+    "idRetentionHint": "ID type, number, expiry and scans are deleted this long after check-in. 12 months unless the law asks for a different period."
   },
   "rooms": {
     "title": "Rooms and room types",
@@ -1099,5 +1103,63 @@
     "askManager": "Ask a manager",
     "cancel": "Cancel",
     "hkOf": "Housekeeping status of room {{room}}"
+  },
+  "checkIn": {
+    "open": "Check in",
+    "title": "Check in {{name}}",
+    "room": "Room {{room}}",
+    "registration": "Registration",
+    "fields": {
+      "nationality": "Nationality",
+      "address": "Home address",
+      "purpose": "Purpose of stay",
+      "idType": "ID type",
+      "idNumber": "ID number",
+      "idExpiry": "ID expiry date"
+    },
+    "nationalityHint": "Two-letter country code, e.g. NG",
+    "purposes": {
+      "BUSINESS": "Business",
+      "LEISURE": "Leisure",
+      "CONFERENCE": "Conference or event",
+      "FAMILY": "Family",
+      "OTHER": "Other"
+    },
+    "idTypes": {
+      "PASSPORT": "Passport",
+      "NATIONAL_ID": "National ID (NIN)",
+      "DRIVERS_LICENCE": "Driver’s licence",
+      "VOTERS_CARD": "Voter’s card",
+      "OTHER": "Other"
+    },
+    "scan": "Photo or scan of the ID (optional)",
+    "idPrivacy": "ID details are stored encrypted and deleted after the hotel’s retention period.",
+    "signature": "Registration card",
+    "signPaper": "The guest signs the printed card",
+    "signScreen": "The guest signs on this screen",
+    "padLabel": "Signature pad: sign here",
+    "clear": "Clear signature",
+    "keys": "Key cards given",
+    "submit": "Check in now",
+    "notReady": "This room is not ready (not clean, or a guest is still in it). Choose another room, or ask a manager to approve it from Change room.",
+    "keysIssued_one": "{{count}} key card issued",
+    "keysIssued_other": "{{count}} key cards issued",
+    "printCard": "Registration card",
+    "issueKey": "Issue another key",
+    "keyLog": "Key log",
+    "keyLine_one": "{{count}} card for room {{room}} by {{by}}, {{when}}",
+    "keyLine_other": "{{count}} cards for room {{room}} by {{by}}, {{when}}",
+    "cardTitle": "Registration card",
+    "print": "Print",
+    "cardHeading": "Confirmation {{no}} · Room {{room}}",
+    "guest": "Guest",
+    "roomType": "Room type",
+    "dates": "Stay",
+    "guests": "Guests",
+    "checkedIn": "Checked in",
+    "declaration": "I confirm these details are correct and agree to the hotel’s terms.",
+    "signatureAlt": "Guest signature",
+    "guestSignature": "Guest signature",
+    "signatureChecking": "Signed on screen (the signature is still being checked and shows shortly)."
   }
 }

@@ -14,6 +14,7 @@ export const SETUP_STEP_IDS = [
   'rooms',
   'rates',
   'payment-methods',
+  'registration',
   'staff',
 ] as const;
 
@@ -36,6 +37,8 @@ export const SETUP_STEPS: readonly SetupStepDef[] = [
   { id: 'rooms', required: true },
   { id: 'rates', required: true },
   { id: 'payment-methods', required: true },
+  // What to collect at check-in (T-051); the defaults work, so it never blocks go-live.
+  { id: 'registration', required: false },
   { id: 'staff', required: false },
 ];
 

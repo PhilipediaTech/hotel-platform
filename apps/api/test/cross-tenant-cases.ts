@@ -767,6 +767,23 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   reinstateReservation: { seed: bReservation, untouched: bReservationUnchanged },
   getReservationHistory: { seed: bReservation },
   listAssignableRooms: { seed: bReservation },
+  checkIn: {
+    seed: bReservation,
+    body: () => ({ registration: {} }),
+    untouched: async (db, w) => {
+      expect(await db.registrationCard.count()).toBe(0);
+      await bReservationUnchanged(db, w);
+    },
+  },
+  getRegistrationCard: { seed: bReservation },
+  listKeys: { seed: bReservation },
+  issueKeys: {
+    seed: bReservation,
+    body: () => ({ count: 1 }),
+    untouched: async (db) => {
+      expect(await db.keyIssue.count()).toBe(0);
+    },
+  },
   assignRoom: {
     seed: bReservation,
     body: () => ({ roomId: null }),

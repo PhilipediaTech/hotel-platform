@@ -9,6 +9,7 @@ const ORIGINS = {
   DATABASE_URL: DB,
   SESSION_SECRET: 'test-session-secret-0123456789abcdef',
   MFA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64url'),
+  ID_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString('base64url'),
 };
 
 describe('loadConfig', () => {
@@ -22,6 +23,7 @@ describe('loadConfig', () => {
       databaseUrl: DB,
       sessionSecret: 'test-session-secret-0123456789abcdef',
       mfaKey: Buffer.alloc(32, 7),
+      idKey: Buffer.alloc(32, 9),
       cookieDomain: undefined,
       cookieSecure: false,
       localFilesDir: path.resolve(import.meta.dirname, '../../../../.data/files'),
@@ -53,6 +55,17 @@ describe('loadConfig', () => {
     expect(() =>
       loadConfig({ ...ORIGINS, NODE_ENV: 'production', MFA_ENCRYPTION_KEY: placeholder }),
     ).toThrow(/MFA_ENCRYPTION_KEY is the .env.example placeholder/);
+  });
+
+  it('needs a 32-byte ID key in production and uses a fixed one in development', () => {
+    expect(() => loadConfig({ ...ORIGINS, ID_ENCRYPTION_KEY: 'c2hvcnQ' })).toThrow(
+      /ID_ENCRYPTION_KEY/,
+    );
+    const { ID_ENCRYPTION_KEY: _key, ...withoutKey } = ORIGINS;
+    expect(loadConfig(withoutKey).idKey).toHaveLength(32);
+    expect(() => loadConfig({ ...withoutKey, NODE_ENV: 'production' })).toThrow(
+      /ID_ENCRYPTION_KEY is required in production/,
+    );
   });
 
   it('sets a Secure cookie in production and reads the cookie domain', () => {

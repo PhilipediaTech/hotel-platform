@@ -13,6 +13,7 @@ import {
 } from './modules/approvals/jobs.ts';
 import { fileScanJob } from './modules/files/jobs.ts';
 import { inventoryJob } from './modules/availability/inventory.ts';
+import { idPurgeJob } from './modules/reservations/check-in.ts';
 import { holdExpiryJob } from './modules/reservations/jobs.ts';
 import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 
@@ -29,6 +30,7 @@ export function workerJobs(deps: {
     roomBlockStatusJob,
     inventoryJob,
     holdExpiryJob,
+    idPurgeJob({ store: deps.files }),
   ];
 }
 

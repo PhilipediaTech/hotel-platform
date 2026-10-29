@@ -52,6 +52,10 @@ function detail(over: { status?: string; paymentMethods?: string[]; details?: St
     checkOutTime: '12:00',
     nightAuditTime: '03:00',
     paymentMethods: over.paymentMethods ?? [],
+    registration: {
+      requiredFields: ['nationality', 'purpose', 'idType', 'idNumber'],
+      idRetentionMonths: 12,
+    },
     checklist: {
       steps: [
         step('organisation', 'DONE'),
@@ -62,6 +66,7 @@ function detail(over: { status?: string; paymentMethods?: string[]; details?: St
         step('rooms', 'LATER', 'T-031'),
         step('rates', 'LATER', 'T-033'),
         step('payment-methods', payments),
+        step('registration', 'DONE', null, false),
         step('staff', 'TODO', null, false),
       ],
       ready: details === 'DONE' && payments === 'DONE',
@@ -219,6 +224,27 @@ describe('Setup wizard', () => {
     await waitFor(() =>
       expect(sent(`PATCH /properties/${LAGOS}`)[0]?.body).toEqual({
         paymentMethods: ['CASH', 'POS_TERMINAL'],
+      }),
+    );
+  });
+
+  it('chooses what to collect at check-in and how long ID details are kept', async () => {
+    const user = userEvent.setup();
+    renderAt('/onboarding?step=registration');
+    const purpose = await screen.findByRole('checkbox', { name: 'Purpose of stay' });
+    expect(purpose).toBeChecked();
+    await user.click(purpose);
+    await user.click(screen.getByRole('checkbox', { name: 'Home address' }));
+    const months = screen.getByLabelText('Keep ID details for (months)');
+    await user.clear(months);
+    await user.type(months, '24');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(sent(`PATCH /properties/${LAGOS}`)[0]?.body).toEqual({
+        registration: {
+          requiredFields: ['nationality', 'address', 'idType', 'idNumber'],
+          idRetentionMonths: 24,
+        },
       }),
     );
   });

@@ -41,6 +41,7 @@ const reservation = (extra: object = {}) => ({
   currency: 'NGN',
   totalMinor: '11092500',
   depositDueMinor: '4500000',
+  deposit: { heldMinor: '0', receivedMinor: '0', paymentMethods: ['CASH'], entries: [] },
   stays: [
     {
       id: STAY,
@@ -594,5 +595,69 @@ describe('Proforma invoice (T-062)', () => {
     renderAt(`/reservations/${RES}`);
     await screen.findByRole('heading', { level: 1 });
     expect(screen.queryByRole('button', { name: 'Proforma invoice' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Advance deposit (M4-13; T-063)', () => {
+  const DEP = '33333333-0000-4000-8000-000000000010';
+  const paid = (held: string) =>
+    reservation({
+      deposit: {
+        heldMinor: held,
+        receivedMinor: '2000000',
+        paymentMethods: ['CASH', 'POS_TERMINAL'],
+        entries: [
+          {
+            id: '33333333-0000-4000-8000-000000000011',
+            kind: 'RECEIVED',
+            amountMinor: '2000000',
+            businessDate: '2026-11-10',
+            paymentId: DEP,
+            method: 'POS_TERMINAL',
+            externalRef: 'MPT-5001',
+          },
+        ],
+      },
+    });
+
+  it('shows what is held and still due, and takes a deposit on the booking', async () => {
+    permissions = [...permissions, 'payment.capture', 'folio.invoice'];
+    handlers[`GET /reservations/${RES}`] = () => json(200, paid('2000000'));
+    handlers['POST /payments'] = () =>
+      json(201, {
+        paymentId: '33333333-0000-4000-8000-000000000012',
+        shiftId: '33333333-0000-4000-8000-000000000013',
+        balanceMinor: '4500000',
+      });
+    const user = userEvent.setup();
+    renderAt(`/reservations/${RES}`);
+    const section = await screen.findByRole('region', { name: 'Advance deposit' });
+    expect(section).toHaveTextContent('Held: ₦20,000.00 · still due: ₦25,000.00');
+    const entries = within(section).getByRole('table', { name: 'Deposit entries' });
+    expect(entries).toHaveTextContent('Received · POS terminal · MPT-5001');
+    expect(within(entries).getByRole('button', { name: 'Receipt for ₦20,000.00' })).toBeEnabled();
+
+    const form = within(section).getByRole('form', { name: 'Take a deposit' });
+    await user.type(within(form).getByLabelText('Amount (₦)'), '25,000');
+    await user.click(within(form).getByRole('button', { name: 'Take payment' }));
+    await waitFor(() => expect(sent('POST /payments')).toHaveLength(1));
+    expect(sent('POST /payments')[0]?.body).toEqual({
+      reservationId: RES,
+      method: 'CASH',
+      amountMinor: '2500000',
+      externalRef: null,
+      note: null,
+    });
+    expect(
+      await within(form).findByText('Deposit recorded. Held now ₦45,000.00.'),
+    ).toBeInTheDocument();
+  }, 15_000);
+
+  it('offers no deposit form without payment.capture, and no receipt without folio.invoice', async () => {
+    handlers[`GET /reservations/${RES}`] = () => json(200, paid('0'));
+    renderAt(`/reservations/${RES}`);
+    const section = await screen.findByRole('region', { name: 'Advance deposit' });
+    expect(within(section).queryByRole('form', { name: 'Take a deposit' })).not.toBeInTheDocument();
+    expect(within(section).queryByRole('button', { name: /^Receipt/ })).not.toBeInTheDocument();
   });
 });

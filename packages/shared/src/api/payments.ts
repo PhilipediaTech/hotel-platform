@@ -19,8 +19,11 @@ const PositiveMinor = AmountMinor.refine(
 
 export const PaymentBody = z
   .object({
-    folioId: Uuid,
+    /** A payment on a folio window… */
+    folioId: Uuid.optional(),
     windowNumber: z.number().int().min(1).max(MAX_FOLIO_WINDOWS).default(1),
+    /** …or an advance deposit on a booking before arrival (M4-13; T-063). */
+    reservationId: Uuid.optional(),
     /** One the property switched on in setup. */
     method: z.enum(MANUAL_PAY_METHODS),
     amountMinor: PositiveMinor,
@@ -33,6 +36,10 @@ export const PaymentBody = z
     externalRef: z.string().trim().min(1).max(100).nullable().default(null),
     note: z.string().trim().max(500).nullable().default(null),
   })
+  .refine((b) => (b.folioId === undefined) !== (b.reservationId === undefined), {
+    message: 'Pay onto a folio or a booking (deposit)',
+    path: ['folioId'],
+  })
   .refine((b) => b.method === 'CASH' || b.externalRef !== null, {
     message: 'Give the reference (POS slip, transfer or voucher number)',
     path: ['externalRef'],
@@ -42,9 +49,9 @@ export const capturePayment = defineRoute({
   operationId: 'capturePayment',
   method: 'post',
   path: '/payments',
-  summary: 'Take a payment at the desk onto a folio window',
+  summary: 'Take a payment at the desk onto a folio window, or a deposit on a booking',
   description:
-    'Recorded on the caller’s open shift (409 SHIFT_NOT_OPEN without one, M4 rule 4) and the business date. A reference is used once per property and method (409 PAYMENT_DUPLICATE). Append-only: corrections are refunds (T-072).',
+    'Recorded on the caller’s open shift (409 SHIFT_NOT_OPEN without one, M4 rule 4) and the business date. With `reservationId` it is an advance deposit (M4-13): it goes into the booking’s deposit ledger and moves to the folio at check-in; `balanceMinor` is then the deposit held. Bookings that are cancelled, no-show or checked out take no deposits (409 STATE_TRANSITION_INVALID). A reference is used once per property and method (409 PAYMENT_DUPLICATE). Append-only: corrections are refunds (T-072).',
   tags: ['Payments'],
   propertyScoped: true,
   permission: 'payment.capture',
@@ -109,9 +116,24 @@ export const getProforma = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+export const getDepositReceipt = defineRoute({
+  operationId: 'getDepositReceipt',
+  method: 'get',
+  path: '/reservations/{reservationId}/receipt.pdf',
+  summary: 'A receipt (PDF) for a deposit paid on a booking',
+  tags: ['Folios'],
+  propertyScoped: true,
+  permission: 'folio.invoice',
+  produces: 'application/pdf',
+  params: z.object({ reservationId: Uuid }),
+  query: z.object({ paymentId: Uuid }),
+  response: PdfDocument,
+});
+
 export const PAYMENT_ROUTES = {
   capturePayment,
   getFolioInvoice,
   getFolioReceipt,
   getProforma,
+  getDepositReceipt,
 } as const;

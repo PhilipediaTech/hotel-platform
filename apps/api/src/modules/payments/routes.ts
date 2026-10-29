@@ -2,7 +2,7 @@ import { PAYMENT_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
-import { folioInvoice, folioReceipt, proforma } from './documents.ts';
+import { depositReceipt, folioInvoice, folioReceipt, proforma } from './documents.ts';
 import * as payments from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -26,6 +26,9 @@ export function paymentRoutes(deps: payments.PaymentDeps): Router {
     folioReceipt(deps, params.folioId, query.paymentId),
   );
   mountRoute(router, r.getProforma, ({ params }) => proforma(deps, params.reservationId));
+  mountRoute(router, r.getDepositReceipt, ({ params, query }) =>
+    depositReceipt(deps, params.reservationId, query.paymentId),
+  );
 
   return router;
 }

@@ -203,8 +203,14 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
     windowNumber && windowNumber > 1 ? `${folio.number}-${windowNumber}` : folio.number;
   const date = await businessDate(db, folio.propertyId, deps.clock);
 
-  const charges = lines.reduce((s, l) => s + l.amountMinor, 0n);
+  const charges = lines
+    .filter((l) => l.kind !== 'DEPOSIT_APPLY')
+    .reduce((s, l) => s + l.amountMinor, 0n);
+  const deposits = lines
+    .filter((l) => l.kind === 'DEPOSIT_APPLY')
+    .reduce((s, l) => s + l.amountMinor, 0n);
   const received = payments.reduce((s, p) => s + p.baseAmountMinor, 0n);
+  const balance = charges + deposits - received;
   const taxes = new Map<string, bigint>();
   for (const l of lines.filter(
     (x) => x.kind === 'TAX' || (x.kind === 'REVERSAL' && x.taxRuleVersionId),
@@ -233,12 +239,14 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
         { title: 'Qty', width: 40, align: 'right' },
         { title: 'Amount', width: 120, align: 'right' },
       ],
-      lines.map((l) => [
-        day(l.businessDate),
-        l.kind === 'TAX' ? `   ${l.description}` : l.description,
-        l.kind === 'TAX' ? '' : String(l.quantity),
-        money(l.amountMinor, cur),
-      ]),
+      lines
+        .filter((l) => l.kind !== 'DEPOSIT_APPLY')
+        .map((l) => [
+          day(l.businessDate),
+          l.kind === 'TAX' ? `   ${l.description}` : l.description,
+          l.kind === 'TAX' ? '' : String(l.quantity),
+          money(l.amountMinor, cur),
+        ]),
     );
     if (payments.length > 0) {
       table(
@@ -259,8 +267,9 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
       ['Charges before tax', money(charges - taxTotal, cur)],
       ...[...taxes.entries()].map(([name, amount]): [string, string] => [name, money(amount, cur)]),
       ['Total charges', money(charges, cur)],
+      ...(deposits !== 0n ? [['Advance deposit', money(deposits, cur)] as [string, string]] : []),
       ['Payments', money(-received, cur)],
-      ['Balance due', money(charges - received, cur)],
+      ['Balance due', money(balance, cur)],
     ]);
     footer(doc, `Folio ${folio.number}. Amounts in ${cur}. Thank you for staying with us.`);
   });
@@ -268,7 +277,7 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
     action: 'folio.invoice_issued',
     entityType: 'folio',
     entityId: folio.id,
-    after: { number, window: windowNumber ?? null, balanceMinor: (charges - received).toString() },
+    after: { number, window: windowNumber ?? null, balanceMinor: balance.toString() },
   });
   return { filename: `invoice-${safeName(number)}.pdf`, content };
 }
@@ -356,9 +365,11 @@ export async function proforma(deps: PaymentDeps, reservationId: string) {
         include: { quote: true, roomType: true, ratePlan: true, guest: true },
         orderBy: { arrival: 'asc' },
       },
+      depositEntries: true,
     },
   });
   if (!reservation) throw new AppError('NOT_FOUND', 'Reservation not found');
+  const depositHeldMinor = reservation.depositEntries.reduce((s, e) => s + e.amountMinor, 0n);
   const stays = reservation.stays.filter(
     (s) => !['CANCELLED', 'NO_SHOW'].includes(s.status) && s.quote !== null,
   );
@@ -416,6 +427,12 @@ export async function proforma(deps: PaymentDeps, reservationId: string) {
       ['Rooms before tax', money(total - taxTotal, cur)],
       ...[...taxes.entries()].map(([name, amount]): [string, string] => [name, money(amount, cur)]),
       ['Total', money(total, cur)],
+      ...(depositHeldMinor > 0n
+        ? ([
+            ['Deposit received', money(-depositHeldMinor, cur)],
+            ['To pay', money(total - depositHeldMinor, cur)],
+          ] as [string, string][])
+        : []),
     ]);
     footer(
       doc,
@@ -426,7 +443,83 @@ export async function proforma(deps: PaymentDeps, reservationId: string) {
     action: 'reservation.proforma_issued',
     entityType: 'reservation',
     entityId: reservation.id,
-    after: { totalMinor: total.toString() },
+    after: { totalMinor: total.toString(), depositHeldMinor: depositHeldMinor.toString() },
   });
   return { filename: `proforma-${safeName(reservation.confirmationNo)}.pdf`, content };
+}
+
+// ── Deposit receipt (M4-13; T-063) ───────────────────────────────────────────────────────
+
+export async function depositReceipt(deps: PaymentDeps, reservationId: string, paymentId: string) {
+  const db = deps.tenantDb;
+  const reservation = await db.reservation.findUnique({
+    where: { id: reservationId },
+    include: {
+      property: true,
+      booker: true,
+      company: true,
+      depositEntries: true,
+      payments: { include: { receivedBy: { select: { name: true } } } },
+      stays: { orderBy: { arrival: 'asc' } },
+    },
+  });
+  if (!reservation) throw new AppError('NOT_FOUND', 'Reservation not found');
+  const payment = reservation.payments.find((p) => p.id === paymentId);
+  if (!payment) throw new AppError('NOT_FOUND', 'Payment not found');
+  const cur = payment.currency;
+  const number = payment.id.slice(0, 8).toUpperCase();
+  const held = reservation.depositEntries.reduce((s, e) => s + e.amountMinor, 0n);
+  const booker = reservation.booker;
+  const first = reservation.stays[0];
+  const content = await render((doc) => {
+    header(doc, reservation.property, 'DEPOSIT RECEIPT');
+    facts(doc, [
+      ['Receipt no.', number],
+      ['Date', day(payment.businessDate)],
+      [
+        'Received from',
+        reservation.company?.name ?? `${booker.firstName} ${booker.lastName}`.trim(),
+      ],
+      ['Booking', reservation.confirmationNo],
+      ['Arrival', first ? day(first.arrival) : '—'],
+      ['Stays', String(reservation.stays.length)],
+    ]);
+    table(
+      doc,
+      [
+        { title: 'Method', width: 140 },
+        { title: 'Reference', width: 235 },
+        { title: 'Amount', width: 120, align: 'right' },
+      ],
+      [
+        [
+          METHOD[payment.method] ?? payment.method,
+          payment.externalRef ?? '—',
+          money(payment.amountMinor, cur),
+        ],
+      ],
+    );
+    totals(doc, [
+      ['Amount received', money(payment.amountMinor, cur)],
+      ['Deposit held for this booking', money(held, cur)],
+    ]);
+    footer(
+      doc,
+      [
+        'An advance deposit: it is credited to the guest bill at check-in.',
+        payment.receivedBy ? `Received by ${payment.receivedBy.name}.` : null,
+        payment.note ? `Note: ${payment.note}.` : null,
+        `Payment ${payment.id}.`,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
+  });
+  await recordAudit(db, {
+    action: 'payment.receipt_issued',
+    entityType: 'payment',
+    entityId: payment.id,
+    after: { reservationId: reservation.id, number },
+  });
+  return { filename: `receipt-${number}.pdf`, content };
 }

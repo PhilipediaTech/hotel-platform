@@ -45,9 +45,19 @@ export type Posted = { lines: Line[]; balanceMinor: string };
 
 /**
  * A live hotel with the Lagos taxes, a Standard room 101 and a guest (Ada Obi, Dangote Group)
- * checked in with a folio, dated TODAY on the test clock (T-060, T-062).
+ * checked in with a folio, dated TODAY on the test clock (T-060, T-062). With `checkIn: false`
+ * the guest is booked (arriving TODAY) and `checkIn()` checks them in.
  */
-export async function inHouse(db: Db, clock: Clock) {
+export async function inHouse(
+  db: Db,
+  clock: Clock,
+  options: {
+    /** The booking's guarantee (DEPOSIT for deposit tests, T-063). */
+    guarantee?: string;
+    /** False: book but don't check in yet; call `checkIn()` later. */
+    checkIn?: boolean;
+  } = {},
+) {
   const h = await makeHotel(db, clock());
   await db.property.update({ where: { id: h.p1.id }, data: { status: 'LIVE' } });
   await createDefaultTaxes(db, { id: h.p1.id, country: 'NG', settings: {} }, TODAY);
@@ -112,26 +122,32 @@ export async function inHouse(db: Db, clock: Clock) {
       source: 'PHONE',
       booker: { firstName: 'Ada', lastName: 'Obi' },
       companyId: company.id,
+      ...(options.guarantee ? { guarantee: options.guarantee } : {}),
       stays: [{ quoteId: quote.quoteId }],
     }),
   );
   const stay = r.stays[0] as { id: string; version: number };
   await db.room.update({ where: { id: room.id }, data: { hkStatus: 'CLEAN' } });
-  const checkedIn = await ok<{ folioId: string | null }>(
-    fd
-      .post(`/stays/${stay.id}/check-in`, {
-        roomId: room.id,
-        registration: {
-          nationality: 'NG',
-          purpose: 'BUSINESS',
-          idType: 'PASSPORT',
-          idNumber: 'A1234567',
-        },
-      })
-      .set('Idempotency-Key', randomUUID())
-      .set('If-Match', `"${stay.version}"`),
-  );
-  const folioId = checkedIn.folioId ?? '';
+  let folioId = '';
+  const checkIn = async () => {
+    const checkedIn = await ok<{ folioId: string | null }>(
+      fd
+        .post(`/stays/${stay.id}/check-in`, {
+          roomId: room.id,
+          registration: {
+            nationality: 'NG',
+            purpose: 'BUSINESS',
+            idType: 'PASSPORT',
+            idNumber: 'A1234567',
+          },
+        })
+        .set('Idempotency-Key', randomUUID())
+        .set('If-Match', `"${stay.version}"`),
+    );
+    folioId = checkedIn.folioId ?? '';
+    return folioId;
+  };
+  if (options.checkIn !== false) await checkIn();
   const folio = async (as = fd) => ok<Folio>(as.get(`/folios/${folioId}`));
   const charge = (body: object, as = fd) => as.send(`/folios/${folioId}/lines`, body);
   const finance = await h.person('finance', h.p1.id);
@@ -142,7 +158,10 @@ export async function inHouse(db: Db, clock: Clock) {
     gm,
     fd,
     ok,
-    folioId,
+    get folioId() {
+      return folioId;
+    },
+    checkIn,
     folio,
     charge,
     stayId: stay.id,

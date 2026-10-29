@@ -77,7 +77,8 @@ apps/api        @hotel/api      Express 5 app
                                 extend.ts: extend / shorten a checked-in stay (new quote of its nights)
   src/modules/folios/          folios: open at check-in, post with taxes, reverse, discount, windows, routing
   src/modules/shifts/          cashier shifts: open with float, blind close, variance and leakage alert, sign-off, handovers
-  src/modules/payments/        service.ts: desk payments on the open shift; documents.ts: invoice, receipt, proforma PDFs (pdfkit)
+  src/modules/payments/        service.ts: desk payments and deposits on the open shift; deposits.ts: deposit ledger, apply at folio
+                                opening; documents.ts: invoice, receipt, deposit receipt, proforma PDFs (pdfkit)
   src/modules/availability/     inventory.ts: rebuildInventory, takeInventory/releaseInventory, daily job; inventory API;
                                 quotes.ts: GET /availability, POST /quotes (live pricing, restrictions, taxes per night)
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
@@ -182,4 +183,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-063 advance-deposit ledger (`deposit_ledger_entries` in tab 3; trial-balance sign per open issue 13): deposits taken before arrival are payments with `reservation_id` and no folio (the `payments_target_check` already allows it), recorded RECEIVED in the ledger and applied to the folio at check-in (DEPOSIT_APPLY). `capturePayment()` in apps/api/src/modules/payments/service.ts and `openFolio()` in apps/api/src/modules/folios/service.ts are the places to extend. PDFs: routes with `produces: 'application/pdf'` and `api.download()`. Bundle is at 294 KB of 300 KB: make the next big screen lazy. The import still needs GUESTS/COMPANIES and BALANCES. Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-064 check-out with warnings and folio send (FOLIO_BALANCE_OUTSTANDING in tab 4’s error list; the day-use check-out `POST /stays/{id}/check-out` in apps/api/src/modules/reservations/day-use.ts is the starting point; settle and close the folio, room to dirty, invoice PDF from apps/api/src/modules/payments/documents.ts; "send" needs T-024 notifications, still waiting for accounts). Lockfile: after any dependency change, check that npm on Windows kept the other platforms’ bindings (see the T-062 fix). Bundle is at 294.8 KB of 300 KB: make the next big screen lazy. The import still needs GUESTS/COMPANIES and BALANCES. Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

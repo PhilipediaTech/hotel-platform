@@ -17,7 +17,7 @@ import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
-import { PrintProforma } from './folio-payments.tsx';
+import { BookingDeposit, PrintProforma } from './folio-payments.tsx';
 import { canCheckIn, CheckInPanel, StayKeys, usePropertyToday } from './check-in.tsx';
 import { DayUseTimes, EndDayUse } from './day-use.tsx';
 
@@ -255,6 +255,8 @@ export function ReservationPage() {
           </>
         )}
       </dl>
+
+      <BookingDeposit reservation={r} onPaid={refresh} />
 
       <h2 className="mt-6 font-semibold">{t('reservations.stays')}</h2>
       <ul className="mt-2 flex flex-col gap-3">

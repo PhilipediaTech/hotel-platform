@@ -74,6 +74,7 @@ const dayUseReservation = (status: string, endsAt = '2026-11-10T13:00:00Z') => (
   currency: 'NGN',
   totalMinor: '1848750',
   depositDueMinor: '0',
+  deposit: { heldMinor: '0', receivedMinor: '0', paymentMethods: ['CASH'], entries: [] },
   stays: [
     {
       id: STAY,

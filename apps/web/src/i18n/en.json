@@ -1393,5 +1393,20 @@
     "printInvoice": "Print invoice",
     "printWindowInvoice": "Invoice for window {{n}}",
     "proforma": "Proforma invoice"
+  },
+  "deposits": {
+    "title": "Advance deposit",
+    "held": "Held: {{amount}}",
+    "stillDue": "still due: {{amount}}",
+    "entries": "Deposit entries",
+    "what": "Entry",
+    "take": "Take a deposit",
+    "taken": "Deposit recorded. Held now {{balance}}.",
+    "kinds": {
+      "RECEIVED": "Received",
+      "APPLIED": "Moved to the guest bill",
+      "REFUNDED": "Refunded",
+      "FORFEITED": "Kept (forfeited)"
+    }
   }
 }

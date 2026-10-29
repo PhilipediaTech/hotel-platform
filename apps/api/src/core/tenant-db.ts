@@ -62,6 +62,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   Folio: { kind: 'property', organisationField: 'organisationId' },
   FolioLine: { kind: 'property' },
   Payment: { kind: 'property' },
+  DepositLedgerEntry: { kind: 'property' },
   // Counts and handovers are written through their shift.
   CashierShift: { kind: 'property' },
   LeakageAlert: { kind: 'property' },

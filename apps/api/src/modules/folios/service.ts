@@ -27,8 +27,9 @@ import { COUNTER, nextPropertyCounter } from '../../core/counters.ts';
 import { raisedBy, type Db } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
-import type { TenantContext } from '../../core/tenancy.ts';
+import { currentTenant, type TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
+import { applyDeposit, DEPOSIT_CODE } from '../payments/deposits.ts';
 
 // Folios (PRD M4-01–M4-05, M4 rules 1–3; tab 4 row "Folios"; T-060). A guest folio opens at
 // check-in, one per stay, with window 1 for the guest. Lines are append-only (M4 rule 1; a
@@ -177,7 +178,11 @@ async function loadFolio(db: Client, folioId: string): Promise<Full> {
 
 async function toItem(db: Client, f: Full): Promise<z.input<typeof FolioItem>> {
   const codes = await db.revenueCode.findMany({
-    where: { active: true, group: { notIn: ['TAX', 'SERVICE_CHARGE'] } },
+    where: {
+      active: true,
+      group: { notIn: ['TAX', 'SERVICE_CHARGE'] },
+      code: { not: DEPOSIT_CODE },
+    },
     orderBy: { code: 'asc' },
   });
   const stay = f.stays[0] ?? null;
@@ -317,6 +322,7 @@ export async function openFolio(
     guestId: string;
     folioId: string | null;
   },
+  clock: Clock,
 ): Promise<string> {
   if (stay.folioId) return stay.folioId;
   const [guest, property] = await Promise.all([
@@ -333,6 +339,7 @@ export async function openFolio(
       currency: property.baseCurrency,
       windows: { create: { number: 1, payerType: 'GUEST', payerGuestId: guest.id } },
     } as unknown as Prisma.FolioUncheckedCreateInput, // tenant IDs come from the client
+    include: { windows: true },
   });
   await tx.stay.update({ where: { id: stay.id }, data: { folioId: folio.id } });
   await recordAudit(tx, {
@@ -341,6 +348,9 @@ export async function openFolio(
     entityId: folio.id,
     after: { number: folio.number, stayId: stay.id },
   });
+  // M4-13: the booking's advance deposit moves onto its first folio (T-063).
+  const window = folio.windows[0];
+  if (window) await applyDeposit(tx, folio, window.id, currentTenant()?.userId ?? null, clock);
   return folio.id;
 }
 
@@ -353,7 +363,7 @@ export async function openStayFolio(deps: FolioDeps, stayId: string) {
         status: stay.status,
       });
     }
-    return openFolio(tx, stay);
+    return openFolio(tx, stay, deps.clock);
   });
   return getFolio(deps, id);
 }
@@ -516,7 +526,12 @@ export async function postCharge(
     const code = await tx.revenueCode.findFirst({
       where: { code: body.revenueCode, active: true },
     });
-    if (!code || code.group === 'TAX' || code.group === 'SERVICE_CHARGE') {
+    if (
+      !code ||
+      code.group === 'TAX' ||
+      code.group === 'SERVICE_CHARGE' ||
+      code.code === DEPOSIT_CODE
+    ) {
       throw invalid('body.revenueCode', 'Choose an active revenue code that takes charges');
     }
     const windowId =

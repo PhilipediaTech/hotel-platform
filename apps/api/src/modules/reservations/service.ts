@@ -31,6 +31,7 @@ import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { propertyToday, releaseInventory, takeInventory } from '../availability/inventory.ts';
 import type { QuoteNight } from '../availability/quotes.ts';
+import { enabledMethods } from '../folios/service.ts';
 import { followRoom, releaseAllocations } from './rooms.ts';
 
 // Reservations (PRD M3-01–M3-05, M3 rules 1 and 8; tab 4 row "Reservations"; T-042).
@@ -66,6 +67,7 @@ const notAllowed = (from: ReservationStatus, to: ReservationStatus, message?: st
 const FULL = {
   booker: true,
   company: true,
+  property: true,
   stays: {
     include: {
       guest: true,
@@ -76,6 +78,16 @@ const FULL = {
       nights: { orderBy: { date: 'asc' } },
     },
     orderBy: [{ arrival: 'asc' }, { id: 'asc' }],
+  },
+  depositEntries: {
+    include: { payment: true },
+    // Same day: received before applied, then in the order the money came in.
+    orderBy: [
+      { businessDate: 'asc' },
+      { kind: 'asc' },
+      { payment: { createdAt: 'asc' } },
+      { id: 'asc' },
+    ],
   },
 } satisfies Prisma.ReservationInclude;
 
@@ -101,6 +113,28 @@ const totalOf = (r: Full) => live(r).reduce((sum, s) => sum + stayTotal(s), 0n);
 function depositDue(r: Full): bigint {
   if (r.guarantee !== 'DEPOSIT') return 0n;
   return live(r).reduce((sum, s) => sum + (s.nights[0]?.amountMinor ?? 0n), 0n);
+}
+
+/** The advance-deposit ledger (M4-13; T-063). */
+function depositOf(r: Full) {
+  const entries = r.depositEntries;
+  return {
+    heldMinor: entries.reduce((sum, e) => sum + e.amountMinor, 0n).toString(),
+    receivedMinor: entries
+      .filter((e) => e.kind === 'RECEIVED')
+      .reduce((sum, e) => sum + e.amountMinor, 0n)
+      .toString(),
+    paymentMethods: enabledMethods(r.property.settings),
+    entries: entries.map((e) => ({
+      id: e.id,
+      kind: e.kind,
+      amountMinor: e.amountMinor.toString(),
+      businessDate: e.businessDate.toISOString().slice(0, 10),
+      paymentId: e.paymentId,
+      method: e.payment?.method ?? null,
+      externalRef: e.payment?.externalRef ?? null,
+    })),
+  };
 }
 
 /** A day-use stay's hours (M3-10); null for overnight stays. */
@@ -129,6 +163,7 @@ function toItem(r: Full): ItemOut {
     currency: r.stays[0]?.quote.currency ?? 'NGN',
     totalMinor: totalOf(r).toString(),
     depositDueMinor: depositDue(r).toString(),
+    deposit: depositOf(r),
     stays: r.stays.map((s) => ({
       id: s.id,
       status: s.status,

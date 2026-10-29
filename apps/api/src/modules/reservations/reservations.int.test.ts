@@ -1527,3 +1527,249 @@ describe('Day-use (M3-10, M2-08; T-052)', () => {
     expect(errorOf(back).details).toMatchObject({ reason: 'DAY_USE' });
   });
 });
+
+describe('Front desk lists (M3-06; T-053)', () => {
+  type Row = {
+    stayId: string;
+    status: string;
+    guest: { firstName: string; lastName: string };
+    roomNumber: string | null;
+    hkStatus: string | null;
+    nights: number;
+    flags: string[];
+    balanceMinor: string | null;
+    depositDueMinor: string;
+    totalMinor: string;
+    dayUse: { startsAt: string; endsAt: string } | null;
+    version: number;
+  };
+  type List = { date: string; data: Row[] };
+  const registration = {
+    nationality: 'NG',
+    purpose: 'BUSINESS',
+    idType: 'PASSPORT',
+    idNumber: 'A12345678',
+  };
+  type H = Awaited<ReturnType<typeof hotel>>;
+  type Client = H['fd'];
+
+  const rooms = async () =>
+    Object.fromEntries((await db.room.findMany()).map((r) => [r.number, r.id]));
+  const named = (list: List) => list.data.map((r) => r.guest.firstName);
+  const get = (fd: Client, path: string) =>
+    fd.get(path) as unknown as Promise<{ status: number; body: List }>;
+
+  /** Books one guest (today for two nights unless told); `first` names them. */
+  async function guest(h: H, first: string, quote: object = {}, extra: object = {}) {
+    const dates = { arrival: TODAY, departure: ARRIVE };
+    const r = await h.book([await h.quote({ adults: 1, ...dates, ...quote })], {
+      booker: { guestId: null, firstName: first, lastName: 'Test', phone: null, email: null },
+      ...extra,
+    });
+    return r.stays[0]?.id ?? '';
+  }
+
+  async function checkIn(fd: Client, stayId: string, roomId: string) {
+    await db.room.update({ where: { id: roomId }, data: { hkStatus: 'CLEAN' } });
+    const ok = async (res: Promise<{ status: number; body: unknown }>) => {
+      const r = await res;
+      expect(r.status, JSON.stringify(r.body)).toBeLessThan(300);
+    };
+    await ok(fd.post(`/stays/${stayId}/assign-room`, { roomId }));
+    const version = (await db.stay.findUniqueOrThrow({ where: { id: stayId } })).version;
+    await ok(
+      fd
+        .post(`/stays/${stayId}/check-in`, { registration })
+        .set('Idempotency-Key', randomUUID())
+        .set('If-Match', `"${version}"`),
+    );
+  }
+
+  it('lists today’s arrivals with their flags, those still to come first', async () => {
+    const h = await hotel(5);
+    const room = await rooms();
+    const ada = await guest(h, 'Ada');
+    const bola = await guest(
+      h,
+      'Bola',
+      {},
+      {
+        holdUntil: '2026-11-10T15:00:00Z',
+        guarantee: 'NONE',
+        notes: null,
+      },
+    );
+    const chi = await guest(h, 'Chi', {}, { guarantee: 'NONE', notes: null });
+    // Chi's room got dirty again; Dayo is already in; Efe comes tomorrow; Femi cancelled.
+    await db.room.update({ where: { id: room['102'] }, data: { hkStatus: 'CLEAN' } });
+    await h.ok(h.fd.post(`/stays/${chi}/assign-room`, { roomId: room['102'] }));
+    await db.room.update({ where: { id: room['102'] }, data: { hkStatus: 'DIRTY' } });
+    const dayo = await guest(h, 'Dayo', {}, { guarantee: 'NONE', notes: null });
+    await checkIn(h.fd, dayo, room['103'] ?? '');
+    await guest(h, 'Efe', { arrival: ARRIVE, departure: LEAVE });
+    const femi = await h.book([await h.quote({ arrival: TODAY, departure: ARRIVE, adults: 1 })]);
+    await h.ok(h.fd.send(`/reservations/${femi.id}/cancel`, { reason: 'DUPLICATE' }));
+    const adaGuest = await db.stay.findUniqueOrThrow({ where: { id: ada } });
+    await db.guest.update({
+      where: { id: adaGuest.guestId },
+      data: { vip: true, flagReason: 'Regular guest' },
+    });
+
+    const res = await get(h.fd, '/front-desk/arrivals');
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.date).toBe(TODAY);
+    expect(named(res.body)).toEqual(['Ada', 'Bola', 'Chi', 'Dayo']);
+    const [a, b, c, d] = res.body.data;
+    expect(a).toMatchObject({
+      stayId: ada,
+      status: 'CONFIRMED',
+      nights: 2,
+      roomNumber: null,
+      // No folios yet (T-060): no balance.
+      balanceMinor: null,
+      depositDueMinor: '4500000',
+      flags: ['VIP', 'NO_ROOM', 'DEPOSIT_DUE', 'NOTES'],
+    });
+    expect(b).toMatchObject({ stayId: bola, flags: ['TENTATIVE', 'NO_ROOM'] });
+    expect(c).toMatchObject({ roomNumber: '102', hkStatus: 'DIRTY', flags: ['ROOM_NOT_READY'] });
+    expect(d).toMatchObject({ stayId: dayo, status: 'CHECKED_IN', roomNumber: '103', flags: [] });
+
+    // Another business date: tomorrow's arrivals.
+    const tomorrow = await get(h.fd, `/front-desk/arrivals?date=${ARRIVE}`);
+    expect(tomorrow.body).toMatchObject({ date: ARRIVE });
+    expect(named(tomorrow.body)).toEqual(['Efe']);
+  });
+
+  it('keeps a guest who did not arrive on today’s list, flagged overdue', async () => {
+    const h = await hotel();
+    await guest(h, 'Ada', { departure: LEAVE }, { notes: null });
+    now = new Date('2026-11-11T09:00:00Z');
+    const fd = await h.as(h.fdId);
+    const list = (await get(fd, '/front-desk/arrivals')).body;
+    expect(list.date).toBe('2026-11-11');
+    expect(list.data).toEqual([
+      expect.objectContaining({ flags: ['NO_ROOM', 'DEPOSIT_DUE', 'OVERDUE'] }),
+    ]);
+    // Not on another date's list.
+    expect((await get(fd, `/front-desk/arrivals?date=${ARRIVE}`)).body.data).toEqual([]);
+  });
+
+  it('lists departures and in-house guests; past their date they are overdue', async () => {
+    const h = await hotel(3);
+    const room = await rooms();
+    const ada = await guest(h, 'Ada', { departure: '2026-11-11' }, { notes: null });
+    const bola = await guest(h, 'Bola', { departure: LEAVE }, { notes: null });
+    await checkIn(h.fd, ada, room['101'] ?? '');
+    await checkIn(h.fd, bola, room['102'] ?? '');
+    await guest(h, 'Chi', { departure: '2026-11-11' });
+
+    const inHouse = (await get(h.fd, '/front-desk/in-house')).body;
+    expect(named(inHouse)).toEqual(['Ada', 'Bola']);
+    expect(inHouse.data[0]).toMatchObject({ status: 'CHECKED_IN', roomNumber: '101', flags: [] });
+    expect((await get(h.fd, '/front-desk/departures')).body.data).toEqual([]);
+    expect(named((await get(h.fd, '/front-desk/departures?date=2026-11-11')).body)).toEqual([
+      'Ada',
+    ]);
+
+    // A day later Ada is due out; two days later she is still in: overdue.
+    now = new Date('2026-11-11T09:00:00Z');
+    const fd = await h.as(h.fdId);
+    expect((await get(fd, '/front-desk/departures')).body.data).toEqual([
+      expect.objectContaining({ stayId: ada, flags: [] }),
+    ]);
+    now = new Date('2026-11-12T09:00:00Z');
+    const later = await h.as(h.fdId);
+    const due = (await get(later, '/front-desk/departures')).body;
+    expect(named(due)).toEqual(['Ada']);
+    expect(due.data[0]?.flags).toEqual(['OVERDUE']);
+    expect(
+      (await get(later, '/front-desk/in-house')).body.data.map((r) => [r.guest.firstName, r.flags]),
+    ).toEqual([
+      ['Ada', ['OVERDUE']],
+      ['Bola', []],
+    ]);
+  });
+
+  it('shows day-use stays with their hours, due out on their date, gone once ended', async () => {
+    const h = await hotel();
+    const room = await rooms();
+    const plan = await h.ok<{ id: string }>(
+      h.gm.post('/rate-plans', {
+        cancellationPolicyId: h.policy.id,
+        code: 'DAY',
+        name: 'Day use',
+        kind: 'DAY_USE',
+        dayUseMaxMinutes: 360,
+      }),
+    );
+    await h.ok(
+      h.gm.put('/rate-calendar', {
+        ratePlanId: plan.id,
+        roomTypeIds: [h.std.id],
+        from: TODAY,
+        to: '2026-12-31',
+        set: { amountMinor: '1500000' },
+      }),
+    );
+    await db.room.updateMany({ data: { hkStatus: 'CLEAN' } });
+    const sold = await h.ok<{ stays: { id: string; version: number }[] }>(
+      h.fd.send('/day-use', {
+        date: TODAY,
+        start: '10:00',
+        minutes: 120,
+        roomTypeId: h.std.id,
+        ratePlanId: plan.id,
+        roomId: room['101'],
+        adults: 1,
+        booker: { firstName: 'Kemi', lastName: 'Ade' },
+      }),
+    );
+    const stay = sold.stays[0] as { id: string; version: number };
+    const arrivals = (await get(h.fd, '/front-desk/arrivals')).body;
+    expect(arrivals.data).toEqual([
+      expect.objectContaining({
+        stayId: stay.id,
+        nights: 0,
+        roomNumber: '101',
+        dayUse: { startsAt: '2026-11-10T09:00:00Z', endsAt: '2026-11-10T11:00:00Z' },
+        flags: ['DAY_USE'],
+      }),
+    ]);
+    await h.ok(
+      h.fd
+        .post(`/stays/${stay.id}/check-in`, { registration })
+        .set('Idempotency-Key', randomUUID())
+        .set('If-Match', `"${stay.version}"`),
+    );
+    expect((await get(h.fd, '/front-desk/departures')).body.data).toEqual([
+      expect.objectContaining({ stayId: stay.id, status: 'CHECKED_IN', flags: ['DAY_USE'] }),
+    ]);
+    // Past its end time and still in: overdue.
+    now = new Date('2026-11-10T11:30:00Z');
+    const fd = await h.as(h.fdId);
+    expect((await get(fd, '/front-desk/in-house')).body.data[0]?.flags).toEqual([
+      'DAY_USE',
+      'OVERDUE',
+    ]);
+    const version = (await db.stay.findUniqueOrThrow({ where: { id: stay.id } })).version;
+    await h.ok(
+      fd
+        .post(`/stays/${stay.id}/check-out`, {})
+        .set('Idempotency-Key', randomUUID())
+        .set('If-Match', `"${version}"`),
+    );
+    expect((await get(fd, '/front-desk/departures')).body.data).toEqual([
+      expect.objectContaining({ stayId: stay.id, status: 'CHECKED_OUT' }),
+    ]);
+    expect((await get(fd, '/front-desk/in-house')).body.data).toEqual([]);
+  });
+
+  it('needs frontdesk.read', async () => {
+    const h = await hotel();
+    const hk = await h.person('hk-attendant', h.p1.id);
+    const attendant = await h.as(hk.id);
+    for (const list of ['arrivals', 'departures', 'in-house']) {
+      expect((await attendant.get(`/front-desk/${list}`)).status).toBe(403);
+    }
+  });
+});

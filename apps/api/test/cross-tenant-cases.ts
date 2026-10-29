@@ -384,6 +384,28 @@ async function bReservationUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** B's guest checked in to a room of their type (T-053). */
+async function bInHouse(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bReservation(db, world, propertyId);
+  const stay = await db.stay.findUniqueOrThrow({
+    where: { id: theirs.stayId },
+    include: { roomType: true },
+  });
+  const room = await makeRoom(db, stay.roomType, { number: '901' });
+  await db.stay.update({
+    where: { id: stay.id },
+    data: { status: 'CHECKED_IN', checkedInAt: new Date('2099-01-01'), roomId: room.id },
+  });
+  return theirs;
+}
+
+/** Stay and reservation IDs on a front desk list (T-053). */
+const frontDeskIds = (body: unknown) =>
+  (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
+    r.stayId,
+    r.reservationId,
+  ]);
+
 export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> = {
   listRoles: { seed: bRole, listIds: ids },
   createRole: {
@@ -869,6 +891,21 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bReservation,
     body: () => ({}),
     untouched: bReservationUnchanged,
+  },
+  listArrivals: {
+    // B's stay arrives on 2099-01-01: A1's list for that day must not show it.
+    seed: bReservation,
+    query: () => ({ date: '2099-01-01' }),
+    listIds: frontDeskIds,
+  },
+  listDepartures: {
+    seed: bInHouse,
+    query: () => ({ date: '2099-01-02' }),
+    listIds: frontDeskIds,
+  },
+  listInHouse: {
+    seed: bInHouse,
+    listIds: frontDeskIds,
   },
   releaseRoomBlock: {
     seed: bBlock,

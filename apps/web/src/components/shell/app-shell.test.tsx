@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createQueryClient } from '../../app/query-client.ts';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { buildRoutes } from '../../app/routes.tsx';
@@ -17,9 +19,11 @@ function PassThroughGate({ children }: { children: ReactNode }) {
 function renderApp(path: string, session: Partial<ShellSession> = {}) {
   const router = createMemoryRouter(buildRoutes(PassThroughGate), { initialEntries: [path] });
   render(
-    <SessionContext value={{ ...PREVIEW_SESSION, ...session }}>
-      <RouterProvider router={router} />
-    </SessionContext>,
+    <QueryClientProvider client={createQueryClient()}>
+      <SessionContext value={{ ...PREVIEW_SESSION, ...session }}>
+        <RouterProvider router={router} />
+      </SessionContext>
+    </QueryClientProvider>,
   );
   return router;
 }
@@ -31,7 +35,23 @@ function setOnline(online: boolean) {
   });
 }
 
+// The front desk home (T-053) reads its lists: empty ones here.
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ date: '2026-11-10', data: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    ),
+  );
+});
+
 afterEach(() => {
+  vi.unstubAllGlobals();
   setOnline(true);
   swState.needRefresh = false;
 });

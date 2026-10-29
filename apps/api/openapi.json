@@ -3921,6 +3921,243 @@
           "plans",
           "rooms"
         ]
+      },
+      "FrontDeskRow": {
+        "type": "object",
+        "properties": {
+          "stayId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "reservationId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "confirmationNo": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ENQUIRY",
+              "TENTATIVE",
+              "CONFIRMED",
+              "CHECKED_IN",
+              "CHECKED_OUT",
+              "NO_SHOW",
+              "CANCELLED"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "WALK_IN",
+              "PHONE",
+              "EMAIL",
+              "WHATSAPP",
+              "DIRECT",
+              "OTA_MANUAL",
+              "OTA_CHANNEL",
+              "CORPORATE",
+              "TRAVEL_AGENT"
+            ]
+          },
+          "guarantee": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "DEPOSIT",
+              "CARD_ON_FILE",
+              "COMPANY"
+            ]
+          },
+          "guest": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "firstName",
+              "lastName",
+              "phone"
+            ]
+          },
+          "roomTypeName": {
+            "type": "string"
+          },
+          "roomId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "roomNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hkStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "DIRTY",
+              "CLEANING",
+              "CLEAN",
+              "INSPECTED",
+              "OUT_OF_ORDER",
+              "OUT_OF_SERVICE",
+              null
+            ]
+          },
+          "ratePlanCode": {
+            "type": "string"
+          },
+          "arrival": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "departure": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "nights": {
+            "type": "integer"
+          },
+          "adults": {
+            "type": "integer"
+          },
+          "children": {
+            "type": "integer"
+          },
+          "dayUse": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "startsAt": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "endsAt": {
+                "$ref": "#/components/schemas/Instant"
+              }
+            },
+            "required": [
+              "startsAt",
+              "endsAt"
+            ]
+          },
+          "checkedInAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "checkedOutAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "totalMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "depositDueMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "balanceMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "VIP",
+                "DO_NOT_RENT",
+                "TENTATIVE",
+                "NO_ROOM",
+                "ROOM_NOT_READY",
+                "DEPOSIT_DUE",
+                "DAY_USE",
+                "OVERDUE",
+                "NOTES"
+              ]
+            }
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stayId",
+          "reservationId",
+          "confirmationNo",
+          "status",
+          "source",
+          "guarantee",
+          "guest",
+          "roomTypeName",
+          "roomId",
+          "roomNumber",
+          "hkStatus",
+          "ratePlanCode",
+          "arrival",
+          "departure",
+          "nights",
+          "adults",
+          "children",
+          "dayUse",
+          "checkedInAt",
+          "checkedOutAt",
+          "totalMinor",
+          "depositDueMinor",
+          "balanceMinor",
+          "flags",
+          "notes",
+          "version"
+        ]
       }
     },
     "parameters": {}
@@ -17634,6 +17871,329 @@
           },
           "409": {
             "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `VERSION_CONFLICT`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/front-desk/arrivals": {
+      "get": {
+        "operationId": "listArrivals",
+        "summary": "Guests arriving on the business date, and those already in",
+        "tags": [
+          "Front desk"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Confirmed and tentative stays arriving that day (and, for today, earlier ones not arrived yet, flagged OVERDUE), then those checked in. Day-use stays are included with their hours.",
+        "x-permission": "frontdesk.read",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FrontDeskRow"
+                      }
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/front-desk/departures": {
+      "get": {
+        "operationId": "listDepartures",
+        "summary": "Guests leaving on the business date, and those already gone",
+        "tags": [
+          "Front desk"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Checked-in stays departing that day (day-use stays on their date; for today, guests past their departure, flagged OVERDUE), then those checked out.",
+        "x-permission": "frontdesk.read",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FrontDeskRow"
+                      }
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/front-desk/in-house": {
+      "get": {
+        "operationId": "listInHouse",
+        "summary": "Guests checked in now",
+        "tags": [
+          "Front desk"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "frontdesk.read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FrontDeskRow"
+                      }
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
             "content": {
               "application/json": {
                 "schema": {

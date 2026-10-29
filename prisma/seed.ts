@@ -37,6 +37,8 @@ export const DEMO_ROOM_TYPES = [
 /** Demo BAR per night in kobo (T-033), set for the next DEMO_RATE_DAYS days. */
 export const DEMO_BAR = { STD: 4_500_000n, DLX: 6_500_000n, STE: 12_000_000n } as const;
 export const DEMO_RATE_DAYS = 90;
+/** Day-use price per stay of up to six hours (T-052), every room type. */
+export const DEMO_DAY_USE = 2_000_000n;
 
 export interface SeedOptions {
   /** Password for demo users that have none yet (local sign-in). Omit to leave them without. */
@@ -338,6 +340,11 @@ async function seedRates(db: Db, today: string): Promise<void> {
     derivationAmountMinor: 1_000_000n,
     mealPlan: 'BREAKFAST',
   });
+  const dayUse = await plan('DAY', {
+    name: 'Day use (up to 6 hours)',
+    kind: 'DAY_USE',
+    dayUseMaxMinutes: 360,
+  });
   const fnb = await db.revenueCode.findUnique({
     where: { propertyId_code: { propertyId: DEMO_PROPERTY_ID, code: 'FNB' } },
   });
@@ -355,16 +362,21 @@ async function seedRates(db: Db, today: string): Promise<void> {
 
   const types = await db.roomType.findMany({ where: { propertyId: DEMO_PROPERTY_ID } });
   const start = new Date(`${today}T00:00:00Z`);
-  await db.rateDay.createMany({
-    data: types.flatMap((type) =>
+  const days = (ratePlanId: string, price: (code: string) => bigint) =>
+    types.flatMap((type) =>
       Array.from({ length: DEMO_RATE_DAYS }, (_, i) => ({
         propertyId: DEMO_PROPERTY_ID,
-        ratePlanId: bar.id,
+        ratePlanId,
         roomTypeId: type.id,
         date: new Date(start.getTime() + i * 86_400_000),
-        amountMinor: DEMO_BAR[type.code as keyof typeof DEMO_BAR] ?? 5_000_000n,
+        amountMinor: price(type.code),
       })),
-    ),
+    );
+  await db.rateDay.createMany({
+    data: [
+      ...days(bar.id, (code) => DEMO_BAR[code as keyof typeof DEMO_BAR] ?? 5_000_000n),
+      ...days(dayUse.id, () => DEMO_DAY_USE),
+    ],
     skipDuplicates: true,
   });
 }

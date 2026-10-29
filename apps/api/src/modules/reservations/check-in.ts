@@ -120,7 +120,11 @@ export async function checkIn(
         { arrival: day(stay.arrival), today },
       );
     }
-    if (day(stay.departure) <= today) {
+    // A day-use stay (M3-10): on its date, until its time is up.
+    const ended = stay.isDayUse
+      ? day(stay.arrival) < today || (stay.dayUseEnd ?? now) <= now
+      : day(stay.departure) <= today;
+    if (ended) {
       throw new AppError('STATE_TRANSITION_INVALID', 'This stay has already ended', {
         departure: day(stay.departure),
       });

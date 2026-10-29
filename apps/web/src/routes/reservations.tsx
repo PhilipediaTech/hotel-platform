@@ -8,7 +8,7 @@ import {
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import type { z } from 'zod';
 import { useSession } from '../app/session.ts';
 import { Alert } from '../components/ui/alert.tsx';
@@ -18,6 +18,7 @@ import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { canCheckIn, CheckInPanel, StayKeys, usePropertyToday } from './check-in.tsx';
+import { DayUseTimes, EndDayUse } from './day-use.tsx';
 
 // S09 Reservations (PRD M3-01–M3-05; T-042): find reservations; a reservation's stays,
 // details, history; change dates or guests (requoted), confirm a hold, cancel with a reason
@@ -46,6 +47,8 @@ export function useFormats() {
       new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(
         new Date(`${iso}T00:00:00Z`),
       ),
+    time: (iso: string) =>
+      new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone }).format(new Date(iso)),
     when: (iso: string) =>
       new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(
         new Date(iso),
@@ -191,6 +194,9 @@ export function ReservationsPage() {
 export function ReservationPage() {
   const { t } = useTranslation();
   const { reservationId = '' } = useParams();
+  // A walk-in or day-use just sold opens its check-in form (M3-09: fewest steps).
+  const [params] = useSearchParams();
+  const checkInNow = params.get('checkIn');
   const { currentPropertyId, permissions } = useSession();
   const f = useFormats();
   const key = [...reservationsKey(currentPropertyId), 'one', reservationId];
@@ -254,15 +260,35 @@ export function ReservationPage() {
               <span className="tabular-nums">{f.money(s.totalMinor)}</span>
             </div>
             <p className="text-text-muted">
-              {f.date(s.arrival)} → {f.date(s.departure)} ·{' '}
-              {t('reservations.guestsCount', { adults: s.adults, children: s.children })}
+              {s.dayUse ? (
+                <DayUseTimes stay={s} />
+              ) : (
+                <>
+                  {f.date(s.arrival)} → {f.date(s.departure)}
+                </>
+              )}{' '}
+              · {t('reservations.guestsCount', { adults: s.adults, children: s.children })}
             </p>
-            <StayRoom reservation={r} stay={s} queryKey={key} />
+            {s.dayUse ? (
+              s.roomNumber && (
+                <p className="mt-2">{t('reservations.room.is', { room: s.roomNumber })}</p>
+              )
+            ) : (
+              <StayRoom reservation={r} stay={s} queryKey={key} />
+            )}
             {canCheckIn(s, today, permissions) && (
-              <CheckInPanel reservation={r} stay={s} onDone={refresh} />
+              <CheckInPanel
+                reservation={r}
+                stay={s}
+                onDone={refresh}
+                startOpen={checkInNow === s.id}
+              />
             )}
             {s.status === 'CHECKED_IN' && <StayKeys stay={s} />}
-            {open && s.status !== 'CANCELLED' && can('reservation.modify') && (
+            {s.dayUse && s.status === 'CHECKED_IN' && can('reservation.checkout') && (
+              <EndDayUse stay={s} onDone={refresh} />
+            )}
+            {open && !s.dayUse && s.status !== 'CANCELLED' && can('reservation.modify') && (
               <ChangeStay reservation={r} stay={s} queryKey={key} />
             )}
           </li>

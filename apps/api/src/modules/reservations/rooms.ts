@@ -24,7 +24,10 @@ import { getReservation, type ReservationDeps } from './service.ts';
 // through allocations (date ranges, end exclusive); the database refuses two active
 // allocations of one room on the same night, so a room is never double-booked even when two
 // desks assign at once. `stays.room_id` mirrors the current room. Assigning plans a room
-// before check-in; a move changes the room of a checked-in guest from today on.
+// before check-in; a move changes the room of a checked-in guest from today on. A day-use stay
+// (T-052) holds its room for hours instead: the database keeps day-use holds apart in time, and
+// a room sold for the day can still be sold for the night (a guest arriving or leaving that day
+// does not collide; one staying through it does).
 
 type Tx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
 /** Reads go through the tenant client or one of its transactions. */
@@ -55,16 +58,39 @@ const conflict = (message: string, details: Record<string, unknown> = {}) =>
   new AppError('BOOKING_CONFLICT', message, details);
 
 /** The exclusion constraint lost a race: another desk took the room for those nights. */
-async function guarded<T>(work: () => Promise<T>): Promise<T> {
+export async function guarded<T>(work: () => Promise<T>): Promise<T> {
   try {
     return await work();
   } catch (err) {
-    if (pgErrorInfo(err)?.constraint === 'room_allocations_no_overlap') {
+    const constraint = pgErrorInfo(err)?.constraint;
+    if (constraint === 'room_allocations_no_overlap') {
       throw conflict('This room was just given to another stay on some of those nights');
+    }
+    if (constraint === 'room_allocations_day_use_no_overlap') {
+      throw conflict('This room was just sold for day-use at that time');
     }
     throw err;
   }
 }
+
+/**
+ * Waits for other desks giving this room away: overnight and day-use holds are checked by the
+ * app against each other, so they are given one at a time per room.
+ */
+export async function lockRoom(tx: Tx, roomId: string): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM rooms WHERE id = ${roomId}::uuid FOR UPDATE`;
+}
+
+/** Assign and move are for overnight stays. */
+const overnightOnly = (stay: { isDayUse: boolean }) => {
+  if (stay.isDayUse) {
+    throw new AppError(
+      'STATE_TRANSITION_INVALID',
+      'A day-use stay keeps the room it was sold with; cancel it and sell it again',
+      { reason: 'DAY_USE' },
+    );
+  }
+};
 
 export async function loadStay(db: Client, stayId: string) {
   const stay = await db.stay.findUnique({ where: { id: stayId } });
@@ -72,7 +98,10 @@ export async function loadStay(db: Client, stayId: string) {
   return stay;
 }
 
-/** Rooms of the type with no block and no other stay on any night of [from, to). */
+/**
+ * Rooms of the type with no block and no other stay on any night of [from, to), and no day-use
+ * on a day the guest stays through (after the arrival date, before the departure date).
+ */
 async function freeRooms(
   db: Client,
   stay: { id: string; roomTypeId: string },
@@ -90,8 +119,41 @@ async function freeRooms(
         none: {
           active: true,
           stayId: { not: stay.id },
-          startDate: { lt: dbDate(to) },
-          endDate: { gt: dbDate(from) },
+          OR: [
+            { startsAt: null, startDate: { lt: dbDate(to) }, endDate: { gt: dbDate(from) } },
+            { startsAt: { not: null }, startDate: { gt: dbDate(from), lt: dbDate(to) } },
+          ],
+        },
+      },
+    },
+    orderBy: { number: 'asc' },
+  });
+}
+
+/**
+ * Rooms of the type free for a day-use on `date` from `startsAt` to `endsAt`: no block that
+ * day, no guest staying through it (night before and night of), no other day-use then.
+ */
+export async function dayUseFreeRooms(
+  db: Client,
+  roomTypeId: string,
+  date: string,
+  startsAt: Date,
+  endsAt: Date,
+): Promise<Room[]> {
+  const d = dbDate(date);
+  return db.room.findMany({
+    where: {
+      roomTypeId,
+      active: true,
+      blocks: { none: { releasedAt: null, startDate: { lte: d }, endDate: { gt: d } } },
+      allocations: {
+        none: {
+          active: true,
+          OR: [
+            { startsAt: null, startDate: { lt: d }, endDate: { gt: d } },
+            { startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
+          ],
         },
       },
     },
@@ -112,6 +174,7 @@ export async function problemsOf(db: Client, room: Room, stayId: string) {
 
 export async function listAssignableRooms(deps: ReservationDeps, stayId: string) {
   const stay = await loadStay(deps.tenantDb, stayId);
+  if (stay.isDayUse) return { data: [] };
   const today = await propertyToday(deps.tenantDb, stay.propertyId, deps.clock);
   const from = stay.status === 'CHECKED_IN' ? later(day(stay.arrival), today) : day(stay.arrival);
   const rooms = await freeRooms(deps.tenantDb, stay, from, day(stay.departure));
@@ -150,6 +213,7 @@ export async function followRoom(
 ): Promise<string | null> {
   if (!stay.roomId) return null;
   await releaseAllocations(tx, [stay.id]);
+  await lockRoom(tx, stay.roomId);
   const free = await freeRooms(
     tx,
     { id: stay.id, roomTypeId: next.roomTypeId },
@@ -197,6 +261,7 @@ export async function assign(
 ): Promise<string> {
   const { tx } = ctx;
   const stay = await loadStay(tx, stayId);
+  overnightOnly(stay);
   if (stay.status === 'CHECKED_IN') {
     throw new AppError(
       'STATE_TRANSITION_INVALID',
@@ -230,6 +295,7 @@ export async function assign(
       });
     }
     const arrival = day(stay.arrival);
+    await lockRoom(tx, room.id);
     const free = await freeRooms(tx, stay, arrival, day(stay.departure));
     if (!free.some((r) => r.id === room.id)) {
       throw conflict(`Room ${room.number} is blocked or taken on some of those nights`, {
@@ -320,6 +386,7 @@ type MovePayload = z.output<typeof MoveStored>;
 async function move(ctx: Ctx, p: MovePayload): Promise<string> {
   const { tx } = ctx;
   const stay = await loadStay(tx, p.stayId);
+  overnightOnly(stay);
   if (stay.status !== 'CHECKED_IN' || !stay.roomId) {
     throw new AppError(
       'STATE_TRANSITION_INVALID',
@@ -345,6 +412,7 @@ async function move(ctx: Ctx, p: MovePayload): Promise<string> {
   if (from >= to) {
     throw new AppError('STATE_TRANSITION_INVALID', 'The stay has no nights left to move');
   }
+  await lockRoom(tx, room.id);
   const free = await freeRooms(tx, stay, from, to);
   if (!free.some((r) => r.id === room.id)) {
     throw conflict(`Room ${room.number} is blocked or taken on some of those nights`, {

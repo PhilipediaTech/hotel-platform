@@ -74,7 +74,7 @@ export const getAvailability = defineRoute({
   method: 'get',
   path: '/availability',
   summary: 'Room types that fit the guests, rooms left, and the price per rate plan',
-  description: `Overnight stays from today, at most ${MAX_STAY_NIGHTS} nights. Day-use plans are quoted with day-use bookings (T-052).`,
+  description: `Overnight stays from today, at most ${MAX_STAY_NIGHTS} nights. Day-use plans are priced with GET /day-use/availability.`,
   tags: ['Availability'],
   propertyScoped: true,
   permission: 'availability.read',

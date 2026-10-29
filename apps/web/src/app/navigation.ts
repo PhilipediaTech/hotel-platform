@@ -80,6 +80,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-044',
   },
   {
+    id: 'day-use',
+    path: '/bookings/day-use',
+    anyOf: ['reservation.dayuse'],
+    group: 'operations',
+    screen: 'S08',
+    ticket: 'T-052',
+  },
+  {
     id: 'reservations',
     path: '/reservations',
     anyOf: ['frontdesk.read'],

@@ -37,29 +37,38 @@ function useProperty() {
   return session.properties.find((p) => p.id === session.currentPropertyId);
 }
 
-/** M3 rule 2: confirmed, arriving today or overdue, and the desk may check in. */
-export function canCheckIn(stay: Stay, today: string, permissions: readonly string[]) {
-  return (
-    stay.status === 'CONFIRMED' &&
-    stay.arrival <= today &&
-    stay.departure > today &&
-    permissions.includes('reservation.checkin')
-  );
+/**
+ * M3 rule 2: confirmed, arriving today or overdue, and the desk may check in. A day-use stay
+ * (T-052) checks in on its date until its time is up.
+ */
+export function canCheckIn(
+  stay: Stay,
+  today: string,
+  permissions: readonly string[],
+  now = new Date(),
+) {
+  const open = stay.dayUse
+    ? stay.arrival === today && Date.parse(stay.dayUse.endsAt) > now.getTime()
+    : stay.arrival <= today && stay.departure > today;
+  return stay.status === 'CONFIRMED' && open && permissions.includes('reservation.checkin');
 }
 
 export function CheckInPanel({
   reservation,
   stay,
   onDone,
+  startOpen = false,
 }: {
   reservation: Reservation;
   stay: Stay;
   onDone: () => void;
+  /** Open at once (a walk-in or day-use just sold: T-052). */
+  startOpen?: boolean;
 }) {
   const { t } = useTranslation();
   const property = useProperty();
   const required = property?.registrationFields ?? [];
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [roomId, setRoomId] = useState('');
   const [reg, setReg] = useState<Registration>({});
   const [scan, setScan] = useState<File | null>(null);

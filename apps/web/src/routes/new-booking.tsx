@@ -24,8 +24,8 @@ import { useFormats } from './reservations.tsx';
 // S08 Availability search and new booking (PRD M3-01, M3-02, M3-05, M3 rule 8; T-044):
 // dates and guests → room types with the price per plan → guest details → guarantee →
 // confirm. Each room is quoted (POST /quotes) and the booking made from the quotes
-// (POST /reservations). Walk-in mode books from today, source Walk-in, confirmed; check-in
-// itself arrives with T-051.
+// (POST /reservations). Walk-in mode books from today, source Walk-in, confirmed, and opens
+// the check-in form on the new reservation (M3-09: at most six steps; T-052).
 
 type RoomType = z.output<typeof AvailabilityRoomType>;
 type Plan = RoomType['plans'][number];
@@ -211,7 +211,12 @@ export function NewBookingPage() {
         setPending({ expiresAt: request.expiresAt, approverRoles: request.approverRoles });
         return;
       }
-      void navigate(`/reservations/${result.id}`);
+      const first = result.stays[0];
+      void navigate(
+        walkIn && first
+          ? `/reservations/${result.id}?checkIn=${first.id}`
+          : `/reservations/${result.id}`,
+      );
     },
     onError: (error) => {
       if (error instanceof ApiError && error.details?.['doNotRent']) setApprovalReason('');
@@ -253,9 +258,16 @@ export function NewBookingPage() {
         <h1 className="text-xl font-semibold">
           {walkIn ? t('booking.walkInTitle') : t('booking.title')}
         </h1>
-        <Button variant="secondary" size="sm" onClick={() => setMode(!walkIn)}>
-          {walkIn ? t('booking.toAdvance') : t('booking.toWalkIn')}
-        </Button>
+        <span className="flex flex-wrap items-center gap-2">
+          {session.permissions.includes('reservation.dayuse') && (
+            <Link to="/bookings/day-use" className="text-sm text-brand underline">
+              {t('booking.toDayUse')}
+            </Link>
+          )}
+          <Button variant="secondary" size="sm" onClick={() => setMode(!walkIn)}>
+            {walkIn ? t('booking.toAdvance') : t('booking.toWalkIn')}
+          </Button>
+        </span>
       </div>
 
       {/* 1. Dates and guests */}

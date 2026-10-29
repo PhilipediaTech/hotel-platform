@@ -1253,3 +1253,277 @@ describe('Check-in (M3-08, M3-19, M3 rules 2 and 6; T-051)', () => {
     expect(after).toMatchObject({ idNumberMasked: null, idType: null, nationality: 'NG' });
   });
 });
+
+describe('Day-use (M3-10, M2-08; T-052)', () => {
+  type DayUseStay = Stay & {
+    roomId: string | null;
+    roomNumber: string | null;
+    version: number;
+    dayUse: { startsAt: string; endsAt: string } | null;
+  };
+  type DayUseReservation = Omit<Reservation, 'stays'> & { stays: DayUseStay[] };
+  type Offer = {
+    roomTypeId: string;
+    plans: { code: string; totalMinor: string | null; sellable: boolean; maxMinutes: number }[];
+    rooms: { number: string }[];
+  };
+  const registration = {
+    nationality: 'NG',
+    purpose: 'LEISURE',
+    idType: 'PASSPORT',
+    idNumber: 'B7654321',
+  };
+
+  /** A 6-hour day-use plan at ₦15,000 on Standard rooms; every room clean. */
+  async function dayUseHotel() {
+    const h = await hotel();
+    const plan = await h.ok<{ id: string }>(
+      h.gm.post('/rate-plans', {
+        cancellationPolicyId: h.policy.id,
+        code: 'DAY',
+        name: 'Day use',
+        kind: 'DAY_USE',
+        dayUseMaxMinutes: 360,
+      }),
+    );
+    await h.ok(
+      h.gm.put('/rate-calendar', {
+        ratePlanId: plan.id,
+        roomTypeIds: [h.std.id],
+        from: TODAY,
+        to: '2026-12-31',
+        set: { amountMinor: '1500000' },
+      }),
+    );
+    const room = Object.fromEntries((await db.room.findMany()).map((r) => [r.number, r.id]));
+    await db.room.updateMany({ data: { hkStatus: 'CLEAN' } });
+    const body = (extra: object = {}) => ({
+      date: TODAY,
+      start: '10:00',
+      minutes: 240,
+      roomTypeId: h.std.id,
+      ratePlanId: plan.id,
+      roomId: room['101'],
+      adults: 1,
+      booker: { firstName: 'Kemi', lastName: 'Ade', phone: '+2348011111111' },
+      ...extra,
+    });
+    const sell = (extra: object = {}) => h.fd.send('/day-use', body(extra));
+    const sold = async (extra: object = {}) =>
+      (await h.ok<DayUseReservation>(sell(extra))).stays[0] as DayUseStay;
+    const offers = async (q: string) =>
+      (await h.ok<{ roomTypes: Offer[] }>(h.fd.get(`/day-use/availability?${q}`))).roomTypes;
+    return { ...h, plan, room, body, sell, sold, offers };
+  }
+
+  it('sells a room for a start time and duration, priced once, and takes no room night', async () => {
+    const h = await dayUseHotel();
+    const types = await h.offers(`date=${TODAY}&start=10:00&minutes=240&adults=1`);
+    // Overnight plans are not offered; Deluxe has no day-use price.
+    expect(types.find((t) => t.roomTypeId === h.dlx.id)?.plans).toMatchObject([
+      { code: 'DAY', sellable: false, totalMinor: null },
+    ]);
+    expect(types.find((t) => t.roomTypeId === h.std.id)).toMatchObject({
+      roomTypeId: h.std.id,
+      plans: [{ code: 'DAY', sellable: true, maxMinutes: 360, totalMinor: '1848750' }],
+      rooms: [{ number: '101' }, { number: '102' }],
+    });
+
+    const res = await h.sell();
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    const r = res.body as DayUseReservation & { source: string };
+    expect(r).toMatchObject({ status: 'CONFIRMED', source: 'WALK_IN', totalMinor: '1848750' });
+    expect(r.stays[0]).toMatchObject({
+      status: 'CONFIRMED',
+      arrival: TODAY,
+      departure: TODAY,
+      roomNumber: '101',
+      // 10:00 in Lagos is 09:00 UTC; four hours.
+      dayUse: { startsAt: '2026-11-10T09:00:00Z', endsAt: '2026-11-10T13:00:00Z' },
+      nights: [{ date: TODAY, amountMinor: '1500000' }],
+    });
+    // Not a room night (M3 acceptance): today's inventory is untouched.
+    const today = await db.roomTypeInventory.findFirstOrThrow({
+      where: { roomTypeId: h.std.id, date: new Date(TODAY) },
+    });
+    expect([today.sold, today.held]).toEqual([0, 0]);
+    // The calendar shows it on its date with its hours.
+    const cal = await h.ok<{ data: { id: string; dayUse: unknown; rooms: unknown[] }[] }>(
+      h.fd.get(`/calendar?from=${TODAY}&to=${ARRIVE}`),
+    );
+    expect(cal.data).toEqual([
+      expect.objectContaining({
+        id: r.stays[0]?.id,
+        dayUse: r.stays[0]?.dayUse,
+        rooms: [{ roomId: h.room['101'], startDate: TODAY, endDate: '2026-11-11' }],
+      }),
+    ]);
+  });
+
+  it('holds the room by the hour: day-use never overlaps, the night is still sold', async () => {
+    const h = await dayUseHotel();
+    await h.sold();
+    // 12:00–14:00 overlaps 10:00–14:00 in 101; 14:00–16:00 follows it.
+    expect(errorOf(await h.sell({ start: '12:00', minutes: 120 }))).toMatchObject({
+      code: 'BOOKING_CONFLICT',
+    });
+    await h.sold({ start: '14:00', minutes: 120 });
+    const at = await h.offers(`date=${TODAY}&start=11:00&minutes=60&adults=1`);
+    const std = at.find((t) => t.roomTypeId === h.std.id);
+    expect(std?.rooms.map((r) => r.number)).toEqual(['102']);
+
+    // Tonight's guest gets 101 too: arriving that day does not collide.
+    const tonight = await h.book([await h.quote({ arrival: TODAY, departure: ARRIVE })]);
+    await h.ok(
+      h.fd.post(`/stays/${tonight.stays[0]?.id ?? ''}/assign-room`, { roomId: h.room['101'] }),
+    );
+
+    // The database refuses two day-use holds of one room at once, whatever the app does.
+    const stay = await db.stay.findFirstOrThrow({ where: { isDayUse: true } });
+    await expect(
+      db.roomAllocation.create({
+        data: {
+          propertyId: h.p1.id,
+          stayId: stay.id,
+          roomId: h.room['101'] ?? '',
+          startDate: new Date(TODAY),
+          endDate: new Date('2026-11-11'),
+          startsAt: new Date('2026-11-10T12:30:00Z'),
+          endsAt: new Date('2026-11-10T13:30:00Z'),
+        },
+      }),
+    ).rejects.toThrow(/room_allocations_day_use_no_overlap/);
+  });
+
+  it('refuses a day-use on a day a guest stays through, and the other way round', async () => {
+    const h = await dayUseHotel();
+    // In 102 from 12 to 14 November: the 13th is theirs all day.
+    const stay = (await h.book([await h.quote({ adults: 1 })])).stays[0]?.id ?? '';
+    await h.ok(h.fd.post(`/stays/${stay}/assign-room`, { roomId: h.room['102'] }));
+    const through = await h.sell({ date: '2026-11-13', roomId: h.room['102'] });
+    expect(errorOf(through)).toMatchObject({ code: 'BOOKING_CONFLICT' });
+    // Their arrival and departure days are free for day-use.
+    await h.sold({ date: ARRIVE, roomId: h.room['102'] });
+    await h.sold({ date: LEAVE, roomId: h.room['102'] });
+
+    // A day-use on the 13th in 101 keeps an overnight 12–14 out of 101.
+    await h.sold({ date: '2026-11-13' });
+    const other = (await h.book([await h.quote({ adults: 1 })])).stays[0]?.id ?? '';
+    const taken = await h.fd.post(`/stays/${other}/assign-room`, { roomId: h.room['101'] });
+    expect(errorOf(taken)).toMatchObject({ code: 'BOOKING_CONFLICT' });
+  });
+
+  it('keeps to the plan: longest stay, restrictions, time, plan kind and permission', async () => {
+    const h = await dayUseHotel();
+    const long = await h.sell({ minutes: 420 });
+    expect(errorOf(long).details).toMatchObject({ issues: [{ path: 'body.minutes' }] });
+    const offered = await h.offers(`date=${TODAY}&start=10:00&minutes=420&adults=1`);
+    expect(offered.find((t) => t.roomTypeId === h.std.id)?.plans[0]?.sellable).toBe(false);
+
+    await h.ok(
+      h.gm.put('/rate-calendar', {
+        ratePlanId: h.plan.id,
+        roomTypeIds: [h.std.id],
+        from: ARRIVE,
+        to: ARRIVE,
+        set: { stopSell: true },
+      }),
+    );
+    expect(errorOf(await h.sell({ date: ARRIVE }))).toMatchObject({
+      code: 'RESTRICTION_VIOLATED',
+    });
+    // 08:00 for an hour was over at 09:00 local; it is 10:00.
+    const past = await h.sell({ start: '08:00', minutes: 60 });
+    expect(errorOf(past).details).toMatchObject({ issues: [{ path: 'body.start' }] });
+    // An overnight plan is not a day-use plan.
+    expect((await h.sell({ ratePlanId: h.bar.id })).status).toBe(400);
+
+    const hk = await h.person('hk-attendant', h.p1.id);
+    const attendant = await h.as(hk.id);
+    expect((await attendant.send('/day-use', h.body())).status).toBe(403);
+    expect(await db.stay.count()).toBe(0);
+  });
+
+  it('checks in, ends at the desk, sets the room dirty and frees it from then', async () => {
+    const h = await dayUseHotel();
+    const stay = await h.sold();
+    const checkIn = await h.fd
+      .post(`/stays/${stay.id}/check-in`, { registration, keysIssued: 1 })
+      .set('Idempotency-Key', randomUUID())
+      .set('If-Match', `"${stay.version}"`);
+    expect(checkIn.status, JSON.stringify(checkIn.body)).toBe(200);
+
+    // Ended early, at 12:00 local.
+    now = new Date('2026-11-10T11:00:00Z');
+    const fd = await h.as(h.fdId);
+    const version = (await db.stay.findUniqueOrThrow({ where: { id: stay.id } })).version;
+    const checkOut = (v: number) =>
+      fd
+        .post(`/stays/${stay.id}/check-out`, {})
+        .set('Idempotency-Key', randomUUID())
+        .set('If-Match', `"${v}"`);
+    expect(errorOf(await checkOut(version - 1))).toMatchObject({ code: 'VERSION_CONFLICT' });
+    const out = await checkOut(version);
+    expect(out.status, JSON.stringify(out.body)).toBe(200);
+    expect(out.body).toMatchObject({ status: 'CHECKED_OUT', stays: [{ status: 'CHECKED_OUT' }] });
+    // Housekeeping rule 2: a day-use end sets the room to dirty.
+    const room = await db.room.findUniqueOrThrow({ where: { id: h.room['101'] } });
+    expect(room.hkStatus).toBe('DIRTY');
+    expect((await db.keyIssue.findFirstOrThrow()).returnedAt).toEqual(now);
+    const held = await db.roomAllocation.findFirstOrThrow({ where: { stayId: stay.id } });
+    expect(held.endsAt).toEqual(now);
+    const history = await h.ok<{ data: { toStatus: string }[] }>(
+      fd.get(`/reservations/${(out.body as { id: string }).id}/history`),
+    );
+    expect(history.data.at(-1)?.toStatus).toBe('CHECKED_OUT');
+    expect(await db.auditEvent.count({ where: { action: 'stay.checked_out' } })).toBe(1);
+    // 101 can be sold again from 12:00 (it needs cleaning before the next check-in).
+    await h.ok(fd.send('/day-use', h.body({ start: '12:00', minutes: 60 })));
+  });
+
+  it('closes check-in after the time, and leaves overnight check-out for folios', async () => {
+    const h = await dayUseHotel();
+    const stay = await h.sold({ minutes: 60 });
+    now = new Date('2026-11-10T10:30:00Z'); // 11:30 local; it ended at 11:00
+    const fd = await h.as(h.fdId);
+    const late = await fd
+      .post(`/stays/${stay.id}/check-in`, { registration })
+      .set('Idempotency-Key', randomUUID())
+      .set('If-Match', `"${stay.version}"`);
+    expect(errorOf(late)).toMatchObject({ code: 'STATE_TRANSITION_INVALID' });
+
+    const overnight = await h.book([await h.quote({ arrival: TODAY, adults: 1 })]);
+    const o = overnight.stays[0];
+    await h.ok(fd.post(`/stays/${o?.id ?? ''}/assign-room`, { roomId: h.room['102'] }));
+    const v = (await db.stay.findUniqueOrThrow({ where: { id: o?.id ?? '' } })).version;
+    await h.ok(
+      fd
+        .post(`/stays/${o?.id ?? ''}/check-in`, { registration })
+        .set('Idempotency-Key', randomUUID())
+        .set('If-Match', `"${v}"`),
+    );
+    const refused = await fd
+      .post(`/stays/${o?.id ?? ''}/check-out`, {})
+      .set('Idempotency-Key', randomUUID())
+      .set('If-Match', `"${v + 1}"`);
+    expect(errorOf(refused).details).toMatchObject({ reason: 'NEEDS_FOLIO' });
+  });
+
+  it('keeps its room and time: no assign or re-quote; cancel frees it, no reinstate', async () => {
+    const h = await dayUseHotel();
+    const r = await h.ok<DayUseReservation>(h.sell());
+    const stay = r.stays[0] as DayUseStay;
+    const assign = await h.fd.post(`/stays/${stay.id}/assign-room`, { roomId: h.room['102'] });
+    expect(errorOf(assign).details).toMatchObject({ reason: 'DAY_USE' });
+    const requote = await h.fd.change(`/reservations/${r.id}`, r.version, {
+      stays: [{ stayId: stay.id, quoteId: await h.quote({ arrival: TODAY, adults: 1 }) }],
+    });
+    expect(errorOf(requote).details).toMatchObject({ reason: 'DAY_USE' });
+    expect((await h.ok<{ data: unknown[] }>(h.fd.get(`/stays/${stay.id}/rooms`))).data).toEqual([]);
+
+    await h.ok(h.fd.send(`/reservations/${r.id}/cancel`, { reason: 'GUEST_REQUEST' }));
+    await h.sold();
+    const back = await h.fd.send(`/reservations/${r.id}/reinstate`);
+    expect(errorOf(back).details).toMatchObject({ reason: 'DAY_USE' });
+  });
+});

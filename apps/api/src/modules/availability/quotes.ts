@@ -433,3 +433,53 @@ export async function createQuote(
     expiresAt: iso(quote.expiresAt),
   };
 }
+
+// ── Day-use (M3-10; T-052) ──────────────────────────────────────────────────────────────
+
+/** Restrictions that stop a day-use sale; stay-length rules are about nights. */
+const DAY_USE_RULES = new Set(['STOP_SELL', 'CLOSED_TO_ARRIVAL', 'NO_PRICE']);
+
+export interface DayUseOffer {
+  type: RoomType;
+  plan: RatePlan;
+  /** The one priced line for the date; null when it has no price. */
+  night: QuoteNight | null;
+  violations: ViolationOut[];
+  netMinor: bigint;
+  totalMinor: bigint;
+  taxes: { code: string; name: string; amountMinor: string }[];
+}
+
+/**
+ * Day-use plans for each room type that fits the guests, priced for `date`: the plan's price
+ * that day covers one stay up to its longest duration (one price per stay, as agreed for V1).
+ */
+export async function dayUseOffers(
+  db: TenantDb,
+  date: string,
+  guests: number,
+): Promise<{ offers: DayUseOffer[]; hasRoomCode: boolean }> {
+  const stay = { arrival: date, departure: addDays(date, 1) };
+  const ctx = await load(db, stay);
+  const offers: DayUseOffer[] = [];
+  for (const type of ctx.types.filter((t) => t.maxOccupancy >= guests)) {
+    for (const plan of ctx.plans.values()) {
+      const forType = plan.roomTypeIds.length === 0 || plan.roomTypeIds.includes(type.id);
+      if (plan.kind !== 'DAY_USE' || !forType) continue;
+      const p = price(ctx, plan, type.id, stay, guests);
+      offers.push({
+        type,
+        plan,
+        night: p.nights?.[0] ? { ...p.nights[0], guests } : null,
+        violations: p.violations.filter((v) => v.date === date && DAY_USE_RULES.has(v.rule)),
+        netMinor: p.netMinor,
+        totalMinor: p.totalMinor,
+        taxes: [...p.taxes.entries()].map(([codeId, amount]) => {
+          const code = ctx.codes.get(codeId);
+          return { code: code?.code ?? '', name: code?.name ?? '', amountMinor: amount.toString() };
+        }),
+      });
+    }
+  }
+  return { offers, hasRoomCode: ctx.roomCode !== null };
+}

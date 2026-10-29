@@ -3,6 +3,7 @@ import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as checkIns from './check-in.ts';
+import * as dayUse from './day-use.ts';
 import * as rooms from './rooms.ts';
 import * as reservations from './service.ts';
 
@@ -78,6 +79,25 @@ export function reservationRoutes(deps: checkIns.CheckInDeps): Router {
   mountRoute(router, r.listKeys, ({ params }) => checkIns.listKeys(deps, params.stayId));
   mountRoute(router, r.issueKeys, ({ params, body }, { tenant }) =>
     checkIns.issueKeys(deps, tenantFrom(tenant), params.stayId, body.count),
+  );
+
+  mountRoute(router, r.getDayUseAvailability, ({ query }, { tenant }) =>
+    dayUse.getDayUseAvailability(deps, tenantFrom(tenant), query),
+  );
+  mountRoute(router, r.createDayUse, async ({ body }, { tenant, res }) =>
+    etag(res, await dayUse.createDayUse(deps, tenantFrom(tenant), body)),
+  );
+  mountRoute(router, r.checkOut, async ({ params, body }, { tenant, req, res }) =>
+    etag(
+      res,
+      await dayUse.checkOut(
+        deps,
+        tenantFrom(tenant),
+        params.stayId,
+        req.get('If-Match') ?? '',
+        body,
+      ),
+    ),
   );
 
   return router;

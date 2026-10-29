@@ -72,6 +72,7 @@ apps/api        @hotel/api      Express 5 app
   src/modules/reservations/     book from quotes, change, cancel, reinstate; hold-expiry job; do-not-rent approval
                                 rooms.ts: room allocations, assign (room.not_ready approval), move (room.move approval)
                                 check-in.ts: check-in, registration card, key log, ID purge job
+                                day-use.ts: day-use availability and sale (hourly room holds), check-out of day-use
   src/modules/availability/     inventory.ts: rebuildInventory, takeInventory/releaseInventory, daily job; inventory API;
                                 quotes.ts: GET /availability, POST /quotes (live pricing, restrictions, taxes per night)
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
@@ -110,6 +111,7 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/routes/new-booking.tsx    S08 new booking: search, plans, guests, guarantee, book (walk-in mode: ?mode=walk-in)
   src/routes/calendar.tsx       S07 calendar: rooms × dates, unassigned rows per type, blocks, rooms left
   src/routes/check-in.tsx       check-in form (on S09), key log, printable registration card (/stays/:id/card)
+  src/routes/day-use.tsx        day-use sale (/bookings/day-use), day-use times and "End day-use" on S09
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -171,4 +173,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-052 walk-in and day-use flows (M3-09 walk-in in under 2 minutes / ≤ 6 steps in the E2E test: today the walk-in books on S08 and checks in on S09 — consider one screen that books and checks in; M3-10 day-use: start time and duration, DAY_USE plans priced per stay (quotes say "Day-use plans are quoted with day-use bookings (T-052)"), a day-use allocation covers [arrival, arrival + 1), the room returns to dirty at the end; M3 acceptance on day-use revenue vs room nights). The import still needs GUESTS/COMPANIES and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-053 front desk dashboard (S06): arrivals, departures and in-house lists for today with check-in from the arrivals list (the check-in form from T-051 opens with `?checkIn=`), day-use stays shown with their hours and "Overdue" (T-052). Overnight check-out waits for folios (T-064); `POST /stays/{id}/check-out` exists for day-use only. The import still needs GUESTS/COMPANIES and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

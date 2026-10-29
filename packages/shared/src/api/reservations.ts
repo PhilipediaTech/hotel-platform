@@ -301,6 +301,55 @@ export const getReservationHistory = defineRoute({
   response: z.object({ data: z.array(ReservationHistoryItem) }),
 });
 
+// ── Calendar (S07; T-044) ──────────────────────────────────────────────────────────────
+
+/** Longest window the calendar reads at once. */
+export const CALENDAR_MAX_DAYS = 31;
+
+export const CalendarQuery = z
+  .object({
+    from: IsoDate,
+    /** Exclusive. */
+    to: IsoDate,
+  })
+  .refine((q) => q.to > q.from, { message: 'End after the start', path: ['to'] })
+  .refine(
+    (q) =>
+      (Date.parse(`${q.to}T00:00:00Z`) - Date.parse(`${q.from}T00:00:00Z`)) / 86_400_000 <=
+      CALENDAR_MAX_DAYS,
+    { message: `At most ${CALENDAR_MAX_DAYS} days`, path: ['to'] },
+  );
+
+export const CalendarStay = z
+  .object({
+    id: Uuid,
+    reservationId: Uuid,
+    confirmationNo: z.string(),
+    status: z.enum(RESERVATION_STATUSES),
+    roomTypeId: Uuid,
+    /** Null until a room is assigned (T-050): shown on the type's unassigned row. */
+    roomId: Uuid.nullable(),
+    arrival: IsoDate,
+    departure: IsoDate,
+    guestName: z.string(),
+    adults: z.number().int(),
+    children: z.number().int(),
+  })
+  .meta({ id: 'CalendarStay' });
+
+export const getCalendar = defineRoute({
+  operationId: 'getCalendar',
+  method: 'get',
+  path: '/calendar',
+  summary: 'Stays in a date window, for the reservation calendar',
+  description: `Stays that are in the hotel on any night from \`from\` up to \`to\` (exclusive; at most ${CALENDAR_MAX_DAYS} days), cancelled and no-show ones left out. Rooms, blocks and rooms left come from GET /rooms and GET /inventory.`,
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'frontdesk.read',
+  query: CalendarQuery,
+  response: z.object({ data: z.array(CalendarStay) }),
+});
+
 export const RESERVATION_ROUTES = {
   listReservations,
   createReservation,
@@ -309,4 +358,5 @@ export const RESERVATION_ROUTES = {
   cancelReservation,
   reinstateReservation,
   getReservationHistory,
+  getCalendar,
 } as const;

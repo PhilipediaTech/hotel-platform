@@ -639,3 +639,59 @@ describe('Finding and merging', () => {
     expect(moved.stays[0]?.guest.id).toBe(kept.id);
   });
 });
+
+describe('Calendar (S07; T-044)', () => {
+  type CalendarStay = {
+    id: string;
+    reservationId: string;
+    confirmationNo: string;
+    status: string;
+    roomTypeId: string;
+    roomId: string | null;
+    arrival: string;
+    departure: string;
+    guestName: string;
+  };
+  const calendar = async (h: Awaited<ReturnType<typeof hotel>>, from: string, to: string) =>
+    (await h.ok<{ data: CalendarStay[] }>(h.fd.get(`/calendar?from=${from}&to=${to}`))).data;
+
+  it('lists stays in the window, unassigned, and leaves out cancelled ones', async () => {
+    const h = await hotel();
+    const a = await h.book([await h.quote()]);
+    const b = await h.book([
+      await h.quote({ arrival: '2026-11-20', departure: '2026-11-22', adults: 1 }),
+    ]);
+    const gone = await h.book([
+      await h.quote({ arrival: '2026-11-13', departure: '2026-11-14', adults: 1 }),
+    ]);
+    await h.ok(h.fd.send(`/reservations/${gone.id}/cancel`, { reason: 'DUPLICATE' }));
+
+    const window = await calendar(h, TODAY, '2026-11-24');
+    expect(window.map((s) => s.reservationId)).toEqual([a.id, b.id]);
+    expect(window[0]).toMatchObject({
+      confirmationNo: a.confirmationNo,
+      status: 'CONFIRMED',
+      roomTypeId: h.std.id,
+      roomId: null,
+      arrival: ARRIVE,
+      departure: LEAVE,
+      guestName: 'Ada Obi',
+    });
+    // A stay is in the window when it has a night in it: departing on `from` is not.
+    expect((await calendar(h, LEAVE, '2026-11-20')).map((s) => s.id)).toEqual([]);
+    expect((await calendar(h, '2026-11-13', '2026-11-14')).map((s) => s.reservationId)).toEqual([
+      a.id,
+    ]);
+  });
+
+  it('refuses a window over 31 days and needs frontdesk.read', async () => {
+    const h = await hotel();
+    const long = await h.fd.get(`/calendar?from=${TODAY}&to=2026-12-12`);
+    expect(long.status).toBe(400);
+    const backwards = await h.fd.get(`/calendar?from=${LEAVE}&to=${ARRIVE}`);
+    expect(backwards.status).toBe(400);
+    const hk = await h.person('hk-attendant', h.p1.id);
+    const attendant = await h.as(hk.id);
+    expect((await attendant.get(`/calendar?from=${TODAY}&to=${LEAVE}`)).status).toBe(403);
+  });
+});

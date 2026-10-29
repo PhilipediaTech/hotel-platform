@@ -19,6 +19,8 @@ import { UsersAndRolesPage } from '../routes/settings/access.tsx';
 import { CompaniesPage, CompanyProfilePage } from '../routes/companies.tsx';
 import { GuestProfilePage, GuestsPage } from '../routes/guests.tsx';
 import { ReservationPage, ReservationsPage } from '../routes/reservations.tsx';
+import { CalendarPage } from '../routes/calendar.tsx';
+import { NewBookingPage } from '../routes/new-booking.tsx';
 import { RatesPage } from '../routes/rates.tsx';
 import { FinanceSettingsPage } from '../routes/settings/finance.tsx';
 import { ImportsPage } from '../routes/settings/imports.tsx';
@@ -36,6 +38,8 @@ const SCREENS: Record<string, ReactElement> = {
   '/guests': <GuestsPage />,
   '/companies': <CompaniesPage />,
   '/reservations': <ReservationsPage />,
+  '/calendar': <CalendarPage />,
+  '/bookings/new': <NewBookingPage />,
   '/settings/imports': <ImportsPage />,
   '/audit': <AuditLogPage />,
   '/approvals': <ApprovalsPage />,

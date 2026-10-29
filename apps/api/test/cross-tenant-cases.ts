@@ -758,6 +758,15 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   reinstateReservation: { seed: bReservation, untouched: bReservationUnchanged },
   getReservationHistory: { seed: bReservation },
+  getCalendar: {
+    seed: bReservation,
+    query: () => ({ from: '2099-01-01', to: '2099-01-03' }),
+    listIds: (body) =>
+      (body as { data: { id: string; reservationId: string }[] }).data.flatMap((s) => [
+        s.id,
+        s.reservationId,
+      ]),
+  },
   releaseRoomBlock: {
     seed: bBlock,
     untouched: async (db, _w, theirs) => {

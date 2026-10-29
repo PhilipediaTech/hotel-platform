@@ -252,6 +252,7 @@ export function ReservationPage() {
               {f.date(s.arrival)} → {f.date(s.departure)} ·{' '}
               {t('reservations.guestsCount', { adults: s.adults, children: s.children })}
             </p>
+            <StayRoom reservation={r} stay={s} queryKey={key} />
             {open && s.status !== 'CANCELLED' && can('reservation.modify') && (
               <ChangeStay reservation={r} stay={s} queryKey={key} />
             )}
@@ -376,6 +377,168 @@ function ChangeStay({ reservation, stay, queryKey }: Props & { stay: Stay }) {
         </Alert>
       )}
     </form>
+  );
+}
+
+/**
+ * M3-07, M3-11 (T-050): the stay's room; give or change it before check-in (a room that is
+ * not ready for a guest arriving today needs a manager), move a checked-in guest with a reason.
+ */
+function StayRoom({ reservation, stay, queryKey }: Props & { stay: Stay }) {
+  const { t } = useTranslation();
+  const { permissions } = useSession();
+  const saved = useSaved(queryKey);
+  const [open, setOpen] = useState(false);
+  const [roomId, setRoomId] = useState('');
+  const [reason, setReason] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const inHouse = stay.status === 'CHECKED_IN';
+  const planned = stay.status === 'TENTATIVE' || stay.status === 'CONFIRMED';
+  const allowed = inHouse ? permissions.includes('room.move') : permissions.includes('room.assign');
+  const rooms = useQuery({
+    queryKey: ['rooms', reservation.id, 'for-stay', stay.id, stay.version],
+    queryFn: async () =>
+      (await api.call('listAssignableRooms', { params: { stayId: stay.id } })).data,
+    enabled: open,
+  });
+  const chosen = rooms.data?.find((r) => r.id === roomId);
+  const needsManager = !inHouse && (chosen?.problems.length ?? 0) > 0;
+  const done = (result: Reservation | { approvalRequestId: string }) => {
+    setOpen(false);
+    setRoomId('');
+    setReason('');
+    if ('approvalRequestId' in result) {
+      setMessage(t('reservations.room.sentForApproval'));
+      return;
+    }
+    setMessage(null);
+    saved(result);
+  };
+  const give = useMutation({
+    mutationFn: (to: string | null) =>
+      api.call('assignRoom', {
+        params: { stayId: stay.id },
+        body: { roomId: to, ...(needsManager && to ? { overrideReason: reason.trim() } : {}) },
+      }),
+    onSuccess: done,
+  });
+  const move = useMutation({
+    mutationFn: () =>
+      api.call('moveStay', {
+        params: { stayId: stay.id },
+        body: { roomId, reason: reason.trim() },
+      }),
+    onSuccess: done,
+  });
+  const error = give.error ?? move.error;
+  if (!planned && !inHouse) return null;
+
+  return (
+    <div className="mt-2">
+      <p className="flex flex-wrap items-center gap-2">
+        <span>
+          {stay.roomNumber
+            ? t('reservations.room.is', { room: stay.roomNumber })
+            : t('reservations.room.none')}
+        </span>
+        {allowed && !open && (
+          <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+            {inHouse
+              ? t('reservations.room.move')
+              : stay.roomNumber
+                ? t('reservations.room.change')
+                : t('reservations.room.choose')}
+          </Button>
+        )}
+        {allowed && !open && planned && stay.roomNumber && (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={give.isPending}
+            onClick={() => give.mutate(null)}
+          >
+            {t('reservations.room.release')}
+          </Button>
+        )}
+      </p>
+      {message && (
+        <Alert tone="success" className="mt-2">
+          {message}
+        </Alert>
+      )}
+      {open && (
+        <form
+          aria-label={inHouse ? t('reservations.room.move') : t('reservations.room.choose')}
+          className="mt-2 flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (inHouse) move.mutate();
+            else give.mutate(roomId);
+          }}
+        >
+          <div className="flex flex-col gap-1">
+            <Label htmlFor={`room-${stay.id}`}>{t('reservations.room.label')}</Label>
+            <select
+              id={`room-${stay.id}`}
+              className={selectClass}
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+            >
+              <option value="">
+                {rooms.data && rooms.data.length === 0
+                  ? t('reservations.room.noneFree')
+                  : t('reservations.room.pick')}
+              </option>
+              {(rooms.data ?? []).map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.number} · {t(`rooms.hk.${r.hkStatus}`)}
+                  {r.problems.length > 0
+                    ? ` · ${r.problems.map((p) => t(`reservations.room.problems.${p}`)).join(', ')}`
+                    : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          {(inHouse || needsManager) && (
+            <div className="flex min-w-64 flex-1 flex-col gap-1">
+              <Label htmlFor={`room-reason-${stay.id}`}>
+                {inHouse ? t('reservations.room.moveReason') : t('reservations.room.managerReason')}
+              </Label>
+              <Input
+                id={`room-reason-${stay.id}`}
+                value={reason}
+                maxLength={500}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </div>
+          )}
+          <Button
+            type="submit"
+            size="sm"
+            disabled={
+              !roomId ||
+              ((inHouse || needsManager) && !reason.trim()) ||
+              give.isPending ||
+              move.isPending
+            }
+          >
+            {inHouse
+              ? t('reservations.room.moveNow')
+              : needsManager
+                ? t('reservations.room.askManager')
+                : t('reservations.room.give')}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+            {t('guests.cancel')}
+          </Button>
+        </form>
+      )}
+      {error && (
+        <Alert tone="critical" className="mt-2">
+          {errorMessage(error)}
+        </Alert>
+      )}
+    </div>
   );
 }
 

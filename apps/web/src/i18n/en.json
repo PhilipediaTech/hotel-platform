@@ -991,6 +991,27 @@
       "HOTEL_REQUEST": "Hotel cancelled",
       "OTHER": "Other",
       "HOLD_EXPIRED": "Hold ran out"
+    },
+    "room": {
+      "is": "Room {{room}}",
+      "none": "No room yet",
+      "choose": "Choose a room",
+      "change": "Change room",
+      "release": "Take the room back",
+      "move": "Move guest",
+      "label": "Room",
+      "pick": "Choose…",
+      "noneFree": "No room of this type is free on those nights",
+      "problems": {
+        "NOT_CLEAN": "not clean yet",
+        "OCCUPIED": "guest still in it"
+      },
+      "managerReason": "This room is not ready: why give it now? A manager approves.",
+      "moveReason": "Reason for the move",
+      "give": "Give this room",
+      "askManager": "Ask a manager",
+      "moveNow": "Move now",
+      "sentForApproval": "Sent to a manager for approval. The room changes once they approve."
     }
   },
   "booking": {
@@ -1067,6 +1088,16 @@
     "leftTitle": "Rooms left to sell",
     "unassigned": "Unassigned",
     "stayLabel": "{{guest}}, {{no}}, {{status}}",
-    "assignLater": "Bookings sit on Unassigned until rooms are assigned (coming with room assignment)."
+    "dragHelp": "Drag a booking onto a room of its type to give it that room; drag it to Unassigned to take the room back. Without a mouse, choose the room on the reservation page.",
+    "assigned": "Room {{room}} given to {{guest}}.",
+    "released": "{{guest}} is unassigned again.",
+    "sentForApproval": "Sent to a manager: room {{room}} is given once they approve.",
+    "otherType": "Drop the booking on a room of the type it was booked for (change the room type on the reservation first).",
+    "moveOnPage": "This guest is checked in: move them from the reservation page, with a reason.",
+    "overrideTitle": "Give room {{room}} although it is not ready",
+    "overrideReason": "Why give room {{room}} now? A manager approves.",
+    "askManager": "Ask a manager",
+    "cancel": "Cancel",
+    "hkOf": "Housekeeping status of room {{room}}"
   }
 }

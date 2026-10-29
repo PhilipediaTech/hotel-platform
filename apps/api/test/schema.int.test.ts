@@ -48,6 +48,7 @@ describe('migrations', () => {
       'reservations',
       'revenue_codes',
       'roles',
+      'room_allocations',
       'room_blocks',
       'room_type_inventory',
       'room_types',

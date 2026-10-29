@@ -70,6 +70,7 @@ apps/api        @hotel/api      Express 5 app
   src/modules/imports/          check (POST /imports) and apply spreadsheet imports: ROOMS, RATES
   src/modules/guests/           guests (search, flags, merge → moveGuestReferences) and companies
   src/modules/reservations/     book from quotes, change, cancel, reinstate; hold-expiry job; do-not-rent approval
+                                rooms.ts: room allocations, assign (room.not_ready approval), move (room.move approval)
   src/modules/availability/     inventory.ts: rebuildInventory, takeInventory/releaseInventory, daily job; inventory API;
                                 quotes.ts: GET /availability, POST /quotes (live pricing, restrictions, taxes per night)
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
@@ -168,4 +169,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-050 room assignment (POST /stays/{id}/assign-room; M3-07: only clean or inspected vacant rooms of the type unless overridden with approval; an exclusion constraint so a room is never given to two overlapping stays; room moves M3-11). Then make the S07 calendar bars draggable onto rooms (assign/move) and show assigned stays on room rows (the calendar already reads `roomId`). The import still needs GUESTS/COMPANIES and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-051 check-in (POST /stays/{id}/check-in ●, tab 4 example: room, registration fields, signature file, keys; M3 rule 2: business date = arrival, room vacant and clean/inspected or approved override → else 409 ROOM_NOT_READY; ID fields encrypted, only the ones the property requires, purge after retention; registration card; key log M3-19). Use `rooms.ts` (allocations, `problemsOf`) for the room checks; check-in then makes moves testable by hand. The import still needs GUESTS/COMPANIES and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

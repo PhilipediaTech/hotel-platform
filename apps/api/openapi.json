@@ -813,6 +813,7 @@
               "room.move",
               "folio.route",
               "reservation.do_not_rent",
+              "room.not_ready",
               "ar.over_limit"
             ]
           },
@@ -2779,6 +2780,12 @@
               }
             ]
           },
+          "roomNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "ratePlanId": {
             "$ref": "#/components/schemas/Uuid"
           },
@@ -2842,6 +2849,7 @@
           "roomTypeId",
           "roomTypeName",
           "roomId",
+          "roomNumber",
           "ratePlanId",
           "ratePlanCode",
           "arrival",
@@ -3358,6 +3366,28 @@
               }
             ]
           },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "roomId": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "startDate": {
+                  "$ref": "#/components/schemas/IsoDate"
+                },
+                "endDate": {
+                  "$ref": "#/components/schemas/IsoDate"
+                }
+              },
+              "required": [
+                "roomId",
+                "startDate",
+                "endDate"
+              ]
+            }
+          },
           "arrival": {
             "$ref": "#/components/schemas/IsoDate"
           },
@@ -3381,11 +3411,57 @@
           "status",
           "roomTypeId",
           "roomId",
+          "rooms",
           "arrival",
           "departure",
           "guestName",
           "adults",
           "children"
+        ]
+      },
+      "AssignableRoom": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "number": {
+            "type": "string"
+          },
+          "floor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hkStatus": {
+            "type": "string",
+            "enum": [
+              "DIRTY",
+              "CLEANING",
+              "CLEAN",
+              "INSPECTED",
+              "OUT_OF_ORDER",
+              "OUT_OF_SERVICE"
+            ]
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "NOT_CLEAN",
+                "OCCUPIED"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "floor",
+          "hkStatus",
+          "problems"
         ]
       }
     },
@@ -9212,6 +9288,158 @@
         }
       }
     },
+    "/rooms/{roomId}/hk-status": {
+      "patch": {
+        "operationId": "setHkStatus",
+        "summary": "Set a room’s housekeeping status",
+        "tags": [
+          "Rooms"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "hk.work or hk.inspect for dirty, cleaning and clean; hk.inspect for inspected. A room under an out-of-order or out-of-service block keeps that status until the block ends (409 STATE_TRANSITION_INVALID). The housekeeping board arrives with T-080.",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "roomId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `ETag` from the last read."
+            },
+            "required": true,
+            "description": "The `ETag` from the last read.",
+            "name": "If-Match",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hkStatus": {
+                    "type": "string",
+                    "enum": [
+                      "DIRTY",
+                      "CLEANING",
+                      "CLEAN",
+                      "INSPECTED"
+                    ]
+                  }
+                },
+                "required": [
+                  "hkStatus"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `VERSION_CONFLICT`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/room-blocks": {
       "post": {
         "operationId": "createRoomBlock",
@@ -9312,6 +9540,16 @@
           },
           "403": {
             "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `BOOKING_CONFLICT`",
             "content": {
               "application/json": {
                 "schema": {
@@ -15314,6 +15552,473 @@
           },
           "403": {
             "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stays/{stayId}/rooms": {
+      "get": {
+        "operationId": "listAssignableRooms",
+        "summary": "Rooms of the stay’s type that are free for its remaining nights",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Active rooms of the type with no block and no other stay on those nights. For a guest arriving today, `problems` says when the room is not clean or inspected, or still has a guest in it.",
+        "x-permission": "room.assign",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AssignableRoom"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stays/{stayId}/assign-room": {
+      "post": {
+        "operationId": "assignRoom",
+        "summary": "Give a stay a room, change it, or take it back (before check-in)",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "The room must be of the stay’s type, active, unblocked and free on every night (409 BOOKING_CONFLICT). For a guest arriving today it must be clean or inspected and empty: otherwise 409 ROOM_NOT_READY, or with `overrideReason` a manager’s approval (202) unless the caller can approve. A checked-in guest is moved with /move.",
+        "x-permission": "room.assign",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roomId": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Uuid"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "overrideReason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "roomId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reservation"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Over the caller’s limit: an approval request was created instead.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalPending"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `BOOKING_CONFLICT`, `ROOM_NOT_READY`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule violated: `APPROVAL_EXPIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stays/{stayId}/move": {
+      "post": {
+        "operationId": "moveStay",
+        "summary": "Move a checked-in guest to another room of the same type, with a reason",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "From today to the end of the stay; the old room becomes dirty and the stay keeps its folio. The new room must be clean or inspected and empty (409 ROOM_NOT_READY). Between 00:00 and 05:00 at the property a move needs approval (202) unless the caller’s role allows it.",
+        "x-permission": "room.move",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roomId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "roomId",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reservation"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Over the caller’s limit: an approval request was created instead.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalPending"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `BOOKING_CONFLICT`, `ROOM_NOT_READY`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule violated: `APPROVAL_EXPIRED`",
             "content": {
               "application/json": {
                 "schema": {

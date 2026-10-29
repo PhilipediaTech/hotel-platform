@@ -4,6 +4,7 @@ import { Email, Phone } from './auth.ts';
 import { defineRoute } from './contract.ts';
 import { AmountMinor, Instant, IsoDate, page, PageQuery, Uuid } from './primitives.ts';
 import { GUARANTEES } from './rates.ts';
+import { HK_STATUSES } from './rooms.ts';
 
 // Reservations (tab 4 row "Reservations" and the POST /reservations example; PRD M3-01–M3-05,
 // M3 rules 1 and 8; S09; T-042). A booking is made from quotes (one per room), so it charges
@@ -85,6 +86,7 @@ export const StayItem = z
     roomTypeId: Uuid,
     roomTypeName: z.string(),
     roomId: Uuid.nullable(),
+    roomNumber: z.string().nullable(),
     ratePlanId: Uuid,
     ratePlanCode: z.string(),
     arrival: IsoDate,
@@ -327,8 +329,10 @@ export const CalendarStay = z
     confirmationNo: z.string(),
     status: z.enum(RESERVATION_STATUSES),
     roomTypeId: Uuid,
-    /** Null until a room is assigned (T-050): shown on the type's unassigned row. */
+    /** The current room; null until one is assigned (shown on the type's unassigned row). */
     roomId: Uuid.nullable(),
+    /** Which room on which nights (a moved guest has two); empty while unassigned. */
+    rooms: z.array(z.object({ roomId: Uuid, startDate: IsoDate, endDate: IsoDate })),
     arrival: IsoDate,
     departure: IsoDate,
     guestName: z.string(),
@@ -350,6 +354,85 @@ export const getCalendar = defineRoute({
   response: z.object({ data: z.array(CalendarStay) }),
 });
 
+// ── Rooms for stays (M3-07, M3-11; T-050) ──────────────────────────────────────────────
+
+const StayParams = z.object({ stayId: Uuid });
+
+/** Why a free room is not ready for a guest arriving today (M3-07). */
+export const ROOM_PROBLEMS = ['NOT_CLEAN', 'OCCUPIED'] as const;
+
+export const AssignableRoom = z
+  .object({
+    id: Uuid,
+    number: z.string(),
+    floor: z.string().nullable(),
+    hkStatus: z.enum(HK_STATUSES),
+    /** Empty when the room can be given as it is; else it needs an approved override. */
+    problems: z.array(z.enum(ROOM_PROBLEMS)),
+  })
+  .meta({ id: 'AssignableRoom' });
+
+export const listAssignableRooms = defineRoute({
+  operationId: 'listAssignableRooms',
+  method: 'get',
+  path: '/stays/{stayId}/rooms',
+  summary: 'Rooms of the stay’s type that are free for its remaining nights',
+  description:
+    'Active rooms of the type with no block and no other stay on those nights. For a guest arriving today, `problems` says when the room is not clean or inspected, or still has a guest in it.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'room.assign',
+  params: StayParams,
+  response: z.object({ data: z.array(AssignableRoom) }),
+});
+
+export const AssignRoomBody = z.object({
+  /** Null takes the room back (before check-in). */
+  roomId: Uuid.nullable(),
+  /** A room that is not ready, for a guest arriving today: a manager must approve. */
+  overrideReason: z.string().trim().min(1).max(500).optional(),
+});
+
+export const assignRoom = defineRoute({
+  operationId: 'assignRoom',
+  method: 'post',
+  path: '/stays/{stayId}/assign-room',
+  summary: 'Give a stay a room, change it, or take it back (before check-in)',
+  description:
+    'The room must be of the stay’s type, active, unblocked and free on every night (409 BOOKING_CONFLICT). For a guest arriving today it must be clean or inspected and empty: otherwise 409 ROOM_NOT_READY, or with `overrideReason` a manager’s approval (202) unless the caller can approve. A checked-in guest is moved with /move.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'room.assign',
+  approval: true,
+  params: StayParams,
+  body: AssignRoomBody,
+  response: ReservationItem,
+  errors: ['BOOKING_CONFLICT', 'ROOM_NOT_READY', 'STATE_TRANSITION_INVALID'],
+});
+
+export const MoveBody = z.object({
+  roomId: Uuid,
+  reason: z.string().trim().min(1).max(500),
+});
+
+export const moveStay = defineRoute({
+  operationId: 'moveStay',
+  method: 'post',
+  path: '/stays/{stayId}/move',
+  summary: 'Move a checked-in guest to another room of the same type, with a reason',
+  description:
+    'From today to the end of the stay; the old room becomes dirty and the stay keeps its folio. The new room must be clean or inspected and empty (409 ROOM_NOT_READY). Between 00:00 and 05:00 at the property a move needs approval (202) unless the caller’s role allows it.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'room.move',
+  idempotent: true,
+  approval: true,
+  params: StayParams,
+  body: MoveBody,
+  response: ReservationItem,
+  errors: ['BOOKING_CONFLICT', 'ROOM_NOT_READY', 'STATE_TRANSITION_INVALID'],
+});
+
 export const RESERVATION_ROUTES = {
   listReservations,
   createReservation,
@@ -359,4 +442,7 @@ export const RESERVATION_ROUTES = {
   reinstateReservation,
   getReservationHistory,
   getCalendar,
+  listAssignableRooms,
+  assignRoom,
+  moveStay,
 } as const;

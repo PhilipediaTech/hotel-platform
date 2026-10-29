@@ -581,14 +581,15 @@ model Room {
   active           Boolean  @default(true)
   version          Int      @default(0)
 
-  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  property       Property     @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
-  roomType       RoomType     @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
+  organisation   Organisation     @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property       Property         @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  roomType       RoomType         @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
   // Same property is checked by the service (Prisma can't mix a required and an optional column in one relation).
-  connectingRoom Room?        @relation("ConnectingRoom", fields: [connectingRoomId], references: [id], onDelete: SetNull)
-  connectedFrom  Room[]       @relation("ConnectingRoom")
+  connectingRoom Room?            @relation("ConnectingRoom", fields: [connectingRoomId], references: [id], onDelete: SetNull)
+  connectedFrom  Room[]           @relation("ConnectingRoom")
   blocks         RoomBlock[]
   stays          Stay[]
+  allocations    RoomAllocation[]
 
   @@unique([propertyId, number])
   // Target of composite foreign keys: blocks and connecting rooms stay within the property.
@@ -1058,21 +1059,47 @@ model Stay {
   checkedOutAt  DateTime?         @map("checked_out_at") @db.Timestamptz(6)
   version       Int               @default(0)
 
-  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  reservation Reservation @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
-  guest       Guest       @relation(fields: [guestId], references: [id], onDelete: Restrict)
-  roomType    RoomType    @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
-  room        Room?       @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
-  ratePlan    RatePlan    @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
-  quote       Quote       @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  property    Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation Reservation      @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  guest       Guest            @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  roomType    RoomType         @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
+  room        Room?            @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+  ratePlan    RatePlan         @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
+  quote       Quote            @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   nights      StayNight[]
+  allocations RoomAllocation[]
 
+  // Target of the composite foreign key from room allocations.
+  @@unique([propertyId, id])
   @@index([propertyId, arrival])
   @@index([propertyId, departure])
   @@index([propertyId, status])
   @@index([reservationId])
   @@index([guestId])
   @@map("stays")
+}
+
+/// A room given to a stay for a date range, endDate exclusive (M3-07, M3-11; T-050). A move ends
+/// one allocation and starts another; inactive rows are history. Active rows never overlap for a
+/// room (exclusion constraint in the migration).
+model RoomAllocation {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  stayId     String   @map("stay_id") @db.Uuid
+  roomId     String   @map("room_id") @db.Uuid
+  startDate  DateTime @map("start_date") @db.Date
+  endDate    DateTime @map("end_date") @db.Date
+  active     Boolean  @default(true)
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  stay Stay @relation(fields: [propertyId, stayId], references: [propertyId, id], onDelete: Restrict)
+  room Room @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+
+  @@index([propertyId, startDate])
+  @@index([stayId])
+  @@index([roomId])
+  @@map("room_allocations")
 }
 
 /// A night of a stay as quoted: price, the plan that priced it and its rule version (M2 rule 4).

@@ -55,6 +55,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   // Status history and stay nights have no property column: reach them through their
   // (scoped) reservation and stay.
   Stay: { kind: 'property' },
+  RoomAllocation: { kind: 'property' },
   // Components have no property column: reach them through their (scoped) rate plan.
 };
 

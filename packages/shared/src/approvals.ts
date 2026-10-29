@@ -83,6 +83,14 @@ export const APPROVAL_ACTIONS = [
     measure: 'none',
     backOffice: false,
   }),
+  // M3-07: a room that is not clean or inspected, or still occupied, given to a guest arriving
+  // today.
+  a({
+    code: 'room.not_ready',
+    label: 'Room not ready given to an arriving guest',
+    measure: 'none',
+    backOffice: false,
+  }),
   a({
     code: 'ar.over_limit',
     label: 'City-ledger transfer over the credit limit',

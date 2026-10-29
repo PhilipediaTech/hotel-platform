@@ -1,5 +1,11 @@
-import { addDays, daysBetween, localDate, type CalendarStay } from '@hotel/shared';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import {
+  addDays,
+  daysBetween,
+  localDate,
+  SETTABLE_HK_STATUSES,
+  type CalendarStay,
+} from '@hotel/shared';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,17 +15,20 @@ import { useSession } from '../app/session.ts';
 import { Alert } from '../components/ui/alert.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Label } from '../components/ui/label.tsx';
-import { api } from '../lib/api.ts';
+import { Input } from '../components/ui/input.tsx';
+import { api, ApiError } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
 import { STATUS_TONE } from './reservations.tsx';
 import { BlockForm } from './settings/rooms-tab.tsx';
 import { useRoomData, type Room } from './settings/rooms.tsx';
 
-// S07 Reservation calendar (tape chart; T-044): room types and their rooms down the side,
-// dates across. Stays without a room sit on their type's "Unassigned" rows (assigning and
-// moving rooms by dragging arrives with T-050); blocks show on their room's row; the type's
-// row shows rooms left per night. Users with room.block can block a room from here.
+// S07 Reservation calendar (tape chart; T-044, T-050): room types and their rooms down the
+// side, dates across. Stays without a room sit on their type's "Unassigned" rows; dragging a
+// booking onto a room gives it that room, dragging it to Unassigned takes the room back (the
+// reservation page does the same without a mouse, and moves checked-in guests). Blocks show
+// on their room's row; the type's row shows rooms left per night. Users with room.block can
+// block a room, housekeeping can set a room's status.
 
 type Stay = z.output<typeof CalendarStay>;
 const DAYS = 14;
@@ -54,9 +63,30 @@ const span = (w: Window, start: string, end: string): CSSProperties => ({
   gridColumnEnd: 2 + Math.min(DAYS, daysBetween(w.from, end)),
 });
 
-function Row(props: { w: Window; label: ReactNode; children?: ReactNode; className?: string }) {
+function Row(props: {
+  w: Window;
+  label: ReactNode;
+  children?: ReactNode;
+  className?: string;
+  /** Set on rows a booking can be dropped on. */
+  onDrop?: () => void;
+}) {
+  const { onDrop } = props;
   return (
-    <div role="row" className={cn('grid border-b border-border', props.className)} style={COLUMNS}>
+    <div
+      role="row"
+      className={cn('grid border-b border-border', props.className)}
+      style={COLUMNS}
+      onDragOver={onDrop ? (e) => e.preventDefault() : undefined}
+      onDrop={
+        onDrop
+          ? (e) => {
+              e.preventDefault();
+              onDrop();
+            }
+          : undefined
+      }
+    >
       <div role="rowheader" className="sticky left-0 z-10 truncate bg-surface p-1.5 text-xs">
         {props.label}
       </div>
@@ -73,7 +103,20 @@ function Row(props: { w: Window; label: ReactNode; children?: ReactNode; classNa
   );
 }
 
-function StayBar({ w, s }: { w: Window; s: Stay }) {
+function StayBar({
+  w,
+  s,
+  start = s.arrival,
+  end = s.departure,
+  onDragStart,
+}: {
+  w: Window;
+  s: Stay;
+  /** The nights shown on this row (a moved guest has a bar on each room). */
+  start?: string;
+  end?: string;
+  onDragStart?: () => void;
+}) {
   const { t } = useTranslation();
   const status = t(`reservations.status.${s.status}`);
   return (
@@ -84,10 +127,13 @@ function StayBar({ w, s }: { w: Window; s: Stay }) {
       className={cn(
         'z-0 m-0.5 truncate rounded px-1.5 py-0.5 text-xs font-medium',
         STATUS_TONE[s.status],
-        s.arrival < w.from && 'rounded-l-none',
-        s.departure > w.to && 'rounded-r-none',
+        start < w.from && 'rounded-l-none',
+        end > w.to && 'rounded-r-none',
+        onDragStart && 'cursor-grab',
       )}
-      style={span(w, s.arrival, s.departure)}
+      style={span(w, start, end)}
+      draggable={onDragStart ? true : undefined}
+      onDragStart={onDragStart}
     >
       {s.guestName} · {status}
     </Link>
@@ -106,6 +152,74 @@ export function CalendarPage() {
   const to = addDays(from, DAYS);
   const can = (p: string) => session.permissions.includes(p);
   const pid = session.currentPropertyId ?? '';
+  const queryClient = useQueryClient();
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ['rooms', pid] });
+  const [dragging, setDragging] = useState<Stay | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'success' | 'critical'; text: string } | null>(null);
+  /** A room that is not ready, offered to a manager for approval (M3-07). */
+  const [override, setOverride] = useState<{ stay: Stay; room: Room; reason: string } | null>(null);
+
+  const assign = useMutation({
+    mutationFn: (v: { stay: Stay; room: Room | null; overrideReason?: string }) =>
+      api.call('assignRoom', {
+        params: { stayId: v.stay.id },
+        body: {
+          roomId: v.room?.id ?? null,
+          ...(v.overrideReason ? { overrideReason: v.overrideReason } : {}),
+        },
+      }),
+    onSuccess: (result, v) => {
+      setOverride(null);
+      refresh();
+      setNotice({
+        tone: 'success',
+        text:
+          'approvalRequestId' in result
+            ? t('calendar.sentForApproval', { room: v.room?.number ?? '' })
+            : v.room
+              ? t('calendar.assigned', { guest: v.stay.guestName, room: v.room.number })
+              : t('calendar.released', { guest: v.stay.guestName }),
+      });
+    },
+    onError: (error, v) => {
+      if (error instanceof ApiError && error.code === 'ROOM_NOT_READY' && v.room) {
+        setOverride({ stay: v.stay, room: v.room, reason: '' });
+        setNotice({ tone: 'critical', text: errorMessage(error) });
+        return;
+      }
+      setNotice({ tone: 'critical', text: errorMessage(error) });
+    },
+  });
+  const setStatus = useMutation({
+    mutationFn: (v: { room: Room; hkStatus: (typeof SETTABLE_HK_STATUSES)[number] }) =>
+      api.call(
+        'setHkStatus',
+        { params: { roomId: v.room.id }, body: { hkStatus: v.hkStatus } },
+        { ifMatch: `"${v.room.version}"` },
+      ),
+    onSuccess: refresh,
+    onError: (error) => setNotice({ tone: 'critical', text: errorMessage(error) }),
+  });
+  const canDrag = can('room.assign');
+  const canClean = can('hk.work') || can('hk.inspect');
+
+  /** A booking dropped on a room row (or on Unassigned: room null). */
+  const dropOn = (room: Room | null, roomTypeId: string) => {
+    const stay = dragging;
+    setDragging(null);
+    if (!stay) return;
+    if (stay.roomTypeId !== roomTypeId) {
+      setNotice({ tone: 'critical', text: t('calendar.otherType') });
+      return;
+    }
+    if (stay.status === 'CHECKED_IN') {
+      setNotice({ tone: 'critical', text: t('calendar.moveOnPage') });
+      return;
+    }
+    if ((room?.id ?? null) === stay.roomId) return;
+    setOverride(null);
+    assign.mutate({ stay, room });
+  };
 
   const { types, rooms } = useRoomData();
   const stays = useQuery({
@@ -222,6 +336,43 @@ export function CalendarPage() {
         )}
       </div>
       {blocking && <BlockForm room={blocking} onDone={() => setBlocking(null)} />}
+      {notice && (
+        <Alert tone={notice.tone} className="mt-3">
+          {notice.text}
+        </Alert>
+      )}
+      {override && (
+        <form
+          aria-label={t('calendar.overrideTitle', { room: override.room.number })}
+          className="mt-2 flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            assign.mutate({
+              stay: override.stay,
+              room: override.room,
+              overrideReason: override.reason.trim(),
+            });
+          }}
+        >
+          <div className="flex min-w-64 flex-1 flex-col gap-1">
+            <Label htmlFor="calendar-override">
+              {t('calendar.overrideReason', { room: override.room.number })}
+            </Label>
+            <Input
+              id="calendar-override"
+              value={override.reason}
+              maxLength={500}
+              onChange={(e) => setOverride({ ...override, reason: e.target.value })}
+            />
+          </div>
+          <Button type="submit" size="sm" disabled={!override.reason.trim() || assign.isPending}>
+            {t('calendar.askManager')}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setOverride(null)}>
+            {t('calendar.cancel')}
+          </Button>
+        </form>
+      )}
 
       <div
         role="grid"
@@ -243,7 +394,8 @@ export function CalendarPage() {
           </Row>
           {types.data.map((type) => {
             const ofType = stays.data.filter((s) => s.roomTypeId === type.id);
-            const unassigned = lanes(ofType.filter((s) => s.roomId === null));
+            const unassigned = lanes(ofType.filter((s) => s.rooms.length === 0));
+            const drag = (s: Stay) => (canDrag ? () => setDragging(s) : undefined);
             const typeRooms = activeRooms.filter((r) => r.roomTypeId === type.id);
             return (
               <div key={type.id} role="rowgroup" aria-label={type.name}>
@@ -275,12 +427,20 @@ export function CalendarPage() {
                     w={w}
                     key={`u${i}`}
                     label={<span className="text-text-muted">{t('calendar.unassigned')}</span>}
+                    onDrop={canDrag ? () => dropOn(null, type.id) : undefined}
                   >
                     {lane.map((s) => (
-                      <StayBar key={s.id} w={w} s={s} />
+                      <StayBar key={s.id} w={w} s={s} onDragStart={drag(s)} />
                     ))}
                   </Row>
                 ))}
+                {canDrag && unassigned.length === 0 && dragging?.roomTypeId === type.id && (
+                  <Row
+                    w={w}
+                    label={<span className="text-text-muted">{t('calendar.unassigned')}</span>}
+                    onDrop={() => dropOn(null, type.id)}
+                  />
+                )}
                 {typeRooms.map((room) => (
                   <Row
                     w={w}
@@ -288,9 +448,33 @@ export function CalendarPage() {
                     label={
                       <>
                         <span className="font-medium">{room.number}</span>{' '}
-                        <span className="text-text-muted">{t(`rooms.hk.${room.hkStatus}`)}</span>
+                        {canClean && !room.hkStatus.startsWith('OUT_OF') ? (
+                          <select
+                            aria-label={t('calendar.hkOf', { room: room.number })}
+                            className="bg-transparent text-text-muted"
+                            value={room.hkStatus}
+                            disabled={setStatus.isPending}
+                            onChange={(e) =>
+                              setStatus.mutate({
+                                room,
+                                hkStatus: e.target.value as (typeof SETTABLE_HK_STATUSES)[number],
+                              })
+                            }
+                          >
+                            {SETTABLE_HK_STATUSES.filter(
+                              (h) => h !== 'INSPECTED' || can('hk.inspect'),
+                            ).map((h) => (
+                              <option key={h} value={h}>
+                                {t(`rooms.hk.${h}`)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-text-muted">{t(`rooms.hk.${room.hkStatus}`)}</span>
+                        )}
                       </>
                     }
+                    onDrop={canDrag ? () => dropOn(room, type.id) : undefined}
                   >
                     {room.blocks
                       .filter((b) => b.endDate > from && b.startDate < to && !b.releasedAt)
@@ -304,11 +488,20 @@ export function CalendarPage() {
                           {t(`rooms.hk.${b.kind}`)}: {b.reason}
                         </div>
                       ))}
-                    {ofType
-                      .filter((s) => s.roomId === room.id)
-                      .map((s) => (
-                        <StayBar key={s.id} w={w} s={s} />
-                      ))}
+                    {ofType.flatMap((s) =>
+                      s.rooms
+                        .filter((a) => a.roomId === room.id)
+                        .map((a) => (
+                          <StayBar
+                            key={`${s.id} ${a.startDate}`}
+                            w={w}
+                            s={s}
+                            start={a.startDate}
+                            end={a.endDate}
+                            onDragStart={drag(s)}
+                          />
+                        )),
+                    )}
                   </Row>
                 ))}
               </div>
@@ -316,7 +509,7 @@ export function CalendarPage() {
           })}
         </div>
       </div>
-      <p className="mt-2 text-xs text-text-muted">{t('calendar.assignLater')}</p>
+      {canDrag && <p className="mt-2 text-xs text-text-muted">{t('calendar.dragHelp')}</p>}
     </section>
   );
 }

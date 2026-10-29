@@ -339,7 +339,7 @@ async function bReservation(db: Db, world: TenantWorld, propertyId: string) {
       history: { create: { toStatus: 'CONFIRMED' } },
     },
   });
-  await db.stay.create({
+  const stay = await db.stay.create({
     data: {
       propertyId,
       reservationId: reservation.id,
@@ -352,7 +352,7 @@ async function bReservation(db: Db, world: TenantWorld, propertyId: string) {
       status: 'CONFIRMED',
     },
   });
-  return { reservationId: reservation.id, guestId, quoteId: quote.id };
+  return { reservationId: reservation.id, stayId: stay.id, guestId, quoteId: quote.id };
 }
 
 async function bReservationUnchanged(db: Db, world: TenantWorld) {
@@ -529,6 +529,14 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     },
   },
   updateRoom: { seed: bRoom, body: () => ({ floor: '9' }), untouched: bRoomUnchanged },
+  setHkStatus: {
+    seed: bRoom,
+    body: () => ({ hkStatus: 'INSPECTED' }),
+    untouched: async (db, _w, theirs) => {
+      const room = await db.room.findUniqueOrThrow({ where: { id: theirs['roomId'] ?? '' } });
+      expect(room.hkStatus).not.toBe('INSPECTED');
+    },
+  },
   createRoomBlock: {
     seed: bRoom,
     creates: true,
@@ -758,6 +766,23 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   reinstateReservation: { seed: bReservation, untouched: bReservationUnchanged },
   getReservationHistory: { seed: bReservation },
+  listAssignableRooms: { seed: bReservation },
+  assignRoom: {
+    seed: bReservation,
+    body: () => ({ roomId: null }),
+    untouched: async (db, _w, theirs) => {
+      expect(await db.roomAllocation.count({ where: { stayId: theirs['stayId'] ?? '' } })).toBe(0);
+      await bReservationUnchanged(db, _w);
+    },
+  },
+  moveStay: {
+    seed: bReservation,
+    body: (theirs) => ({ roomId: theirs['quoteId'], reason: 'Leak' }),
+    untouched: async (db, _w, theirs) => {
+      expect(await db.roomAllocation.count({ where: { stayId: theirs['stayId'] ?? '' } })).toBe(0);
+      await bReservationUnchanged(db, _w);
+    },
+  },
   getCalendar: {
     seed: bReservation,
     query: () => ({ from: '2099-01-01', to: '2099-01-03' }),

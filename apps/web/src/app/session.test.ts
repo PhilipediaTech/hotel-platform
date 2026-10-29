@@ -66,6 +66,15 @@ describe('toShellSession', () => {
     });
   });
 
+  it('takes the business date of the current property (T-054)', () => {
+    const live = makeMe({
+      properties: [{ ...LAGOS_PROPERTY, businessDate: '2026-11-12' }, ABUJA_PROPERTY],
+      memberships: [membership(LAGOS, ['frontdesk.read']), membership(ABUJA, ['frontdesk.read'])],
+    });
+    expect(toShellSession(live, LAGOS).businessDate).toBe('2026-11-12');
+    expect(toShellSession(live, ABUJA).businessDate).toBeNull();
+  });
+
   it('handles a user with no property yet', () => {
     const session = toShellSession(makeMe({ properties: [], memberships: [] }), null);
     expect(session).toMatchObject({ currentPropertyId: null, permissions: [], properties: [] });

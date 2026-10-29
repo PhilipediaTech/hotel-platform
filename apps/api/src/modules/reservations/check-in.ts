@@ -17,7 +17,7 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
-import { propertyToday } from '../availability/inventory.ts';
+import { businessDate } from '../../core/business-day.ts';
 import { registrationOf } from '../setup/service.ts';
 import { assign, loadStay, problemsOf } from './rooms.ts';
 import type { ReservationDeps } from './service.ts';
@@ -112,7 +112,7 @@ export async function checkIn(
       );
     }
     // M3 rule 2: on the arrival date (late arrivals too, until night audit marks no-shows).
-    const today = await propertyToday(tx, stay.propertyId, () => now);
+    const today = await businessDate(tx, stay.propertyId, () => now);
     if (day(stay.arrival) > today) {
       throw new AppError(
         'STATE_TRANSITION_INVALID',

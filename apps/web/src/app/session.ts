@@ -14,6 +14,8 @@ export interface ShellProperty {
   locale: string;
   /** What the desk must collect at check-in (T-051). */
   registrationFields: readonly RegistrationField[];
+  /** The business date it trades on (T-054); null until it goes live. */
+  businessDate: string | null;
 }
 
 /** What the shell needs to render: from GET /me; business date and counts arrive later. */
@@ -60,7 +62,7 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
     userName: me.user.name,
     permissions: [...permissions].sort(),
     properties: me.properties.map(
-      ({ id, code, name, status, timeZone, baseCurrency, locale, registrationFields }) => ({
+      ({
         id,
         code,
         name,
@@ -69,10 +71,21 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
         baseCurrency,
         locale,
         registrationFields,
+        businessDate,
+      }) => ({
+        id,
+        code,
+        name,
+        status,
+        timeZone,
+        baseCurrency,
+        locale,
+        registrationFields,
+        businessDate,
       }),
     ),
     currentPropertyId: property?.id ?? null,
-    businessDate: null, // business_days arrive with night audit (T-070s)
+    businessDate: property?.businessDate ?? null,
     pendingApprovals: 0, // filled in by SessionGate from GET /approvals (T-022)
     openAlerts: 0, // T-090
     preview: false,
@@ -140,6 +153,7 @@ export const PREVIEW_SESSION: ShellSession = {
       baseCurrency: 'NGN',
       locale: 'en-NG',
       registrationFields: [],
+      businessDate: null,
     },
   ],
   currentPropertyId: '0d0d0d0d-0000-4000-8000-000000000002',

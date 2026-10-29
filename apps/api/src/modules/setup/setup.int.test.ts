@@ -235,11 +235,14 @@ describe('go-live', () => {
       after: { status: 'LIVE', later: [] },
     });
     const me = await owner.get('/me');
-    expect(
-      (me.body as { properties: { id: string; status: string }[] }).properties.find(
-        (p) => p.id === h.p1.id,
-      )?.status,
-    ).toBe('LIVE');
+    const mine = (
+      me.body as { properties: { id: string; status: string; businessDate: string | null }[] }
+    ).properties.find((p) => p.id === h.p1.id);
+    expect(mine?.status).toBe('LIVE');
+    // The first business day opens with go-live (T-054), and /me carries it.
+    const days = await db.businessDay.findMany({ where: { propertyId: h.p1.id } });
+    expect(days.map((d) => d.status)).toEqual(['OPEN']);
+    expect(mine?.businessDate).toBe(days[0]?.date.toISOString().slice(0, 10));
 
     const again = await owner.post(`${h.path}/go-live`);
     expect(again.status).toBe(409);

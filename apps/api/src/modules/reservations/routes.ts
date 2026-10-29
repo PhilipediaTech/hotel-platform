@@ -1,9 +1,11 @@
-import { FRONT_DESK_ROUTES, RESERVATION_ROUTES } from '@hotel/shared';
+import { FRONT_DESK_ROUTES, NIGHT_AUDIT_ROUTES, RESERVATION_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
+import { businessDay } from '../../core/business-day.ts';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as checkIns from './check-in.ts';
 import * as dayUse from './day-use.ts';
+import * as extend from './extend.ts';
 import * as frontDesk from './front-desk.ts';
 import * as rooms from './rooms.ts';
 import * as reservations from './service.ts';
@@ -100,6 +102,27 @@ export function reservationRoutes(deps: checkIns.CheckInDeps): Router {
       ),
     ),
   );
+
+  mountRoute(router, r.extendStay, async ({ params, body }, { tenant, req, res }) =>
+    etag(
+      res,
+      await extend.extendStay(
+        deps,
+        tenantFrom(tenant),
+        params.stayId,
+        req.get('If-Match') ?? '',
+        body,
+      ),
+    ),
+  );
+  mountRoute(router, NIGHT_AUDIT_ROUTES.getBusinessDay, async (_input, { tenant }) => {
+    const d = await businessDay(deps.tenantDb, tenantFrom(tenant).propertyId, deps.clock);
+    return {
+      date: d.date,
+      status: d.status,
+      openedAt: d.openedAt ? d.openedAt.toISOString().replace(/\.\d{3}Z$/, 'Z') : null,
+    };
+  });
 
   const fd = FRONT_DESK_ROUTES;
   mountRoute(router, fd.listArrivals, ({ query }, { tenant }) =>

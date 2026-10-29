@@ -19,6 +19,7 @@ const property = (id: string, name: string, code: string) => ({
     'idType',
     'idNumber',
   ] as MeResponse['properties'][number]['registrationFields'],
+  businessDate: null as string | null,
 });
 
 export const LAGOS_PROPERTY = property(LAGOS, 'Lagos Hotel', 'LAG');

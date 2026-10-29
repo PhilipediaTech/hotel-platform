@@ -74,6 +74,7 @@ apps/api        @hotel/api      Express 5 app
                                 check-in.ts: check-in, registration card, key log, ID purge job
                                 day-use.ts: day-use availability and sale (hourly room holds), check-out of day-use
                                 front-desk.ts: arrivals, departures and in-house lists with flags (S06)
+                                extend.ts: extend / shorten a checked-in stay (new quote of its nights)
   src/modules/availability/     inventory.ts: rebuildInventory, takeInventory/releaseInventory, daily job; inventory API;
                                 quotes.ts: GET /availability, POST /quotes (live pricing, restrictions, taxes per night)
   src/core/openapi.ts           buildOpenApiDocument(routes) / openApiDocument() (cached)
@@ -175,4 +176,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-054 business day model; extend and shorten stays (M3-03 changes of a checked-in stay; business_days per property: the business date that the front desk lists, check-in rule "business date equals arrival date" and the shell chip use instead of today at the property; night audit T-073 closes it). Overnight check-out waits for folios (T-064); `POST /stays/{id}/check-out` exists for day-use only. The import still needs GUESTS/COMPANIES and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-060 folios (M4): windows, routing, charge posting with taxes per line (tax versions in force on the business date, M4 rule 1), reversal, discounts; open the folio at check-in (check-in answers `folioId: null` until then) and post day-use and extension nights from `stay_nights`. Business days exist (`apps/api/src/core/business-day.ts`): folio lines carry the business date, and the closed-day trigger (tab 3 constraint 5) comes with folio_lines. The rollover is automatic at the property’s midnight until night audit (T-073). Overnight check-out waits for T-064. The import still needs GUESTS/COMPANIES and BALANCES (folios). Philip still has to confirm the example tax rates in S25. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

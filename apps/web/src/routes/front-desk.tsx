@@ -63,7 +63,8 @@ export function FrontDeskPage() {
   const { t } = useTranslation();
   const session = useSession();
   const property = session.properties.find((p) => p.id === session.currentPropertyId);
-  const today = localDate(new Date(), property?.timeZone ?? 'Africa/Lagos');
+  const today =
+    property?.businessDate ?? localDate(new Date(), property?.timeZone ?? 'Africa/Lagos');
   const [params, setParams] = useSearchParams();
   const tab: Tab = TABS.find((x) => x === params.get('tab')) ?? 'arrivals';
   const [dateInput, setDate] = useState(today);

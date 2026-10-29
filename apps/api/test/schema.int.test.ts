@@ -24,6 +24,7 @@ describe('migrations', () => {
       'approval_requests',
       'audit_events',
       'auth_tokens',
+      'business_days',
       'cancellation_policies',
       'companies',
       'departments',

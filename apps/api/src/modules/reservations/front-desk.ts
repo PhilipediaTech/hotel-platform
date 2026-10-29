@@ -1,13 +1,13 @@
 import type { FrontDeskFlag, FrontDeskQuery, FrontDeskRow } from '@hotel/shared';
 import type { z } from 'zod';
 import type { Prisma } from '../../generated/prisma/client.ts';
-import { propertyToday } from '../availability/inventory.ts';
+import { businessDate } from '../../core/business-day.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { dayUseOf, type ReservationDeps } from './service.ts';
 
 // Front desk lists (PRD M3-06; tab 4 GET /front-desk/arrivals · /departures · /in-house; S06;
-// T-053). One row per stay, with what the desk should notice (flags). The business date is
-// today at the property until business days arrive (T-054); until night audit marks no-shows
+// T-053). One row per stay, with what the desk should notice (flags). Lists default to the
+// property's business date (T-054); until night audit marks no-shows
 // and folios exist, today's lists also carry earlier guests not arrived or not gone (OVERDUE)
 // and the balance is null.
 
@@ -123,7 +123,7 @@ async function list(
   where: (seen: Seen) => Prisma.StayWhereInput,
   done: (s: StayRow) => boolean,
 ) {
-  const today = await propertyToday(deps.tenantDb, tenant.propertyId, deps.clock);
+  const today = await businessDate(deps.tenantDb, tenant.propertyId, deps.clock);
   const inRooms = await deps.tenantDb.stay.findMany({
     where: { status: 'CHECKED_IN', roomId: { not: null } },
     select: { id: true, roomId: true },

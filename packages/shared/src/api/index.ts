@@ -8,6 +8,7 @@ export * from './front-desk.ts';
 export * from './guests.ts';
 export * from './imports.ts';
 export * from './inventory.ts';
+export * from './night-audit.ts';
 export * from './primitives.ts';
 export * from './properties.ts';
 export * from './quotes.ts';

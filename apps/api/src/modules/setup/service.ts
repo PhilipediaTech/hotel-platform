@@ -19,6 +19,7 @@ import { recordAudit } from '../../core/audit.ts';
 import type { Clock } from '../../core/clock.ts';
 import { pgErrorInfo, type Db, type DbClient } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
+import { businessDay } from '../../core/business-day.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { createDefaultApprovalPolicies } from '../approvals/defaults.ts';
 import { createDefaultTaxes, taxSettingsOf } from '../tax/defaults.ts';
@@ -449,6 +450,8 @@ export async function goLive(
       where: { id: property.id },
       data: { status: 'LIVE' },
     });
+    // The first business day: today at the property (T-054).
+    await businessDay(tx, property.id, () => now);
     await recordAudit(tx, {
       action: 'property.went_live',
       entityType: 'property',

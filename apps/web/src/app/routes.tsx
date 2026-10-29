@@ -24,6 +24,7 @@ import { FolioPage, FoliosPage } from '../routes/folios.tsx';
 import { FrontDeskPage } from '../routes/front-desk.tsx';
 import { NewBookingPage } from '../routes/new-booking.tsx';
 import { RoomsSettingsPage } from '../routes/settings/rooms.tsx';
+import { ShiftPage } from '../routes/shift.tsx';
 import { HomeRedirect, NotFoundPage, PlaceholderPage, RouteErrorPage } from '../routes/pages.tsx';
 import { NAV_ITEMS, type NavItem } from './navigation.ts';
 import { SessionGate } from './session-gate.tsx';
@@ -57,6 +58,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/companies': <CompaniesPage />,
   '/front-desk': <FrontDeskPage />,
   '/folios': <FoliosPage />,
+  '/shift': <ShiftPage />,
   '/reservations': <ReservationsPage />,
   '/calendar': <CalendarPage />,
   '/bookings/new': <NewBookingPage />,

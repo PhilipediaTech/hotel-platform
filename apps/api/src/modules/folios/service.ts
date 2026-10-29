@@ -300,6 +300,15 @@ export async function openStayFolio(deps: FolioDeps, stayId: string) {
   return getFolio(deps, id);
 }
 
+/** The poster's open cashier shift: lines carry it for per-shift reports (T-061). */
+async function shiftIdOf(tx: Tx, userId: string): Promise<string | null> {
+  const shift = await tx.cashierShift.findFirst({
+    where: { userId, status: 'OPEN', outletId: null },
+    select: { id: true },
+  });
+  return shift?.id ?? null;
+}
+
 // ── Posting (M4-02, M4 rules 2–3) ───────────────────────────────────────────────────────
 
 async function openFolioFor(tx: Tx, folioId: string) {
@@ -366,6 +375,7 @@ export async function postChargeLines(
   const { versions, rules } = await taxesFor(tx, args.code, date);
   const result = calculateTaxes(gross, versions);
   const versionOf = new Map(versions.map((v) => [v.taxRuleId, v.id]));
+  const shiftId = await shiftIdOf(tx, ctx.tenant.userId);
   const common = {
     propertyId: args.folio.propertyId,
     folioId: args.folio.id,
@@ -374,6 +384,7 @@ export async function postChargeLines(
     postedAt: ctx.now,
     currency: args.folio.currency,
     postedById: ctx.tenant.userId,
+    shiftId,
     approvalRequestId: ctx.approvalRequestId,
   };
   return closedDayGuard(async () => {
@@ -551,6 +562,7 @@ async function reverse(ctx: Ctx, p: ReversePayload): Promise<string> {
   const originals = await tx.folioLine.findMany({ where: { id: { in: lines.map((l) => l.id) } } });
   const byId = new Map(originals.map((l) => [l.id, l]));
   const made = new Map<string, string>();
+  const shiftId = await shiftIdOf(tx, ctx.tenant.userId);
   await closedDayGuard(async () => {
     // Parents first, so each reversal of a tax line can point at its charge's reversal.
     for (const l of lines) {
@@ -574,6 +586,7 @@ async function reverse(ctx: Ctx, p: ReversePayload): Promise<string> {
           reversesLineId: o.id,
           taxRuleVersionId: o.taxRuleVersionId,
           postedById: ctx.tenant.userId,
+          shiftId,
           approvalRequestId: ctx.approvalRequestId,
           reason: p.reason,
         },
@@ -693,6 +706,7 @@ async function discount(ctx: Ctx, p: DiscountPayload): Promise<string> {
   // Each tax gives up its share; the charge part takes what is left, so the parts add up.
   const taxParts = taxes.map((t) => ({ t, part: share(t.amountMinor, amount, gross) }));
   const chargePart = amount - taxParts.reduce((s, x) => s + x.part, 0n);
+  const shiftId = await shiftIdOf(tx, ctx.tenant.userId);
   const common = {
     propertyId: charge.propertyId,
     folioId: charge.folioId,
@@ -701,6 +715,7 @@ async function discount(ctx: Ctx, p: DiscountPayload): Promise<string> {
     postedAt: ctx.now,
     currency: charge.currency,
     postedById: ctx.tenant.userId,
+    shiftId,
     approvalRequestId: ctx.approvalRequestId,
   };
   const id = await closedDayGuard(async () => {

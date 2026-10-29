@@ -117,6 +117,8 @@ model Property {
   idDocuments          IdDocument[]
   businessDays         BusinessDay[]
   folios               Folio[]
+  cashierShifts        CashierShift[]
+  leakageAlerts        LeakageAlert[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -226,6 +228,10 @@ model User {
   cardsSigned        RegistrationCard[]
   daysClosed         BusinessDay[]
   folioLinesPosted   FolioLine[]
+  shifts             CashierShift[]     @relation("ShiftCashier")
+  shiftsSignedOff    CashierShift[]     @relation("ShiftSignedOff")
+  cashReceived       CashHandover[]
+  leakageAlerts      LeakageAlert[]
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -1372,7 +1378,7 @@ model FolioLine {
   sourceType        String?  @map("source_type")
   sourceId          String?  @map("source_id")
   postedById        String?  @map("posted_by_id") @db.Uuid
-  /// Cashier shifts arrive with T-061.
+  /// The poster's open cashier shift, if any.
   shiftId           String?  @map("shift_id") @db.Uuid
   approvalRequestId String?  @map("approval_request_id") @db.Uuid
   reason            String?
@@ -1386,8 +1392,132 @@ model FolioLine {
   children       FolioLine[]     @relation("LineParent")
   reverses       FolioLine?      @relation("LineReversal", fields: [reversesLineId], references: [id], onDelete: Restrict)
   reversedBy     FolioLine?      @relation("LineReversal")
+  shift          CashierShift?   @relation(fields: [propertyId, shiftId], references: [propertyId, id], onDelete: Restrict)
 
   @@index([folioId])
   @@index([propertyId, businessDate])
   @@map("folio_lines")
+}
+
+// ── Cashier shifts (M4-10–M4-12, M4 rule 4; tab 3; T-061) ─────────────────────────────
+
+enum PayMethod {
+  CASH
+  BANK_TRANSFER
+  POS_TERMINAL
+  CARD_ONLINE
+  VIRTUAL_ACCOUNT
+  MOBILE_MONEY
+  VOUCHER
+  AR_TRANSFER
+
+  @@map("pay_method")
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSING
+  CLOSED
+
+  @@map("shift_status")
+}
+
+/// A cashier's shift: opened with a counted float, closed by a blind count per method. Above
+/// the variance tolerance it waits in CLOSING for a supervisor's sign-off.
+model CashierShift {
+  id            String      @id @default(uuid()) @db.Uuid
+  propertyId    String      @map("property_id") @db.Uuid
+  /// Null = the property's system shift for webhook payments (T-062).
+  userId        String?     @map("user_id") @db.Uuid
+  /// Outlet shifts come with POS (T-090s).
+  outletId      String?     @map("outlet_id") @db.Uuid
+  status        ShiftStatus @default(OPEN)
+  floatMinor    BigInt      @default(0) @map("float_minor")
+  openedAt      DateTime    @default(now()) @map("opened_at") @db.Timestamptz(6)
+  /// When the count was given (the shift leaves OPEN).
+  closedAt      DateTime?   @map("closed_at") @db.Timestamptz(6)
+  signedOffById String?     @map("signed_off_by_id") @db.Uuid
+  varianceNote  String?     @map("variance_note")
+
+  property    Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  user        User?          @relation("ShiftCashier", fields: [userId], references: [id], onDelete: Restrict)
+  signedOffBy User?          @relation("ShiftSignedOff", fields: [signedOffById], references: [id], onDelete: SetNull)
+  counts      CashCount[]
+  handovers   CashHandover[]
+  folioLines  FolioLine[]
+
+  @@unique([propertyId, id])
+  @@index([propertyId, status])
+  @@map("cashier_shifts")
+}
+
+/// One method's blind count at close: expected (from the shift's float, handovers and
+/// payments), counted, and the difference.
+model CashCount {
+  id            String    @id @default(uuid()) @db.Uuid
+  shiftId       String    @map("shift_id") @db.Uuid
+  method        PayMethod
+  currency      String    @db.Char(3)
+  expectedMinor BigInt    @map("expected_minor")
+  countedMinor  BigInt    @map("counted_minor")
+  varianceMinor BigInt    @map("variance_minor")
+
+  shift CashierShift @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+
+  @@unique([shiftId, method, currency])
+  @@map("cash_counts")
+}
+
+/// Cash leaving a shift's drawer: to another cashier (who confirms it into their open shift) or
+/// to the safe (confirmed at once).
+model CashHandover {
+  id          String    @id @default(uuid()) @db.Uuid
+  fromShiftId String    @map("from_shift_id") @db.Uuid
+  /// Null = the safe.
+  toUserId    String?   @map("to_user_id") @db.Uuid
+  amountMinor BigInt    @map("amount_minor")
+  currency    String    @db.Char(3)
+  at          DateTime  @default(now()) @db.Timestamptz(6)
+  confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz(6)
+
+  fromShift CashierShift @relation(fields: [fromShiftId], references: [id], onDelete: Restrict)
+  toUser    User?        @relation(fields: [toUserId], references: [id], onDelete: Restrict)
+
+  @@index([fromShiftId])
+  @@index([toUserId])
+  @@map("cash_handovers")
+}
+
+// ── Leakage (M-control; tab 3). Rules and review come later; T-061 raises shift variances. ──
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+
+  @@map("priority")
+}
+
+model LeakageAlert {
+  id            String   @id @default(uuid()) @db.Uuid
+  propertyId    String   @map("property_id") @db.Uuid
+  ruleCode      String   @map("rule_code")
+  businessDate  DateTime @map("business_date") @db.Date
+  severity      Priority
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id")
+  subjectUserId String?  @map("subject_user_id") @db.Uuid
+  evidence      Json
+  dedupeKey     String   @map("dedupe_key")
+  /// OPEN | REVIEWED
+  status        String   @default("OPEN")
+  raisedAt      DateTime @default(now()) @map("raised_at") @db.Timestamptz(6)
+
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  subjectUser User?    @relation(fields: [subjectUserId], references: [id], onDelete: SetNull)
+
+  @@unique([propertyId, dedupeKey])
+  @@index([propertyId, status])
+  @@map("leakage_alerts")
 }

@@ -32,6 +32,7 @@ import { guestRoutes } from './modules/guests/routes.ts';
 import { importRoutes } from './modules/imports/routes.ts';
 import { rateRoutes } from './modules/rates/routes.ts';
 import { folioRoutes } from './modules/folios/routes.ts';
+import { shiftRoutes } from './modules/shifts/routes.ts';
 import { reservationRoutes } from './modules/reservations/routes.ts';
 import { roomRoutes } from './modules/rooms/routes.ts';
 import { setupRoutes } from './modules/setup/routes.ts';
@@ -134,6 +135,7 @@ export function createApp({
   api.use(guestRoutes({ tenantDb, clock }));
   api.use(reservationRoutes({ db, tenantDb, clock, idKey: config.idKey }));
   api.use(folioRoutes({ db, tenantDb, clock }));
+  api.use(shiftRoutes({ db, tenantDb, clock }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

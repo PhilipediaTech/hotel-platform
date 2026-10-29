@@ -443,6 +443,54 @@ async function bFolioUnchanged(db: Db, world: TenantWorld) {
   expect([folio.windows.length, folio.routingRules.length, folio.lines.length]).toEqual([1, 0, 1]);
 }
 
+/**
+ * B's cashier with an open shift (float ₦1), a counted shift waiting for sign-off, and an
+ * unconfirmed handover of ₦1 to A's own user: even that must stay out of A's sight (T-061).
+ */
+async function bShifts(db: Db, world: TenantWorld, propertyId: string) {
+  const open = await db.cashierShift.create({
+    data: { propertyId, userId: world.bStaff.id, floatMinor: 100n },
+  });
+  const closing = await db.cashierShift.create({
+    data: {
+      propertyId,
+      userId: world.bStaff.id,
+      status: 'CLOSING',
+      closedAt: new Date('2099-01-01T18:00:00Z'),
+      varianceNote: 'Short',
+      counts: {
+        create: {
+          method: 'CASH',
+          currency: 'NGN',
+          expectedMinor: 100000n,
+          countedMinor: 0n,
+          varianceMinor: -100000n,
+        },
+      },
+    },
+  });
+  const handover = await db.cashHandover.create({
+    data: { fromShiftId: open.id, toUserId: world.aStaff.id, amountMinor: 100n, currency: 'NGN' },
+  });
+  return { shiftId: open.id, closingShiftId: closing.id, handoverId: handover.id };
+}
+
+async function bShiftsUnchanged(db: Db, world: TenantWorld) {
+  const shifts = await db.cashierShift.findMany({
+    where: { propertyId: world.b1.id },
+    include: { counts: true, handovers: true },
+    orderBy: { status: 'asc' },
+  });
+  expect(
+    shifts.map((x) => [x.status, x.varianceNote, x.counts.length, x.handovers.length]),
+  ).toEqual([
+    ['OPEN', null, 0, 1],
+    ['CLOSING', 'Short', 1, 0],
+  ]);
+  expect(shifts[0]?.handovers[0]?.confirmedAt).toBeNull();
+  expect(await db.leakageAlert.count({ where: { propertyId: world.b1.id } })).toBe(0);
+}
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -993,6 +1041,56 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({ revenueGroup: 'OTHER', windowNumber: 1 }),
     untouched: bFolioUnchanged,
   },
+  getCurrentShift: {
+    seed: bShifts,
+    listIds: (body) => {
+      const b = body as {
+        shift: { id: string } | null;
+        awaitingSignOff: { id: string }[];
+        incoming: { id: string }[];
+      };
+      return [
+        ...(b.shift ? [b.shift.id] : []),
+        ...b.awaitingSignOff.map((x) => x.id),
+        ...b.incoming.map((x) => x.id),
+      ];
+    },
+  },
+  listShifts: { seed: bShifts, listIds: ids },
+  openShift: {
+    seed: bShifts,
+    creates: true,
+    body: () => ({ floatMinor: '0' }),
+    untouched: bShiftsUnchanged,
+  },
+  closeShift: {
+    seed: bShifts,
+    body: () => ({ counts: [{ method: 'CASH', currency: 'NGN', countedMinor: '0' }] }),
+    untouched: bShiftsUnchanged,
+  },
+  addVarianceNote: {
+    seed: async (db, world, propertyId) => {
+      const theirs = await bShifts(db, world, propertyId);
+      return { ...theirs, shiftId: theirs.closingShiftId };
+    },
+    body: () => ({ note: 'Leak' }),
+    untouched: bShiftsUnchanged,
+  },
+  signOffShift: {
+    seed: async (db, world, propertyId) => {
+      const theirs = await bShifts(db, world, propertyId);
+      return { ...theirs, shiftId: theirs.closingShiftId };
+    },
+    body: () => ({}),
+    untouched: bShiftsUnchanged,
+  },
+  createHandover: {
+    seed: bShifts,
+    creates: true,
+    body: () => ({ toUserId: null, amountMinor: '100' }),
+    untouched: bShiftsUnchanged,
+  },
+  confirmHandover: { seed: bShifts, body: () => ({}), untouched: bShiftsUnchanged },
   releaseRoomBlock: {
     seed: bBlock,
     untouched: async (db, _w, theirs) => {

@@ -1,12 +1,14 @@
 import { localDate } from '@hotel/shared';
 import type { Clock } from './clock.ts';
 import type { DbClient } from './db.ts';
+import { AppError } from './errors.ts';
 import type { TenantDb } from './tenant-db.ts';
 
 // Business days (tab 3 business_days; PRD global rule "dates are property-local business
-// dates"; T-054). A live property trades on one open business day at a time. Night audit
-// (T-073) will close it and open the next; until it exists, the open day rolls over by itself
-// once the property's local date has moved on (checked whenever the business date is read).
+// dates"; T-054, T-073). A live property trades on one open business day at a time. Night
+// audit closes it and opens the next (M4 rule 8 step 10); the day does not move with the
+// clock. While the audit posts (from step 4 until the day closes) the day is AUDITING and
+// postings from the desk wait (409 AUDIT_IN_PROGRESS).
 
 type Client = DbClient | Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
 
@@ -19,7 +21,8 @@ export interface BusinessDayInfo {
 
 /**
  * The property's current business day. A property not live yet has none: its local date is
- * used. Raw SQL: the same call on every kind of client.
+ * used. A live property without one (just gone live) opens its local date. Raw SQL: the same
+ * call on every kind of client.
  */
 export async function businessDay(
   db: Client,
@@ -34,23 +37,25 @@ export async function businessDay(
   const today = localDate(now, property.time_zone);
   if (property.status !== 'LIVE') return { date: today, status: 'OPEN', openedAt: null };
 
-  // Interim rollover until night audit: close an open day that is behind, open today's.
-  await db.$executeRaw`
-    UPDATE business_days SET status = 'CLOSED', closed_at = ${now}
-    WHERE property_id = ${propertyId}::uuid AND status = 'OPEN' AND date < ${today}::date`;
-  await db.$executeRaw`
-    INSERT INTO business_days (property_id, date, status, opened_at)
-    SELECT ${propertyId}::uuid, ${today}::date, 'OPEN', ${now}
-    WHERE NOT EXISTS (
-      SELECT 1 FROM business_days WHERE property_id = ${propertyId}::uuid AND status <> 'CLOSED')
-    ON CONFLICT DO NOTHING`;
-  const days = await db.$queryRaw<
-    { date: Date; status: BusinessDayInfo['status']; opened_at: Date }[]
-  >`
-    SELECT date, status, opened_at FROM business_days
-    WHERE property_id = ${propertyId}::uuid AND status <> 'CLOSED'
-    ORDER BY date DESC LIMIT 1`;
-  const day = days[0];
+  // The open (or auditing) day; else the last one, which is closed (postings then refused).
+  const current = async () => {
+    const days = await db.$queryRaw<
+      { date: Date; status: BusinessDayInfo['status']; opened_at: Date }[]
+    >`
+      SELECT date, status, opened_at FROM business_days
+      WHERE property_id = ${propertyId}::uuid
+      ORDER BY (status <> 'CLOSED') DESC, date DESC LIMIT 1`;
+    return days[0];
+  };
+  let day = await current();
+  if (!day) {
+    // The first day of a property that has just gone live: its local date.
+    await db.$executeRaw`
+      INSERT INTO business_days (property_id, date, status, opened_at)
+      VALUES (${propertyId}::uuid, ${today}::date, 'OPEN', ${now})
+      ON CONFLICT DO NOTHING`;
+    day = await current();
+  }
   if (!day) return { date: today, status: 'OPEN', openedAt: null };
   return { date: day.date.toISOString().slice(0, 10), status: day.status, openedAt: day.opened_at };
 }
@@ -58,4 +63,20 @@ export async function businessDay(
 /** The property's business date (`YYYY-MM-DD`). */
 export async function businessDate(db: Client, propertyId: string, clock: Clock): Promise<string> {
   return (await businessDay(db, propertyId, clock)).date;
+}
+
+/**
+ * The business date a desk posting or payment goes on; refused while night audit posts
+ * (409 AUDIT_IN_PROGRESS, tab 4 POST /folios/{id}/lines).
+ */
+export async function postingDate(db: Client, propertyId: string, clock: Clock): Promise<string> {
+  const day = await businessDay(db, propertyId, clock);
+  if (day.status === 'AUDITING') {
+    throw new AppError(
+      'AUDIT_IN_PROGRESS',
+      `Night audit is posting ${day.date}; try again when the day has closed`,
+      { businessDate: day.date },
+    );
+  }
+  return day.date;
 }

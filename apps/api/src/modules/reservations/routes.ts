@@ -1,6 +1,5 @@
-import { FRONT_DESK_ROUTES, NIGHT_AUDIT_ROUTES, RESERVATION_ROUTES } from '@hotel/shared';
+import { FRONT_DESK_ROUTES, RESERVATION_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
-import { businessDay } from '../../core/business-day.ts';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as checkIns from './check-in.ts';
@@ -119,15 +118,6 @@ export function reservationRoutes(deps: checkIns.CheckInDeps): Router {
       ),
     ),
   );
-  mountRoute(router, NIGHT_AUDIT_ROUTES.getBusinessDay, async (_input, { tenant }) => {
-    const d = await businessDay(deps.tenantDb, tenantFrom(tenant).propertyId, deps.clock);
-    return {
-      date: d.date,
-      status: d.status,
-      openedAt: d.openedAt ? d.openedAt.toISOString().replace(/\.\d{3}Z$/, 'Z') : null,
-    };
-  });
-
   const fd = FRONT_DESK_ROUTES;
   mountRoute(router, fd.listArrivals, ({ query }, { tenant }) =>
     frontDesk.listArrivals(deps, tenantFrom(tenant), query),

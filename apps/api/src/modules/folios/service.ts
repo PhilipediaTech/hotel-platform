@@ -23,7 +23,7 @@ import {
   type ExecuteContext,
 } from '../../core/approvals.ts';
 import { recordAudit } from '../../core/audit.ts';
-import { businessDate } from '../../core/business-day.ts';
+import { postingDate } from '../../core/business-day.ts';
 import type { Clock } from '../../core/clock.ts';
 import { COUNTER, nextPropertyCounter } from '../../core/counters.ts';
 import { raisedBy, type Db } from '../../core/db.ts';
@@ -504,10 +504,12 @@ export async function postChargeLines(
     note: string | null;
     sourceType: string;
     sourceId: string | null;
+    /** Night audit posts on the day it audits; the desk on the open day. */
+    businessDate?: string;
   },
 ): Promise<string[]> {
   const { tx } = ctx;
-  const date = await businessDate(tx, args.folio.propertyId, () => ctx.now);
+  const date = args.businessDate ?? (await postingDate(tx, args.folio.propertyId, () => ctx.now));
   const gross = args.unitAmountMinor * BigInt(args.quantity);
   const { versions, rules } = await taxesFor(tx, args.code, date);
   const result = calculateTaxes(gross, versions);
@@ -562,7 +564,7 @@ export async function postChargeLines(
 }
 
 /** The window a charge of `code` goes to: a rule for the code, then for its group, else 1. */
-function routedWindow(
+export function routedWindow(
   folio: {
     windows: { id: string; number: number }[];
     routingRules: { revenueCodeId: string | null; revenueGroup: string | null; windowId: string }[];
@@ -708,7 +710,7 @@ async function reverse(ctx: Ctx, p: ReversePayload): Promise<string> {
   const { tx } = ctx;
   const { root, lines } = await measureReversal(tx, p.lineId);
   const folio = await openFolioFor(tx, root.folioId);
-  const date = await businessDate(tx, folio.propertyId, () => ctx.now);
+  const date = await postingDate(tx, folio.propertyId, () => ctx.now);
   const originals = await tx.folioLine.findMany({ where: { id: { in: lines.map((l) => l.id) } } });
   const byId = new Map(originals.map((l) => [l.id, l]));
   const made = new Map<string, string>();
@@ -852,7 +854,7 @@ async function discount(ctx: Ctx, p: DiscountPayload): Promise<string> {
     lineId: p.lineId,
     amountMinor: p.amountMinor,
   });
-  const date = await businessDate(tx, folio.propertyId, () => ctx.now);
+  const date = await postingDate(tx, folio.propertyId, () => ctx.now);
   // Each tax gives up its share; the charge part takes what is left, so the parts add up.
   const taxParts = taxes.map((t) => ({ t, part: share(t.amountMinor, amount, gross) }));
   const chargePart = amount - taxParts.reduce((s, x) => s + x.part, 0n);

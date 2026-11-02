@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { catchUpBusinessDay } from '../../../test/business-day.ts';
 import { resetDb, testDb } from '../../../test/db.ts';
 import { errorOf } from '../../../test/helpers.ts';
 import { inHouse, TODAY } from '../../../test/in-house.ts';
@@ -203,6 +204,7 @@ describe('Refunds with approval', () => {
     );
 
     now = new Date('2026-11-11T09:00:00Z');
+    await catchUpBusinessDay(db, h.p1.id, now);
     const gmUser = await db.membership.findFirstOrThrow({ where: { roleId: h.role('gm') } });
     const gm = await h.as(gmUser.userId);
     await h.ok(gm.send('/shifts', { floatMinor: '0' }));

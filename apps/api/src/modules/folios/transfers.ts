@@ -6,7 +6,7 @@ import {
   type ExecuteContext,
 } from '../../core/approvals.ts';
 import { recordAudit } from '../../core/audit.ts';
-import { businessDate } from '../../core/business-day.ts';
+import { postingDate } from '../../core/business-day.ts';
 import { raisedBy } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
@@ -95,7 +95,7 @@ async function transfer(ctx: ExecuteContext & { now: Date }, p: TransferPayload)
       owes > 0n ? 'More than the window owes' : 'This window owes nothing',
     );
   }
-  const date = await businessDate(tx, from.propertyId, () => ctx.now);
+  const date = await postingDate(tx, from.propertyId, () => ctx.now);
   const codeId = await systemCodeId(tx, 'TRANSFER');
   const common = {
     propertyId: from.propertyId,

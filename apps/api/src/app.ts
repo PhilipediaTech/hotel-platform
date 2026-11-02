@@ -35,6 +35,7 @@ import { folioRoutes } from './modules/folios/routes.ts';
 import { shiftRoutes } from './modules/shifts/routes.ts';
 import { paymentRoutes } from './modules/payments/routes.ts';
 import { fxRoutes } from './modules/fx/routes.ts';
+import { nightAuditRoutes } from './modules/nightaudit/routes.ts';
 import { reservationRoutes } from './modules/reservations/routes.ts';
 import { roomRoutes } from './modules/rooms/routes.ts';
 import { setupRoutes } from './modules/setup/routes.ts';
@@ -140,6 +141,7 @@ export function createApp({
   api.use(shiftRoutes({ db, tenantDb, clock }));
   api.use(paymentRoutes({ db, tenantDb, clock }));
   api.use(fxRoutes({ db, tenantDb, clock }));
+  api.use(nightAuditRoutes({ db, tenantDb, clock, logger }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

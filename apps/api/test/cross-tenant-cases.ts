@@ -552,6 +552,29 @@ async function bRateUnchanged(db: Db, world: TenantWorld) {
   expect(rates.map((r) => [r.currency, r.rateMicros])).toEqual([['XAF', 2_500_000n]]);
 }
 
+/** B's night audit run, stopped at step 1 (T-073). */
+async function bNightAudit(db: Db, _world: TenantWorld, propertyId: string) {
+  const run = await db.nightAuditRun.create({
+    data: {
+      propertyId,
+      businessDate: new Date('2099-01-01'),
+      status: 'FAILED',
+      steps: { create: [{ step: 1, name: 'OPEN_SHIFTS', status: 'BLOCKED' }] },
+    },
+  });
+  return { nightAuditId: run.id };
+}
+
+async function bNightAuditUnchanged(db: Db, world: TenantWorld) {
+  const runs = await db.nightAuditRun.findMany({
+    where: { propertyId: world.b1.id },
+    include: { steps: true },
+  });
+  expect(runs.map((r) => [r.status, r.currentStep, r.steps.map((s) => s.status)])).toEqual([
+    ['FAILED', 1, ['BLOCKED']],
+  ]);
+}
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -1220,4 +1243,12 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       expect(block.releasedAt).toBeNull();
     },
   },
+  getNightAudit: { seed: bNightAudit },
+  startNightAudit: {
+    seed: bNightAudit,
+    creates: true,
+    body: () => ({ businessDate: '2099-01-01' }),
+    untouched: bNightAuditUnchanged,
+  },
+  resumeNightAudit: { seed: bNightAudit, untouched: bNightAuditUnchanged },
 };

@@ -122,6 +122,8 @@ model Property {
   depositEntries       DepositLedgerEntry[]
   exchangeRates        ExchangeRate[]
   leakageAlerts        LeakageAlert[]
+  nightAuditRuns       NightAuditRun[]
+  roomChargePostings   RoomChargePosting[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -237,6 +239,7 @@ model User {
   leakageAlerts      LeakageAlert[]
   paymentsReceived   Payment[]
   exchangeRatesSet   ExchangeRate[]
+  nightAuditsStarted NightAuditRun[]
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -1089,17 +1092,18 @@ model Stay {
   checkedOutAt  DateTime?         @map("checked_out_at") @db.Timestamptz(6)
   version       Int               @default(0)
 
-  property    Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  reservation Reservation       @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
-  guest       Guest             @relation(fields: [guestId], references: [id], onDelete: Restrict)
-  roomType    RoomType          @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
-  room        Room?             @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
-  ratePlan    RatePlan          @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
-  quote       Quote             @relation(fields: [quoteId], references: [id], onDelete: Restrict)
-  folio       Folio?            @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
+  property    Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation Reservation         @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  guest       Guest               @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  roomType    RoomType            @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
+  room        Room?               @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+  ratePlan    RatePlan            @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
+  quote       Quote               @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  folio       Folio?              @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
   nights      StayNight[]
   allocations RoomAllocation[]
   keys        KeyIssue[]
+  roomCharges RoomChargePosting[]
   card        RegistrationCard?
 
   // Target of the composite foreign key from room allocations.
@@ -1392,16 +1396,17 @@ model FolioLine {
   approvalRequestId String?  @map("approval_request_id") @db.Uuid
   reason            String?
 
-  folio          Folio           @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
-  window         FolioWindow     @relation(fields: [windowId], references: [id], onDelete: Restrict)
-  revenueCode    RevenueCode     @relation(fields: [propertyId, revenueCodeId], references: [propertyId, id], onDelete: Restrict)
-  taxRuleVersion TaxRuleVersion? @relation(fields: [taxRuleVersionId], references: [id], onDelete: Restrict)
-  postedBy       User?           @relation(fields: [postedById], references: [id], onDelete: SetNull)
-  parentLine     FolioLine?      @relation("LineParent", fields: [parentLineId], references: [id], onDelete: Restrict)
-  children       FolioLine[]     @relation("LineParent")
-  reverses       FolioLine?      @relation("LineReversal", fields: [reversesLineId], references: [id], onDelete: Restrict)
-  reversedBy     FolioLine?      @relation("LineReversal")
-  shift          CashierShift?   @relation(fields: [propertyId, shiftId], references: [propertyId, id], onDelete: Restrict)
+  folio          Folio              @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
+  window         FolioWindow        @relation(fields: [windowId], references: [id], onDelete: Restrict)
+  revenueCode    RevenueCode        @relation(fields: [propertyId, revenueCodeId], references: [propertyId, id], onDelete: Restrict)
+  taxRuleVersion TaxRuleVersion?    @relation(fields: [taxRuleVersionId], references: [id], onDelete: Restrict)
+  postedBy       User?              @relation(fields: [postedById], references: [id], onDelete: SetNull)
+  parentLine     FolioLine?         @relation("LineParent", fields: [parentLineId], references: [id], onDelete: Restrict)
+  children       FolioLine[]        @relation("LineParent")
+  reverses       FolioLine?         @relation("LineReversal", fields: [reversesLineId], references: [id], onDelete: Restrict)
+  reversedBy     FolioLine?         @relation("LineReversal")
+  roomCharge     RoomChargePosting?
+  shift          CashierShift?      @relation(fields: [propertyId, shiftId], references: [propertyId, id], onDelete: Restrict)
 
   @@index([folioId])
   @@index([propertyId, businessDate])
@@ -1629,4 +1634,69 @@ model ExchangeRate {
 
   @@id([propertyId, currency, businessDate])
   @@map("exchange_rates")
+}
+
+// ───────────────────────── Night audit (T-073) ─────────────────────────
+
+enum RunStatus {
+  RUNNING
+  FAILED
+  COMPLETED
+
+  @@map("run_status")
+}
+
+model NightAuditRun {
+  id           String    @id @default(uuid()) @db.Uuid
+  propertyId   String    @map("property_id") @db.Uuid
+  businessDate DateTime  @map("business_date") @db.Date
+  status       RunStatus @default(RUNNING)
+  currentStep  Int       @default(1) @map("current_step")
+  startedById  String?   @map("started_by_id") @db.Uuid
+  startedAt    DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt   DateTime? @map("finished_at") @db.Timestamptz(6)
+  error        String?
+  summary      Json      @default("{}")
+
+  property  Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  startedBy User?            @relation(fields: [startedById], references: [id], onDelete: SetNull)
+  steps     NightAuditStep[]
+
+  @@unique([propertyId, businessDate])
+  @@unique([propertyId, id])
+  @@map("night_audit_runs")
+}
+
+/// One row per step of a run (open issue 14): status and the exceptions it found.
+model NightAuditStep {
+  runId      String    @map("run_id") @db.Uuid
+  step       Int
+  name       String
+  /// PENDING | DONE | BLOCKED | FAILED | SKIPPED
+  status     String    @default("PENDING")
+  exceptions Json      @default("[]")
+  result     Json      @default("{}")
+  startedAt  DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(6)
+
+  run NightAuditRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@id([runId, step])
+  @@map("night_audit_steps")
+}
+
+/// One room posting per stay and night (M4 rule 8): night audit never charges a night twice.
+model RoomChargePosting {
+  propertyId   String   @map("property_id") @db.Uuid
+  stayId       String   @map("stay_id") @db.Uuid
+  night        DateTime @db.Date
+  businessDate DateTime @map("business_date") @db.Date
+  folioLineId  String   @unique @map("folio_line_id") @db.Uuid
+
+  property  Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  stay      Stay      @relation(fields: [propertyId, stayId], references: [propertyId, id], onDelete: Restrict)
+  folioLine FolioLine @relation(fields: [folioLineId], references: [id], onDelete: Restrict)
+
+  @@id([propertyId, stayId, night])
+  @@map("room_charge_postings")
 }

@@ -1,7 +1,7 @@
 import { addDays, daysBetween, type CheckOutBody, type CheckOutPreview } from '@hotel/shared';
 import type { z } from 'zod';
 import { recordAudit } from '../../core/audit.ts';
-import { businessDate } from '../../core/business-day.ts';
+import { businessDate, postingDate } from '../../core/business-day.ts';
 import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
@@ -150,7 +150,7 @@ export async function checkOut(
     if (stay.folioId) {
       await tx.$queryRaw`SELECT id FROM folios WHERE id = ${stay.folioId}::uuid FOR UPDATE`;
     }
-    const date = await businessDate(tx, stay.propertyId, deps.clock);
+    const date = await postingDate(tx, stay.propertyId, deps.clock);
     const { blockers, balances } = await blockersOf(tx, stay);
     if (blockers.includes('FOLIO_BALANCE_OUTSTANDING') && balances) {
       throw new AppError('FOLIO_BALANCE_OUTSTANDING', 'Settle the bill before checking out', {

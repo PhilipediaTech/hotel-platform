@@ -56,12 +56,14 @@ export async function applyDeposit(
   windowId: string,
   userId: string | null,
   clock: Clock,
+  /** Night audit opens folios on the day it audits (T-073). */
+  businessDate?: string,
 ): Promise<bigint> {
   if (!folio.reservationId) return 0n;
   await lockReservation(tx, folio.reservationId);
   const held = await depositHeld(tx, folio.reservationId);
   if (held <= 0n) return 0n;
-  const date = await postingDate(tx, folio.propertyId, clock);
+  const date = businessDate ?? (await postingDate(tx, folio.propertyId, clock));
   const entry = await tx.depositLedgerEntry.create({
     data: {
       reservationId: folio.reservationId,

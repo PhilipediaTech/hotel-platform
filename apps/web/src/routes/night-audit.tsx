@@ -8,11 +8,12 @@ import { Alert } from '../components/ui/alert.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
+import { PdfError, usePdf } from '../lib/pdf.tsx';
 import { useFormats } from './reservations.tsx';
 
 // S15 Night audit (PRD M4 rule 8; T-073): the ten steps of tonight's run with their status,
-// the exceptions to resolve (with a link to where they are resolved), run and resume. Steps
-// 6–9 (no-show fees, rate lock, leakage rules, reports) arrive with T-073b.
+// the exceptions to resolve (with a link to where they are resolved), run and resume, and the
+// closed day's reports to download once step 9 has kept them.
 
 type Run = z.output<typeof NightAuditItem>;
 type Step = Run['steps'][number];
@@ -122,6 +123,7 @@ export function NightAuditPage() {
           {exceptionsOnly && visible.length === 0 && (
             <p className="mt-4 text-sm text-text-muted">{t('nightAudit.noExceptions')}</p>
           )}
+          {shown.reports.length > 0 && <Reports run={shown} />}
           <ol className="mt-4 flex flex-col gap-2" aria-label={t('nightAudit.steps')}>
             {visible.map((s) => (
               <StepRow key={s.step} step={s} current={shown.currentStep === s.step} />
@@ -130,6 +132,38 @@ export function NightAuditPage() {
         </>
       )}
     </section>
+  );
+}
+
+function Reports({ run }: { run: Run }) {
+  const { t } = useTranslation();
+  const pdf = usePdf();
+  return (
+    <div className="mt-4 rounded-md border border-border bg-surface p-3">
+      <h2 className="text-sm font-semibold">{t('nightAudit.reports')}</h2>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {run.reports.map((report) => (
+          <Button
+            key={report}
+            variant="secondary"
+            size="sm"
+            disabled={pdf.busy}
+            onClick={() =>
+              void pdf.open(
+                () =>
+                  api.download('getNightAuditReport', {
+                    params: { nightAuditId: run.id, report },
+                  }),
+                `${report}-${run.businessDate}.pdf`,
+              )
+            }
+          >
+            {t(`nightAudit.report.${report}`)}
+          </Button>
+        ))}
+      </div>
+      <PdfError error={pdf.error} />
+    </div>
   );
 }
 

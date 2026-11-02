@@ -339,6 +339,8 @@ export async function openFolio(
     folioId: string | null;
   },
   clock: Clock,
+  /** Night audit opens folios on the day it audits (T-073). */
+  businessDate?: string,
 ): Promise<string> {
   if (stay.folioId) return stay.folioId;
   const [guest, property] = await Promise.all([
@@ -366,7 +368,9 @@ export async function openFolio(
   });
   // M4-13: the booking's advance deposit moves onto its first folio (T-063).
   const window = folio.windows[0];
-  if (window) await applyDeposit(tx, folio, window.id, currentTenant()?.userId ?? null, clock);
+  if (window) {
+    await applyDeposit(tx, folio, window.id, currentTenant()?.userId ?? null, clock, businessDate);
+  }
   return folio.id;
 }
 

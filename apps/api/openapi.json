@@ -4707,6 +4707,19 @@
             "items": {
               "$ref": "#/components/schemas/NightAuditStep"
             }
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "flash",
+                "trial-balance",
+                "cashier",
+                "high-balance",
+                "discrepancy"
+              ]
+            }
           }
         },
         "required": [
@@ -4718,7 +4731,8 @@
           "startedAt",
           "finishedAt",
           "error",
-          "steps"
+          "steps",
+          "reports"
         ]
       },
       "NightAuditStep": {
@@ -20603,6 +20617,131 @@
           },
           "409": {
             "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/night-audits/{nightAuditId}/reports/{report}.pdf": {
+      "get": {
+        "operationId": "getNightAuditReport",
+        "summary": "A night audit report of the closed day, as PDF",
+        "tags": [
+          "Night audit"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Drawn from the figures step 9 kept: a closed day’s report never changes.",
+        "x-permission": "report.audit",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "nightAuditId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "flash",
+                "trial-balance",
+                "cashier",
+                "high-balance",
+                "discrepancy"
+              ]
+            },
+            "required": true,
+            "name": "report",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
             "content": {
               "application/json": {
                 "schema": {

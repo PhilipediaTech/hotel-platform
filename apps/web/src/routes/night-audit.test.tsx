@@ -61,6 +61,10 @@ const run = (status: string, statuses: string[], extra: object = {}) => ({
     startedAt: null,
     finishedAt: null,
   })),
+  reports:
+    status === 'COMPLETED'
+      ? ['flash', 'trial-balance', 'cashier', 'high-balance', 'discrepancy']
+      : [],
   ...extra,
 });
 
@@ -117,10 +121,10 @@ describe('Night audit (S15)', () => {
           'DONE',
           'DONE',
           'DONE',
-          'SKIPPED',
-          'SKIPPED',
-          'SKIPPED',
-          'SKIPPED',
+          'DONE',
+          'DONE',
+          'DONE',
+          'DONE',
           'DONE',
         ]),
       );
@@ -140,7 +144,20 @@ describe('Night audit (S15)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Resume at step 1' }));
     expect(await screen.findByText(/is complete: the day is closed/)).toBeInTheDocument();
-    expect(screen.getAllByText('Not in this release')).toHaveLength(4);
+    expect(screen.getAllByText('Done')).toHaveLength(10);
+    const reports = screen.getByRole('heading', { name: 'Reports of the closed day' })
+      .parentElement as HTMLElement;
+    expect(
+      within(reports)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual([
+      'Flash report',
+      'Trial balance',
+      'Cashier summary',
+      'High balance',
+      'Discrepancies',
+    ]);
   }, 15_000);
 
   it('lists only the steps with exceptions in the exceptions view', async () => {

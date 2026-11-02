@@ -52,8 +52,13 @@ async function stayFor(tx: Tx, stayId: string) {
   });
 }
 
-async function folioFor(tx: Tx, stay: Awaited<ReturnType<typeof stayFor>>, clock: Clock) {
-  const folioId = await openFolio(tx, stay, clock);
+async function folioFor(
+  tx: Tx,
+  stay: Awaited<ReturnType<typeof stayFor>>,
+  clock: Clock,
+  businessDate: string,
+) {
+  const folioId = await openFolio(tx, stay, clock, businessDate);
   const folio = await tx.folio.findUniqueOrThrow({
     where: { id: folioId },
     include: { windows: true, routingRules: true },
@@ -107,7 +112,7 @@ export async function postRoomNight(
     throw new PostingProblem('NO_ROOM_CODE', 'There is no active room revenue code to post to');
   }
   const price = priceOf(stay, args.night);
-  const folio = await folioFor(tx, stay, args.clock);
+  const folio = await folioFor(tx, stay, args.clock, args.businessDate);
   const windowId = routedWindow(folio, code);
   if (!windowId) throw new PostingProblem('FOLIO_NOT_OPEN', `Folio ${folio.number} has no window`);
   const room = stay.room?.number ?? '—';
@@ -155,7 +160,7 @@ export async function postPackageNight(
   const stay = await stayFor(tx, args.stayId);
   if (stay.ratePlan.kind !== 'PACKAGE' || stay.ratePlan.components.length === 0) return 0;
   const price = priceOf(stay, args.night);
-  const folio = await folioFor(tx, stay, args.clock);
+  const folio = await folioFor(tx, stay, args.clock, args.businessDate);
   const codes = await tx.revenueCode.findMany({
     where: { id: { in: stay.ratePlan.components.map((c) => c.revenueCodeId) } },
   });

@@ -7,7 +7,7 @@ import { Alert } from '../components/ui/alert.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
-import { PdfError, usePdf } from './folio-payments.tsx';
+import { PdfError, usePdf } from '../lib/pdf.tsx';
 import { useFormats } from './reservations.tsx';
 
 // S12 Check-out (PRD M3 check-out story, M3 rules 3–4; T-064): the bill per window, warnings

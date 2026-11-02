@@ -68,13 +68,22 @@ async function hotel() {
   );
   await db.room.update({ where: { id: room102.id }, data: { hkStatus: 'CLEAN' } });
   /** Books a guest on `plan` (BAR by default) arriving today. */
-  const book = async (first: string, options: { ratePlanId?: string; adults?: number } = {}) => {
+  const book = async (
+    first: string,
+    options: {
+      ratePlanId?: string;
+      adults?: number;
+      guarantee?: string;
+      arrival?: string;
+      departure?: string;
+    } = {},
+  ) => {
     const quote = await h.ok<{ quoteId: string }>(
       who.fd.post('/quotes', {
         roomTypeId: type.id,
         ratePlanId: options.ratePlanId ?? bar.id,
-        arrival: TODAY,
-        departure: '2026-11-12',
+        arrival: options.arrival ?? TODAY,
+        departure: options.departure ?? '2026-11-12',
         adults: options.adults ?? 1,
       }),
     );
@@ -82,6 +91,7 @@ async function hotel() {
       who.fd.send('/reservations', {
         source: 'PHONE',
         booker: { firstName: first, lastName: 'Ade' },
+        ...(options.guarantee ? { guarantee: options.guarantee } : {}),
         stays: [{ quoteId: quote.quoteId }],
       }),
     );
@@ -201,10 +211,10 @@ describe('night audit', () => {
       'DONE',
       'DONE',
       'DONE',
-      'SKIPPED',
-      'SKIPPED',
-      'SKIPPED',
-      'SKIPPED',
+      'DONE',
+      'DONE',
+      'DONE',
+      'DONE',
       'DONE',
     ]);
     expect(h.step(run, 2)).toMatchObject({
@@ -434,5 +444,204 @@ describe('night audit', () => {
     expect((await h.auditor.get('/night-audits/0d0d0d0d-0000-4000-8000-000000000002')).status).toBe(
       404,
     );
+  });
+});
+
+describe('night audit, steps 6–9 (T-073b)', () => {
+  const d = (date: string) => new Date(`${date}T00:00:00Z`);
+
+  it('makes unarrived guests no-shows; guaranteed ones pay the fee, all give the rooms back', async () => {
+    const h = await hotel();
+    await h.ok(h.gm.post('/rooms', { number: '103', roomTypeId: h.type.id }));
+    const bola = await h.book('Bola', { guarantee: 'CARD_ON_FILE' });
+    const chi = await h.book('Chi');
+    const sold = async () =>
+      (
+        await db.roomTypeInventory.findMany({
+          where: { roomTypeId: h.type.id, date: { in: [d(TODAY), d('2026-11-11')] } },
+          orderBy: { date: 'asc' },
+        })
+      ).map((r) => r.sold);
+    expect(await sold()).toEqual([3, 3]);
+
+    // A crash after the first no-show: resume finishes the rest, the first is not touched again.
+    await h.at('2026-11-10T21:00:00Z');
+    nightAuditFaults.at = (point) => {
+      if (point === 'no-show:1') throw new Error('power cut');
+    };
+    let run = (await h.start()).body as Run;
+    expect(run).toMatchObject({ status: 'FAILED', currentStep: 6 });
+    nightAuditFaults.at = null;
+    run = await h.ok<Run>(h.resume(run.id));
+    expect(run.status).toBe('COMPLETED');
+    expect(h.step(run, 6).result).toMatchObject({ noShowsNow: 1, noShowsTotal: 2 });
+
+    const stays = await db.stay.findMany({
+      where: { id: { in: [bola.id, chi.id] } },
+      include: { reservation: true },
+    });
+    expect(stays.map((s) => [s.status, s.reservation.status, s.roomId])).toEqual([
+      ['NO_SHOW', 'NO_SHOW', null],
+      ['NO_SHOW', 'NO_SHOW', null],
+    ]);
+    expect(await sold()).toEqual([1, 1]);
+
+    // Bola (guaranteed) owes the first night, untaxed, on a folio of her own; Chi owes nothing.
+    const bolaStay = stays.find((s) => s.id === bola.id);
+    const chiStay = stays.find((s) => s.id === chi.id);
+    expect(chiStay?.folioId).toBeNull();
+    const folio = await h.folioOf(bolaStay?.folioId ?? '');
+    expect(
+      folio.windows
+        .flatMap((w) => w.lines)
+        .map((l) => [l.kind, l.revenueCode, l.description, l.amountMinor, l.businessDate]),
+    ).toEqual([['CHARGE', 'NOSHOW', 'No-show fee, arrival 2026-11-10', '10000000', TODAY]]);
+    expect(folio.balanceMinor).toBe('10000000');
+    const history = await db.reservationStatusHistory.findMany({
+      where: { stayId: bola.id, toStatus: 'NO_SHOW' },
+    });
+    expect(history).toHaveLength(1);
+  });
+
+  it('locks the rates, raises the reversal pattern, keeps the reports, and balances day after day', async () => {
+    const h = await hotel();
+    const fin = await h.as(h.finance.id);
+    await h.ok(
+      fin.put(`/exchange-rates/${TODAY}`, { rates: [{ currency: 'USD', rate: '1580.50' }] }),
+    );
+    // A deposit on a booking for next week, and money on the in-house guest's folio.
+    const later = await db.stay.findUniqueOrThrow({
+      where: {
+        id: (
+          await h.book('Efe', {
+            guarantee: 'DEPOSIT',
+            arrival: '2026-11-20',
+            departure: '2026-11-21',
+          })
+        ).id,
+      },
+    });
+    const { shift } = await h.ok<{ shift: { id: string } }>(
+      h.fd.send('/shifts', { floatMinor: '0' }),
+    );
+    await h.ok(
+      h.fd.send('/payments', {
+        reservationId: later.reservationId,
+        method: 'CASH',
+        amountMinor: '3000000',
+      }),
+    );
+    await h.ok(
+      h.fd.send('/payments', { folioId: h.folioId, method: 'CASH', amountMinor: '5000000' }),
+    );
+    await h.ok(
+      h.fd.send('/payments', {
+        folioId: h.folioId,
+        method: 'POS_TERMINAL',
+        amountMinor: '2000',
+        currency: 'USD',
+        externalRef: 'MPT-1',
+      }),
+    );
+    // Four charges posted by the desk and reversed by the GM: a reversal pattern.
+    for (const i of [1, 2, 3, 4]) {
+      const posted = await h.ok<{ lines: { id: string }[] }>(
+        h.charge({ revenueCode: 'MISC', description: `Water ${i}`, unitAmountMinor: '100000' }),
+      );
+      await h.ok(
+        h.gm.send(`/folio-lines/${posted.lines[0]?.id}/reverse`, { reason: 'Wrong room' }),
+      );
+    }
+    await h.ok(
+      h.fd.send(`/shifts/${shift.id}/close`, {
+        counts: [{ method: 'CASH', currency: 'NGN', countedMinor: '8000000' }],
+      }),
+    );
+
+    await h.at('2026-11-10T21:00:00Z');
+    const early = await h.auditor.get(
+      '/night-audits/0d0d0d0d-0000-4000-8000-000000000002/reports/flash.pdf',
+    );
+    expect(early.status).toBe(404);
+    let run = await h.ok<Run & { reports: string[] }>(h.start());
+    expect(run.status).toBe('COMPLETED');
+    expect(run.reports).toEqual([
+      'flash',
+      'trial-balance',
+      'cashier',
+      'high-balance',
+      'discrepancy',
+    ]);
+
+    // Step 7: today's rate is locked.
+    const rate = await db.exchangeRate.findFirstOrThrow({ where: { businessDate: d(TODAY) } });
+    expect(rate.lockedAt).not.toBeNull();
+    expect(h.step(run, 7).result).toMatchObject({ lockedNow: 1, rates: 1 });
+
+    // Step 8: one alert for the GM's four reversals, listed for review.
+    expect(h.step(run, 8)).toMatchObject({
+      result: { raisedNow: 1, alerts: 1 },
+      exceptions: [{ type: 'REVERSAL_PATTERN', blocking: false }],
+    });
+    const alert = await db.leakageAlert.findFirstOrThrow();
+    expect(alert).toMatchObject({ ruleCode: 'REVERSAL_PATTERN', severity: 'NORMAL' });
+    expect(alert.evidence).toMatchObject({ reversals: 4, totalMinor: '400000' });
+
+    // Step 9: the figures are kept on the run.
+    type Kept = {
+      reports: {
+        flash: Record<string, unknown>;
+        trialBalance: Record<string, unknown>;
+        highBalance: { folios: unknown[] };
+      };
+    };
+    const kept = async (id: string) =>
+      ((await db.nightAuditRun.findUniqueOrThrow({ where: { id } })).summary as Kept).reports;
+    const day1 = await kept(run.id);
+    const roomLines = await db.folioLine.aggregate({
+      where: { businessDate: d(TODAY), revenueCode: { group: 'ROOM' } },
+      _sum: { amountMinor: true },
+    });
+    expect(day1.flash).toMatchObject({
+      roomsTotal: 2,
+      roomsSold: 1,
+      occupancyBps: 5000,
+      roomRevenueMinor: String(roomLines._sum.amountMinor),
+      adrMinor: '10000000',
+      noShows: 0,
+    });
+    expect(day1.trialBalance).toMatchObject({
+      paymentsMinor: String(3_000_000 + 5_000_000 + 3_161_000),
+      depositLedgerClosingMinor: '-3000000',
+      differenceMinor: '0',
+      balanced: true,
+      openingMatchesPreviousClose: null,
+    });
+
+    // The next day balances too, and opens where the first closed.
+    await h.at('2026-11-11T21:00:00Z');
+    run = await h.ok<Run & { reports: string[] }>(h.start('2026-11-11'));
+    expect(run.status).toBe('COMPLETED');
+    const day2 = await kept(run.id);
+    expect(day2.trialBalance).toMatchObject({
+      guestLedgerOpeningMinor: day1.trialBalance['guestLedgerClosingMinor'],
+      balanced: true,
+      openingMatchesPreviousClose: true,
+    });
+
+    // The PDFs, for report.audit only.
+    const pdf = await h.auditor
+      .get(`/night-audits/${run.id}/reports/trial-balance.pdf`)
+      .buffer(true)
+      .parse((res, done) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => done(null, Buffer.concat(chunks)));
+      });
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers['content-type']).toBe('application/pdf');
+    expect((pdf.body as Buffer).subarray(0, 4).toString()).toBe('%PDF');
+    expect((await h.fd.get(`/night-audits/${run.id}/reports/flash.pdf`)).status).toBe(403);
+    expect((await h.auditor.get(`/night-audits/${run.id}/reports/nope.pdf`)).status).toBe(400);
   });
 });

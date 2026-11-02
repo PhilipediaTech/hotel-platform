@@ -17,7 +17,7 @@ import type { PaymentDeps } from './service.ts';
 type Doc = PDFKit.PDFDocument;
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
-const METHOD: Record<string, string> = {
+export const METHOD: Record<string, string> = {
   CASH: 'Cash',
   BANK_TRANSFER: 'Bank transfer',
   POS_TERMINAL: 'POS terminal',
@@ -37,7 +37,7 @@ export function money(minor: bigint, currency: string): string {
   return `${negative ? '-' : ''}${currency} ${whole}.${cents}`;
 }
 
-function render(build: (doc: Doc) => void): Promise<Uint8Array> {
+export function render(build: (doc: Doc) => void): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 50, info: { Producer: 'Hotel platform' } });
     const chunks: Buffer[] = [];
@@ -52,7 +52,7 @@ function render(build: (doc: Doc) => void): Promise<Uint8Array> {
 const LEFT = 50;
 const RIGHT = 545;
 
-function header(doc: Doc, property: Property, title: string) {
+export function header(doc: Doc, property: Property, title: string) {
   const address = (property.address ?? {}) as Record<string, string | null>;
   const tax = (property.taxRegistration ?? {}) as Record<string, string | null>;
   doc.font('Helvetica-Bold').fontSize(16).text(property.name, LEFT, 50);
@@ -75,7 +75,7 @@ function header(doc: Doc, property: Property, title: string) {
 }
 
 /** Label / value pairs, two columns. */
-function facts(doc: Doc, rows: [string, string][]) {
+export function facts(doc: Doc, rows: [string, string][]) {
   const top = doc.y;
   rows.forEach(([label, value], i) => {
     const x = i % 2 === 0 ? LEFT : 300;
@@ -86,13 +86,18 @@ function facts(doc: Doc, rows: [string, string][]) {
   doc.y = top + Math.ceil(rows.length / 2) * 14 + 12;
 }
 
-interface Column {
+export interface Column {
   title: string;
   width: number;
   align?: 'left' | 'right';
 }
 
-function table(doc: Doc, columns: Column[], rows: string[][], bold: Set<number> = new Set()) {
+export function table(
+  doc: Doc,
+  columns: Column[],
+  rows: string[][],
+  bold: Set<number> = new Set(),
+) {
   const row = (cells: string[], font: string) => {
     if (doc.y > 760) doc.addPage();
     const y = doc.y;
@@ -120,7 +125,7 @@ function table(doc: Doc, columns: Column[], rows: string[][], bold: Set<number> 
   doc.moveDown(0.5);
 }
 
-function totals(doc: Doc, rows: [string, string][], strongLast = true) {
+export function totals(doc: Doc, rows: [string, string][], strongLast = true) {
   rows.forEach(([label, value], i) => {
     if (doc.y > 770) doc.addPage();
     const font = strongLast && i === rows.length - 1 ? 'Helvetica-Bold' : 'Helvetica';
@@ -131,7 +136,7 @@ function totals(doc: Doc, rows: [string, string][], strongLast = true) {
   });
 }
 
-function footer(doc: Doc, text: string) {
+export function footer(doc: Doc, text: string) {
   doc
     .moveDown(1)
     .font('Helvetica')
@@ -143,7 +148,7 @@ function footer(doc: Doc, text: string) {
   doc.fillColor('#000000');
 }
 
-const safeName = (s: string) => s.replace(/[^\w-]/g, '_');
+export const safeName = (s: string) => s.replace(/[^\w-]/g, '_');
 
 // ── Invoice ─────────────────────────────────────────────────────────────────────────────
 

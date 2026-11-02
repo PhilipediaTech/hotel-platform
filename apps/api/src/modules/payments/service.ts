@@ -2,7 +2,7 @@ import { microsToRate, toBaseMinor, type PaymentBody } from '@hotel/shared';
 import type { z } from 'zod';
 import type { Prisma } from '../../generated/prisma/client.ts';
 import { recordAudit } from '../../core/audit.ts';
-import { businessDate } from '../../core/business-day.ts';
+import { postingDate } from '../../core/business-day.ts';
 import type { Clock } from '../../core/clock.ts';
 import { pgErrorInfo, raisedBy, type Db } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
@@ -118,7 +118,7 @@ export async function capturePayment(
         throw new AppError('SHIFT_NOT_OPEN', 'Open a cashier shift before taking payments');
       }
 
-      const date = await businessDate(tx, property.id, deps.clock);
+      const date = await postingDate(tx, property.id, deps.clock);
       const amount = BigInt(body.amountMinor);
       // M4 rule 6: a foreign payment records its rate and what it is worth in the base currency.
       let rateMicros: bigint | null = null;

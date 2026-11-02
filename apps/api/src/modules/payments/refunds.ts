@@ -7,7 +7,7 @@ import {
   type ExecuteContext,
 } from '../../core/approvals.ts';
 import { recordAudit } from '../../core/audit.ts';
-import { businessDate } from '../../core/business-day.ts';
+import { postingDate } from '../../core/business-day.ts';
 import { pgErrorInfo, raisedBy } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
@@ -92,7 +92,7 @@ async function refund(ctx: ExecuteContext & { now: Date }, p: RefundPayload): Pr
   if (!open || open.status !== 'OPEN') {
     throw new AppError('SHIFT_NOT_OPEN', 'Open a cashier shift before refunding');
   }
-  const date = await businessDate(tx, original.propertyId, () => ctx.now);
+  const date = await postingDate(tx, original.propertyId, () => ctx.now);
 
   // What the refund is worth in the base currency.
   const valueThen = atOriginalRate(original, amount);

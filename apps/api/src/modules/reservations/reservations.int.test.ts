@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
+import type request from 'supertest';
+import { catchUpBusinessDay } from '../../../test/business-day.ts';
 import { resetDb, testDb } from '../../../test/db.ts';
 import { errorOf } from '../../../test/helpers.ts';
 import { hotelClient, makeHotel } from '../../../test/hotel.ts';
@@ -1255,6 +1257,32 @@ describe('Check-in (M3-08, M3-19, M3 rules 2 and 6; T-051)', () => {
   });
 });
 
+/** A day-use is charged at check-in (T-073): pays the bill in cash so the guest can leave. */
+async function payDayUse(
+  fd: { post: (path: string, body?: object) => request.Test },
+  propertyId: string,
+  stayId: string,
+) {
+  await db.property.update({
+    where: { id: propertyId },
+    data: { settings: { paymentMethods: ['CASH'] } },
+  });
+  const { folioId } = await db.stay.findUniqueOrThrow({ where: { id: stayId } });
+  const balance = await db.folioLine.aggregate({
+    where: { folioId: folioId ?? '' },
+    _sum: { amountMinor: true },
+  });
+  await fd.post('/shifts', { floatMinor: '0' }).set('Idempotency-Key', randomUUID());
+  const paid = await fd
+    .post('/payments', {
+      folioId,
+      method: 'CASH',
+      amountMinor: String(balance._sum?.amountMinor ?? 0n),
+    })
+    .set('Idempotency-Key', randomUUID());
+  expect(paid.status, JSON.stringify(paid.body)).toBe(201);
+}
+
 describe('Day-use (M3-10, M2-08; T-052)', () => {
   type DayUseStay = Stay & {
     roomId: string | null;
@@ -1457,6 +1485,7 @@ describe('Day-use (M3-10, M2-08; T-052)', () => {
     // Ended early, at 12:00 local.
     now = new Date('2026-11-10T11:00:00Z');
     const fd = await h.as(h.fdId);
+    await payDayUse(fd, h.p1.id, stay.id);
     const version = (await db.stay.findUniqueOrThrow({ where: { id: stay.id } })).version;
     const checkOut = (v: number) =>
       fd
@@ -1674,11 +1703,13 @@ describe('Front desk lists (M3-06; T-053)', () => {
 
     // A day later Ada is due out; two days later she is still in: overdue.
     now = new Date('2026-11-11T09:00:00Z');
+    await catchUpBusinessDay(db, h.p1.id, now);
     const fd = await h.as(h.fdId);
     expect((await get(fd, '/front-desk/departures')).body.data).toEqual([
       expect.objectContaining({ stayId: ada, flags: [] }),
     ]);
     now = new Date('2026-11-12T09:00:00Z');
+    await catchUpBusinessDay(db, h.p1.id, now);
     const later = await h.as(h.fdId);
     const due = (await get(later, '/front-desk/departures')).body;
     expect(named(due)).toEqual(['Ada']);
@@ -1752,6 +1783,7 @@ describe('Front desk lists (M3-06; T-053)', () => {
       'DAY_USE',
       'OVERDUE',
     ]);
+    await payDayUse(fd, h.p1.id, stay.id);
     const version = (await db.stay.findUniqueOrThrow({ where: { id: stay.id } })).version;
     await h.ok(
       fd
@@ -1778,11 +1810,16 @@ describe('Front desk lists (M3-06; T-053)', () => {
 describe('Business day (T-054)', () => {
   type Day = { date: string; status: string; openedAt: string | null };
 
-  it('opens on first use, rolls over with the date, and is on /me', async () => {
+  it('opens on first use, stays until night audit, and is on /me', async () => {
     const h = await hotel();
     const res = await h.gm.get('/business-day');
     expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toEqual({ date: TODAY, status: 'OPEN', openedAt: '2026-11-10T09:00:00Z' });
+    expect(res.body).toEqual({
+      date: TODAY,
+      status: 'OPEN',
+      openedAt: '2026-11-10T09:00:00Z',
+      nightAuditId: null,
+    });
     const me = (await h.gm.get('/me')).body as {
       properties: { id: string; businessDate: string | null }[];
     };
@@ -1790,21 +1827,16 @@ describe('Business day (T-054)', () => {
     // A property still in setup has no business day.
     expect(me.properties.find((p) => p.id === h.p2.id)?.businessDate ?? null).toBeNull();
 
-    // Until night audit (T-073), the day rolls over when the local date changes:
-    // 23:30 UTC is already the 11th in Lagos.
+    // The day moves only with night audit (T-073): 23:30 UTC is the 11th in Lagos, and the
+    // business day is still the 10th.
     now = new Date('2026-11-10T23:30:00Z');
     const gmId = (await db.membership.findFirstOrThrow({ where: { roleId: h.role('gm') } })).userId;
     const gm = await h.as(gmId);
-    expect(((await gm.get('/business-day')).body as Day).date).toBe('2026-11-11');
+    expect(((await gm.get('/business-day')).body as Day).date).toBe(TODAY);
     const days = await db.businessDay.findMany({ orderBy: { date: 'asc' } });
     expect(days.map((d) => [d.date.toISOString().slice(0, 10), d.status])).toEqual([
-      [TODAY, 'CLOSED'],
-      ['2026-11-11', 'OPEN'],
+      [TODAY, 'OPEN'],
     ]);
-    expect(days[0]?.closedAt).toEqual(now);
-    // Reading it again changes nothing.
-    await gm.get('/business-day');
-    expect(await db.businessDay.count()).toBe(2);
   });
 
   it('needs audit.run', async () => {

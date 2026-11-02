@@ -17,9 +17,10 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
-import { businessDate } from '../../core/business-day.ts';
+import { postingDate } from '../../core/business-day.ts';
 import { registrationOf } from '../setup/service.ts';
 import { openFolio } from '../folios/service.ts';
+import { postDayUse, PostingProblem } from '../nightaudit/room-charges.ts';
 import { assign, loadStay, problemsOf } from './rooms.ts';
 import type { ReservationDeps } from './service.ts';
 
@@ -114,7 +115,7 @@ export async function checkIn(
       );
     }
     // M3 rule 2: on the arrival date (late arrivals too, until night audit marks no-shows).
-    const today = await businessDate(tx, stay.propertyId, () => now);
+    const today = await postingDate(tx, stay.propertyId, () => now);
     if (day(stay.arrival) > today) {
       throw new AppError(
         'STATE_TRANSITION_INVALID',
@@ -252,6 +253,17 @@ export async function checkIn(
     }
     // The guest's folio (M4; T-060).
     const folioId = await openFolio(tx, stay, deps.clock);
+    // A day-use's one price goes on the bill now: it is not a night (T-073).
+    if (stay.isDayUse) {
+      try {
+        await postDayUse(ctx, stay, deps.clock);
+      } catch (err) {
+        if (err instanceof PostingProblem) {
+          throw new AppError('STATE_TRANSITION_INVALID', err.message, { problem: err.type });
+        }
+        throw err;
+      }
+    }
     const reservation = await tx.reservation.findUniqueOrThrow({
       where: { id: stay.reservationId },
     });

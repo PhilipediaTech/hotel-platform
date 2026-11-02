@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { catchUpBusinessDay } from '../../../test/business-day.ts';
 import { resetDb, testDb } from '../../../test/db.ts';
 import { errorOf } from '../../../test/helpers.ts';
 import { inHouse as inHouseHotel, type Folio, type Posted } from '../../../test/in-house.ts';
@@ -140,6 +141,7 @@ describe('Posting a charge (M4-02, M4 rules 1–3)', () => {
   it('uses the business date of the day it is posted', async () => {
     const h = await inHouse();
     now = new Date('2026-11-11T08:00:00Z');
+    await catchUpBusinessDay(db, h.p1.id, now);
     const fd = await h.as(h.fdId);
     const posted = await h.ok<Posted>(
       fd.send(`/folios/${h.folioId}/lines`, {

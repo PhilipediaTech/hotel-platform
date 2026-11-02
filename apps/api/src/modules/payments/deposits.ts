@@ -1,6 +1,6 @@
 import type { Prisma } from '../../generated/prisma/client.ts';
 import { recordAudit } from '../../core/audit.ts';
-import { businessDate } from '../../core/business-day.ts';
+import { postingDate } from '../../core/business-day.ts';
 import type { Clock } from '../../core/clock.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { systemCodeId } from '../folios/system-codes.ts';
@@ -61,7 +61,7 @@ export async function applyDeposit(
   await lockReservation(tx, folio.reservationId);
   const held = await depositHeld(tx, folio.reservationId);
   if (held <= 0n) return 0n;
-  const date = await businessDate(tx, folio.propertyId, clock);
+  const date = await postingDate(tx, folio.propertyId, clock);
   const entry = await tx.depositLedgerEntry.create({
     data: {
       reservationId: folio.reservationId,

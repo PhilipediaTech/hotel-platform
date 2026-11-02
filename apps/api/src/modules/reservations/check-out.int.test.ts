@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { catchUpBusinessDay } from '../../../test/business-day.ts';
 import { resetDb, testDb } from '../../../test/db.ts';
 import { errorOf } from '../../../test/helpers.ts';
 import { inHouse } from '../../../test/in-house.ts';
@@ -49,6 +50,7 @@ async function leaving(morning = '2026-11-12T08:00:00Z') {
   /** Moves the clock and signs the desk in again (sessions expire). */
   const at = async (instant: string) => {
     now = new Date(instant);
+    await catchUpBusinessDay(db, h.p1.id, now);
     fd = await h.as(h.fdId);
   };
   await at(morning); // by default 09:00 in Lagos on the departure day

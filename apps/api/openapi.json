@@ -2787,6 +2787,15 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "currency": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "refundableMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
                     }
                   },
                   "required": [
@@ -2796,7 +2805,9 @@
                     "businessDate",
                     "paymentId",
                     "method",
-                    "externalRef"
+                    "externalRef",
+                    "currency",
+                    "refundableMinor"
                   ]
                 }
               }
@@ -3257,6 +3268,15 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "currency": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "refundableMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
                     }
                   },
                   "required": [
@@ -3266,7 +3286,9 @@
                     "businessDate",
                     "paymentId",
                     "method",
-                    "externalRef"
+                    "externalRef",
+                    "currency",
+                    "refundableMinor"
                   ]
                 }
               }
@@ -3531,6 +3553,15 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "currency": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "refundableMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
                     }
                   },
                   "required": [
@@ -3540,7 +3571,9 @@
                     "businessDate",
                     "paymentId",
                     "method",
-                    "externalRef"
+                    "externalRef",
+                    "currency",
+                    "refundableMinor"
                   ]
                 }
               }
@@ -5082,6 +5115,22 @@
               "null"
             ]
           },
+          "refundsPaymentId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "refundableMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
           "externalRef": {
             "type": [
               "string",
@@ -5115,6 +5164,8 @@
           "currency",
           "baseAmountMinor",
           "rate",
+          "refundsPaymentId",
+          "refundableMinor",
           "externalRef",
           "businessDate",
           "receivedAt",
@@ -5496,6 +5547,29 @@
         },
         "required": [
           "paymentId",
+          "shiftId",
+          "baseAmountMinor",
+          "balanceMinor"
+        ]
+      },
+      "RefundResult": {
+        "type": "object",
+        "properties": {
+          "refundId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "shiftId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "baseAmountMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "balanceMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          }
+        },
+        "required": [
+          "refundId",
           "shiftId",
           "baseAmountMinor",
           "balanceMinor"
@@ -23192,6 +23266,202 @@
           },
           "404": {
             "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments/{paymentId}/refund": {
+      "post": {
+        "operationId": "refundPayment",
+        "summary": "Refund a payment, with a reason and approval",
+        "tags": [
+          "Payments"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "A refund is a negative payment pointing at the original, on the refunder’s open shift (409 SHIFT_NOT_OPEN), never more than is left of it. Every refund goes through the payment.refund approval policy (202 until a manager approves; managers within their limit refund directly). A folio refund needs the folio open; a deposit refund takes the money out of the booking’s deposit ledger. A foreign refund on a folio uses the business date’s rate; the difference from the original rate posts to the FX revenue code (M4 rule 6).",
+        "x-permission": "payment.refund",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "paymentId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amountMinor": {
+                    "type": "string",
+                    "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                    "example": "4500000"
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "CASH",
+                      "BANK_TRANSFER",
+                      "POS_TERMINAL",
+                      "MOBILE_MONEY",
+                      "VOUCHER"
+                    ]
+                  },
+                  "externalRef": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "default": null
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "amountMinor",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResult"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Over the caller’s limit: an approval request was created instead.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalPending"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `SHIFT_NOT_OPEN`, `PAYMENT_DUPLICATE`, `BUSINESS_DAY_CLOSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule violated: `APPROVAL_EXPIRED`",
             "content": {
               "application/json": {
                 "schema": {

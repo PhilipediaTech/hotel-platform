@@ -551,3 +551,97 @@ describe('House accounts, transfers and foreign currency (T-065)', () => {
     expect(await screen.findByText('House account')).toBeInTheDocument();
   }, 15_000);
 });
+
+describe('Refunds (T-072)', () => {
+  const overpaid = () =>
+    folio([], {
+      windows: [
+        {
+          number: 1,
+          payerType: 'GUEST',
+          payerName: 'Ada Obi',
+          balanceMinor: '-2000000',
+          lines: [],
+          payments: [
+            {
+              id: id(80),
+              windowNumber: 1,
+              method: 'POS_TERMINAL',
+              amountMinor: '14325000',
+              currency: 'NGN',
+              baseAmountMinor: '14325000',
+              rate: null,
+              refundsPaymentId: null,
+              refundableMinor: '14325000',
+              externalRef: 'MPT-1',
+              businessDate: '2026-11-10',
+              receivedAt: '2026-11-10T10:00:00Z',
+              receivedBy: 'Bola Desk',
+              note: null,
+            },
+          ],
+        },
+      ],
+      balanceMinor: '-2000000',
+    });
+
+  it('refunds part of a payment in cash and says it went to a manager', async () => {
+    permissions = [...permissions, 'payment.refund'];
+    handlers[`GET /folios/${FOLIO}`] = () => json(200, overpaid());
+    handlers[`POST /payments/${id(80)}/refund`] = () =>
+      json(202, {
+        approvalRequestId: id(81),
+        status: 'PENDING',
+        expiresAt: '2026-11-12T10:00:00Z',
+        approverRoles: ['General Manager'],
+      });
+    const user = userEvent.setup();
+    renderAt(`/folios/${FOLIO}`);
+    await user.click(await screen.findByRole('button', { name: 'Refund ₦143,250.00' }));
+    const form = screen.getByRole('form', { name: 'Refund' });
+    expect(form).toHaveTextContent('Refund (up to ₦143,250.00 left)');
+    const amount = within(form).getByLabelText('Amount (NGN)');
+    await user.clear(amount);
+    await user.type(amount, '20,000');
+    await user.selectOptions(within(form).getByLabelText('Method'), 'CASH');
+    await user.type(within(form).getByLabelText('Reason'), 'Overpaid');
+    await user.click(within(form).getByRole('button', { name: 'Refund' }));
+    await waitFor(() => expect(sent(`POST /payments/${id(80)}/refund`)).toHaveLength(1));
+    expect(sent(`POST /payments/${id(80)}/refund`)[0]?.body).toEqual({
+      amountMinor: '2000000',
+      method: 'CASH',
+      externalRef: null,
+      reason: 'Overpaid',
+    });
+    expect(await within(form).findByText('Sent to a manager for approval.')).toBeInTheDocument();
+  }, 15_000);
+
+  it('shows a refund as money back, and no refund button without payment.refund', async () => {
+    handlers[`GET /folios/${FOLIO}`] = () => {
+      const f = overpaid();
+      const w = f.windows[0] as { payments: object[] };
+      w.payments.push({
+        id: id(82),
+        windowNumber: 1,
+        method: 'CASH',
+        amountMinor: '-2000000',
+        currency: 'NGN',
+        baseAmountMinor: '-2000000',
+        rate: null,
+        refundsPaymentId: id(80),
+        refundableMinor: '0',
+        externalRef: null,
+        businessDate: '2026-11-10',
+        receivedAt: '2026-11-10T11:00:00Z',
+        receivedBy: 'Finance',
+        note: 'Overpaid',
+      });
+      return json(200, f);
+    };
+    renderAt(`/folios/${FOLIO}`);
+    const table = await screen.findByRole('table', { name: 'Payments' });
+    expect(table).toHaveTextContent('Refund · Cash');
+    expect(table).toHaveTextContent('+₦20,000.00');
+    expect(within(table).queryByRole('button', { name: /^Refund/ })).not.toBeInTheDocument();
+  });
+});

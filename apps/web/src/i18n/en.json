@@ -1470,5 +1470,13 @@
     "rateFor": "{{base}} for 1 {{currency}}",
     "date": "For business date",
     "save": "Save rate"
+  },
+  "refunds": {
+    "title": "Refund",
+    "button": "Refund",
+    "named": "Refund {{amount}}",
+    "heading": "Refund (up to {{left}} left)",
+    "submit": "Refund",
+    "label": "Refund · {{method}}"
   }
 }

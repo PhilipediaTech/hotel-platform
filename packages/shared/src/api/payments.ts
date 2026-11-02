@@ -136,10 +136,54 @@ export const getDepositReceipt = defineRoute({
   response: PdfDocument,
 });
 
+export const RefundBody = z.object({
+  /** In the payment's currency; at most what is left of it. */
+  amountMinor: PositiveMinor,
+  /** Back the way it came by default; another desk method when that can't be done. */
+  method: z.enum(MANUAL_PAY_METHODS).optional(),
+  /** Transfer or POS reversal reference; not needed for cash. */
+  externalRef: z.string().trim().min(1).max(100).nullable().default(null),
+  reason: z.string().trim().min(1).max(500),
+});
+
+export const refundPayment = defineRoute({
+  operationId: 'refundPayment',
+  method: 'post',
+  path: '/payments/{paymentId}/refund',
+  summary: 'Refund a payment, with a reason and approval',
+  description:
+    'A refund is a negative payment pointing at the original, on the refunder’s open shift (409 SHIFT_NOT_OPEN), never more than is left of it. Every refund goes through the payment.refund approval policy (202 until a manager approves; managers within their limit refund directly). A folio refund needs the folio open; a deposit refund takes the money out of the booking’s deposit ledger. A foreign refund on a folio uses the business date’s rate; the difference from the original rate posts to the FX revenue code (M4 rule 6).',
+  tags: ['Payments'],
+  propertyScoped: true,
+  permission: 'payment.refund',
+  idempotent: true,
+  approval: true,
+  params: z.object({ paymentId: Uuid }),
+  body: RefundBody,
+  status: 201,
+  response: z
+    .object({
+      refundId: Uuid,
+      shiftId: Uuid,
+      /** Negative: what left the hotel, in the base currency. */
+      baseAmountMinor: AmountMinor,
+      /** The folio's balance, or the deposit held, after the refund. */
+      balanceMinor: AmountMinor,
+    })
+    .meta({ id: 'RefundResult' }),
+  errors: [
+    'SHIFT_NOT_OPEN',
+    'PAYMENT_DUPLICATE',
+    'BUSINESS_DAY_CLOSED',
+    'STATE_TRANSITION_INVALID',
+  ],
+});
+
 export const PAYMENT_ROUTES = {
   capturePayment,
   getFolioInvoice,
   getFolioReceipt,
   getProforma,
   getDepositReceipt,
+  refundPayment,
 } as const;

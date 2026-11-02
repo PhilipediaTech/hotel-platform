@@ -1,14 +1,17 @@
 import type { Prisma, RevenueGroup } from '../../generated/prisma/client.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 
-// Revenue codes the system posts to itself (T-063, T-065): moving money between ledgers and
-// folios, never income. Created per property on first use; never offered for charges.
+// Revenue codes the system posts to itself (T-063, T-065, T-072): moving money between
+// ledgers and folios, and exchange differences. Created per property on first use; never
+// offered for charges, and their lines are not reversed or discounted by hand.
 
 type Tx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
 
 export const SYSTEM_CODES = {
   DEPOSIT: { name: 'Advance deposit', group: 'OTHER' },
   TRANSFER: { name: 'Folio transfer', group: 'OTHER' },
+  /** Exchange gain or loss when foreign money goes back out at another rate (T-072). */
+  FX: { name: 'Exchange difference', group: 'FX' },
 } as const satisfies Record<string, { name: string; group: RevenueGroup }>;
 
 export type SystemCode = keyof typeof SYSTEM_CODES;

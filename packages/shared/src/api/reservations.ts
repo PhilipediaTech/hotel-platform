@@ -146,6 +146,10 @@ export const ReservationItem = z
           paymentId: Uuid.nullable(),
           method: z.string().nullable(),
           externalRef: z.string().nullable(),
+          /** The payment's currency (refunds are in it). */
+          currency: z.string().nullable(),
+          /** A received deposit: what can still be refunded of its payment (T-072). */
+          refundableMinor: AmountMinor,
         }),
       ),
     }),

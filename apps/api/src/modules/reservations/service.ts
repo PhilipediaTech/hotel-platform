@@ -80,7 +80,7 @@ const FULL = {
     orderBy: [{ arrival: 'asc' }, { id: 'asc' }],
   },
   depositEntries: {
-    include: { payment: true },
+    include: { payment: { include: { refundedBy: { select: { amountMinor: true } } } } },
     // Same day: received before applied, then in the order the money came in.
     orderBy: [
       { businessDate: 'asc' },
@@ -133,6 +133,11 @@ function depositOf(r: Full) {
       paymentId: e.paymentId,
       method: e.payment?.method ?? null,
       externalRef: e.payment?.externalRef ?? null,
+      currency: e.payment?.currency ?? null,
+      refundableMinor: (e.kind === 'RECEIVED' && e.payment
+        ? e.payment.amountMinor + e.payment.refundedBy.reduce((s, r) => s + r.amountMinor, 0n)
+        : 0n
+      ).toString(),
     })),
   };
 }

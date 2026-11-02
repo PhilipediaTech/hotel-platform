@@ -113,7 +113,10 @@ export function Payments({ folio, window: w }: { folio: Folio; window: Window })
   const { t } = useTranslation();
   const f = useFormats();
   const { permissions } = useSession();
+  const queryClient = useQueryClient();
   const pdf = usePdf();
+  const [refunding, setRefunding] = useState<Refundable | null>(null);
+  const canRefund = permissions.includes('payment.refund') && folio.status === 'OPEN';
   if (w.payments.length === 0) return null;
   return (
     <div className="mt-4 overflow-x-auto">
@@ -135,12 +138,16 @@ export function Payments({ folio, window: w }: { folio: Folio; window: Window })
             <tr key={p.id} className="border-t border-border">
               <td className="py-1.5 pr-3">{f.date(p.businessDate)}</td>
               <td className="py-1.5 pr-3">
-                {t(`shift.methods.${p.method}`)}
+                {p.refundsPaymentId
+                  ? t('refunds.label', { method: t(`shift.methods.${p.method}`) })
+                  : t(`shift.methods.${p.method}`)}
                 {p.note && <span className="block text-xs text-text-muted">{p.note}</span>}
               </td>
               <td className="py-1.5 pr-3">{p.externalRef ?? '—'}</td>
               <td className="py-1.5 pr-3 text-right tabular-nums">
-                −{f.money(p.baseAmountMinor)}
+                {p.refundsPaymentId
+                  ? `+${f.money(String(-BigInt(p.baseAmountMinor)))}`
+                  : `−${f.money(p.baseAmountMinor)}`}
                 {p.rate && (
                   <span className="block text-xs text-text-muted">
                     {t('payments.foreign', {
@@ -172,13 +179,160 @@ export function Payments({ folio, window: w }: { folio: Folio; window: Window })
                     {t('payments.receipt')}
                   </Button>
                 )}
+                {canRefund && p.refundableMinor !== '0' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t('refunds.named', { amount: f.money(p.baseAmountMinor) })}
+                    onClick={() => setRefunding(p)}
+                  >
+                    {t('refunds.button')}
+                  </Button>
+                )}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       <PdfError error={pdf.error} />
+      {refunding && (
+        <RefundForm
+          payment={refunding}
+          methods={folio.paymentMethods}
+          onDone={() => {
+            setRefunding(null);
+            void queryClient.invalidateQueries({ queryKey: ['folios'] });
+            void queryClient.invalidateQueries({ queryKey: ['shifts'] });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+type Refundable = {
+  id: string;
+  method: string;
+  amountMinor: string;
+  currency: string;
+  refundableMinor: string;
+};
+
+/** Refund a payment (T-072): every refund waits for a manager unless the refunder is one. */
+export function RefundForm({
+  payment,
+  methods,
+  onDone,
+}: {
+  payment: Refundable;
+  methods: readonly Method[];
+  onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const session = useSession();
+  const base =
+    session.properties.find((x) => x.id === session.currentPropertyId)?.baseCurrency ?? 'NGN';
+  const left = payment.refundableMinor;
+  const [amount, setAmount] = useState((Number(left) / 100).toFixed(2));
+  const [method, setMethod] = useState(payment.method);
+  const [reference, setReference] = useState('');
+  const [reason, setReason] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const minor = toMinor(amount);
+  const needsRef = method !== 'CASH' && method !== payment.method;
+  const ready = minor !== null && reason.trim() !== '' && (!needsRef || reference.trim() !== '');
+  const send = useMutation({
+    mutationFn: () =>
+      api.call('refundPayment', {
+        params: { paymentId: payment.id },
+        body: {
+          amountMinor: minor ?? '0',
+          ...(method !== payment.method ? { method: method as Method } : {}),
+          externalRef: reference.trim() || null,
+          reason: reason.trim(),
+        },
+      }),
+    onSuccess: (result) => {
+      if ('approvalRequestId' in result) setMessage(t('folios.sentForApproval'));
+      else onDone();
+    },
+  });
+  const options = [...new Set([payment.method, ...methods])];
+  return (
+    <form
+      aria-label={t('refunds.title')}
+      className="mt-3 grid items-end gap-3 rounded-md border border-border bg-surface p-4 sm:grid-cols-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ready) send.mutate();
+      }}
+    >
+      <h3 className="font-semibold sm:col-span-4">
+        {t('refunds.heading', {
+          left:
+            payment.currency === base
+              ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: base }).format(
+                  Number(left) / 100,
+                )
+              : foreignMoney(left, payment.currency),
+        })}
+      </h3>
+      <Field id="rf-amount" label={t('payments.amountIn', { currency: payment.currency })}>
+        <Input
+          id="rf-amount"
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+      </Field>
+      <Field id="rf-method" label={t('payments.method')}>
+        <select
+          id="rf-method"
+          className={selectClass}
+          value={method}
+          onChange={(e) => setMethod(e.target.value)}
+        >
+          {options.map((m) => (
+            <option key={m} value={m}>
+              {t(`shift.methods.${m}`)}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {needsRef && (
+        <Field id="rf-ref" label={t('payments.reference')}>
+          <Input
+            id="rf-ref"
+            maxLength={100}
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+          />
+        </Field>
+      )}
+      <Field id="rf-reason" label={t('folios.reason')}>
+        <Input
+          id="rf-reason"
+          maxLength={500}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </Field>
+      <div className="sm:col-span-4">
+        <Button type="submit" disabled={!ready || send.isPending}>
+          {t('refunds.submit')}
+        </Button>
+      </div>
+      {send.error && (
+        <Alert tone="critical" className="sm:col-span-4">
+          {errorMessage(send.error)}
+        </Alert>
+      )}
+      {message && (
+        <Alert tone="success" className="sm:col-span-4">
+          {message}
+        </Alert>
+      )}
+    </form>
   );
 }
 
@@ -390,6 +544,7 @@ export function BookingDeposit({
   const { permissions } = useSession();
   const pdf = usePdf();
   const d = reservation.deposit;
+  const [refunding, setRefunding] = useState<Refundable | null>(null);
   const open = reservation.status === 'TENTATIVE' || reservation.status === 'CONFIRMED';
   const due = BigInt(reservation.depositDueMinor) - BigInt(d.receivedMinor);
   if (d.entries.length === 0 && !(open && permissions.includes('payment.capture'))) return null;
@@ -444,6 +599,26 @@ export function BookingDeposit({
                       {t('payments.receipt')}
                     </Button>
                   )}
+                  {e.paymentId &&
+                    e.refundableMinor !== '0' &&
+                    permissions.includes('payment.refund') && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={t('refunds.named', { amount: f.money(e.amountMinor) })}
+                        onClick={() =>
+                          setRefunding({
+                            id: e.paymentId ?? '',
+                            method: e.method ?? 'CASH',
+                            amountMinor: e.amountMinor,
+                            currency: e.currency ?? 'NGN',
+                            refundableMinor: e.refundableMinor,
+                          })
+                        }
+                      >
+                        {t('refunds.button')}
+                      </Button>
+                    )}
                 </td>
               </tr>
             ))}
@@ -451,6 +626,17 @@ export function BookingDeposit({
         </table>
       )}
       <PdfError error={pdf.error} />
+      {refunding && (
+        <RefundForm
+          payment={refunding}
+          methods={d.paymentMethods}
+          onDone={() => {
+            setRefunding(null);
+            onPaid();
+            void queryClient.invalidateQueries({ queryKey: ['shifts'] });
+          }}
+        />
+      )}
       {open && permissions.includes('payment.capture') && (
         <PaymentForm
           target={{ reservationId: reservation.id }}

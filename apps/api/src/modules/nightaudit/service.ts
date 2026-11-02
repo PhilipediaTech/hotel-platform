@@ -1,6 +1,8 @@
 import {
   localDate,
+  NIGHT_AUDIT_REPORTS,
   NIGHT_AUDIT_STEPS,
+  type NightAuditReportName,
   type STEP_STATUSES,
   type NightAuditBody,
   type NightAuditException,
@@ -17,6 +19,15 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
+import { money } from '../payments/documents.ts';
+import { reversalPattern } from './leakage.ts';
+import { markNoShow } from './no-shows.ts';
+import {
+  buildReports,
+  DEFAULT_HIGH_BALANCE_MINOR,
+  reportPdf,
+  type AuditReports,
+} from './reports.ts';
 import { postPackageNight, postRoomNight, PostingProblem } from './room-charges.ts';
 
 // Night audit (PRD M4 rule 8 and its acceptance criteria; tab 4 POST /night-audits ●, GET
@@ -24,8 +35,8 @@ import { postPackageNight, postRoomNight, PostingProblem } from './room-charges.
 // the ten steps from its current step. Every step is idempotent, so a rerun or a resumed run
 // does no work twice: a step with blocking exceptions (or an error) stops the run as FAILED at
 // that step, and resume starts again there. Steps 1–3 only look; from step 4 the day is
-// AUDITING (the desk's postings wait) until step 10 closes it and opens the next.
-// T-073a: steps 1–5 and 10; steps 6–9 (no-show fees, rate lock, leakage, reports) are T-073b.
+// AUDITING (the desk's postings wait) until step 10 closes it and opens the next (T-073a,
+// T-073b).
 
 export interface NightAuditDeps {
   db: Db;
@@ -282,9 +293,146 @@ async function packages(env: Env): Promise<Outcome> {
   return { exceptions, result: { packageStays: packaged.length, linesPosted: posted } };
 }
 
-/** Steps 6–9 come with T-073b. */
-function later(): Promise<Outcome> {
-  return Promise.resolve({ exceptions: [], result: { note: 'Comes with T-073b' }, skipped: true });
+/** Step 6: confirmed guests who never arrived become no-shows; guaranteed ones pay the fee. */
+async function noShows({ deps, tenant, date }: Env): Promise<Outcome> {
+  const stays = await deps.tenantDb.stay.findMany({
+    where: { status: 'CONFIRMED', arrival: { lte: dbDate(date) } },
+    select: { id: true },
+    orderBy: [{ arrival: 'asc' }, { id: 'asc' }],
+  });
+  let marked = 0;
+  let charged = 0;
+  let fees = 0n;
+  for (const [i, stay] of stays.entries()) {
+    const fee = await deps.tenantDb.$transaction((tx) =>
+      markNoShow(
+        { tx, tenant, approvalRequestId: null, now: deps.clock() },
+        { stayId: stay.id, businessDate: date, clock: deps.clock },
+      ),
+    );
+    if (fee !== null) {
+      marked += 1;
+      if (fee > 0n) charged += 1;
+      fees += fee;
+    }
+    fault(`no-show:${i + 1}`);
+  }
+  const total = await deps.tenantDb.stay.count({
+    where: { status: 'NO_SHOW', arrival: dbDate(date) },
+  });
+  return {
+    exceptions: [],
+    result: {
+      noShowsNow: marked,
+      chargedNow: charged,
+      feesNowMinor: fees.toString(),
+      noShowsTotal: total,
+    },
+  };
+}
+
+/** Step 7: the date's exchange rates lock (M4-18): they never change after this. */
+async function lockRates({ deps, date }: Env): Promise<Outcome> {
+  const locked = await deps.tenantDb.exchangeRate.updateMany({
+    where: { businessDate: dbDate(date), lockedAt: null },
+    data: { lockedAt: deps.clock() },
+  });
+  const rates = await deps.tenantDb.exchangeRate.count({ where: { businessDate: dbDate(date) } });
+  return { exceptions: [], result: { lockedNow: locked.count, rates } };
+}
+
+const RULE_LABEL: Record<string, string> = {
+  SHIFT_VARIANCE: 'Cash variance',
+  REVERSAL_PATTERN: 'Reversal pattern',
+};
+
+/** Step 8: the leakage rules that look at the day; the day's alerts are listed for review. */
+async function leakage({ deps, date }: Env): Promise<Outcome> {
+  const raised = await deps.tenantDb.$transaction((tx) => reversalPattern(tx, date));
+  const alerts = await deps.tenantDb.leakageAlert.findMany({
+    where: { businessDate: dbDate(date) },
+    include: { subjectUser: { select: { name: true } } },
+    orderBy: { raisedAt: 'asc' },
+  });
+  const exceptions: Exception[] = alerts.map((a) => {
+    const evidence = (a.evidence ?? {}) as Record<string, unknown>;
+    const who = a.subjectUser?.name ?? 'Someone';
+    const total = typeof evidence['totalMinor'] === 'string' ? evidence['totalMinor'] : '0';
+    const detail =
+      a.ruleCode === 'REVERSAL_PATTERN'
+        ? `${who}: ${String(evidence['reversals'])} reversals, ${money(BigInt(total), 'NGN')}`
+        : who;
+    return {
+      type: a.ruleCode,
+      blocking: false,
+      message: `${RULE_LABEL[a.ruleCode] ?? a.ruleCode} (${a.severity.toLowerCase()}): ${detail}`,
+      ...(a.entityType === 'cashier_shift' ? { shiftId: a.entityId } : {}),
+      subject: who,
+    };
+  });
+  return { exceptions, result: { raisedNow: raised, alerts: alerts.length } };
+}
+
+/** Step 9: the closed day's reports, worked out once and kept on the run. */
+async function reports({ deps, tenant, runId, date }: Env): Promise<Outcome> {
+  const [run, previous, property] = await Promise.all([
+    deps.tenantDb.nightAuditRun.findUniqueOrThrow({
+      where: { id: runId },
+      include: { steps: { where: { step: { in: [3, 6] } } } },
+    }),
+    deps.tenantDb.nightAuditRun.findFirst({
+      where: { status: 'COMPLETED', businessDate: { lt: dbDate(date) } },
+      orderBy: { businessDate: 'desc' },
+    }),
+    deps.tenantDb.property.findUniqueOrThrow({ where: { id: tenant.propertyId } }),
+  ]);
+  const stepOf = (n: number) => run.steps.find((st) => st.step === n);
+  const discrepancies = ((stepOf(3)?.exceptions ?? []) as Exception[]).map((e) => ({
+    room: e.subject ?? '',
+    message: e.message,
+  }));
+  const before = previous ? reportsOf(previous) : null;
+  const settings = (property.settings ?? {}) as Record<string, unknown>;
+  const line = settings['highBalanceMinor'];
+  const built = await buildReports(deps.tenantDb, {
+    date,
+    noShows: Number((stepOf(6)?.result as Result | undefined)?.['noShowsTotal'] ?? 0),
+    discrepancies,
+    previousGuestLedgerClosing: before ? BigInt(before.trialBalance.guestLedgerClosingMinor) : null,
+    highBalanceMinor:
+      typeof line === 'string' && /^\d+$/.test(line) ? BigInt(line) : DEFAULT_HIGH_BALANCE_MINOR,
+  });
+  await deps.tenantDb.nightAuditRun.update({
+    where: { id: runId },
+    data: { summary: { reports: built } as unknown as Prisma.InputJsonValue },
+  });
+  const t = built.trialBalance;
+  const exceptions: Exception[] = [];
+  if (!t.balanced) {
+    exceptions.push({
+      type: 'TRIAL_BALANCE',
+      blocking: false,
+      message: `The trial balance is out by ${money(BigInt(t.differenceMinor), property.baseCurrency)}: tell support before the next audit`,
+    });
+  }
+  if (t.openingMatchesPreviousClose === false) {
+    exceptions.push({
+      type: 'BACK_DATED',
+      blocking: false,
+      message:
+        'The guest ledger opened away from where the previous audit closed it: something was posted to an earlier day',
+    });
+  }
+  return {
+    exceptions,
+    result: {
+      reports: NIGHT_AUDIT_REPORTS.length,
+      roomRevenueMinor: built.flash.roomRevenueMinor,
+      occupancyBps: built.flash.occupancyBps,
+      trialBalanceDifferenceMinor: t.differenceMinor,
+      highBalanceFolios: built.highBalance.folios.length,
+    },
+  };
 }
 
 /** Step 10: close the day and open the next (idempotent: a closed day stays closed). */
@@ -324,10 +472,10 @@ const STEP_WORK: Record<number, (env: Env) => Promise<Outcome>> = {
   3: roomStatus,
   4: roomAndTax,
   5: packages,
-  6: later,
-  7: later,
-  8: later,
-  9: later,
+  6: noShows,
+  7: lockRates,
+  8: leakage,
+  9: reports,
   10: closeDay,
 };
 
@@ -342,6 +490,10 @@ async function loadRun(deps: NightAuditDeps, id: string) {
   const run = await deps.tenantDb.nightAuditRun.findUnique({ where: { id }, include: RUN });
   if (!run) throw new AppError('NOT_FOUND', 'Night audit not found');
   return run;
+}
+
+function reportsOf(run: { summary: unknown }): AuditReports | null {
+  return (run.summary as { reports?: AuditReports } | null)?.reports ?? null;
 }
 
 function runItem(run: Awaited<ReturnType<typeof loadRun>>): z.input<typeof NightAuditItem> {
@@ -363,6 +515,7 @@ function runItem(run: Awaited<ReturnType<typeof loadRun>>): z.input<typeof Night
       startedAt: s.startedAt ? iso(s.startedAt) : null,
       finishedAt: s.finishedAt ? iso(s.finishedAt) : null,
     })),
+    reports: reportsOf(run) ? [...NIGHT_AUDIT_REPORTS] : [],
   };
 }
 
@@ -549,4 +702,31 @@ export async function runIdFor(db: TenantDb, date: string): Promise<string | nul
     select: { id: true },
   });
   return run?.id ?? null;
+}
+
+/** A report of the run's closed day, from the figures step 9 kept (tab 4 …/reports/{name}.pdf). */
+export async function nightAuditReport(
+  deps: NightAuditDeps,
+  tenant: TenantContext,
+  id: string,
+  name: NightAuditReportName,
+) {
+  const run = await loadRun(deps, id);
+  const reports = reportsOf(run);
+  if (!reports) {
+    throw new AppError('STATE_TRANSITION_INVALID', 'The reports are ready once step 9 has run', {
+      currentStep: run.currentStep,
+    });
+  }
+  const property = await deps.tenantDb.property.findUniqueOrThrow({
+    where: { id: tenant.propertyId },
+  });
+  const pdf = await reportPdf(property, day(run.businessDate), name, reports);
+  await recordAudit(deps.tenantDb, {
+    action: 'night_audit.report_issued',
+    entityType: 'night_audit',
+    entityId: run.id,
+    after: { report: name, businessDate: day(run.businessDate) },
+  });
+  return pdf;
 }

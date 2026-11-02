@@ -35,5 +35,9 @@ export function nightAuditRoutes(deps: audit.NightAuditDeps): Router {
     audit.resumeNightAudit(deps, tenantFrom(tenant), params.nightAuditId),
   );
 
+  mountRoute(router, r.getNightAuditReport, ({ params }, { tenant }) =>
+    audit.nightAuditReport(deps, tenantFrom(tenant), params.nightAuditId, params.report),
+  );
+
   return router;
 }

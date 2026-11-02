@@ -1495,7 +1495,7 @@
     "status": {
       "PENDING": "Not yet",
       "DONE": "Done",
-      "SKIPPED": "Not in this release",
+      "SKIPPED": "Skipped",
       "BLOCKED": "Exceptions",
       "FAILED": "Failed"
     },
@@ -1510,6 +1510,14 @@
       "LEAKAGE": "Run leakage rules",
       "REPORTS": "Generate reports",
       "CLOSE_DAY": "Close the day and open the next"
+    },
+    "reports": "Reports of the closed day",
+    "report": {
+      "flash": "Flash report",
+      "trial-balance": "Trial balance",
+      "cashier": "Cashier summary",
+      "high-balance": "High balance",
+      "discrepancy": "Discrepancies"
     }
   }
 }

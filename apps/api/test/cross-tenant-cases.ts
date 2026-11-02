@@ -1251,4 +1251,10 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bNightAuditUnchanged,
   },
   resumeNightAudit: { seed: bNightAudit, untouched: bNightAuditUnchanged },
+  getNightAuditReport: {
+    seed: async (db, world, propertyId) => ({
+      ...(await bNightAudit(db, world, propertyId)),
+      report: 'flash',
+    }),
+  },
 };

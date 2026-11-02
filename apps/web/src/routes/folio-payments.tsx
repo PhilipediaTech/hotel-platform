@@ -11,6 +11,7 @@ import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
+import { PdfError, usePdf } from '../lib/pdf.tsx';
 import { useFormats } from './reservations.tsx';
 
 // Payments on the folio and its documents (PRD M4-08 and the receipt/invoice/proforma story;
@@ -24,47 +25,6 @@ type Window = Folio['windows'][number];
 type Reservation = z.output<typeof ReservationItem>;
 
 const selectClass = 'h-10 rounded-md border border-border bg-surface px-3 text-sm';
-
-/**
- * Shows a PDF in a new tab. The tab is opened before the download (browsers block pop-ups
- * that open after a wait); without one, the file is saved instead.
- */
-export function usePdf() {
-  const [error, setError] = useState<unknown>(null);
-  const [busy, setBusy] = useState(false);
-  const open = async (fetchFile: () => Promise<Blob>, filename: string) => {
-    setError(null);
-    setBusy(true);
-    const tab = window.open('', '_blank');
-    try {
-      const url = URL.createObjectURL(await fetchFile());
-      if (tab) {
-        tab.location.href = url;
-      } else {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.click();
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (err) {
-      tab?.close();
-      setError(err);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return { open, error, busy };
-}
-
-export function PdfError({ error }: { error: unknown }) {
-  if (!error) return null;
-  return (
-    <Alert tone="critical" className="mt-2">
-      {errorMessage(error)}
-    </Alert>
-  );
-}
 
 export function PrintInvoice({ folio, windowNumber }: { folio: Folio; windowNumber: number }) {
   const { t } = useTranslation();

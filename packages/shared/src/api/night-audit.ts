@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineRoute } from './contract.ts';
-import { Instant, IsoDate, Uuid } from './primitives.ts';
+import { Instant, IsoDate, PdfDocument, Uuid } from './primitives.ts';
 
 // Business day and night audit (PRD M4 rule 8 and its acceptance criteria; tab 4 row "Night
 // audit" and the POST /night-audits example; S15; T-054, T-073). A live property trades on one
@@ -26,6 +26,16 @@ export const NIGHT_AUDIT_STEPS = [
   { step: 10, name: 'CLOSE_DAY', label: 'Close the day and open the next' },
 ] as const;
 export type NightAuditStepName = (typeof NIGHT_AUDIT_STEPS)[number]['name'];
+
+/** The reports step 9 keeps for the closed day (PRD M10 night auditor story). */
+export const NIGHT_AUDIT_REPORTS = [
+  'flash',
+  'trial-balance',
+  'cashier',
+  'high-balance',
+  'discrepancy',
+] as const;
+export type NightAuditReportName = (typeof NIGHT_AUDIT_REPORTS)[number];
 
 export const BusinessDayItem = z
   .object({
@@ -79,6 +89,8 @@ export const NightAuditItem = z
     /** Why the run stopped, when it is FAILED. */
     error: z.string().nullable(),
     steps: z.array(NightAuditStepItem),
+    /** Reports ready to download (once step 9 has run). */
+    reports: z.array(z.enum(NIGHT_AUDIT_REPORTS)),
   })
   .meta({ id: 'NightAudit' });
 
@@ -140,9 +152,24 @@ export const resumeNightAudit = defineRoute({
   response: NightAuditItem,
 });
 
+export const getNightAuditReport = defineRoute({
+  operationId: 'getNightAuditReport',
+  method: 'get',
+  path: '/night-audits/{nightAuditId}/reports/{report}.pdf',
+  summary: 'A night audit report of the closed day, as PDF',
+  description: 'Drawn from the figures step 9 kept: a closed day’s report never changes.',
+  tags: ['Night audit'],
+  propertyScoped: true,
+  permission: 'report.audit',
+  params: z.object({ nightAuditId: Uuid, report: z.enum(NIGHT_AUDIT_REPORTS) }),
+  produces: 'application/pdf',
+  response: PdfDocument,
+});
+
 export const NIGHT_AUDIT_ROUTES = {
   getBusinessDay,
   startNightAudit,
   getNightAudit,
   resumeNightAudit,
+  getNightAuditReport,
 } as const;

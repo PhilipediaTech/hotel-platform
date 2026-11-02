@@ -80,6 +80,7 @@ apps/api        @hotel/api      Express 5 app
   src/modules/folios/          folios: open at check-in, post with taxes, reverse, discount, windows, routing;
                                 house / paymaster accounts; transfers.ts; system-codes.ts (DEPOSIT, TRANSFER)
   src/modules/fx/              exchange rates per business date; rateFor() for foreign payments
+  src/modules/payments/refunds.ts  refunds with approval (negative payments; deposit REFUNDED; FX difference line)
   src/modules/shifts/          cashier shifts: open with float, blind close, variance and leakage alert, sign-off, handovers
   src/modules/payments/        service.ts: desk payments and deposits on the open shift; deposits.ts: deposit ledger, apply at folio
                                 opening; documents.ts: invoice, receipt, deposit receipt, proforma PDFs (pdfkit)
@@ -191,4 +192,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-070 payment adapter: needs the payment provider chosen in ADR-021 (open ADR — stop and ask Philip before building, and any provider account is his to create). If that is still open, the next unblocked tickets are T-072 refunds with approval (payment.refund policy, negative payments with refunds_payment_id, FX code for foreign refunds at a new rate, REFUNDED / FORFEITED deposit entries) and T-073 night audit. Lockfile: after any dependency change, check npm kept the other platforms’ bindings. First load 292.8 KB of 300 KB: new screens load on first use, and shared helpers go in lib/ (a route importing another route pulls it into the first load). The tax rates in S25 still need Philip’s confirmation. Still waiting for accounts: R2 and the scan engine, T-024 notifications (also folio send at check-out), T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-073 night audit engine (split 073a steps 1–5, 073b steps 6–10; M4 rule on the 10 idempotent, resumable steps; `night_audit_runs`, `room_charge_postings` in tab 3; open issue 14 asks for a per-step table). Pieces in place: `businessDay()` (apps/api/src/core/business-day.ts; replace the interim midnight rollover), open-shift check (cashier_shifts), room/tax posting via `postChargeLines()`, exchange-rate lock (`exchange_rates.locked_at`), leakage alerts table. T-070/T-071 wait for Philip’s payment provider choice (ADR-021, stop and ask). Lockfile: after any dependency change, check npm kept the other platforms’ bindings. First load 293.8 KB of 300 KB: new screens load on first use; shared helpers go in lib/. The tax rates in S25 still need Philip’s confirmation. Still waiting for accounts: R2 and the scan engine, T-024 notifications, T-025 nightly dump, T-005 staging (paid: stop and ask).

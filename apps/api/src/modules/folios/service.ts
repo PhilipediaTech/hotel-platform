@@ -86,7 +86,11 @@ const FOLIO = {
   },
   payments: {
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    include: { window: true, receivedBy: { select: { name: true } } },
+    include: {
+      window: true,
+      receivedBy: { select: { name: true } },
+      refundedBy: { select: { amountMinor: true } },
+    },
   },
   reservation: { include: { company: true } },
   stays: { include: { room: true } },
@@ -166,6 +170,11 @@ function paymentItem(x: Full['payments'][number]): z.input<typeof FolioPaymentIt
     amountMinor: x.amountMinor.toString(),
     baseAmountMinor: x.baseAmountMinor.toString(),
     rate: x.rateMicros === null ? null : microsToRate(x.rateMicros),
+    refundsPaymentId: x.refundsPaymentId,
+    refundableMinor: (x.refundsPaymentId
+      ? 0n
+      : x.amountMinor + x.refundedBy.reduce((s, r) => s + r.amountMinor, 0n)
+    ).toString(),
     currency: x.currency,
     externalRef: x.externalRef,
     businessDate: day(x.businessDate),
@@ -670,6 +679,13 @@ async function tree(tx: Tx | TenantDb, lineId: string) {
 
 async function measureReversal(db: Tx | TenantDb, lineId: string) {
   const { root, lines } = await tree(db, lineId);
+  const code = await db.revenueCode.findUnique({ where: { id: root.revenueCodeId } });
+  if (code && isSystemCode(code.code)) {
+    throw new AppError('STATE_TRANSITION_INVALID', 'This line is not reversed by hand', {
+      kind: root.kind,
+      revenueCode: code.code,
+    });
+  }
   if (root.kind !== 'CHARGE' && root.kind !== 'DISCOUNT') {
     throw new AppError(
       'STATE_TRANSITION_INVALID',
@@ -798,12 +814,12 @@ async function measureDiscount(
 ) {
   const charge = await db.folioLine.findUnique({
     where: { id: body.lineId },
-    include: { reversedBy: { select: { id: true } } },
+    include: { reversedBy: { select: { id: true } }, revenueCode: true },
   });
   if (!charge || charge.folioId !== folioId) {
     throw invalid('body.lineId', 'Choose a charge on this folio');
   }
-  if (charge.kind !== 'CHARGE' || charge.reversedBy) {
+  if (charge.kind !== 'CHARGE' || charge.reversedBy || isSystemCode(charge.revenueCode.code)) {
     throw invalid('body.lineId', 'Only a charge that is not reversed takes a discount');
   }
   const children = await db.folioLine.findMany({

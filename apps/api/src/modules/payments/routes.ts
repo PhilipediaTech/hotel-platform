@@ -3,6 +3,7 @@ import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { depositReceipt, folioInvoice, folioReceipt, proforma } from './documents.ts';
+import { refundPayment } from './refunds.ts';
 import * as payments from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -26,6 +27,9 @@ export function paymentRoutes(deps: payments.PaymentDeps): Router {
     folioReceipt(deps, params.folioId, query.paymentId),
   );
   mountRoute(router, r.getProforma, ({ params }) => proforma(deps, params.reservationId));
+  mountRoute(router, r.refundPayment, ({ params, body }, { tenant }) =>
+    refundPayment(deps, tenantFrom(tenant), params.paymentId, body),
+  );
   mountRoute(router, r.getDepositReceipt, ({ params, query }) =>
     depositReceipt(deps, params.reservationId, query.paymentId),
   );

@@ -62,6 +62,10 @@ export const FolioPaymentItem = z
     baseAmountMinor: AmountMinor,
     /** The exchange rate used for a foreign payment; null in the base currency. */
     rate: z.string().nullable(),
+    /** Set on a refund (negative): the payment it gives back (T-072). */
+    refundsPaymentId: Uuid.nullable(),
+    /** What can still be refunded of a payment, in its currency; 0 for a refund. */
+    refundableMinor: AmountMinor,
     externalRef: z.string().nullable(),
     businessDate: IsoDate,
     receivedAt: Instant,

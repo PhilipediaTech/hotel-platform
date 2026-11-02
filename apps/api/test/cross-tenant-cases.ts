@@ -1167,6 +1167,17 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     query: (theirs) => ({ paymentId: theirs['paymentId'] ?? '' }),
   },
   getProforma: { seed: bReservation },
+  refundPayment: {
+    seed: bFolioPaid,
+    body: () => ({ amountMinor: '1', reason: 'Leak' }),
+    untouched: async (db, world) => {
+      expect(
+        await db.payment.count({
+          where: { propertyId: world.b1.id, refundsPaymentId: { not: null } },
+        }),
+      ).toBe(0);
+    },
+  },
   getDepositReceipt: {
     seed: bDeposit,
     query: (theirs) => ({ paymentId: theirs['paymentId'] ?? '' }),

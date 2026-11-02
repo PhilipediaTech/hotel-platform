@@ -152,7 +152,10 @@ function OpenShiftView({
               : shift.paymentCounts
                   .map((p) =>
                     t('shift.paymentCount', {
-                      method: t(`shift.methods.${p.method}`),
+                      method:
+                        p.currency === shift.currency
+                          ? t(`shift.methods.${p.method}`)
+                          : `${t(`shift.methods.${p.method}`)} (${p.currency})`,
                       count: p.count,
                     }),
                   )
@@ -195,7 +198,15 @@ function OpenShiftView({
       )}
 
       {permissions.includes('shift.handover') && <HandoverForm current={current} />}
-      {permissions.includes('shift.close') && <CloseForm shiftId={shift.id} onClosed={onClosed} />}
+      {permissions.includes('shift.close') && (
+        <CloseForm
+          shiftId={shift.id}
+          foreign={shift.paymentCounts
+            .filter((p) => p.currency !== shift.currency)
+            .map((p) => ({ method: p.method, currency: p.currency }))}
+          onClosed={onClosed}
+        />
+      )}
     </div>
   );
 }
@@ -307,23 +318,41 @@ function Incoming({ current }: { current: Current }) {
 
 // ── Blind close (M4-11) ─────────────────────────────────────────────────────────────────
 
-function CloseForm({ shiftId, onClosed }: { shiftId: string; onClosed: (shift: Shift) => void }) {
+function CloseForm({
+  shiftId,
+  foreign,
+  onClosed,
+}: {
+  shiftId: string;
+  /** Methods taken in another currency, counted as that currency (T-065). */
+  foreign: { method: Shift['lines'][number]['method']; currency: string }[];
+  onClosed: (shift: Shift) => void;
+}) {
   const { t } = useTranslation();
   const refresh = useRefresh();
   const { properties, currentPropertyId } = useSession();
   const currency = properties.find((p) => p.id === currentPropertyId)?.baseCurrency ?? 'NGN';
   const [counts, setCounts] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState(false);
-  const parsed = COUNTED.map((method) => ({ method, text: counts[method] ?? '' }))
-    .filter((c) => c.method === 'CASH' || c.text.trim() !== '')
-    .map((c) => ({ method: c.method, minor: amountMinor(c.text) }));
+  const fields = [
+    ...COUNTED.map((method) => ({ method, currency, key: method })),
+    ...foreign.map((x) => ({ ...x, key: `${x.method} ${x.currency}` })),
+  ];
+  const parsed = fields
+    .map((c) => ({ ...c, text: counts[c.key] ?? '' }))
+    .filter((c) => (c.method === 'CASH' && c.currency === currency) || c.text.trim() !== '')
+    .map((c) => ({ method: c.method, currency: c.currency, minor: amountMinor(c.text) }));
   const ready = parsed.every((c) => c.minor !== null);
   const close = useMutation({
     mutationFn: () =>
       api.call('closeShift', {
         params: { shiftId },
         body: {
-          counts: parsed.map((c) => ({ method: c.method, currency, countedMinor: c.minor ?? '0' })),
+          counts: parsed.map((c) => ({
+            method: c.method,
+            currency: c.currency,
+            countedMinor: c.minor ?? '0',
+          })),
           varianceNote: null,
         },
       }),
@@ -345,16 +374,24 @@ function CloseForm({ shiftId, onClosed }: { shiftId: string; onClosed: (shift: S
     >
       <h2 className="font-semibold sm:col-span-3">{t('shift.close')}</h2>
       <p className="text-sm text-text-muted sm:col-span-3">{t('shift.blindHint')}</p>
-      {COUNTED.map((method) => (
-        <Field key={method} id={`sh-count-${method}`} label={t(`shift.methods.${method}`)}>
+      {fields.map(({ method, currency: cur, key }) => (
+        <Field
+          key={key}
+          id={`sh-count-${key.replace(' ', '-')}`}
+          label={
+            cur === currency
+              ? t(`shift.methods.${method}`)
+              : `${t(`shift.methods.${method}`)} (${cur})`
+          }
+        >
           <Input
-            id={`sh-count-${method}`}
+            id={`sh-count-${key.replace(' ', '-')}`}
             inputMode="decimal"
-            placeholder={method === 'CASH' ? '0.00' : t('shift.notTaken')}
-            value={counts[method] ?? ''}
+            placeholder={method === 'CASH' && cur === currency ? '0.00' : t('shift.notTaken')}
+            value={counts[key] ?? ''}
             onChange={(e) => {
               setConfirming(false);
-              setCounts({ ...counts, [method]: e.target.value });
+              setCounts({ ...counts, [key]: e.target.value });
             }}
           />
         </Field>

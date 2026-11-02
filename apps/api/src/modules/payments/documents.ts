@@ -1,3 +1,4 @@
+import { microsToRate } from '@hotel/shared';
 import PDFDocument from 'pdfkit';
 import type { Property } from '../../generated/prisma/client.ts';
 import { recordAudit } from '../../core/audit.ts';
@@ -203,14 +204,16 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
     windowNumber && windowNumber > 1 ? `${folio.number}-${windowNumber}` : folio.number;
   const date = await businessDate(db, folio.propertyId, deps.clock);
 
-  const charges = lines
-    .filter((l) => l.kind !== 'DEPOSIT_APPLY')
-    .reduce((s, l) => s + l.amountMinor, 0n);
-  const deposits = lines
-    .filter((l) => l.kind === 'DEPOSIT_APPLY')
-    .reduce((s, l) => s + l.amountMinor, 0n);
+  // Deposits applied and transfers move money between bills: they are not charges.
+  const moved = new Set(['DEPOSIT_APPLY', 'TRANSFER_IN', 'TRANSFER_OUT']);
+  const sumOf = (kinds: string[]) =>
+    lines.filter((l) => kinds.includes(l.kind)).reduce((s, l) => s + l.amountMinor, 0n);
+  const charges = lines.filter((l) => !moved.has(l.kind)).reduce((s, l) => s + l.amountMinor, 0n);
+  const deposits = sumOf(['DEPOSIT_APPLY']);
+  const transferredIn = sumOf(['TRANSFER_IN']);
+  const transferredOut = sumOf(['TRANSFER_OUT']);
   const received = payments.reduce((s, p) => s + p.baseAmountMinor, 0n);
-  const balance = charges + deposits - received;
+  const balance = charges + deposits + transferredIn + transferredOut - received;
   const taxes = new Map<string, bigint>();
   for (const l of lines.filter(
     (x) => x.kind === 'TAX' || (x.kind === 'REVERSAL' && x.taxRuleVersionId),
@@ -240,7 +243,7 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
         { title: 'Amount', width: 120, align: 'right' },
       ],
       lines
-        .filter((l) => l.kind !== 'DEPOSIT_APPLY')
+        .filter((l) => !moved.has(l.kind))
         .map((l) => [
           day(l.businessDate),
           l.kind === 'TAX' ? `   ${l.description}` : l.description,
@@ -258,7 +261,15 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
         ],
         payments.map((p) => [
           day(p.businessDate),
-          [METHOD[p.method] ?? p.method, p.externalRef].filter(Boolean).join(' · '),
+          [
+            METHOD[p.method] ?? p.method,
+            p.externalRef,
+            p.rateMicros === null
+              ? null
+              : `${money(p.amountMinor, p.currency)} at ${microsToRate(p.rateMicros)}`,
+          ]
+            .filter(Boolean)
+            .join(' · '),
           money(-p.baseAmountMinor, cur),
         ]),
       );
@@ -268,6 +279,12 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
       ...[...taxes.entries()].map(([name, amount]): [string, string] => [name, money(amount, cur)]),
       ['Total charges', money(charges, cur)],
       ...(deposits !== 0n ? [['Advance deposit', money(deposits, cur)] as [string, string]] : []),
+      ...(transferredIn !== 0n
+        ? [['Transferred in', money(transferredIn, cur)] as [string, string]]
+        : []),
+      ...(transferredOut !== 0n
+        ? [['Transferred to another bill', money(transferredOut, cur)] as [string, string]]
+        : []),
       ['Payments', money(-received, cur)],
       ['Balance due', money(balance, cur)],
     ]);

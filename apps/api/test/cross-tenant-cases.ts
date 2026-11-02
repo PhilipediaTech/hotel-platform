@@ -533,6 +533,25 @@ async function bDeposit(db: Db, world: TenantWorld, propertyId: string) {
   return { ...theirs, paymentId: payment.id };
 }
 
+/** B's exchange rate for XAF on 2099-01-01 (T-065). */
+async function bRate(db: Db, world: TenantWorld, propertyId: string) {
+  await db.exchangeRate.create({
+    data: {
+      propertyId,
+      currency: 'XAF',
+      businessDate: new Date('2099-01-01'),
+      rateMicros: 2_500_000n,
+      setById: world.bStaff.id,
+    },
+  });
+  return { date: '2099-01-01' };
+}
+
+async function bRateUnchanged(db: Db, world: TenantWorld) {
+  const rates = await db.exchangeRate.findMany({ where: { propertyId: world.b1.id } });
+  expect(rates.map((r) => [r.currency, r.rateMicros])).toEqual([['XAF', 2_500_000n]]);
+}
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -1151,6 +1170,35 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   getDepositReceipt: {
     seed: bDeposit,
     query: (theirs) => ({ paymentId: theirs['paymentId'] ?? '' }),
+  },
+  createFolio: {
+    seed: bFolio,
+    creates: true,
+    body: () => ({ kind: 'HOUSE', name: 'Leak' }),
+    untouched: async (db, world) => {
+      expect(await db.folio.count({ where: { propertyId: world.b1.id } })).toBe(1);
+    },
+  },
+  transferFolio: {
+    seed: bFolio,
+    body: (theirs) => ({
+      fromWindow: 1,
+      toFolioId: theirs['folioId'],
+      toWindow: 1,
+      amountMinor: '1',
+      reason: 'Leak',
+    }),
+    untouched: bFolioUnchanged,
+  },
+  getExchangeRates: {
+    seed: bRate,
+    listIds: (body) => (body as { rates: { currency: string }[] }).rates.map((r) => r.currency),
+  },
+  putExchangeRates: {
+    seed: bRate,
+    creates: true,
+    body: () => ({ rates: [{ currency: 'XAF', rate: '9' }] }),
+    untouched: bRateUnchanged,
   },
   releaseRoomBlock: {
     seed: bBlock,

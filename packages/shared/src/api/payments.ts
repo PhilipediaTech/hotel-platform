@@ -27,7 +27,7 @@ export const PaymentBody = z
     /** One the property switched on in setup. */
     method: z.enum(MANUAL_PAY_METHODS),
     amountMinor: PositiveMinor,
-    /** The property's base currency; other currencies come with T-065. */
+    /** Base currency by default; a foreign one uses the business date's exchange rate (T-065). */
     currency: z
       .string()
       .regex(/^[A-Z]{3}$/)
@@ -59,7 +59,13 @@ export const capturePayment = defineRoute({
   body: PaymentBody,
   status: 201,
   response: z
-    .object({ paymentId: Uuid, shiftId: Uuid, balanceMinor: AmountMinor })
+    .object({
+      paymentId: Uuid,
+      shiftId: Uuid,
+      /** The payment's value in the base currency (the rate applied for a foreign one). */
+      baseAmountMinor: AmountMinor,
+      balanceMinor: AmountMinor,
+    })
     .meta({ id: 'PaymentCaptured' }),
   errors: [
     'SHIFT_NOT_OPEN',

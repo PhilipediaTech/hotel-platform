@@ -27,6 +27,7 @@ import { api, ApiError } from '../../lib/api.ts';
 import { cn } from '../../lib/cn.ts';
 import { apiFieldErrors, errorMessage } from '../../lib/form.ts';
 import { Field } from '../auth/layout.tsx';
+import { ExchangeRatesTab } from './exchange-rates.tsx';
 import { fieldErrorsOf, serverErrors, validated, type FieldErrors } from './room-form.ts';
 
 // S25 Tax, revenue codes and FX (PRD M4-17; T-032): tax rules with dated versions, the
@@ -101,7 +102,7 @@ export function FinanceSettingsPage() {
       <div role="tabpanel" className="mt-4">
         {tab === 'taxes' && <TaxesTab />}
         {tab === 'codes' && <CodesTab />}
-        {tab === 'fx' && <p className="text-sm text-text-muted">{t('finance.fxLater')}</p>}
+        {tab === 'fx' && <ExchangeRatesTab />}
       </div>
     </section>
   );

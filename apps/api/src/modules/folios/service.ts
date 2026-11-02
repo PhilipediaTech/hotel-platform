@@ -1,5 +1,7 @@
 import {
   MANUAL_PAY_METHODS,
+  microsToRate,
+  type NewFolioBody,
   calculateTaxes,
   type FolioPaymentItem,
   type ManualPayMethod,
@@ -29,7 +31,8 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import { currentTenant, type TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
-import { applyDeposit, DEPOSIT_CODE } from '../payments/deposits.ts';
+import { applyDeposit } from '../payments/deposits.ts';
+import { isSystemCode, SYSTEM_CODES } from './system-codes.ts';
 
 // Folios (PRD M4-01–M4-05, M4 rules 1–3; tab 4 row "Folios"; T-060). A guest folio opens at
 // check-in, one per stay, with window 1 for the guest. Lines are append-only (M4 rule 1; a
@@ -161,6 +164,8 @@ function paymentItem(x: Full['payments'][number]): z.input<typeof FolioPaymentIt
     windowNumber: x.window?.number ?? 1,
     method: x.method,
     amountMinor: x.amountMinor.toString(),
+    baseAmountMinor: x.baseAmountMinor.toString(),
+    rate: x.rateMicros === null ? null : microsToRate(x.rateMicros),
     currency: x.currency,
     externalRef: x.externalRef,
     businessDate: day(x.businessDate),
@@ -181,7 +186,7 @@ async function toItem(db: Client, f: Full): Promise<z.input<typeof FolioItem>> {
     where: {
       active: true,
       group: { notIn: ['TAX', 'SERVICE_CHARGE'] },
-      code: { not: DEPOSIT_CODE },
+      code: { notIn: Object.keys(SYSTEM_CODES) },
     },
     orderBy: { code: 'asc' },
   });
@@ -246,6 +251,7 @@ export async function listFolios(deps: FolioDeps, query: z.output<typeof FolioQu
   const folios = await deps.tenantDb.folio.findMany({
     where: {
       status: query.status,
+      ...(query.kind ? { kind: query.kind } : {}),
       ...(q
         ? {
             OR: [
@@ -269,6 +275,7 @@ export async function listFolios(deps: FolioDeps, query: z.output<typeof FolioQu
     number: f.number,
     name: f.name,
     status: f.status,
+    kind: f.kind,
     roomNumber: f.stays[0]?.room?.number ?? null,
     confirmationNo: f.reservation?.confirmationNo ?? null,
     balanceMinor: (balance.get(f.id) ?? 0n).toString(),
@@ -375,6 +382,59 @@ async function shiftIdOf(tx: Tx, userId: string): Promise<string | null> {
     select: { id: true },
   });
   return shift?.id ?? null;
+}
+
+/** House and paymaster accounts take postings only from holders of folio.house (M4-20). */
+export function houseRights(folio: { kind: string }, tenant: TenantContext): void {
+  if (folio.kind !== 'GUEST' && !tenant.permissions.has('folio.house')) {
+    throw new AppError('FORBIDDEN', 'House and paymaster accounts need folio.house', {
+      permission: 'folio.house',
+    });
+  }
+}
+
+/** Opens a house or paymaster account (M4-20; tab 4 POST /folios; T-065). */
+export async function createFolio(
+  deps: FolioDeps,
+  tenant: TenantContext,
+  body: z.output<typeof NewFolioBody>,
+) {
+  const id = await deps.tenantDb.$transaction(async (tx) => {
+    let company: { id: string; name: string } | null = null;
+    if (body.companyId) {
+      const found = await tx.company.findUnique({ where: { id: body.companyId } });
+      if (!found?.active) throw invalid('body.companyId', 'Choose an active company');
+      company = found;
+    }
+    const property = await tx.property.findUniqueOrThrow({ where: { id: tenant.propertyId } });
+    const n = await nextPropertyCounter(tx, tenant.propertyId, COUNTER.FOLIO);
+    const folio = await tx.folio.create({
+      data: {
+        number: `F${String(n).padStart(5, '0')}`,
+        kind: body.kind,
+        name: body.name,
+        currency: property.baseCurrency,
+        windows: {
+          create: company
+            ? { number: 1, payerType: 'COMPANY', companyId: company.id }
+            : { number: 1, payerType: 'GUEST' },
+        },
+      } as unknown as Prisma.FolioUncheckedCreateInput, // tenant IDs come from the client
+    });
+    await recordAudit(tx, {
+      action: 'folio.opened',
+      entityType: 'folio',
+      entityId: folio.id,
+      after: {
+        number: folio.number,
+        kind: body.kind,
+        name: body.name,
+        companyId: company?.id ?? null,
+      },
+    });
+    return folio.id;
+  });
+  return getFolio(deps, id);
 }
 
 // ── Posting (M4-02, M4 rules 2–3) ───────────────────────────────────────────────────────
@@ -523,6 +583,7 @@ export async function postCharge(
   const now = deps.clock();
   const ids = await deps.tenantDb.$transaction(async (tx) => {
     const folio = await openFolioFor(tx, folioId);
+    houseRights(folio, tenant);
     const code = await tx.revenueCode.findFirst({
       where: { code: body.revenueCode, active: true },
     });
@@ -530,7 +591,7 @@ export async function postCharge(
       !code ||
       code.group === 'TAX' ||
       code.group === 'SERVICE_CHARGE' ||
-      code.code === DEPOSIT_CODE
+      isSystemCode(code.code)
     ) {
       throw invalid('body.revenueCode', 'Choose an active revenue code that takes charges');
     }

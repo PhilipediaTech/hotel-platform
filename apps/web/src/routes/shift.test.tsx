@@ -249,3 +249,33 @@ describe('Cashier shift (S14)', () => {
     expect(screen.queryByRole('form', { name: 'Hand over cash' })).not.toBeInTheDocument();
   });
 });
+
+describe('Foreign currency on the shift (T-065)', () => {
+  it('counts dollars taken as dollars at close', async () => {
+    handlers['GET /shifts/current'] = () =>
+      json(
+        200,
+        current({
+          shift: openShift({ paymentCounts: [{ method: 'CASH', currency: 'USD', count: 1 }] }),
+        }),
+      );
+    handlers[`POST /shifts/${SHIFT}/close`] = () =>
+      json(200, counted({ status: 'CLOSED', requiresSignOff: false }));
+    const user = userEvent.setup();
+    renderShift();
+    const form = await screen.findByRole('form', { name: 'Close shift' });
+    expect(screen.getByText('Cash (USD): 1')).toBeInTheDocument();
+    await user.type(within(form).getByLabelText('Cash'), '20,000');
+    await user.type(within(form).getByLabelText('Cash (USD)'), '50');
+    await user.click(within(form).getByRole('button', { name: 'Submit count' }));
+    await user.click(within(form).getByRole('button', { name: 'Yes, submit this count' }));
+    await waitFor(() => expect(sent(`POST /shifts/${SHIFT}/close`)).toHaveLength(1));
+    expect(sent(`POST /shifts/${SHIFT}/close`)[0]?.body).toEqual({
+      counts: [
+        { method: 'CASH', currency: 'NGN', countedMinor: '2000000' },
+        { method: 'CASH', currency: 'USD', countedMinor: '5000' },
+      ],
+      varianceNote: null,
+    });
+  }, 15_000);
+});

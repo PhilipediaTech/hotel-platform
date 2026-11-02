@@ -3,6 +3,7 @@ import { recordAudit } from '../../core/audit.ts';
 import { businessDate } from '../../core/business-day.ts';
 import type { Clock } from '../../core/clock.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
+import { systemCodeId } from '../folios/system-codes.ts';
 
 // Advance deposits (PRD M4-13; tab 3 `deposit_ledger_entries`; T-063). A deposit taken before
 // arrival is a payment on the booking (no folio yet) and a RECEIVED entry in its ledger: a
@@ -12,9 +13,6 @@ import type { TenantDb } from '../../core/tenant-db.ts';
 
 type Tx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
 type Client = Tx | TenantDb;
-
-/** Revenue code of applied deposits; created when first needed, never offered for charges. */
-export const DEPOSIT_CODE = 'DEPOSIT';
 
 const dbDate = (date: string) => new Date(`${date}T00:00:00Z`);
 
@@ -46,19 +44,6 @@ export async function receiveDeposit(
       businessDate: dbDate(args.businessDate),
     } as unknown as Prisma.DepositLedgerEntryUncheckedCreateInput, // tenant IDs come from the client
   });
-}
-
-async function depositCode(tx: Tx): Promise<string> {
-  const code = await tx.revenueCode.findFirst({ where: { code: DEPOSIT_CODE } });
-  if (code) return code.id;
-  const created = await tx.revenueCode.create({
-    data: {
-      code: DEPOSIT_CODE,
-      name: 'Advance deposit',
-      group: 'OTHER',
-    } as unknown as Prisma.RevenueCodeUncheckedCreateInput, // tenant IDs come from the client
-  });
-  return created.id;
 }
 
 /**
@@ -93,7 +78,7 @@ export async function applyDeposit(
       businessDate: dbDate(date),
       postedAt: clock(),
       kind: 'DEPOSIT_APPLY',
-      revenueCodeId: await depositCode(tx),
+      revenueCodeId: await systemCodeId(tx, 'DEPOSIT'),
       description: 'Advance deposit applied',
       quantity: 1,
       unitAmountMinor: -held,

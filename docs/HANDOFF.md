@@ -77,7 +77,9 @@ apps/api        @hotel/api      Express 5 app
                                 extend.ts: extend / shorten a checked-in stay (new quote of its nights)
 
                                 check-out.ts: check-out preview and check-out (balance per window, settle folio, room dirty)
-  src/modules/folios/          folios: open at check-in, post with taxes, reverse, discount, windows, routing
+  src/modules/folios/          folios: open at check-in, post with taxes, reverse, discount, windows, routing;
+                                house / paymaster accounts; transfers.ts; system-codes.ts (DEPOSIT, TRANSFER)
+  src/modules/fx/              exchange rates per business date; rateFor() for foreign payments
   src/modules/shifts/          cashier shifts: open with float, blind close, variance and leakage alert, sign-off, handovers
   src/modules/payments/        service.ts: desk payments and deposits on the open shift; deposits.ts: deposit ledger, apply at folio
                                 opening; documents.ts: invoice, receipt, deposit receipt, proforma PDFs (pdfkit)
@@ -125,6 +127,9 @@ apps/web        @hotel/web      React 19 + Vite 8 PWA (staff and owner app)
   src/routes/shift.tsx          S14 cashier shift (/shift): open, hand over, blind close, reason; supervisor sign-off
   src/routes/folio-payments.tsx payments on the folio, take payment, invoice / receipt / proforma PDF buttons (usePdf)
   src/routes/check-out.tsx      S12 check-out (/stays/:id/check-out): bill per window, warnings, blockers, print, check out
+  src/routes/folio-transfer.tsx transfer to another window or folio (folio page)
+  src/routes/settings/exchange-rates.tsx  S25 Exchange rates tab
+  src/lib/money.ts              toMinor() (kept out of route files so lazy screens stay lazy)
   src/app/query-client.ts       TanStack Query defaults (shouldRetry)
   src/lib/api.ts                createApiClient / api, ApiError (typed by API_ROUTES)
   src/components/shell/         AppShell, TopBar, PropertyContext, offline/update banners
@@ -186,4 +191,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-065 house and paymaster accounts (`POST /folios` for HOUSE / PAYMASTER kinds, folio transfer `POST /folios/{id}/transfer` ● with TRANSFER_IN / TRANSFER_OUT lines and the `folio.route` / transfer approval), exchange rates (`exchange_rates` in tab 3, locked by night audit step 7) and USD payments (`currency` on `POST /payments`, `rate_micros` and `base_amount_minor` already in `payments`; FX differences to an FX revenue code, M4 rule 6). The tax rates in S25 still need Philip’s confirmation. Lockfile: after any dependency change, check npm kept the other platforms’ bindings. First load 294.0 KB of 300 KB: new screens load on first use (React.lazy in apps/web/src/app/routes.tsx). Still waiting for accounts: R2 and the scan engine, T-024 notifications (also folio send at check-out), T-025 nightly dump, T-005 staging (paid: stop and ask).
+T-070 payment adapter: needs the payment provider chosen in ADR-021 (open ADR — stop and ask Philip before building, and any provider account is his to create). If that is still open, the next unblocked tickets are T-072 refunds with approval (payment.refund policy, negative payments with refunds_payment_id, FX code for foreign refunds at a new rate, REFUNDED / FORFEITED deposit entries) and T-073 night audit. Lockfile: after any dependency change, check npm kept the other platforms’ bindings. First load 292.8 KB of 300 KB: new screens load on first use, and shared helpers go in lib/ (a route importing another route pulls it into the first load). The tax rates in S25 still need Philip’s confirmation. Still waiting for accounts: R2 and the scan engine, T-024 notifications (also folio send at check-out), T-025 nightly dump, T-005 staging (paid: stop and ask).

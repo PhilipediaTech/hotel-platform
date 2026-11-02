@@ -1,4 +1,4 @@
-import type { PaymentBody } from '@hotel/shared';
+import { microsToRate, toBaseMinor, type PaymentBody } from '@hotel/shared';
 import type { z } from 'zod';
 import type { Prisma } from '../../generated/prisma/client.ts';
 import { recordAudit } from '../../core/audit.ts';
@@ -9,7 +9,8 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
-import { enabledMethods, folioBalances } from '../folios/service.ts';
+import { enabledMethods, folioBalances, houseRights } from '../folios/service.ts';
+import { rateFor } from '../fx/service.ts';
 import { depositHeld, lockReservation, receiveDeposit } from './deposits.ts';
 
 // Manual payments (PRD M4-08, M4 rules 1, 4, 5; tab 4 POST /payments; T-062). A payment is
@@ -46,7 +47,7 @@ type Target =
   | { kind: 'deposit'; reservationId: string };
 
 /** Checks the folio or booking the payment is for; answers the target and its currency. */
-async function targetOf(tx: Tx, body: z.output<typeof PaymentBody>) {
+async function targetOf(tx: Tx, tenant: TenantContext, body: z.output<typeof PaymentBody>) {
   if (body.folioId) {
     const folio = await tx.folio.findUnique({
       where: { id: body.folioId },
@@ -58,6 +59,7 @@ async function targetOf(tx: Tx, body: z.output<typeof PaymentBody>) {
         status: folio.status,
       });
     }
+    houseRights(folio, tenant);
     const window = folio.windows.find((w) => w.number === body.windowNumber);
     if (!window) throw invalid('body.windowNumber', 'This folio has no such window');
     const target: Target = {
@@ -92,14 +94,12 @@ export async function capturePayment(
   tenant: TenantContext,
   body: z.output<typeof PaymentBody>,
 ) {
-  let result: { paymentId: string; shiftId: string; target: Target };
+  let result: { paymentId: string; shiftId: string; target: Target; baseAmount: bigint };
   try {
     result = await deps.tenantDb.$transaction(async (tx) => {
-      const { target, property, currency: base } = await targetOf(tx, body);
+      const { target, property, currency: base } = await targetOf(tx, tenant, body);
       const currency = body.currency ?? base;
-      if (currency !== base) {
-        throw invalid('body.currency', `Payments are taken in ${base} for now`);
-      }
+
       if (!enabledMethods(property.settings).includes(body.method)) {
         throw invalid(
           'body.method',
@@ -120,6 +120,19 @@ export async function capturePayment(
 
       const date = await businessDate(tx, property.id, deps.clock);
       const amount = BigInt(body.amountMinor);
+      // M4 rule 6: a foreign payment records its rate and what it is worth in the base currency.
+      let rateMicros: bigint | null = null;
+      if (currency !== base) {
+        const rate = await rateFor(tx, currency, date);
+        if (!rate) {
+          throw invalid(
+            'body.currency',
+            `No exchange rate for ${currency} yet: finance sets it in Settings`,
+          );
+        }
+        rateMicros = rate.rateMicros;
+      }
+      const baseAmount = rateMicros === null ? amount : toBaseMinor(amount, rateMicros);
       const payment = await tx.payment.create({
         data: {
           ...(target.kind === 'folio'
@@ -128,7 +141,8 @@ export async function capturePayment(
           method: body.method,
           amountMinor: amount,
           currency,
-          baseAmountMinor: amount,
+          rateMicros,
+          baseAmountMinor: baseAmount,
           provider: 'MANUAL',
           externalRef: body.externalRef,
           businessDate: dbDate(date),
@@ -142,7 +156,7 @@ export async function capturePayment(
         await receiveDeposit(tx, {
           reservationId: target.reservationId,
           paymentId: payment.id,
-          amountMinor: amount,
+          amountMinor: baseAmount,
           businessDate: date,
         });
       }
@@ -153,6 +167,9 @@ export async function capturePayment(
         method: body.method,
         amountMinor: body.amountMinor,
         currency,
+        ...(rateMicros === null
+          ? {}
+          : { rate: microsToRate(rateMicros), baseAmountMinor: baseAmount.toString() }),
         externalRef: body.externalRef,
         shiftId: shift.id,
       };
@@ -167,7 +184,7 @@ export async function capturePayment(
         type: 'payment.captured',
         payload: { paymentId: payment.id, ...facts },
       });
-      return { paymentId: payment.id, shiftId: shift.id, target };
+      return { paymentId: payment.id, shiftId: shift.id, target, baseAmount };
     });
   } catch (err) {
     if (pgErrorInfo(err)?.constraint === 'payments_manual_ref_key') {
@@ -193,6 +210,7 @@ export async function capturePayment(
   return {
     paymentId: result.paymentId,
     shiftId: result.shiftId,
+    baseAmountMinor: result.baseAmount.toString(),
     balanceMinor: balance.toString(),
   };
 }

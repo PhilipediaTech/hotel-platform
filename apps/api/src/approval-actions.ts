@@ -3,6 +3,7 @@ import type { Clock } from './core/clock.ts';
 import type { Db } from './core/db.ts';
 import type { TenantDb } from './core/tenant-db.ts';
 import { discountHandler, reverseHandler } from './modules/folios/service.ts';
+import { transferHandler } from './modules/folios/transfers.ts';
 import { roomMoveHandler, roomNotReadyHandler } from './modules/reservations/rooms.ts';
 import { doNotRentHandler } from './modules/reservations/service.ts';
 
@@ -21,5 +22,6 @@ export function approvalHandlers(deps: {
     roomMoveHandler(deps),
     reverseHandler(deps),
     discountHandler(deps),
+    transferHandler(deps),
   ].map((h) => h as unknown as ApprovalActionHandler<never>);
 }

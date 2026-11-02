@@ -599,7 +599,6 @@
       "codes": "Revenue codes",
       "fx": "Exchange rates"
     },
-    "fxLater": "Exchange rates arrive with USD payments (T-065).",
     "actions": "Actions",
     "edit": "Edit",
     "save": "Save",
@@ -1303,7 +1302,20 @@
       "FEE": "Fees"
     },
     "openLink": "Open folio",
-    "openNew": "Open a folio"
+    "openNew": "Open a folio",
+    "kind": "Kind",
+    "kinds": {
+      "ALL": "All",
+      "GUEST": "Guest",
+      "HOUSE": "House account",
+      "PAYMASTER": "Paymaster",
+      "EVENT": "Event",
+      "POS": "Outlet"
+    },
+    "newHouse": "Open a house or paymaster account",
+    "houseHint": "e.g. Staff meals",
+    "openAccount": "Open account",
+    "accountKind": "Account type"
   },
   "shift": {
     "title": "Cashier shift",
@@ -1392,7 +1404,11 @@
     "receiptFor": "Receipt for {{amount}}",
     "printInvoice": "Print invoice",
     "printWindowInvoice": "Invoice for window {{n}}",
-    "proforma": "Proforma invoice"
+    "proforma": "Proforma invoice",
+    "currency": "Currency",
+    "amountIn": "Amount ({{currency}})",
+    "converted": "= {{amount}} at {{rate}}",
+    "foreign": "{{amount}} at {{rate}}"
   },
   "deposits": {
     "title": "Advance deposit",
@@ -1428,5 +1444,31 @@
     },
     "early_one": "Leaving {{count}} night early (booked until {{booked}}): the stay ends on {{leaves}} and that night is given back.",
     "early_other": "Leaving {{count}} nights early (booked until {{booked}}): the stay ends on {{leaves}} and those nights are given back."
+  },
+  "transfer": {
+    "title": "Transfer",
+    "heading": "Transfer from window {{n}} (owes {{owes}})",
+    "to": "To",
+    "window": "Another window",
+    "folio": "Another folio",
+    "number": "Folio number",
+    "button": "Transfer",
+    "done": "Transferred.",
+    "noFolio": "No open folio numbered {{number}}."
+  },
+  "fx": {
+    "title": "Exchange rates",
+    "intro": "What one unit of a foreign currency is worth in {{base}} for a business date. Payments in that currency use the business date’s rate (or the latest earlier one); night audit locks each day’s rates.",
+    "none": "No exchange rates yet: payments are taken in the base currency only.",
+    "currency": "Currency",
+    "rate": "Rate ({{base}})",
+    "setFor": "Set for",
+    "setBy": "Set by",
+    "carried": "(carried forward)",
+    "locked": "(locked)",
+    "set": "Set a rate",
+    "rateFor": "{{base}} for 1 {{currency}}",
+    "date": "For business date",
+    "save": "Save rate"
   }
 }

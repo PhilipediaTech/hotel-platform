@@ -20,7 +20,6 @@ import { ReservationPage, ReservationsPage } from '../routes/reservations.tsx';
 import { CalendarPage } from '../routes/calendar.tsx';
 import { RegistrationCardPage } from '../routes/check-in.tsx';
 import { DayUsePage } from '../routes/day-use.tsx';
-import { FolioPage, FoliosPage } from '../routes/folios.tsx';
 import { FrontDeskPage } from '../routes/front-desk.tsx';
 import { NewBookingPage } from '../routes/new-booking.tsx';
 import { RoomsSettingsPage } from '../routes/settings/rooms.tsx';
@@ -42,6 +41,12 @@ const UsersAndRolesPage = lazy(() =>
 const RatesPage = lazy(() => import('../routes/rates.tsx').then((m) => ({ default: m.RatesPage })));
 const FinanceSettingsPage = lazy(() =>
   import('../routes/settings/finance.tsx').then((m) => ({ default: m.FinanceSettingsPage })),
+);
+const FoliosPage = lazy(() =>
+  import('../routes/folios.tsx').then((m) => ({ default: m.FoliosPage })),
+);
+const FolioPage = lazy(() =>
+  import('../routes/folios.tsx').then((m) => ({ default: m.FolioPage })),
 );
 const ShiftPage = lazy(() => import('../routes/shift.tsx').then((m) => ({ default: m.ShiftPage })));
 const CheckOutPage = lazy(() =>
@@ -140,7 +145,14 @@ export function buildRoutes(
                 </Suspense>
               ),
             },
-            { path: 'folios/:folioId', element: <FolioPage /> },
+            {
+              path: 'folios/:folioId',
+              element: (
+                <Suspense fallback={<Loading />}>
+                  <FolioPage />
+                </Suspense>
+              ),
+            },
             ...screenRoutes(),
             { path: '*', element: <NotFoundPage /> },
           ],

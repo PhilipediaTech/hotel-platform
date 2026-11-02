@@ -3,6 +3,7 @@ import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as folios from './service.ts';
+import { transferFolio } from './transfers.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
 function tenantFrom(tenant: TenantContext | null): TenantContext {
@@ -29,6 +30,12 @@ export function folioRoutes(deps: folios.FolioDeps): Router {
   );
   mountRoute(router, r.addWindow, ({ params, body }) =>
     folios.addWindow(deps, params.folioId, body),
+  );
+  mountRoute(router, r.createFolio, ({ body }, { tenant }) =>
+    folios.createFolio(deps, tenantFrom(tenant), body),
+  );
+  mountRoute(router, r.transferFolio, ({ params, body }, { tenant }) =>
+    transferFolio(deps, tenantFrom(tenant), params.folioId, body),
   );
   mountRoute(router, r.addRoutingRule, ({ params, body }) =>
     folios.addRoutingRule(deps, params.folioId, body),

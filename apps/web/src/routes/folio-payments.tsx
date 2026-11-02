@@ -1,5 +1,5 @@
-import type { FolioItem, ReservationItem } from '@hotel/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { rateToMicros, toBaseMinor, type FolioItem, type ReservationItem } from '@hotel/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
@@ -10,7 +10,7 @@ import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
-import { toMinor } from './folios.tsx';
+import { toMinor } from '../lib/money.ts';
 import { useFormats } from './reservations.tsx';
 
 // Payments on the folio and its documents (PRD M4-08 and the receipt/invoice/proforma story;
@@ -139,7 +139,17 @@ export function Payments({ folio, window: w }: { folio: Folio; window: Window })
                 {p.note && <span className="block text-xs text-text-muted">{p.note}</span>}
               </td>
               <td className="py-1.5 pr-3">{p.externalRef ?? '—'}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">−{f.money(p.amountMinor)}</td>
+              <td className="py-1.5 pr-3 text-right tabular-nums">
+                −{f.money(p.baseAmountMinor)}
+                {p.rate && (
+                  <span className="block text-xs text-text-muted">
+                    {t('payments.foreign', {
+                      amount: foreignMoney(p.amountMinor, p.currency),
+                      rate: p.rate,
+                    })}
+                  </span>
+                )}
+              </td>
               <td className="py-1.5 pr-3 text-xs">{p.receivedBy ?? ''}</td>
               <td className="py-1.5">
                 {permissions.includes('folio.invoice') && (
@@ -172,6 +182,13 @@ export function Payments({ folio, window: w }: { folio: Folio; window: Window })
   );
 }
 
+/** "US$50.00" from minor units of a foreign currency. */
+export function foreignMoney(minor: string, currency: string): string {
+  return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(
+    Number(minor) / 100,
+  );
+}
+
 type Method = Folio['paymentMethods'][number];
 type Target = { folioId: string; windowNumber: number } | { reservationId: string };
 
@@ -196,6 +213,16 @@ function PaymentForm({
   const { t } = useTranslation();
   const f = useFormats();
   const [method, setMethod] = useState<Method>(methods[0] ?? 'CASH');
+  const session = useSession();
+  const base =
+    session.properties.find((p) => p.id === session.currentPropertyId)?.baseCurrency ?? 'NGN';
+  const today = session.businessDate ?? new Date().toISOString().slice(0, 10);
+  const rates = useQuery({
+    queryKey: ['exchange-rates', session.currentPropertyId ?? '', today],
+    queryFn: () => api.call('getExchangeRates', { params: { date: today } }),
+  });
+  const [currency, setCurrency] = useState(base);
+  const rate = rates.data?.rates.find((r) => r.currency === currency)?.rate ?? null;
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
@@ -208,6 +235,7 @@ function PaymentForm({
       api.call('capturePayment', {
         body: {
           ...target,
+          ...(currency !== base ? { currency } : {}),
           method,
           amountMinor: minor ?? '0',
           externalRef: needsRef ? reference.trim() : null,
@@ -250,7 +278,27 @@ function PaymentForm({
           ))}
         </select>
       </Field>
-      <Field id="pay-amount" label={t('payments.amount')}>
+      {(rates.data?.rates.length ?? 0) > 0 && (
+        <Field id="pay-currency" label={t('payments.currency')}>
+          <select
+            id="pay-currency"
+            className={selectClass}
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+          >
+            <option value={base}>{base}</option>
+            {rates.data?.rates.map((r) => (
+              <option key={r.currency} value={r.currency}>
+                {r.currency}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      <Field
+        id="pay-amount"
+        label={currency === base ? t('payments.amount') : t('payments.amountIn', { currency })}
+      >
         <Input
           id="pay-amount"
           inputMode="decimal"
@@ -259,6 +307,14 @@ function PaymentForm({
           onChange={(e) => setAmount(e.target.value)}
         />
       </Field>
+      {currency !== base && rate && minor && (
+        <p className="text-sm text-text-muted sm:col-span-2">
+          {t('payments.converted', {
+            amount: f.money(toBaseMinor(BigInt(minor), rateToMicros(rate)).toString()),
+            rate,
+          })}
+        </p>
+      )}
       {needsRef && (
         <Field id="pay-ref" label={t('payments.reference')}>
           <Input

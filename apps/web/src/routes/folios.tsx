@@ -2,12 +2,13 @@ import {
   REVENUE_GROUPS,
   type ApprovalPending,
   type FolioItem,
+  type FOLIO_KINDS,
   type FOLIO_STATUSES,
 } from '@hotel/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import type { z } from 'zod';
 import { useSession } from '../app/session.ts';
 import { Alert } from '../components/ui/alert.tsx';
@@ -16,8 +17,10 @@ import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
+import { toMinor } from '../lib/money.ts';
 import { errorMessage } from '../lib/form.ts';
 import { Payments, PrintInvoice, TakePayment } from './folio-payments.tsx';
+import { TransferForm } from './folio-transfer.tsx';
 import { useFormats } from './reservations.tsx';
 
 // S11 Folio (PRD M4-01–M4-05; T-060): windows as tabs, lines with their taxes, balance; post a
@@ -27,34 +30,83 @@ import { useFormats } from './reservations.tsx';
 type Folio = z.output<typeof FolioItem>;
 type Line = Folio['windows'][number]['lines'][number];
 type FolioStatus = (typeof FOLIO_STATUSES)[number];
+type FolioKind = (typeof FOLIO_KINDS)[number];
 
 const selectClass = 'h-10 rounded-md border border-border bg-surface px-3 text-sm';
 const folioKey = (pid: string | null, id: string) => ['folios', pid ?? '', id];
 
-/** "1,500.50" → "150050" (minor units); null when it is not a positive amount. */
-export function toMinor(text: string): string | null {
-  const clean = text.replace(/[,\s₦]/g, '');
-  if (!/^\d+(\.\d{1,2})?$/.test(clean)) return null;
-  const [whole = '0', fraction = ''] = clean.split('.');
-  const minor = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
-  return minor > 0n ? minor.toString() : null;
-}
-
 const isPending = (r: unknown): r is z.output<typeof ApprovalPending> =>
   typeof r === 'object' && r !== null && 'approvalRequestId' in r;
+
+/** Opens a house or paymaster account (M4-20; T-065). */
+function NewHouseAccount() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [kind, setKind] = useState<'HOUSE' | 'PAYMASTER'>('HOUSE');
+  const [name, setName] = useState('');
+  const open = useMutation({
+    mutationFn: () => api.call('createFolio', { body: { kind, name: name.trim() } }),
+    onSuccess: (folio) => void navigate(`/folios/${folio.id}`),
+  });
+  return (
+    <form
+      aria-label={t('folios.newHouse')}
+      className="mt-4 flex flex-wrap items-end gap-3 rounded-md border border-border bg-surface p-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (name.trim()) open.mutate();
+      }}
+    >
+      <h2 className="w-full font-semibold">{t('folios.newHouse')}</h2>
+      <Field id="nh-kind" label={t('folios.accountKind')}>
+        <select
+          id="nh-kind"
+          className={selectClass}
+          value={kind}
+          onChange={(e) => setKind(e.target.value as 'HOUSE' | 'PAYMASTER')}
+        >
+          <option value="HOUSE">{t('folios.kinds.HOUSE')}</option>
+          <option value="PAYMASTER">{t('folios.kinds.PAYMASTER')}</option>
+        </select>
+      </Field>
+      <Field id="nh-name" label={t('folios.name')}>
+        <Input
+          id="nh-name"
+          className="w-64"
+          maxLength={120}
+          placeholder={t('folios.houseHint')}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </Field>
+      <Button type="submit" disabled={!name.trim() || open.isPending}>
+        {t('folios.openAccount')}
+      </Button>
+      {open.error && (
+        <Alert tone="critical" className="w-full">
+          {errorMessage(open.error)}
+        </Alert>
+      )}
+    </form>
+  );
+}
 
 // ── List ──────────────────────────────────────────────────────────────────────────────
 
 export function FoliosPage() {
   const { t } = useTranslation();
   const f = useFormats();
-  const { currentPropertyId } = useSession();
+  const { currentPropertyId, permissions } = useSession();
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<FolioStatus>('OPEN');
+  const [kind, setKind] = useState<FolioKind | ''>('');
   const list = useQuery({
-    queryKey: ['folios', currentPropertyId ?? '', 'list', status, q],
-    queryFn: () => api.call('listFolios', { query: { status, ...(q ? { q } : {}) } }),
+    queryKey: ['folios', currentPropertyId ?? '', 'list', status, kind, q],
+    queryFn: () =>
+      api.call('listFolios', {
+        query: { status, ...(kind ? { kind } : {}), ...(q ? { q } : {}) },
+      }),
   });
   return (
     <section className="max-w-4xl">
@@ -89,10 +141,26 @@ export function FoliosPage() {
             ))}
           </select>
         </Field>
+        <Field id="fo-kind" label={t('folios.kind')}>
+          <select
+            id="fo-kind"
+            className={selectClass}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as FolioKind | '')}
+          >
+            <option value="">{t('folios.kinds.ALL')}</option>
+            {(['GUEST', 'HOUSE', 'PAYMASTER'] as const).map((k) => (
+              <option key={k} value={k}>
+                {t(`folios.kinds.${k}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Button type="submit" variant="secondary">
           {t('guests.find')}
         </Button>
       </form>
+      {permissions.includes('folio.house') && <NewHouseAccount />}
       {list.error && (
         <Alert tone="critical" className="mt-3">
           {errorMessage(list.error)}
@@ -163,6 +231,11 @@ export function FolioPage() {
         <span className="rounded bg-surface-sunken px-1.5 text-xs font-normal text-text-muted">
           {t(`folios.statuses.${data.status}`)}
         </span>
+        {data.kind !== 'GUEST' && (
+          <span className="rounded bg-brand-subtle px-1.5 text-xs font-normal text-brand-strong">
+            {t(`folios.kinds.${data.kind}`)}
+          </span>
+        )}
       </h1>
       <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
         {data.stay && (
@@ -238,6 +311,9 @@ export function FolioPage() {
         <PostCharge folio={data} onPending={() => setMessage(t('folios.sentForApproval'))} />
       )}
       {open && can('folio.route') && <Routing folio={data} />}
+      {open && can('folio.route') && current && (
+        <TransferForm folio={data} windowNumber={current.number} />
+      )}
     </section>
   );
 }

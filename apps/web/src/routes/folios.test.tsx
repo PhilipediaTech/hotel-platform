@@ -8,7 +8,7 @@ import { createQueryClient } from '../app/query-client.ts';
 import { routes } from '../app/routes.tsx';
 import { setApiPropertyId } from '../lib/api.ts';
 import { LAGOS, makeMe, membership } from '../test/me-fixture.ts';
-import { toMinor } from './folios.tsx';
+import { toMinor } from '../lib/money.ts';
 
 // S11 Folio (PRD M4-01–M4-05; T-060).
 
@@ -20,6 +20,8 @@ const json = (status: number, body?: unknown) =>
 
 const id = (n: number) => `77777777-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const FOLIO = id(1);
+/** The page asks for the rates of the session's business date (none here: today). */
+const TODAY = new Date().toISOString().slice(0, 10);
 const CHARGE = id(10);
 
 const line = (n: number, extra: object) => ({
@@ -119,6 +121,8 @@ beforeEach(() => {
     'GET /me': () => json(200, makeMe({ memberships: [membership(LAGOS, permissions)] })),
     'GET /auth/device': () => json(200, { pinSwitchAvailable: false, deviceLabel: null }),
     [`GET /folios/${FOLIO}`]: () => json(200, folio()),
+    [`GET /exchange-rates/${TODAY}`]: () =>
+      json(200, { date: '2026-11-10', baseCurrency: 'NGN', businessDate: '2026-11-10', rates: [] }),
     'GET /folios': (_b, url) =>
       json(200, {
         data: [
@@ -126,6 +130,7 @@ beforeEach(() => {
             id: FOLIO,
             number: 'F00001',
             name: 'Ada Obi',
+            kind: 'GUEST',
             status: url.searchParams.get('status'),
             roomNumber: '101',
             confirmationNo: 'LAG-00001',
@@ -324,6 +329,8 @@ describe('Payments and documents (M4-08; T-062)', () => {
               method: 'CASH',
               amountMinor: '5000000',
               currency: 'NGN',
+              baseAmountMinor: '5000000',
+              rate: null,
               externalRef: null,
               businessDate: '2026-11-10',
               receivedAt: '2026-11-10T10:00:00Z',
@@ -410,4 +417,137 @@ describe('Payments and documents (M4-08; T-062)', () => {
     renderAt(`/folios/${FOLIO}`);
     expect(await screen.findByText(/No payment methods are switched on/)).toBeInTheDocument();
   });
+});
+
+describe('House accounts, transfers and foreign currency (T-065)', () => {
+  it('takes US dollars at the day’s rate, showing the naira value', async () => {
+    handlers[`GET /exchange-rates/${TODAY}`] = () =>
+      json(200, {
+        date: '2026-11-10',
+        baseCurrency: 'NGN',
+        businessDate: '2026-11-10',
+        rates: [
+          {
+            currency: 'USD',
+            rate: '1580.5',
+            setFor: '2026-11-10',
+            setBy: 'Finance',
+            lockedAt: null,
+          },
+        ],
+      });
+    handlers['POST /payments'] = () =>
+      json(201, {
+        paymentId: id(41),
+        shiftId: id(42),
+        baseAmountMinor: '7902500',
+        balanceMinor: '4422500',
+      });
+    const user = userEvent.setup();
+    renderAt(`/folios/${FOLIO}`);
+    const form = await screen.findByRole('form', { name: 'Take a payment' });
+    await user.selectOptions(await within(form).findByLabelText('Currency'), 'USD');
+    await user.type(within(form).getByLabelText('Amount (USD)'), '50');
+    expect(within(form).getByText('= ₦79,025.00 at 1580.5')).toBeInTheDocument();
+    await user.click(within(form).getByRole('button', { name: 'Take payment' }));
+    await waitFor(() => expect(sent('POST /payments')).toHaveLength(1));
+    expect(sent('POST /payments')[0]?.body).toMatchObject({
+      method: 'CASH',
+      currency: 'USD',
+      amountMinor: '5000',
+    });
+  }, 15_000);
+
+  it('transfers to another window, or to another folio by number (sent for approval)', async () => {
+    handlers[`GET /folios/${FOLIO}`] = () =>
+      json(
+        200,
+        folio([
+          {
+            number: 2,
+            payerType: 'COMPANY',
+            payerName: 'Dangote Group',
+            balanceMinor: '0',
+            lines: [],
+            payments: [],
+          },
+        ]),
+      );
+    let pending = false;
+    handlers[`POST /folios/${FOLIO}/transfer`] = () =>
+      pending
+        ? json(202, {
+            approvalRequestId: id(50),
+            status: 'PENDING',
+            expiresAt: '2026-11-10T09:30:00Z',
+            approverRoles: ['General Manager'],
+          })
+        : json(201, { lineIds: [id(51), id(52)], balanceMinor: '12325000' });
+    handlers['GET /folios'] = () =>
+      json(200, {
+        data: [
+          {
+            id: id(60),
+            number: 'F00009',
+            name: 'Dangote retreat',
+            kind: 'PAYMASTER',
+            status: 'OPEN',
+            roomNumber: null,
+            confirmationNo: null,
+            balanceMinor: '0',
+          },
+        ],
+      });
+    const user = userEvent.setup();
+    renderAt(`/folios/${FOLIO}`);
+    const form = await screen.findByRole('form', { name: 'Transfer' });
+    expect(form).toHaveTextContent('Transfer from window 1 (owes ₦123,250.00)');
+    await user.type(within(form).getByLabelText('Amount (₦)'), '100,000');
+    await user.type(within(form).getByLabelText('Reason'), 'Company pays the room');
+    await user.click(within(form).getByRole('button', { name: 'Transfer' }));
+    await waitFor(() => expect(sent(`POST /folios/${FOLIO}/transfer`)).toHaveLength(1));
+    expect(sent(`POST /folios/${FOLIO}/transfer`)[0]?.body).toEqual({
+      fromWindow: 1,
+      toFolioId: FOLIO,
+      toWindow: 2,
+      amountMinor: '10000000',
+      reason: 'Company pays the room',
+    });
+    expect(await within(form).findByText('Transferred.')).toBeInTheDocument();
+
+    pending = true;
+    await user.selectOptions(within(form).getByLabelText('To'), 'folio');
+    await user.type(within(form).getByLabelText('Folio number'), 'f00009');
+    await user.type(within(form).getByLabelText('Amount (₦)'), '23,250');
+    await user.type(within(form).getByLabelText('Reason'), 'Retreat pays the extras');
+    await user.click(within(form).getByRole('button', { name: 'Transfer' }));
+    await waitFor(() => expect(sent(`POST /folios/${FOLIO}/transfer`)).toHaveLength(2));
+    expect(sent(`POST /folios/${FOLIO}/transfer`)[1]?.body).toMatchObject({
+      toFolioId: id(60),
+      toWindow: 1,
+      amountMinor: '2325000',
+    });
+    expect(await within(form).findByText('Sent to a manager for approval.')).toBeInTheDocument();
+  }, 20_000);
+
+  it('filters the list by kind and opens a house account', async () => {
+    permissions = [...permissions, 'folio.house'];
+    handlers['POST /folios'] = () =>
+      json(201, folio([], { id: id(70), kind: 'HOUSE', name: 'Staff meals' }));
+    handlers[`GET /folios/${id(70)}`] = () =>
+      json(200, folio([], { id: id(70), kind: 'HOUSE', name: 'Staff meals' }));
+    const user = userEvent.setup();
+    renderAt('/folios');
+    await screen.findByRole('table', { name: 'Folios' });
+    await user.selectOptions(screen.getByLabelText('Kind'), 'HOUSE');
+    await waitFor(() =>
+      expect(sent('GET /folios').at(-1)?.url.searchParams.get('kind')).toBe('HOUSE'),
+    );
+    const form = screen.getByRole('form', { name: 'Open a house or paymaster account' });
+    await user.type(within(form).getByLabelText('Name'), 'Staff meals');
+    await user.click(within(form).getByRole('button', { name: 'Open account' }));
+    await waitFor(() => expect(sent('POST /folios')).toHaveLength(1));
+    expect(sent('POST /folios')[0]?.body).toEqual({ kind: 'HOUSE', name: 'Staff meals' });
+    expect(await screen.findByText('House account')).toBeInTheDocument();
+  }, 15_000);
 });

@@ -230,12 +230,12 @@ export async function currentShift(
           ),
           paymentCounts: (
             await db.payment.groupBy({
-              by: ['method'],
+              by: ['method', 'currency'],
               where: { shiftId: shift.id },
               _count: { _all: true },
-              orderBy: { method: 'asc' },
+              orderBy: [{ method: 'asc' }, { currency: 'asc' }],
             })
-          ).map((p) => ({ method: p.method, count: p._count._all })),
+          ).map((p) => ({ method: p.method, currency: p.currency, count: p._count._all })),
         }
       : null,
     awaitingSignOff: await Promise.all(waiting.map((s) => shiftItem(db, s))),

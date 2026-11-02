@@ -229,8 +229,8 @@ describe('Payments on the shift (M4-10, M4-11)', () => {
       h.fd.get('/shifts/current'),
     );
     expect(current.shift.paymentCounts).toEqual([
-      { method: 'CASH', count: 1 },
-      { method: 'POS_TERMINAL', count: 1 },
+      { method: 'CASH', currency: 'NGN', count: 1 },
+      { method: 'POS_TERMINAL', currency: 'NGN', count: 1 },
     ]);
     // Still blind: no amounts expected on the cashier's view.
     expect(JSON.stringify(current)).not.toContain('expected');

@@ -58,6 +58,10 @@ export const FolioPaymentItem = z
     method: z.enum(PAY_METHODS),
     amountMinor: AmountMinor,
     currency: z.string(),
+    /** What it counts for on the folio, in the base currency (T-065). */
+    baseAmountMinor: AmountMinor,
+    /** The exchange rate used for a foreign payment; null in the base currency. */
+    rate: z.string().nullable(),
     externalRef: z.string().nullable(),
     businessDate: IsoDate,
     receivedAt: Instant,
@@ -123,6 +127,8 @@ const FolioParams = z.object({ folioId: Uuid });
 
 export const FolioQuery = z.object({
   status: z.enum(FOLIO_STATUSES).default('OPEN'),
+  /** Guest folios, or house and paymaster accounts (T-065). */
+  kind: z.enum(FOLIO_KINDS).optional(),
   /** Folio number, guest or room number. */
   q: z.string().trim().max(100).optional(),
 });
@@ -133,6 +139,7 @@ export const FolioSummary = z
     number: z.string(),
     name: z.string(),
     status: z.enum(FOLIO_STATUSES),
+    kind: z.enum(FOLIO_KINDS),
     roomNumber: z.string().nullable(),
     confirmationNo: z.string().nullable(),
     balanceMinor: AmountMinor,
@@ -317,6 +324,66 @@ export const addRoutingRule = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+/** House and paymaster accounts (M4-20; T-065). */
+export const NewFolioBody = z
+  .object({
+    kind: z.enum(['HOUSE', 'PAYMASTER']),
+    /** E.g. "Staff meals", "Owner's account", "Conference — Dangote Group". */
+    name: z.string().trim().min(1).max(120),
+    /** A paymaster account billed to a company. */
+    companyId: Uuid.optional(),
+  })
+  .refine((b) => b.kind === 'PAYMASTER' || b.companyId === undefined, {
+    message: 'Only a paymaster account names a company',
+    path: ['companyId'],
+  });
+
+export const createFolio = defineRoute({
+  operationId: 'createFolio',
+  method: 'post',
+  path: '/folios',
+  summary: 'Open a house or paymaster account',
+  description:
+    'A house account takes the hotel’s own costs (staff meals, owner use); a paymaster account gathers charges for a group or event, optionally billed to a company. Posting to them needs folio.house as well.',
+  tags: ['Folios'],
+  propertyScoped: true,
+  permission: 'folio.house',
+  body: NewFolioBody,
+  status: 201,
+  response: FolioItem,
+});
+
+export const TransferBody = z.object({
+  /** The window the amount leaves. */
+  fromWindow: z.number().int().min(1).max(MAX_FOLIO_WINDOWS),
+  /** Another open folio, or this one for a move between windows. */
+  toFolioId: Uuid,
+  toWindow: z.number().int().min(1).max(MAX_FOLIO_WINDOWS).default(1),
+  amountMinor: AmountMinor.refine((v) => !v.startsWith('-') && v !== '0', 'Must be more than zero'),
+  reason: z.string().trim().min(1).max(500),
+});
+
+export const transferFolio = defineRoute({
+  operationId: 'transferFolio',
+  method: 'post',
+  path: '/folios/{folioId}/transfer',
+  summary: 'Move an amount owed from a window to another window or folio',
+  description:
+    'A TRANSFER_OUT line takes it off the window, a TRANSFER_IN line puts it on the target; nothing else changes (M4 rule 1). Up to what the window owes. To another folio it is a transfer between guests: 202 and a manager approves unless within the caller’s limit (approval policy folio.route).',
+  tags: ['Folios'],
+  propertyScoped: true,
+  permission: 'folio.route',
+  idempotent: true,
+  approval: true,
+  params: FolioParams,
+  body: TransferBody,
+  status: 201,
+  response: z
+    .object({ lineIds: z.array(Uuid), balanceMinor: AmountMinor })
+    .meta({ id: 'TransferResult' }),
+  errors: ['BUSINESS_DAY_CLOSED', 'STATE_TRANSITION_INVALID'],
+});
+
 export const FOLIO_ROUTES = {
   listFolios,
   getFolio,
@@ -326,4 +393,6 @@ export const FOLIO_ROUTES = {
   addDiscount,
   addWindow,
   addRoutingRule,
+  createFolio,
+  transferFolio,
 } as const;

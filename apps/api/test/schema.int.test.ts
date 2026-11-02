@@ -33,6 +33,7 @@ describe('migrations', () => {
       'departments',
       'deposit_ledger_entries',
       'domain_events',
+      'exchange_rates',
       'feature_flags',
       'files',
       'folio_lines',

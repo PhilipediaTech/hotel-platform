@@ -88,7 +88,9 @@ export const MyShift = z
     handoversOut: z.array(HandoverItem),
     /** Confirmed into this shift. */
     handoversIn: z.array(HandoverItem),
-    paymentCounts: z.array(z.object({ method: z.enum(PAY_METHODS), count: z.number().int() })),
+    paymentCounts: z.array(
+      z.object({ method: z.enum(PAY_METHODS), currency: z.string(), count: z.number().int() }),
+    ),
   })
   .meta({ id: 'MyShift' });
 

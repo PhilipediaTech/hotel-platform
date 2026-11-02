@@ -7,6 +7,7 @@ import { defineRoute } from './contract.ts';
 import { FILE_ROUTES } from './files.ts';
 import { FOLIO_ROUTES } from './folios.ts';
 import { FRONT_DESK_ROUTES } from './front-desk.ts';
+import { FX_ROUTES } from './fx.ts';
 import { GUEST_ROUTES } from './guests.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
@@ -54,6 +55,7 @@ export const API_ROUTES = {
   ...FOLIO_ROUTES,
   ...SHIFT_ROUTES,
   ...PAYMENT_ROUTES,
+  ...FX_ROUTES,
 } as const;
 
 export type ApiRoutes = typeof API_ROUTES;

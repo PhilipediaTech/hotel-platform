@@ -120,6 +120,7 @@ model Property {
   cashierShifts        CashierShift[]
   payments             Payment[]
   depositEntries       DepositLedgerEntry[]
+  exchangeRates        ExchangeRate[]
   leakageAlerts        LeakageAlert[]
 
   @@unique([organisationId, code])
@@ -235,6 +236,7 @@ model User {
   cashReceived       CashHandover[]
   leakageAlerts      LeakageAlert[]
   paymentsReceived   Payment[]
+  exchangeRatesSet   ExchangeRate[]
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -1608,4 +1610,23 @@ model DepositLedgerEntry {
   @@index([reservationId])
   @@index([propertyId, businessDate])
   @@map("deposit_ledger_entries")
+}
+
+// ── Exchange rates (M4-18, M4 rule 6; tab 3; T-065) ─────────────────────────────────────
+
+/// Base-currency value of one unit of `currency` on a business date, in millionths
+/// (1 USD = ₦1,580.50 → 1580500000). Night audit locks the day's rates (step 7, T-073).
+model ExchangeRate {
+  propertyId   String    @map("property_id") @db.Uuid
+  currency     String    @db.Char(3)
+  businessDate DateTime  @map("business_date") @db.Date
+  rateMicros   BigInt    @map("rate_micros")
+  setById      String    @map("set_by_id") @db.Uuid
+  lockedAt     DateTime? @map("locked_at") @db.Timestamptz(6)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  setBy    User     @relation(fields: [setById], references: [id], onDelete: Restrict)
+
+  @@id([propertyId, currency, businessDate])
+  @@map("exchange_rates")
 }

@@ -205,3 +205,56 @@ describe('Revenue codes tab', () => {
     );
   });
 });
+
+describe('Exchange rates tab (M4-18; T-065)', () => {
+  const TODAY = new Date().toISOString().slice(0, 10);
+
+  it('shows the rates in force and lets fx.manage set one', async () => {
+    handlers['GET /me'] = () =>
+      json(
+        200,
+        makeMe({ memberships: [membership(LAGOS, ['tax.manage', 'fx.manage', 'folio.read'])] }),
+      );
+    const rates = (list: object[]) =>
+      json(200, { date: TODAY, baseCurrency: 'NGN', businessDate: TODAY, rates: list });
+    let saved = false;
+    handlers[`GET /exchange-rates/${TODAY}`] = () =>
+      rates(
+        saved
+          ? [{ currency: 'USD', rate: '1580.5', setFor: TODAY, setBy: 'Ada Obi', lockedAt: null }]
+          : [],
+      );
+    handlers[`PUT /exchange-rates/${TODAY}`] = () => {
+      saved = true;
+      return rates([]);
+    };
+    const user = userEvent.setup();
+    renderAt('/settings/finance?tab=fx');
+    expect(await screen.findByText(/No exchange rates yet/)).toBeInTheDocument();
+    const form = screen.getByRole('form', { name: 'Set a rate' });
+    await user.type(within(form).getByLabelText('NGN for 1 USD'), '1,580.50');
+    await user.click(within(form).getByRole('button', { name: 'Save rate' }));
+    await waitFor(() => expect(sent(`PUT /exchange-rates/${TODAY}`)).toHaveLength(1));
+    expect(sent(`PUT /exchange-rates/${TODAY}`)[0]?.body).toEqual({
+      rates: [{ currency: 'USD', rate: '1580.50' }],
+    });
+    const table = await screen.findByRole('table', { name: 'Exchange rates' });
+    expect(table).toHaveTextContent('USD');
+    expect(table).toHaveTextContent('1580.5');
+  });
+
+  it('shows rates read-only without fx.manage', async () => {
+    handlers[`GET /exchange-rates/${TODAY}`] = () =>
+      json(200, {
+        date: TODAY,
+        baseCurrency: 'NGN',
+        businessDate: TODAY,
+        rates: [
+          { currency: 'USD', rate: '1580.5', setFor: '2026-01-01', setBy: 'Ada', lockedAt: null },
+        ],
+      });
+    renderAt('/settings/finance?tab=fx');
+    expect(await screen.findByText('(carried forward)')).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Set a rate' })).not.toBeInTheDocument();
+  });
+});

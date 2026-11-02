@@ -5,6 +5,7 @@ export * from './auth.ts';
 export * from './contract.ts';
 export * from './files.ts';
 export * from './folios.ts';
+export * from './fx.ts';
 export * from './front-desk.ts';
 export * from './guests.ts';
 export * from './imports.ts';

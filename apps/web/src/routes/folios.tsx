@@ -21,6 +21,7 @@ import { toMinor } from '../lib/money.ts';
 import { errorMessage } from '../lib/form.ts';
 import { Payments, PrintInvoice, TakePayment } from './folio-payments.tsx';
 import { TransferForm } from './folio-transfer.tsx';
+import { PaymentLinks } from './payment-links.tsx';
 import { useFormats } from './reservations.tsx';
 
 // S11 Folio (PRD M4-01–M4-05; T-060): windows as tabs, lines with their taxes, balance; post a
@@ -306,6 +307,13 @@ export function FolioPage() {
 
       {open && can('payment.capture') && current && (
         <TakePayment folio={data} windowNumber={current.number} />
+      )}
+      {open && can('payment.request') && current && (
+        <PaymentLinks
+          target={{ folioId: data.id, windowNumber: current.number }}
+          suggestedMinor={BigInt(current.balanceMinor) > 0n ? current.balanceMinor : '0'}
+          onPaid={() => void folio.refetch()}
+        />
       )}
       {open && can('folio.charge') && (
         <PostCharge folio={data} onPending={() => setMessage(t('folios.sentForApproval'))} />

@@ -52,6 +52,7 @@ describe('migrations', () => {
       'night_audit_steps',
       'organisations',
       'package_components',
+      'payment_intents',
       'payments',
       'properties',
       'property_counters',

@@ -168,5 +168,9 @@ export async function inHouse(
     reservationId: r.id,
     company,
     finance,
+    /** The app, its fake email and payment provider (T-070). */
+    app: c.app,
+    email: c.email,
+    payments: c.payments,
   };
 }

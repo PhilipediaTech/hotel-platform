@@ -27,6 +27,7 @@ describe('loadConfig', () => {
       cookieDomain: undefined,
       cookieSecure: false,
       localFilesDir: path.resolve(import.meta.dirname, '../../../../.data/files'),
+      payments: { provider: 'fake', secretKey: null },
     });
   });
 
@@ -73,6 +74,8 @@ describe('loadConfig', () => {
       ...ORIGINS,
       NODE_ENV: 'production',
       COOKIE_DOMAIN: '.example.com',
+      PAYMENT_PROVIDER: 'paystack',
+      PAYMENT_SECRET_KEY: 'sk_live_abc123',
     });
     expect(config).toMatchObject({ cookieSecure: true, cookieDomain: '.example.com' });
     expect(() => loadConfig({ ...ORIGINS, COOKIE_DOMAIN: 'https://x' })).toThrow(/COOKIE_DOMAIN/);
@@ -81,6 +84,25 @@ describe('loadConfig', () => {
     );
     expect(loadConfig({ ...ORIGINS, COOKIE_DOMAIN: 'example.com' }).cookieDomain).toBe(
       'example.com',
+    );
+  });
+
+  it('takes Paystack with its key, test keys only outside production, never the fake in production', () => {
+    expect(
+      loadConfig({ ...ORIGINS, PAYMENT_PROVIDER: 'paystack', PAYMENT_SECRET_KEY: 'sk_test_abc123' })
+        .payments,
+    ).toEqual({ provider: 'paystack', secretKey: 'sk_test_abc123' });
+    expect(() => loadConfig({ ...ORIGINS, PAYMENT_PROVIDER: 'paystack' })).toThrow(
+      /PAYMENT_SECRET_KEY is required/,
+    );
+    expect(() =>
+      loadConfig({ ...ORIGINS, PAYMENT_PROVIDER: 'paystack', PAYMENT_SECRET_KEY: 'pk_test_abc' }),
+    ).toThrow(/Paystack secret key/);
+    expect(() =>
+      loadConfig({ ...ORIGINS, PAYMENT_PROVIDER: 'paystack', PAYMENT_SECRET_KEY: 'sk_live_abc' }),
+    ).toThrow(/use a test key/);
+    expect(() => loadConfig({ ...ORIGINS, NODE_ENV: 'production' })).toThrow(
+      /PAYMENT_PROVIDER=fake in production/,
     );
   });
 
@@ -104,6 +126,8 @@ describe('loadConfig', () => {
       NODE_ENV: 'production',
       PORT: '8080',
       LOG_LEVEL: 'warn',
+      PAYMENT_PROVIDER: 'paystack',
+      PAYMENT_SECRET_KEY: 'sk_live_abc123',
     });
     expect(config).toMatchObject({ nodeEnv: 'production', port: 8080, logLevel: 'warn' });
   });

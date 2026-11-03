@@ -36,6 +36,9 @@ export const ERROR_HTTP_STATUS = {
 
   RATE_LIMITED: 429,
 
+  // Not in tab 4 (T-070): the payment provider could not be reached or refused the call.
+  PAYMENT_PROVIDER_UNAVAILABLE: 502,
+
   // Never carries details.
   INTERNAL: 500,
 } as const;

@@ -12,6 +12,7 @@ import { GUEST_ROUTES } from './guests.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
 import { NIGHT_AUDIT_ROUTES } from './night-audit.ts';
+import { PAYMENT_INTENT_ROUTES } from './payment-intents.ts';
 import { PAYMENT_ROUTES } from './payments.ts';
 import { QUOTE_ROUTES } from './quotes.ts';
 import { PROPERTY_ROUTES } from './properties.ts';
@@ -55,6 +56,7 @@ export const API_ROUTES = {
   ...FOLIO_ROUTES,
   ...SHIFT_ROUTES,
   ...PAYMENT_ROUTES,
+  ...PAYMENT_INTENT_ROUTES,
   ...FX_ROUTES,
 } as const;
 

@@ -10,6 +10,7 @@ import { createDb, type Db } from '../src/core/db.ts';
 import { createFakeEmailProvider } from '../src/core/email.ts';
 import { createLocalFileStore } from '../src/core/files.ts';
 import { createLogger } from '../src/core/logger.ts';
+import { createFakePaymentProvider } from '../src/core/payments.ts';
 import type { ApprovalActionHandler } from '../src/core/approvals.ts';
 
 export const TEST_CONFIG: Config = {
@@ -26,6 +27,7 @@ export const TEST_CONFIG: Config = {
   cookieDomain: undefined,
   cookieSecure: false,
   localFilesDir: path.join(os.tmpdir(), 'hotel-test-files'),
+  payments: { provider: 'fake', secretKey: null },
 };
 
 /** `Origin` the API accepts on non-GET requests (middleware step 6). */
@@ -52,6 +54,9 @@ export function buildTestApp(routes?: Router, options: TestAppOptions = {}) {
   // PrismaClient connects lazily, so this one only fails if a test unexpectedly queries it.
   unusedDb ??= createDb(TEST_CONFIG.databaseUrl);
   const email = createFakeEmailProvider();
+  const payments = createFakePaymentProvider({
+    checkoutBase: `${TEST_CONFIG.appOrigin}/api/v1/dev/fake-pay`,
+  });
   // A fresh directory per app, so tests never see each other's files.
   const files = createLocalFileStore({
     dir: mkdtempSync(path.join(os.tmpdir(), 'hotel-files-')),
@@ -63,12 +68,13 @@ export function buildTestApp(routes?: Router, options: TestAppOptions = {}) {
     logger,
     db: options.db ?? unusedDb,
     email,
+    payments,
     files,
     ...(options.clock ? { clock: options.clock } : {}),
     ...(routes ? { routes } : {}),
     ...(options.approvalHandlers ? { approvalHandlers: options.approvalHandlers } : {}),
   });
-  return { app, logLines, logger, email, files };
+  return { app, logLines, logger, email, payments, files };
 }
 
 /** Typed access to an error envelope in a Supertest response. */

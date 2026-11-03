@@ -7,6 +7,7 @@ import { TEST_CONFIG } from '../../test/helpers.ts';
 import { workerJobs } from '../jobs.ts';
 import { createFakeFileScanner } from './file-scan.ts';
 import { createLocalFileStore } from './files.ts';
+import { createFakePaymentProvider } from './payments.ts';
 import { createSession } from './auth.ts';
 import { cleanupJob, RETENTION } from './cleanup.ts';
 import { startWorker, type RunningWorker } from './jobs.ts';
@@ -79,6 +80,7 @@ beforeAll(async () => {
     jobs: workerJobs({
       files: createLocalFileStore({ dir: TEST_CONFIG.localFilesDir, secret: 'test', clock }),
       scanner: createFakeFileScanner(),
+      payments: createFakePaymentProvider({ checkoutBase: TEST_CONFIG.appOrigin }),
     }),
     handlers: HANDLERS,
     // Tests publish by hand.

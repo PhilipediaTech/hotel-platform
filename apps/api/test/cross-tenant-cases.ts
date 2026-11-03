@@ -575,6 +575,31 @@ async function bNightAuditUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** B's payment link on its folio, not paid (T-070). */
+async function bIntent(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bFolio(db, world, propertyId);
+  const intent = await db.paymentIntent.create({
+    data: {
+      propertyId,
+      folioId: theirs['folioId'] ?? '',
+      windowNumber: 1,
+      provider: 'FAKE',
+      providerRef: `HP-b-${propertyId}`,
+      amountMinor: 100n,
+      currency: 'NGN',
+      idempotencyKey: `b-${propertyId}`,
+      checkoutUrl: 'https://pay.example/b',
+      expiresAt: new Date('2099-01-01'),
+    },
+  });
+  return { ...theirs, paymentIntentId: intent.id };
+}
+
+async function bIntentsUnchanged(db: Db, world: TenantWorld) {
+  const intents = await db.paymentIntent.findMany({ where: { propertyId: world.b1.id } });
+  expect(intents.map((i) => i.status)).toEqual(['CREATED']);
+}
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -1257,4 +1282,20 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       report: 'flash',
     }),
   },
+  createPaymentIntent: {
+    seed: bIntent,
+    creates: true,
+    body: (theirs) => ({
+      folioId: theirs['folioId'],
+      amountMinor: '100',
+      email: 'leak@example.com',
+    }),
+    untouched: bIntentsUnchanged,
+  },
+  listPaymentIntents: {
+    seed: bIntent,
+    query: (theirs) => ({ folioId: theirs['folioId'] ?? '' }),
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((i) => i.id),
+  },
+  checkPaymentIntent: { seed: bIntent, untouched: bIntentsUnchanged },
 };

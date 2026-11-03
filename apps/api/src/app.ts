@@ -36,6 +36,8 @@ import { shiftRoutes } from './modules/shifts/routes.ts';
 import { paymentRoutes } from './modules/payments/routes.ts';
 import { fxRoutes } from './modules/fx/routes.ts';
 import { nightAuditRoutes } from './modules/nightaudit/routes.ts';
+import { paymentIntentRoutes } from './modules/payments/intent-routes.ts';
+import type { PaymentProvider } from './core/payments.ts';
 import { reservationRoutes } from './modules/reservations/routes.ts';
 import { roomRoutes } from './modules/rooms/routes.ts';
 import { setupRoutes } from './modules/setup/routes.ts';
@@ -48,6 +50,8 @@ export interface AppOptions {
   logger: Logger;
   db: Db;
   email: EmailProvider;
+  /** Payment links (ADR-021: Paystack; the fake locally and in tests). */
+  payments: PaymentProvider;
   /** File storage (R2 in production); the local store also serves its signed links. */
   files: FileStore | LocalFileStore;
   clock?: Clock;
@@ -63,6 +67,7 @@ export function createApp({
   logger,
   db,
   email,
+  payments,
   files,
   clock = systemClock,
   routes,
@@ -142,6 +147,17 @@ export function createApp({
   api.use(paymentRoutes({ db, tenantDb, clock }));
   api.use(fxRoutes({ db, tenantDb, clock }));
   api.use(nightAuditRoutes({ db, tenantDb, clock, logger }));
+  api.use(
+    paymentIntentRoutes({
+      db,
+      tenantDb,
+      clock,
+      provider: payments,
+      email,
+      logger,
+      devPages: config.nodeEnv !== 'production',
+    }),
+  );
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

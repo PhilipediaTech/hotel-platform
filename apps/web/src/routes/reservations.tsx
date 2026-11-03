@@ -6,7 +6,7 @@ import {
   type ReservationStatus,
 } from '@hotel/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import type { z } from 'zod';
@@ -20,6 +20,11 @@ import { errorMessage } from '../lib/form.ts';
 import { BookingDeposit, PrintProforma } from './folio-payments.tsx';
 import { canCheckIn, CheckInPanel, StayKeys, usePropertyToday } from './check-in.tsx';
 import { DayUseTimes, EndDayUse } from './day-use.tsx';
+
+// Loads on first use: the reservation screen is part of the first load (T-070).
+const PaymentLinks = lazy(() =>
+  import('./payment-links.tsx').then((m) => ({ default: m.PaymentLinks })),
+);
 
 // S09 Reservations (PRD M3-01–M3-05; T-042): find reservations; a reservation's stays,
 // details, history; change dates or guests (requoted), confirm a hold, cancel with a reason
@@ -257,6 +262,18 @@ export function ReservationPage() {
       </dl>
 
       <BookingDeposit reservation={r} onPaid={refresh} />
+      {(r.status === 'TENTATIVE' || r.status === 'CONFIRMED') && can('payment.request') && (
+        <Suspense fallback={null}>
+          <PaymentLinks
+            target={{ reservationId: r.id }}
+            suggestedMinor={(() => {
+              const due = BigInt(r.depositDueMinor) - BigInt(r.deposit.receivedMinor);
+              return (due > 0n ? due : 0n).toString();
+            })()}
+            onPaid={refresh}
+          />
+        </Suspense>
+      )}
 
       <h2 className="mt-6 font-semibold">{t('reservations.stays')}</h2>
       <ul className="mt-2 flex flex-col gap-3">

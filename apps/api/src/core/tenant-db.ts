@@ -70,6 +70,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   // Steps are written through their run.
   NightAuditRun: { kind: 'property' },
   RoomChargePosting: { kind: 'property' },
+  PaymentIntent: { kind: 'property' },
   RegistrationCard: { kind: 'property' },
   // Components have no property column: reach them through their (scoped) rate plan.
 };

@@ -11,6 +11,7 @@ export * from './guests.ts';
 export * from './imports.ts';
 export * from './inventory.ts';
 export * from './night-audit.ts';
+export * from './payment-intents.ts';
 export * from './payments.ts';
 export * from './primitives.ts';
 export * from './properties.ts';

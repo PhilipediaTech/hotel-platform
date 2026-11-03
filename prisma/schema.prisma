@@ -124,6 +124,7 @@ model Property {
   leakageAlerts        LeakageAlert[]
   nightAuditRuns       NightAuditRun[]
   roomChargePostings   RoomChargePosting[]
+  paymentIntents       PaymentIntent[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -240,6 +241,7 @@ model User {
   paymentsReceived   Payment[]
   exchangeRatesSet   ExchangeRate[]
   nightAuditsStarted NightAuditRun[]
+  paymentIntents     PaymentIntent[]
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -1058,6 +1060,7 @@ model Reservation {
   folios         Folio[]
   payments       Payment[]
   depositEntries DepositLedgerEntry[]
+  paymentIntents PaymentIntent[]
 
   @@unique([propertyId, confirmationNo])
   @@unique([propertyId, source, channelRef])
@@ -1316,13 +1319,14 @@ model Folio {
   createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   version          Int         @default(0)
 
-  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  reservation  Reservation?  @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
-  windows      FolioWindow[]
-  lines        FolioLine[]
-  routingRules RoutingRule[]
-  stays        Stay[]
-  payments     Payment[]
+  property       Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation    Reservation?    @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  windows        FolioWindow[]
+  lines          FolioLine[]
+  routingRules   RoutingRule[]
+  stays          Stay[]
+  payments       Payment[]
+  paymentIntents PaymentIntent[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, id])
@@ -1576,6 +1580,7 @@ model Payment {
   receivedBy     User?                @relation(fields: [receivedById], references: [id], onDelete: SetNull)
   refunds        Payment?             @relation("PaymentRefund", fields: [refundsPaymentId], references: [id], onDelete: Restrict)
   refundedBy     Payment[]            @relation("PaymentRefund")
+  intent         PaymentIntent?
   depositEntries DepositLedgerEntry[]
 
   @@index([propertyId, businessDate])
@@ -1699,4 +1704,44 @@ model RoomChargePosting {
 
   @@id([propertyId, stayId, night])
   @@map("room_charge_postings")
+}
+
+// ───────────────────────── Online payments (T-070) ─────────────────────────
+
+/// A request for money through the payment provider: a hosted checkout the guest opens from a
+/// payment link (M4-08). Beyond tab 3 (approved by Philip 2026-11-03): the link, the window it
+/// pays, who asked, where it was sent, and the payment it became.
+model PaymentIntent {
+  id             String    @id @default(uuid()) @db.Uuid
+  propertyId     String    @map("property_id") @db.Uuid
+  folioId        String?   @map("folio_id") @db.Uuid
+  windowNumber   Int?      @map("window_number")
+  reservationId  String?   @map("reservation_id") @db.Uuid
+  provider       String
+  /// Our reference, given to the provider: it identifies the charge there.
+  providerRef    String    @unique @map("provider_ref")
+  amountMinor    BigInt    @map("amount_minor")
+  currency       String    @db.Char(3)
+  /// CREATED | SUCCEEDED | FAILED | EXPIRED
+  status         String    @default("CREATED")
+  idempotencyKey String    @unique @map("idempotency_key")
+  checkoutUrl    String    @map("checkout_url")
+  requestedById  String?   @map("requested_by_id") @db.Uuid
+  /// The email address the link was sent to, when it was sent.
+  sentTo         String?   @map("sent_to")
+  paymentId      String?   @unique @map("payment_id") @db.Uuid
+  paidAt         DateTime? @map("paid_at") @db.Timestamptz(6)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  folio       Folio?       @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
+  reservation Reservation? @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  requestedBy User?        @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  payment     Payment?     @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, status])
+  @@index([folioId])
+  @@index([reservationId])
+  @@map("payment_intents")
 }

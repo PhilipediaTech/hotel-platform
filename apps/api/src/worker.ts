@@ -6,6 +6,7 @@ import { createLogger } from './core/logger.ts';
 import { createFakeFileScanner } from './core/file-scan.ts';
 import { createLocalFileStore } from './core/files.ts';
 import { eventHandlers, workerJobs } from './jobs.ts';
+import { createPaymentProvider } from './core/payment-provider.ts';
 
 // Worker entry (tab 2: one process for HTTP, one for jobs; T-021): scheduled jobs, outbox
 // handlers and the outbox publisher. Needs the same environment as the API.
@@ -39,7 +40,11 @@ try {
     db,
     clock: systemClock,
     logger,
-    jobs: workerJobs({ files, scanner: createFakeFileScanner() }),
+    jobs: workerJobs({
+      files,
+      scanner: createFakeFileScanner(),
+      payments: createPaymentProvider(config, logger),
+    }),
     handlers: eventHandlers({ db, config, logger }),
   });
 } catch (err) {

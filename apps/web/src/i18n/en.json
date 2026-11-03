@@ -1519,5 +1519,25 @@
       "high-balance": "High balance",
       "discrepancy": "Discrepancies"
     }
+  },
+  "paymentLinks": {
+    "title": "Payment links",
+    "new": "New payment link",
+    "email": "Guest email",
+    "sendByEmail": "Email it to the guest",
+    "create": "Create payment link",
+    "emailed": "Link emailed to {{email}}:",
+    "ready": "Link ready: copy it to the guest.",
+    "copy": "Copy link",
+    "copied": "Copied",
+    "check": "Check payment",
+    "sentTo": "sent to {{email}}, {{when}}",
+    "made": "made {{when}}",
+    "status": {
+      "CREATED": "Waiting",
+      "SUCCEEDED": "Paid",
+      "FAILED": "Failed",
+      "EXPIRED": "Expired"
+    }
   }
 }

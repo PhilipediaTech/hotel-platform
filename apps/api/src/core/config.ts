@@ -33,6 +33,15 @@ const envSchema = z.object({
     .optional(),
   // Local file store directory (T-023), shared by the API and the worker; never production.
   LOCAL_FILES_DIR: z.string().min(1).optional(),
+  // Payment provider (T-070, ADR-021): `fake` locally and in tests, `paystack` with its secret key.
+  PAYMENT_PROVIDER: z.enum(['fake', 'paystack']).default('fake'),
+  PAYMENT_SECRET_KEY: z
+    .string()
+    .regex(
+      /^sk_(test|live)_[A-Za-z0-9]+$/,
+      'PAYMENT_SECRET_KEY must be a Paystack secret key (sk_test_… or sk_live_…)',
+    )
+    .optional(),
 });
 
 const PLACEHOLDER_SECRET = /^dev-only-/;
@@ -57,6 +66,8 @@ export interface Config {
   cookieSecure: boolean;
   /** Where the local (fake) file store keeps files; default `.data/files` in the repo. */
   localFilesDir: string;
+  /** The payment provider and its secret key (null for the fake). */
+  payments: { provider: 'fake' | 'paystack'; secretKey: string | null };
 }
 
 /** Repository root: config.ts lives in apps/api/src/core. */
@@ -84,6 +95,19 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       'Invalid environment configuration:\n✖ ID_ENCRYPTION_KEY is required in production',
     );
   }
+  if (e.PAYMENT_PROVIDER === 'paystack' && !e.PAYMENT_SECRET_KEY) {
+    throw new Error(
+      'Invalid environment configuration:\n✖ PAYMENT_SECRET_KEY is required with PAYMENT_PROVIDER=paystack',
+    );
+  }
+  if (e.NODE_ENV !== 'production' && e.PAYMENT_SECRET_KEY?.startsWith('sk_live_')) {
+    throw new Error(
+      'Invalid environment configuration:\n✖ PAYMENT_SECRET_KEY is a live key: use a test key (sk_test_…) outside production',
+    );
+  }
+  if (e.NODE_ENV === 'production' && e.PAYMENT_PROVIDER === 'fake') {
+    throw new Error('Invalid environment configuration:\n✖ PAYMENT_PROVIDER=fake in production');
+  }
   return {
     nodeEnv: e.NODE_ENV,
     port: e.PORT,
@@ -99,5 +123,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     cookieDomain: e.COOKIE_DOMAIN,
     cookieSecure: e.NODE_ENV === 'production',
     localFilesDir: path.resolve(REPO_ROOT, e.LOCAL_FILES_DIR ?? '.data/files'),
+    payments: { provider: e.PAYMENT_PROVIDER, secretKey: e.PAYMENT_SECRET_KEY ?? null },
   };
 }

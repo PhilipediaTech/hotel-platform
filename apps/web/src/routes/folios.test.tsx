@@ -645,3 +645,67 @@ describe('Refunds (T-072)', () => {
     expect(within(table).queryByRole('button', { name: /^Refund/ })).not.toBeInTheDocument();
   });
 });
+
+describe('Payment links (M4-08; T-070)', () => {
+  const link = (extra: object = {}) => ({
+    id: id(70),
+    folioId: FOLIO,
+    windowNumber: 1,
+    reservationId: null,
+    provider: 'PAYSTACK',
+    reference: 'HP-abc',
+    amountMinor: '12325000',
+    currency: 'NGN',
+    status: 'CREATED',
+    checkoutUrl: 'https://checkout.paystack.com/abc',
+    sentTo: 'ada@example.com',
+    requestedBy: 'Bola Desk',
+    paymentId: null,
+    paidAt: null,
+    expiresAt: '2026-11-13T09:00:00Z',
+    createdAt: '2026-11-10T09:00:00Z',
+    ...extra,
+  });
+
+  it('emails a link for the balance, then checks it was paid', async () => {
+    permissions = [...permissions, 'payment.request'];
+    let links: object[] = [];
+    handlers['GET /payment-intents'] = () => json(200, { data: links });
+    handlers['POST /payment-intents'] = () => {
+      links = [link()];
+      return json(201, link());
+    };
+    handlers[`POST /payment-intents/${id(70)}/check`] = () => {
+      links = [link({ status: 'SUCCEEDED', paymentId: id(71), paidAt: '2026-11-10T09:20:00Z' })];
+      return json(200, links[0]);
+    };
+    const user = userEvent.setup();
+    renderAt(`/folios/${FOLIO}`);
+    const form = await screen.findByRole('form', { name: 'New payment link' });
+    await user.type(within(form).getByLabelText('Guest email'), 'ada@example.com');
+    await user.click(within(form).getByRole('button', { name: 'Create payment link' }));
+    await waitFor(() => expect(sent('POST /payment-intents')).toHaveLength(1));
+    expect(sent('POST /payment-intents')[0]?.body).toEqual({
+      folioId: FOLIO,
+      windowNumber: 1,
+      amountMinor: '12325000',
+      email: 'ada@example.com',
+      send: true,
+    });
+    expect(await within(form).findByText(/Link emailed to ada@example.com/)).toBeInTheDocument();
+
+    const section = screen.getByRole('region', { name: 'Payment links' });
+    expect(await within(section).findByText('Waiting')).toBeInTheDocument();
+    await user.click(within(section).getByRole('button', { name: 'Check payment' }));
+    expect(await within(section).findByText('Paid')).toBeInTheDocument();
+    expect(
+      within(section).queryByRole('button', { name: 'Check payment' }),
+    ).not.toBeInTheDocument();
+  }, 15_000);
+
+  it('offers no payment links without payment.request', async () => {
+    renderAt(`/folios/${FOLIO}`);
+    await screen.findByRole('form', { name: /Take a payment/ });
+    expect(screen.queryByRole('region', { name: 'Payment links' })).not.toBeInTheDocument();
+  });
+});

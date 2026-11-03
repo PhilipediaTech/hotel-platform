@@ -6,6 +6,7 @@ import type { FileScanner } from './core/file-scan.ts';
 import type { FileStore } from './core/files.ts';
 import type { JobDefinition } from './core/jobs.ts';
 import type { EventHandler } from './core/outbox.ts';
+import type { PaymentProvider } from './core/payments.ts';
 import {
   approvalExpiryJob,
   approvalOtpHandler,
@@ -15,6 +16,7 @@ import { fileScanJob } from './modules/files/jobs.ts';
 import { inventoryJob } from './modules/availability/inventory.ts';
 import { idPurgeJob } from './modules/reservations/check-in.ts';
 import { holdExpiryJob } from './modules/reservations/jobs.ts';
+import { paymentLinkCheckJob } from './modules/payments/jobs.ts';
 import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
@@ -22,6 +24,7 @@ import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 export function workerJobs(deps: {
   files: FileStore;
   scanner: FileScanner;
+  payments: PaymentProvider;
 }): readonly JobDefinition<never>[] {
   return [
     cleanupJob,
@@ -31,6 +34,8 @@ export function workerJobs(deps: {
     inventoryJob,
     holdExpiryJob,
     idPurgeJob({ store: deps.files }),
+    // The fake keeps its links in the API process: nothing for the worker to ask.
+    ...(deps.payments.name === 'FAKE' ? [] : [paymentLinkCheckJob({ provider: deps.payments })]),
   ];
 }
 

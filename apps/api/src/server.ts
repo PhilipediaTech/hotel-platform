@@ -5,6 +5,7 @@ import { systemClock } from './core/clock.ts';
 import { createFakeEmailProvider } from './core/email.ts';
 import { createLocalFileStore } from './core/files.ts';
 import { createLogger } from './core/logger.ts';
+import { createPaymentProvider } from './core/payment-provider.ts';
 
 let config;
 try {
@@ -31,7 +32,9 @@ const files = createLocalFileStore({
   secret: config.sessionSecret,
   clock: systemClock,
 });
-const app = createApp({ config, logger, db, email, files });
+// Payment links: Paystack with its key, or the fake (its links open a development page).
+const payments = createPaymentProvider(config, logger);
+const app = createApp({ config, logger, db, email, payments, files });
 
 const server = app.listen(config.port, (err?: Error) => {
   if (err) {

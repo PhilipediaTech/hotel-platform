@@ -37,6 +37,7 @@ import { paymentRoutes } from './modules/payments/routes.ts';
 import { fxRoutes } from './modules/fx/routes.ts';
 import { nightAuditRoutes } from './modules/nightaudit/routes.ts';
 import { paymentIntentRoutes } from './modules/payments/intent-routes.ts';
+import { RAW_BODY, webhookRoutes } from './modules/payments/webhook-routes.ts';
 import type { PaymentProvider } from './core/payments.ts';
 import { reservationRoutes } from './modules/reservations/routes.ts';
 import { roomRoutes } from './modules/rooms/routes.ts';
@@ -97,7 +98,17 @@ export function createApp({
   if ('router' in files) app.use(LOCAL_FILES_PATH, files.router());
 
   // 4. Body parser with size limit
-  app.use(express.json({ limit: BODY_LIMIT }));
+  app.use(
+    express.json({
+      limit: BODY_LIMIT,
+      // Webhook signatures are over the exact bytes received (T-071).
+      verify: (req, _res, buf) => {
+        if (req.url?.startsWith('/api/v1/webhooks/')) {
+          (req as unknown as Record<symbol, Buffer>)[RAW_BODY] = Buffer.from(buf);
+        }
+      },
+    }),
+  );
   // 5. Session load (cookie → sessions row)
   app.use(sessionLoader({ db, config, clock }));
   // Request facts (request ID, IP, device, user) for audit events.
@@ -158,6 +169,7 @@ export function createApp({
       devPages: config.nodeEnv !== 'production',
     }),
   );
+  api.use(webhookRoutes({ db, tenantDb, clock, provider: payments, email, logger }));
   if (routes) api.use(routes);
   app.use('/api/v1', api);
 

@@ -121,6 +121,7 @@ beforeEach(() => {
     'GET /me': () => json(200, makeMe({ memberships: [membership(LAGOS, permissions)] })),
     'GET /auth/device': () => json(200, { pinSwitchAvailable: false, deviceLabel: null }),
     [`GET /folios/${FOLIO}`]: () => json(200, folio()),
+    'GET /virtual-accounts': () => json(200, { data: [] }),
     [`GET /exchange-rates/${TODAY}`]: () =>
       json(200, { date: '2026-11-10', baseCurrency: 'NGN', businessDate: '2026-11-10', rates: [] }),
     'GET /folios': (_b, url) =>
@@ -708,4 +709,78 @@ describe('Payment links (M4-08; T-070)', () => {
     await screen.findByRole('form', { name: /Take a payment/ });
     expect(screen.queryByRole('region', { name: 'Payment links' })).not.toBeInTheDocument();
   });
+});
+
+describe('Bank transfer accounts and unmatched transfers (T-071)', () => {
+  const account = {
+    id: id(80),
+    provider: 'PAYSTACK',
+    ownerType: 'FOLIO',
+    ownerId: FOLIO,
+    accountNumber: '9930000001',
+    bankName: 'Test Bank',
+    accountName: 'HOTEL/OBI ADA',
+    active: true,
+  };
+
+  it('issues the folio its own account number and shows it', async () => {
+    permissions = [...permissions, 'payment.request'];
+    let accounts: object[] = [];
+    handlers['GET /payment-intents'] = () => json(200, { data: [] });
+    handlers['GET /virtual-accounts'] = () => json(200, { data: accounts });
+    handlers['POST /virtual-accounts'] = () => {
+      accounts = [account];
+      return json(201, account);
+    };
+    const user = userEvent.setup();
+    renderAt(`/folios/${FOLIO}`);
+    const form = await screen.findByRole('form', { name: 'Get an account number' });
+    await user.type(within(form).getByLabelText('Guest email'), 'ada@example.com');
+    await user.type(within(form).getByLabelText('Guest phone'), '+2348011111111');
+    await user.click(within(form).getByRole('button', { name: 'Get an account number' }));
+    await waitFor(() => expect(sent('POST /virtual-accounts')).toHaveLength(1));
+    expect(sent('POST /virtual-accounts')[0]?.body).toEqual({
+      ownerType: 'FOLIO',
+      ownerId: FOLIO,
+      email: 'ada@example.com',
+      phone: '+2348011111111',
+      send: true,
+    });
+    const section = screen.getByRole('region', { name: 'Bank transfer account' });
+    expect(
+      await within(section).findByText('Test Bank · 9930000001 · HOTEL/OBI ADA'),
+    ).toBeInTheDocument();
+  }, 15_000);
+
+  it('matches an unmatched transfer to a folio found by number', async () => {
+    let matched = false;
+    const transfer = () => ({
+      id: id(90),
+      provider: 'PAYSTACK',
+      reference: 'T4001',
+      amountMinor: '3000000',
+      senderName: 'ADA OBI',
+      receivedAt: '2026-11-09T09:00:00Z',
+      overdue: true,
+      matchedPaymentId: matched ? id(91) : null,
+    });
+    handlers['GET /unmatched-transfers'] = () => json(200, { data: [transfer()] });
+    handlers[`POST /unmatched-transfers/${id(90)}/match`] = () => {
+      matched = true;
+      return json(200, transfer());
+    };
+    const user = userEvent.setup();
+    renderAt('/folios?view=unmatched');
+    const list = await screen.findByRole('list', { name: 'Transfers to match' });
+    expect(await within(list).findByText('ADA OBI')).toBeInTheDocument();
+    expect(within(list).getByText('Over 24 hours')).toBeInTheDocument();
+    await user.type(within(list).getByLabelText('Folio, guest or room'), 'F00001');
+    await user.click(within(list).getByRole('button', { name: 'Find' }));
+    await user.click(await within(list).findByRole('button', { name: 'Match here' }));
+    await waitFor(() => expect(sent(`POST /unmatched-transfers/${id(90)}/match`)).toHaveLength(1));
+    expect(sent(`POST /unmatched-transfers/${id(90)}/match`)[0]?.body).toEqual({
+      folioId: FOLIO,
+    });
+    expect(await screen.findByText('Nothing waiting to be matched.')).toBeInTheDocument();
+  }, 15_000);
 });

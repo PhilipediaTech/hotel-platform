@@ -27,7 +27,7 @@ describe('loadConfig', () => {
       cookieDomain: undefined,
       cookieSecure: false,
       localFilesDir: path.resolve(import.meta.dirname, '../../../../.data/files'),
-      payments: { provider: 'fake', secretKey: null },
+      payments: { provider: 'fake', secretKey: null, webhookSecret: null },
     });
   });
 
@@ -91,7 +91,7 @@ describe('loadConfig', () => {
     expect(
       loadConfig({ ...ORIGINS, PAYMENT_PROVIDER: 'paystack', PAYMENT_SECRET_KEY: 'sk_test_abc123' })
         .payments,
-    ).toEqual({ provider: 'paystack', secretKey: 'sk_test_abc123' });
+    ).toEqual({ provider: 'paystack', secretKey: 'sk_test_abc123', webhookSecret: null });
     expect(() => loadConfig({ ...ORIGINS, PAYMENT_PROVIDER: 'paystack' })).toThrow(
       /PAYMENT_SECRET_KEY is required/,
     );

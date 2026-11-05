@@ -42,6 +42,8 @@ const envSchema = z.object({
       'PAYMENT_SECRET_KEY must be a Paystack secret key (sk_test_… or sk_live_…)',
     )
     .optional(),
+  // Webhook signing key (runbook); Paystack signs with the secret key, the default.
+  PAYMENT_WEBHOOK_SECRET: z.string().min(16).optional(),
 });
 
 const PLACEHOLDER_SECRET = /^dev-only-/;
@@ -67,7 +69,12 @@ export interface Config {
   /** Where the local (fake) file store keeps files; default `.data/files` in the repo. */
   localFilesDir: string;
   /** The payment provider and its secret key (null for the fake). */
-  payments: { provider: 'fake' | 'paystack'; secretKey: string | null };
+  payments: {
+    provider: 'fake' | 'paystack';
+    secretKey: string | null;
+    /** Signs webhooks; null = the secret key (Paystack). */
+    webhookSecret: string | null;
+  };
 }
 
 /** Repository root: config.ts lives in apps/api/src/core. */
@@ -123,6 +130,10 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     cookieDomain: e.COOKIE_DOMAIN,
     cookieSecure: e.NODE_ENV === 'production',
     localFilesDir: path.resolve(REPO_ROOT, e.LOCAL_FILES_DIR ?? '.data/files'),
-    payments: { provider: e.PAYMENT_PROVIDER, secretKey: e.PAYMENT_SECRET_KEY ?? null },
+    payments: {
+      provider: e.PAYMENT_PROVIDER,
+      secretKey: e.PAYMENT_SECRET_KEY ?? null,
+      webhookSecret: e.PAYMENT_WEBHOOK_SECRET ?? null,
+    },
   };
 }

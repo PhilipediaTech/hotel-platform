@@ -22,3 +22,4 @@ export * from './rooms.ts';
 export * from './shifts.ts';
 export * from './tax.ts';
 export * from './routes.ts';
+export * from './virtual-accounts.ts';

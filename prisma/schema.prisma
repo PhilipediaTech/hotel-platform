@@ -125,6 +125,8 @@ model Property {
   nightAuditRuns       NightAuditRun[]
   roomChargePostings   RoomChargePosting[]
   paymentIntents       PaymentIntent[]
+  virtualAccounts      VirtualAccount[]
+  unmatchedTransfers   UnmatchedTransfer[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -1572,16 +1574,17 @@ model Payment {
   note              String?
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  property       Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  folio          Folio?               @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
-  window         FolioWindow?         @relation(fields: [windowId], references: [id], onDelete: Restrict)
-  reservation    Reservation?         @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
-  shift          CashierShift         @relation(fields: [propertyId, shiftId], references: [propertyId, id], onDelete: Restrict)
-  receivedBy     User?                @relation(fields: [receivedById], references: [id], onDelete: SetNull)
-  refunds        Payment?             @relation("PaymentRefund", fields: [refundsPaymentId], references: [id], onDelete: Restrict)
-  refundedBy     Payment[]            @relation("PaymentRefund")
-  intent         PaymentIntent?
-  depositEntries DepositLedgerEntry[]
+  property        Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  folio           Folio?               @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
+  window          FolioWindow?         @relation(fields: [windowId], references: [id], onDelete: Restrict)
+  reservation     Reservation?         @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  shift           CashierShift         @relation(fields: [propertyId, shiftId], references: [propertyId, id], onDelete: Restrict)
+  receivedBy      User?                @relation(fields: [receivedById], references: [id], onDelete: SetNull)
+  refunds         Payment?             @relation("PaymentRefund", fields: [refundsPaymentId], references: [id], onDelete: Restrict)
+  refundedBy      Payment[]            @relation("PaymentRefund")
+  intent          PaymentIntent?
+  matchedTransfer UnmatchedTransfer?
+  depositEntries  DepositLedgerEntry[]
 
   @@index([propertyId, businessDate])
   @@index([folioId])
@@ -1744,4 +1747,63 @@ model PaymentIntent {
   @@index([folioId])
   @@index([reservationId])
   @@map("payment_intents")
+}
+
+// ───────────────────────── Webhooks and virtual accounts (T-071) ─────────────────────────
+
+/// A provider's webhook, kept raw as it arrived (M4 rule 6): one row per provider event, so a
+/// replay is a no-op. Only signed events are stored. Not a tenant table: the event names its
+/// property only through what it pays.
+model WebhookEvent {
+  id          BigInt    @id @default(autoincrement())
+  provider    String
+  eventId     String    @map("event_id")
+  signatureOk Boolean   @map("signature_ok")
+  payload     Json
+  receivedAt  DateTime  @default(now()) @map("received_at") @db.Timestamptz(6)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+  error       String?
+
+  @@unique([provider, eventId])
+  @@index([processedAt])
+  @@map("webhook_events")
+}
+
+/// A bank account number the provider issued for one owner (M4-08): money sent to it is theirs.
+model VirtualAccount {
+  id            String  @id @default(uuid()) @db.Uuid
+  propertyId    String  @map("property_id") @db.Uuid
+  provider      String
+  accountNumber String  @map("account_number")
+  bankName      String  @map("bank_name")
+  accountName   String  @map("account_name")
+  /// FOLIO | COMPANY | EVENT | GUEST
+  ownerType     String  @map("owner_type")
+  ownerId       String  @map("owner_id") @db.Uuid
+  active        Boolean @default(true)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, accountNumber])
+  @@index([propertyId, ownerType, ownerId])
+  @@map("virtual_accounts")
+}
+
+/// Money that arrived with no owner able to take it (M4 rule 7): matched by hand within 24 h.
+model UnmatchedTransfer {
+  id               String   @id @default(uuid()) @db.Uuid
+  propertyId       String   @map("property_id") @db.Uuid
+  provider         String
+  externalRef      String   @map("external_ref")
+  amountMinor      BigInt   @map("amount_minor")
+  senderName       String?  @map("sender_name")
+  receivedAt       DateTime @map("received_at") @db.Timestamptz(6)
+  matchedPaymentId String?  @unique @map("matched_payment_id") @db.Uuid
+
+  property       Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  matchedPayment Payment? @relation(fields: [matchedPaymentId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, externalRef])
+  @@index([propertyId, matchedPaymentId])
+  @@map("unmatched_transfers")
 }

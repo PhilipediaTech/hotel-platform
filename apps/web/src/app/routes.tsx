@@ -52,6 +52,12 @@ const ShiftPage = lazy(() => import('../routes/shift.tsx').then((m) => ({ defaul
 const NightAuditPage = lazy(() =>
   import('../routes/night-audit.tsx').then((m) => ({ default: m.NightAuditPage })),
 );
+const HousekeepingPage = lazy(() =>
+  import('../routes/housekeeping.tsx').then((m) => ({ default: m.HousekeepingPage })),
+);
+const MyRoomsPage = lazy(() =>
+  import('../routes/housekeeping.tsx').then((m) => ({ default: m.MyRoomsPage })),
+);
 const CheckOutPage = lazy(() =>
   import('../routes/check-out.tsx').then((m) => ({ default: m.CheckOutPage })),
 );
@@ -71,6 +77,8 @@ const SCREENS: Record<string, ReactElement> = {
   '/folios': <FoliosPage />,
   '/shift': <ShiftPage />,
   '/night-audit': <NightAuditPage />,
+  '/housekeeping': <HousekeepingPage />,
+  '/my-rooms': <MyRoomsPage />,
   '/reservations': <ReservationsPage />,
   '/calendar': <CalendarPage />,
   '/bookings/new': <NewBookingPage />,

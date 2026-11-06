@@ -127,6 +127,7 @@ model Property {
   paymentIntents       PaymentIntent[]
   virtualAccounts      VirtualAccount[]
   unmatchedTransfers   UnmatchedTransfer[]
+  hkAssignments        HkAssignment[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -244,6 +245,7 @@ model User {
   exchangeRatesSet   ExchangeRate[]
   nightAuditsStarted NightAuditRun[]
   paymentIntents     PaymentIntent[]
+  hkAssignments      HkAssignment[]
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -618,6 +620,7 @@ model Room {
   stays          Stay[]
   allocations    RoomAllocation[]
   keyIssues      KeyIssue[]
+  hkAssignments  HkAssignment[]
 
   @@unique([propertyId, number])
   // Target of composite foreign keys: blocks and connecting rooms stay within the property.
@@ -1806,4 +1809,40 @@ model UnmatchedTransfer {
   @@unique([provider, externalRef])
   @@index([propertyId, matchedPaymentId])
   @@map("unmatched_transfers")
+}
+
+// ───────────────────────── Housekeeping (T-080) ─────────────────────────
+
+enum HkTaskKind {
+  DEPARTURE
+  STAYOVER
+  ARRIVAL
+  DEEP_CLEAN
+
+  @@map("hk_task_kind")
+}
+
+/// A room on a business date's cleaning list (M5-02), and who cleans it (M5-03, M5-04).
+model HkAssignment {
+  id           String     @id @default(uuid()) @db.Uuid
+  propertyId   String     @map("property_id") @db.Uuid
+  businessDate DateTime   @map("business_date") @db.Date
+  roomId       String     @map("room_id") @db.Uuid
+  kind         HkTaskKind
+  attendantId  String?    @map("attendant_id") @db.Uuid
+  /// PENDING | IN_PROGRESS | PAUSED | DONE
+  status       String     @default("PENDING")
+  startedAt    DateTime?  @map("started_at") @db.Timestamptz(6)
+  completedAt  DateTime?  @map("completed_at") @db.Timestamptz(6)
+  checklist    Json       @default("[]")
+  minibar      Json?
+  notes        String?
+
+  property  Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  room      Room     @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+  attendant User?    @relation(fields: [attendantId], references: [id], onDelete: SetNull)
+
+  @@unique([propertyId, businessDate, roomId])
+  @@index([attendantId, businessDate])
+  @@map("hk_assignments")
 }

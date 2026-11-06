@@ -73,6 +73,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   PaymentIntent: { kind: 'property' },
   VirtualAccount: { kind: 'property' },
   UnmatchedTransfer: { kind: 'property' },
+  HkAssignment: { kind: 'property' },
   RegistrationCard: { kind: 'property' },
   // Components have no property column: reach them through their (scoped) rate plan.
 };

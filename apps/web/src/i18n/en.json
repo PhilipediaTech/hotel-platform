@@ -1573,5 +1573,52 @@
     "noFolio": "No open folio found.",
     "room": "room {{room}}",
     "matchHere": "Match here"
+  },
+  "hk": {
+    "title": "Room board",
+    "floor": "Floor",
+    "allFloors": "All floors",
+    "floorN": "Floor {{floor}}",
+    "assign": "Assign rooms",
+    "attendant": "Attendant",
+    "nobody": "Nobody (take off)",
+    "assignSelected": "Assign {{count}} selected",
+    "rooms": "Rooms",
+    "select": "Select room {{room}}",
+    "dueOut": "due out",
+    "arrival": "guest arriving",
+    "priorityHigh": "Priority: guest arriving",
+    "unassigned": "not assigned",
+    "notListed": "Not on today’s list",
+    "fo": {
+      "OCCUPIED": "occupied",
+      "VACANT": "vacant"
+    },
+    "kind": {
+      "DEPARTURE": "Departure",
+      "STAYOVER": "Stayover",
+      "ARRIVAL": "Arrival",
+      "DEEP_CLEAN": "Deep clean"
+    },
+    "status": {
+      "PENDING": "To do",
+      "IN_PROGRESS": "Cleaning",
+      "PAUSED": "Paused",
+      "DONE": "Done"
+    },
+    "myRooms": "My rooms",
+    "noRooms": "No rooms given to you today.",
+    "roomN": "Room {{room}}",
+    "start": "Start",
+    "resume": "Resume",
+    "pause": "Pause",
+    "complete": "Done",
+    "checklist": "Checklist",
+    "minibar": "Minibar used",
+    "minibarItem": "Minibar item",
+    "quantity": "Quantity",
+    "addMinibar": "Add",
+    "notes": "Notes (linen, lost items, faults)",
+    "saveNotes": "Save notes"
   }
 }

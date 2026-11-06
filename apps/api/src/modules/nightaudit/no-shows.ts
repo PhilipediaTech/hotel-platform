@@ -4,8 +4,7 @@ import { recordAudit } from '../../core/audit.ts';
 import type { Clock } from '../../core/clock.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import { releaseInventory } from '../availability/inventory.ts';
-import { openFolio, postChargeLines, routedWindow } from '../folios/service.ts';
-import { systemCodeId } from '../folios/system-codes.ts';
+import { postBookingFee } from '../reservations/fees.ts';
 import { lockReservation } from '../payments/deposits.ts';
 import { releaseAllocations } from '../reservations/rooms.ts';
 
@@ -21,11 +20,17 @@ type Ctx = ExecuteContext & { now: Date };
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
 
-/** Marks one stay a no-show; answers the fee posted (0 when none), or null if it arrived. */
+/** Marks one stay a no-show; answers the fee posted (0 when none) and its folio, or null. */
 export async function markNoShow(
   ctx: Ctx,
-  args: { stayId: string; businessDate: string; clock: Clock },
-): Promise<bigint | null> {
+  args: {
+    stayId: string;
+    businessDate: string;
+    clock: Clock;
+    /** Kept on the history and audit: night audit by default, else the desk's reason. */
+    reason?: string;
+  },
+): Promise<{ feeMinor: bigint; folioId: string | null } | null> {
   const { tx, now } = ctx;
   const found = await tx.stay.findUniqueOrThrow({ where: { id: args.stayId } });
   await lockReservation(tx, found.reservationId);
@@ -71,7 +76,7 @@ export async function markNoShow(
           stayId: stay.id,
           fromStatus: 'CONFIRMED',
           toStatus: 'NO_SHOW',
-          reason: 'Night audit',
+          reason: args.reason ?? 'Night audit',
           byUserId: ctx.tenant.userId,
           at: now,
         },
@@ -92,25 +97,13 @@ export async function markNoShow(
       stay.nights.map((n) => n.amountMinor),
     );
     if (feeMinor > 0n) {
-      folioId = await openFolio(tx, stay, args.clock, args.businessDate);
-      const folio = await tx.folio.findUniqueOrThrow({
-        where: { id: folioId },
-        include: { windows: true, routingRules: true },
-      });
-      const code = await tx.revenueCode.findUniqueOrThrow({
-        where: { id: await systemCodeId(tx, 'NOSHOW') },
-      });
-      await postChargeLines(ctx, {
-        folio,
-        windowId: routedWindow(folio, code) ?? '',
-        code,
+      folioId = await postBookingFee(ctx, {
+        stay,
+        code: 'NOSHOW',
+        amountMinor: feeMinor,
         description: `No-show fee, arrival ${day(stay.arrival)}`,
-        quantity: 1,
-        unitAmountMinor: feeMinor,
-        note: null,
-        sourceType: 'NO_SHOW',
-        sourceId: stay.id,
         businessDate: args.businessDate,
+        clock: args.clock,
       });
     }
   }
@@ -118,7 +111,7 @@ export async function markNoShow(
     action: 'reservation.no_show',
     entityType: 'reservation',
     entityId: reservation.id,
-    reason: 'Night audit',
+    reason: args.reason ?? 'Night audit',
     before: { stayId: stay.id, status: 'CONFIRMED' },
     after: { stayId: stay.id, status: 'NO_SHOW', feeMinor: feeMinor.toString(), folioId },
   });
@@ -126,5 +119,5 @@ export async function markNoShow(
     type: 'reservation.no_show',
     payload: { reservationId: reservation.id, stayId: stay.id, feeMinor: feeMinor.toString() },
   });
-  return feeMinor;
+  return { feeMinor, folioId };
 }

@@ -335,6 +335,10 @@ export function ReservationPage() {
       )}
       {can('reservation.modify') && <DetailsForm reservation={r} queryKey={key} />}
       {open && can('reservation.cancel') && <CancelPanel reservation={r} queryKey={key} />}
+      {can('reservation.noshow') &&
+        r.stays.some((s) => s.status === 'CONFIRMED' && s.arrival < today) && (
+          <NoShowPanel reservation={r} queryKey={key} />
+        )}
       {(r.status === 'CANCELLED' || r.status === 'NO_SHOW') && can('reservation.modify') && (
         <Reinstate reservation={r} queryKey={key} />
       )}
@@ -939,10 +943,58 @@ function CancelPanel({ reservation, queryKey }: Props) {
       )}
       {cancel.data && (
         <p role="status" className="mt-2 text-sm">
-          {t('reservations.cancelled', { fee: f.money(cancel.data.feeMinor) })}
+          {cancel.data.feeFolioId ? (
+            <>
+              {t('reservations.cancelledCharged', { fee: f.money(cancel.data.feeMinor) })}{' '}
+              <Link to={`/folios/${cancel.data.feeFolioId}`} className="text-brand underline">
+                {t('reservations.openFolio')}
+              </Link>
+            </>
+          ) : cancel.data.feeMinor !== '0' ? (
+            t('reservations.cancelledNotCharged', { fee: f.money(cancel.data.feeMinor) })
+          ) : (
+            t('reservations.cancelledNoFee')
+          )}
         </p>
       )}
     </section>
+  );
+}
+
+/** A guest who never came, once night audit has closed the arrival date (T-074). */
+function NoShowPanel({ reservation, queryKey }: Props) {
+  const { t } = useTranslation();
+  const f = useFormats();
+  const saved = useSaved(queryKey);
+  const mark = useMutation({
+    mutationFn: () =>
+      api.call('markNoShow', { params: { reservationId: reservation.id }, body: { note: null } }),
+    onSuccess: saved,
+  });
+  return (
+    <div className="mt-6 rounded-md border border-border bg-surface p-4">
+      <p className="text-sm">{t('reservations.noShowHelp')}</p>
+      <Button
+        className="mt-2"
+        variant="secondary"
+        disabled={mark.isPending}
+        onClick={() => mark.mutate()}
+      >
+        {t('reservations.markNoShow')}
+      </Button>
+      {mark.data && (
+        <p role="status" className="mt-2 text-sm">
+          {mark.data.feeFolioId
+            ? t('reservations.noShowCharged', { fee: f.money(mark.data.feeMinor) })
+            : t('reservations.noShowNoFee')}
+        </p>
+      )}
+      {mark.error && (
+        <Alert tone="critical" className="mt-2">
+          {errorMessage(mark.error)}
+        </Alert>
+      )}
+    </div>
   );
 }
 

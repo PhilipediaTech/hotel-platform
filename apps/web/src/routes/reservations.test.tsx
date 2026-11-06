@@ -258,6 +258,33 @@ describe('Reservation detail', () => {
     await waitFor(() => expect(sent(`POST /reservations/${RES}/reinstate`)).toHaveLength(1));
   });
 
+  it('marks a guest who never came as a no-show once their arrival date has closed', async () => {
+    permissions = [...permissions, 'reservation.noshow'];
+    const past = (status: string, extra: object = {}) =>
+      reservation({
+        status,
+        stays: [
+          { ...reservation().stays[0], status, arrival: '2026-01-01', departure: '2026-01-03' },
+        ],
+        ...extra,
+      });
+    handlers[`GET /reservations/${RES}`] = () => json(200, past('CONFIRMED'));
+    handlers[`POST /reservations/${RES}/no-show`] = () =>
+      json(200, { ...past('NO_SHOW', { version: 4 }), feeMinor: '4500000', feeFolioId: STAY });
+    const user = userEvent.setup();
+    renderAt(`/reservations/${RES}`);
+    await user.click(await screen.findByRole('button', { name: 'Mark as no-show' }));
+    await waitFor(() => expect(sent(`POST /reservations/${RES}/no-show`)).toHaveLength(1));
+    expect(sent(`POST /reservations/${RES}/no-show`)[0]?.body).toEqual({ note: null });
+  });
+
+  it('offers no no-show before the arrival date has closed', async () => {
+    permissions = [...permissions, 'reservation.noshow'];
+    renderAt(`/reservations/${RES}`);
+    await screen.findByRole('heading', { name: /LAG-00001/ });
+    expect(screen.queryByRole('button', { name: 'Mark as no-show' })).toBeNull();
+  });
+
   it('shows no actions to a role that only views the desk', async () => {
     permissions = ['frontdesk.read'];
     renderAt(`/reservations/${RES}`);

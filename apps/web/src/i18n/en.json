@@ -958,8 +958,7 @@
     "cancelWarning": "The rooms are given back and the cancellation policy’s fee applies.",
     "cancelConfirm": "Yes, cancel it",
     "keep": "Keep it",
-    "cancelled": "Cancelled. Cancellation fee: {{fee}}.",
-    "reinstateHelp": "Bring this reservation back if its rooms are still free.",
+    "reinstateHelp": "Bring this reservation back if its rooms are still free. Any cancellation fee is reversed.",
     "reinstate": "Reinstate",
     "history": "History",
     "status": {
@@ -1022,7 +1021,15 @@
     "newDeparture": "New departure",
     "departureReason": "Reason (optional)",
     "extend": "Extend stay",
-    "shorten": "Shorten stay"
+    "shorten": "Shorten stay",
+    "cancelledCharged": "Cancelled. Cancellation fee {{fee}} posted to the guest’s folio (any deposit pays it).",
+    "cancelledNotCharged": "Cancelled. The policy fee would be {{fee}}, but the booking had no guarantee, so nothing was charged.",
+    "cancelledNoFee": "Cancelled. No cancellation fee.",
+    "openFolio": "Open the folio",
+    "noShowHelp": "Night audit has closed the arrival date and the guest never came. Night audit usually marks this itself.",
+    "markNoShow": "Mark as no-show",
+    "noShowCharged": "Marked as no-show. No-show fee {{fee}} posted to the guest’s folio.",
+    "noShowNoFee": "Marked as no-show. No fee: the booking had no guarantee."
   },
   "booking": {
     "title": "New booking",

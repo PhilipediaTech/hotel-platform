@@ -11,6 +11,7 @@ import { FX_ROUTES } from './fx.ts';
 import { GUEST_ROUTES } from './guests.ts';
 import { HANDOVER_ROUTES } from './handovers.ts';
 import { LEAKAGE_ROUTES } from './leakage.ts';
+import { MESSAGE_ROUTES } from './messages.ts';
 import { HOUSEKEEPING_ROUTES } from './housekeeping.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
@@ -67,6 +68,7 @@ export const API_ROUTES = {
   ...TASK_ROUTES,
   ...HANDOVER_ROUTES,
   ...LEAKAGE_ROUTES,
+  ...MESSAGE_ROUTES,
   ...FX_ROUTES,
 } as const;
 

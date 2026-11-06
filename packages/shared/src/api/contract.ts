@@ -40,8 +40,11 @@ export interface RouteContract<
   params?: Params;
   query?: Query;
   body?: Body;
-  /** A file instead of JSON (`response` is `PdfDocument`): sent inline with its file name. */
-  produces?: 'application/pdf';
+  /**
+   * Not JSON: a file (`application/pdf`, `response` is `PdfDocument`) sent inline with its
+   * file name, or plain text (`text/plain`, `response` is a string; webhook checks).
+   */
+  produces?: 'application/pdf' | 'text/plain';
   /** Success status; 204 means no body (use `z.void()` as `response`). */
   status?: 200 | 201 | 202 | 204;
   response: Response;

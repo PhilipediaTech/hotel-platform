@@ -12,6 +12,13 @@ const ORIGINS = {
   ID_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString('base64url'),
 };
 
+/** WhatsApp through Meta, which production needs (T-024). */
+const META = {
+  WHATSAPP_PROVIDER: 'meta',
+  WHATSAPP_TOKEN: 'EAAtest-token-0123456789',
+  WHATSAPP_PHONE_NUMBER_ID: '1234567890',
+};
+
 describe('loadConfig', () => {
   it('applies defaults', () => {
     expect(loadConfig({ ...ORIGINS })).toEqual({
@@ -28,6 +35,15 @@ describe('loadConfig', () => {
       cookieSecure: false,
       localFilesDir: path.resolve(import.meta.dirname, '../../../../.data/files'),
       payments: { provider: 'fake', secretKey: null, webhookSecret: null },
+      whatsapp: {
+        provider: 'fake',
+        token: null,
+        phoneNumberId: null,
+        businessAccountId: null,
+        appSecret: null,
+        verifyToken: null,
+        graphVersion: 'v23.0',
+      },
     });
   });
 
@@ -76,6 +92,7 @@ describe('loadConfig', () => {
       COOKIE_DOMAIN: '.example.com',
       PAYMENT_PROVIDER: 'paystack',
       PAYMENT_SECRET_KEY: 'sk_live_abc123',
+      ...META,
     });
     expect(config).toMatchObject({ cookieSecure: true, cookieDomain: '.example.com' });
     expect(() => loadConfig({ ...ORIGINS, COOKIE_DOMAIN: 'https://x' })).toThrow(/COOKIE_DOMAIN/);
@@ -106,6 +123,34 @@ describe('loadConfig', () => {
     );
   });
 
+  it('takes Meta for WhatsApp with its token and number ID, never the fake in production', () => {
+    expect(
+      loadConfig({ ...ORIGINS, ...META, WHATSAPP_BUSINESS_ACCOUNT_ID: '987654321' }).whatsapp,
+    ).toEqual({
+      provider: 'meta',
+      token: 'EAAtest-token-0123456789',
+      phoneNumberId: '1234567890',
+      businessAccountId: '987654321',
+      appSecret: null,
+      verifyToken: null,
+      graphVersion: 'v23.0',
+    });
+    expect(() => loadConfig({ ...ORIGINS, WHATSAPP_PROVIDER: 'meta' })).toThrow(
+      /WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID are required/,
+    );
+    expect(() =>
+      loadConfig({ ...ORIGINS, ...META, WHATSAPP_PHONE_NUMBER_ID: '+2348012345678' }),
+    ).toThrow(/number ID, digits only/);
+    expect(() =>
+      loadConfig({
+        ...ORIGINS,
+        NODE_ENV: 'production',
+        PAYMENT_PROVIDER: 'paystack',
+        PAYMENT_SECRET_KEY: 'sk_live_abc123',
+      }),
+    ).toThrow(/WHATSAPP_PROVIDER=fake in production/);
+  });
+
   it('requires a PostgreSQL DATABASE_URL', () => {
     const { DATABASE_URL: _omit, ...withoutDb } = ORIGINS;
     expect(() => loadConfig(withoutDb)).toThrow(/DATABASE_URL/);
@@ -128,6 +173,7 @@ describe('loadConfig', () => {
       LOG_LEVEL: 'warn',
       PAYMENT_PROVIDER: 'paystack',
       PAYMENT_SECRET_KEY: 'sk_live_abc123',
+      ...META,
     });
     expect(config).toMatchObject({ nodeEnv: 'production', port: 8080, logLevel: 'warn' });
   });

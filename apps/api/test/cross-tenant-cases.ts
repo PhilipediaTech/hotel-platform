@@ -780,6 +780,44 @@ async function bLeakageUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** B's own French wording of the booking email and a message B sent (T-024). */
+async function bMessages(db: Db, world: TenantWorld, propertyId: string) {
+  const marker = `Their wording ${crypto.randomUUID()}`;
+  await db.messageTemplate.create({
+    data: {
+      organisationId: orgOf(world, propertyId),
+      code: 'BOOKING_CONFIRMED',
+      channel: 'EMAIL',
+      language: 'fr',
+      subject: 'Leak test',
+      body: marker,
+    },
+  });
+  const delivery = await db.notificationDelivery.create({
+    data: {
+      propertyId,
+      channel: 'WHATSAPP',
+      templateCode: 'BOOKING_CONFIRMED',
+      recipient: '+2348000000777',
+      payload: { vars: {}, language: 'en' },
+    },
+  });
+  return {
+    code: 'BOOKING_CONFIRMED',
+    channel: 'EMAIL',
+    language: 'fr',
+    marker,
+    deliveryId: delivery.id,
+  };
+}
+
+async function bMessagesUnchanged(db: Db, world: TenantWorld, theirs: Record<string, string>) {
+  const rows = await db.messageTemplate.findMany({ where: { organisationId: world.orgB.id } });
+  expect(rows.map((r) => r.body)).toEqual([theirs['marker']]);
+  const sent = await db.notificationDelivery.findMany({ where: { propertyId: world.b1.id } });
+  expect(sent.map((d) => d.id)).toEqual([theirs['deliveryId']]);
+}
+
 const taskWrite = (body?: object) => ({
   seed: bTask,
   ...(body ? { body: () => body } : {}),
@@ -1617,4 +1655,29 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({ rules: [{ code: 'REVERSAL_PATTERN', enabled: true, notifyInstant: false }] }),
     untouched: bLeakageUnchanged,
   },
+  listMessageTemplates: {
+    seed: bMessages,
+    listIds: (body) => (body as { templates: { body: string }[] }).templates.map((t) => t.body),
+  },
+  saveMessageTemplate: {
+    seed: bMessages,
+    creates: true,
+    body: () => ({
+      code: 'BOOKING_CONFIRMED',
+      channel: 'EMAIL',
+      language: 'fr',
+      subject: 'Leak test',
+      body: 'Our wording',
+    }),
+    untouched: bMessagesUnchanged,
+  },
+  // A's own (absent) wording may be reset; B's stays.
+  resetMessageTemplate: { seed: bMessages, creates: true, untouched: bMessagesUnchanged },
+  sendTestMessage: {
+    seed: bMessages,
+    creates: true,
+    body: () => ({ code: 'BOOKING_CONFIRMED', channel: 'WHATSAPP', to: '+2348000000888' }),
+    untouched: bMessagesUnchanged,
+  },
+  listMessageDeliveries: { seed: bMessages, listIds: ids },
 };

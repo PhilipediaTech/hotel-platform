@@ -72,6 +72,9 @@ const HandoversPage = lazy(() =>
 const LeakagePage = lazy(() =>
   import('../routes/leakage.tsx').then((m) => ({ default: m.LeakagePage })),
 );
+const MessagesPage = lazy(() =>
+  import('../routes/messages.tsx').then((m) => ({ default: m.MessagesPage })),
+);
 const CheckOutPage = lazy(() =>
   import('../routes/check-out.tsx').then((m) => ({ default: m.CheckOutPage })),
 );
@@ -97,6 +100,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/tasks/new': <NewTaskPage />,
   '/handovers': <HandoversPage />,
   '/leakage': <LeakagePage />,
+  '/messages': <MessagesPage />,
   '/reservations': <ReservationsPage />,
   '/calendar': <CalendarPage />,
   '/bookings/new': <NewBookingPage />,

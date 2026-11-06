@@ -82,7 +82,14 @@ function toRouteConfig(route: RouteContract): RouteConfig {
         : route.produces
           ? {
               description: STATUS_TEXT[status] ?? '',
-              content: { [route.produces]: { schema: { type: 'string', format: 'binary' } } },
+              content: {
+                [route.produces]: {
+                  schema:
+                    route.produces === 'text/plain'
+                      ? { type: 'string' }
+                      : { type: 'string', format: 'binary' },
+                },
+              },
             }
           : { description: STATUS_TEXT[status] ?? '', content: json(route.response) },
     ...errorResponses(routeErrorCodes(route)),

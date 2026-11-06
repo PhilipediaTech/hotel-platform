@@ -68,6 +68,7 @@ model Organisation {
   guests           Guest[]
   companies        Company[]
   reservations     Reservation[]
+  messageTemplates MessageTemplate[]
 
   @@map("organisations")
 }
@@ -92,7 +93,7 @@ model Property {
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organisation         Organisation         @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  organisation         Organisation           @relation(fields: [organisationId], references: [id], onDelete: Restrict)
   departments          Department[]
   memberships          Membership[]
   invitations          Invitation[]
@@ -134,6 +135,7 @@ model Property {
   taskTemplates        TaskTemplate[]
   tasks                Task[]
   handoverNotes        HandoverNote[]
+  notifications        NotificationDelivery[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -2089,4 +2091,49 @@ model TaskEvent {
 
   @@index([taskId])
   @@map("task_events")
+}
+
+/// An organisation's own wording of a message (M11-05). The defaults live in the code
+/// (packages/shared/src/messages.ts); a row exists only where the organisation changed one.
+model MessageTemplate {
+  id                   String  @id @default(uuid()) @db.Uuid
+  organisationId       String  @map("organisation_id") @db.Uuid
+  /// BOOKING_CONFIRMED, PAYMENT_REQUEST, FLASH_REPORT, APPROVAL_OTP, ...
+  code                 String
+  /// EMAIL | WHATSAPP | SMS
+  channel              String
+  language             String  @default("en")
+  providerTemplateName String? @map("provider_template_name")
+  subject              String?
+  body                 String
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  @@unique([organisationId, code, channel, language])
+  @@map("message_templates")
+}
+
+/// One message to one recipient (T-024): queued, then sent by the worker; the provider's
+/// status callbacks move it on. Never holds a one-time code.
+model NotificationDelivery {
+  id           String    @id @default(uuid()) @db.Uuid
+  propertyId   String?   @map("property_id") @db.Uuid
+  /// EMAIL | WHATSAPP | SMS
+  channel      String
+  templateCode String    @map("template_code")
+  recipient    String
+  payload      Json
+  /// QUEUED | SENT | DELIVERED | READ | FAILED
+  status       String    @default("QUEUED")
+  providerRef  String?   @map("provider_ref")
+  attempts     Int       @default(0)
+  lastError    String?   @map("last_error")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  sentAt       DateTime? @map("sent_at") @db.Timestamptz(6)
+
+  property Property? @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@index([providerRef])
+  @@index([propertyId, createdAt])
+  @@map("notification_deliveries")
 }

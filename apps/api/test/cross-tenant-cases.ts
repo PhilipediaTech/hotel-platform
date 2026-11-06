@@ -673,6 +673,61 @@ async function bReportUnchanged(db: Db, world: TenantWorld) {
   expect(await db.leakageAlert.count({ where: { propertyId: world.b1.id } })).toBe(0);
 }
 
+/** B's department, template and a reported task on B's room (T-082). */
+async function bTask(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bRoom(db, world, propertyId);
+  const organisationId = orgOf(world, propertyId);
+  const department = await db.department.create({
+    data: { organisationId, propertyId, code: 'MNT', name: 'Maintenance' },
+  });
+  const template = await db.taskTemplate.create({
+    data: { propertyId, type: 'FAULT', name: 'Fault', departmentId: department.id },
+  });
+  const task = await db.task.create({
+    data: {
+      organisationId,
+      propertyId,
+      number: 1,
+      type: 'FAULT',
+      templateId: template.id,
+      title: 'Their fault',
+      departmentId: department.id,
+      roomId: theirs.roomId,
+    },
+  });
+  return { ...theirs, departmentId: department.id, templateId: template.id, taskId: task.id };
+}
+
+async function bTaskUnchanged(db: Db, world: TenantWorld) {
+  const tasks = await db.task.findMany({
+    where: { propertyId: world.b1.id },
+    include: { events: true },
+  });
+  expect(tasks.map((t) => [t.title, t.status, t.assigneeId, t.events.length])).toEqual([
+    ['Their fault', 'REPORTED', null, 0],
+  ]);
+  expect(await db.taskTemplate.count({ where: { propertyId: world.b1.id } })).toBe(1);
+}
+
+/** B's room, named by its QR sticker token (T-082). */
+async function bQr(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bRoom(db, world, propertyId);
+  const room = await db.room.findUniqueOrThrow({ where: { id: theirs.roomId } });
+  return { ...theirs, token: room.qrToken };
+}
+
+async function bQrUnchanged(db: Db, world: TenantWorld) {
+  expect(await db.task.count({ where: { propertyId: world.b1.id } })).toBe(0);
+  const rooms = await db.room.findMany({ where: { propertyId: world.b1.id } });
+  expect(rooms.map((r) => r.hkStatus)).not.toContain('OUT_OF_ORDER');
+}
+
+const taskWrite = (body?: object) => ({
+  seed: bTask,
+  ...(body ? { body: () => body } : {}),
+  untouched: bTaskUnchanged,
+});
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -1428,5 +1483,47 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     creates: true,
     body: (theirs) => ({ entries: [{ roomId: theirs['roomId'], observed: 'OCCUPIED' }] }),
     untouched: bReportUnchanged,
+  },
+  listTasks: {
+    seed: bTask,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((t) => t.id),
+  },
+  createTask: {
+    seed: bTask,
+    creates: true,
+    body: (theirs) => ({ templateId: theirs['templateId'], roomId: theirs['roomId'] }),
+    untouched: bTaskUnchanged,
+  },
+  getTaskFormOptions: {
+    seed: bTask,
+    listIds: (body) => {
+      const b = body as { departments: { id: string }[]; rooms: { id: string }[] };
+      return [...b.departments.map((d) => d.id), ...b.rooms.map((r) => r.id)];
+    },
+  },
+  getTask: { seed: bTask },
+  assignTask: taskWrite({ assigneeId: null }),
+  acknowledgeTask: taskWrite(),
+  startTask: taskWrite(),
+  holdTask: taskWrite({ reason: 'Leak test' }),
+  resolveTask: taskWrite({ note: 'Leak test' }),
+  verifyTask: taskWrite({}),
+  reopenTask: taskWrite({ reason: 'Leak test' }),
+  addTaskComment: taskWrite({ note: 'Leak test' }),
+  listTaskTemplates: {
+    seed: bTask,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((t) => t.id),
+  },
+  createTaskTemplate: {
+    seed: bTask,
+    creates: true,
+    body: (theirs) => ({ type: 'FAULT', name: 'Leak', departmentId: theirs['departmentId'] }),
+    untouched: bTaskUnchanged,
+  },
+  getQrRoom: { seed: bQr },
+  reportQrFault: {
+    seed: bQr,
+    body: () => ({ category: 'OTHER', severity: 'CRITICAL', outOfOrderUntil: '2099-01-02' }),
+    untouched: bQrUnchanged,
   },
 };

@@ -37,6 +37,7 @@ import { paymentRoutes } from './modules/payments/routes.ts';
 import { fxRoutes } from './modules/fx/routes.ts';
 import { nightAuditRoutes } from './modules/nightaudit/routes.ts';
 import { housekeepingRoutes } from './modules/housekeeping/routes.ts';
+import { taskRoutes } from './modules/tasks/routes.ts';
 import { paymentIntentRoutes } from './modules/payments/intent-routes.ts';
 import { RAW_BODY, webhookRoutes } from './modules/payments/webhook-routes.ts';
 import type { PaymentProvider } from './core/payments.ts';
@@ -160,6 +161,7 @@ export function createApp({
   api.use(fxRoutes({ db, tenantDb, clock }));
   api.use(nightAuditRoutes({ db, tenantDb, clock, logger }));
   api.use(housekeepingRoutes({ db, tenantDb, clock }));
+  api.use(taskRoutes({ db, tenantDb, clock }));
   api.use(
     paymentIntentRoutes({
       db,

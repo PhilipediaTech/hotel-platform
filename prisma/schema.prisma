@@ -51,6 +51,7 @@ model Organisation {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   properties       Property[]
+  tasks            Task[]
   roles            Role[]
   memberships      Membership[]
   departments      Department[]
@@ -129,6 +130,8 @@ model Property {
   unmatchedTransfers   UnmatchedTransfer[]
   hkAssignments        HkAssignment[]
   roomStatusReports    RoomStatusReport[]
+  taskTemplates        TaskTemplate[]
+  tasks                Task[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -143,9 +146,11 @@ model Department {
   code           String
   name           String
 
-  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  property     Property     @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
-  memberships  Membership[]
+  organisation  Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property      Property       @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  memberships   Membership[]
+  taskTemplates TaskTemplate[]
+  tasks         Task[]
 
   @@unique([propertyId, code])
   @@unique([propertyId, id])
@@ -248,6 +253,10 @@ model User {
   paymentIntents     PaymentIntent[]
   hkAssignments      HkAssignment[]
   roomStatusReports  RoomStatusReport[]
+  tasksReported      Task[]             @relation("TaskReporter")
+  tasksAssigned      Task[]             @relation("TaskAssignee")
+  tasksVerified      Task[]             @relation("TaskVerifier")
+  taskEvents         TaskEvent[]
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -624,6 +633,7 @@ model Room {
   keyIssues      KeyIssue[]
   hkAssignments  HkAssignment[]
   statusReports  RoomStatusReport[]
+  tasks          Task[]
 
   @@unique([propertyId, number])
   // Target of composite foreign keys: blocks and connecting rooms stay within the property.
@@ -975,6 +985,7 @@ model Guest {
   stays        Stay[]
   idDocuments  IdDocument[]
   folioWindows FolioWindow[]
+  tasks        Task[]
 
   @@index([organisationId, phone])
   @@index([organisationId, email])
@@ -1115,6 +1126,7 @@ model Stay {
   allocations RoomAllocation[]
   keys        KeyIssue[]
   roomCharges RoomChargePosting[]
+  tasks       Task[]
   card        RegistrationCard?
 
   // Target of the composite foreign key from room allocations.
@@ -1878,4 +1890,121 @@ model RoomStatusReport {
 
   @@index([propertyId, businessDate, roomId])
   @@map("room_status_reports")
+}
+
+// ── Tasks (PRD M6-01–M6-05, M6 rules 1–2, M5-07; tab 3; T-082) ───────────────────────────
+
+enum TaskType {
+  GUEST_REQUEST
+  COMPLAINT
+  FAULT
+  INCIDENT
+  CHECKLIST
+  DISCREPANCY
+  GENERAL
+
+  @@map("task_type")
+}
+
+enum TaskStatus {
+  REPORTED
+  TRIAGED
+  ASSIGNED
+  ACKNOWLEDGED
+  IN_PROGRESS
+  ON_HOLD
+  RESOLVED
+  VERIFIED
+  CLOSED
+
+  @@map("task_status")
+}
+
+/// What a task starts from (M6-01): its type, department, priority and SLA.
+model TaskTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @map("property_id") @db.Uuid
+  type         TaskType
+  name         String
+  departmentId String   @map("department_id") @db.Uuid
+  priority     Priority @default(NORMAL)
+  slaMinutes   Int?     @map("sla_minutes")
+  fields       Json     @default("[]")
+  active       Boolean  @default(true)
+
+  property   Property   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  department Department @relation(fields: [propertyId, departmentId], references: [propertyId, id], onDelete: Restrict)
+  tasks      Task[]
+
+  @@index([propertyId])
+  @@map("task_templates")
+}
+
+/// A piece of work with an owner and a deadline. Lifecycle (M6 rule 1): REPORTED → TRIAGED →
+/// ASSIGNED → ACKNOWLEDGED → IN_PROGRESS ⇄ ON_HOLD → RESOLVED → VERIFIED; a reopen returns it
+/// to ASSIGNED. escalationLevel counts the SLA escalations done (M6-05: once per level).
+/// assetId points at an asset once assets exist (M5-08, V1.1).
+model Task {
+  id              String     @id @default(uuid()) @db.Uuid
+  organisationId  String     @map("organisation_id") @db.Uuid
+  propertyId      String     @map("property_id") @db.Uuid
+  number          Int
+  type            TaskType
+  templateId      String?    @map("template_id") @db.Uuid
+  title           String
+  description     String?
+  departmentId    String     @map("department_id") @db.Uuid
+  priority        Priority   @default(NORMAL)
+  status          TaskStatus @default(REPORTED)
+  roomId          String?    @map("room_id") @db.Uuid
+  assetId         String?    @map("asset_id") @db.Uuid
+  stayId          String?    @map("stay_id") @db.Uuid
+  guestId         String?    @map("guest_id") @db.Uuid
+  reportedById    String?    @map("reported_by_id") @db.Uuid
+  assigneeId      String?    @map("assignee_id") @db.Uuid
+  dueAt           DateTime?  @map("due_at") @db.Timestamptz(6)
+  escalationLevel Int        @default(0) @map("escalation_level")
+  acknowledgedAt  DateTime?  @map("acknowledged_at") @db.Timestamptz(6)
+  resolvedAt      DateTime?  @map("resolved_at") @db.Timestamptz(6)
+  verifiedById    String?    @map("verified_by_id") @db.Uuid
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  version         Int        @default(0)
+
+  organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property     Property      @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  department   Department    @relation(fields: [propertyId, departmentId], references: [propertyId, id], onDelete: Restrict)
+  // Same property is checked by the service (Prisma can't mix a required and an optional column in one relation).
+  template     TaskTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  room         Room?         @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  stay         Stay?         @relation(fields: [stayId], references: [id], onDelete: Restrict)
+  guest        Guest?        @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  reportedBy   User?         @relation("TaskReporter", fields: [reportedById], references: [id], onDelete: SetNull)
+  assignee     User?         @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  verifiedBy   User?         @relation("TaskVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  events       TaskEvent[]
+
+  @@unique([propertyId, number])
+  @@index([propertyId, status])
+  @@index([assigneeId, status])
+  @@map("tasks")
+}
+
+/// A task's timeline, append-only: STATUS, COMMENT, ASSIGN, ESCALATE, ATTACH. No property
+/// column (tab 3): written and read through the task, which is scoped.
+model TaskEvent {
+  id         BigInt      @id @default(autoincrement())
+  taskId     String      @map("task_id") @db.Uuid
+  kind       String
+  fromStatus TaskStatus? @map("from_status")
+  toStatus   TaskStatus? @map("to_status")
+  note       String?
+  fileIds    String[]    @map("file_ids") @db.Uuid
+  byUserId   String?     @map("by_user_id") @db.Uuid
+  at         DateTime    @default(now()) @db.Timestamptz(6)
+
+  task Task  @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  by   User? @relation(fields: [byUserId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@map("task_events")
 }

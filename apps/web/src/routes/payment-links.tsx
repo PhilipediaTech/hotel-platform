@@ -189,3 +189,114 @@ function Field(props: { id: string; label: string; children: ReactNode }) {
     </div>
   );
 }
+
+/**
+ * The folio's own bank account (PRD M4-08 "virtual-account details"; T-071): shown with a
+ * copy button once issued; issuing needs the guest's email and phone (the provider's account
+ * holder). Transfers to it are recorded on the folio by the webhook.
+ */
+export function VirtualAccountPanel({ folioId }: { folioId: string }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { currentPropertyId } = useSession();
+  const key = ['virtual-accounts', currentPropertyId ?? '', folioId];
+  const accounts = useQuery({
+    queryKey: key,
+    queryFn: () =>
+      api.call('listVirtualAccounts', { query: { ownerType: 'FOLIO', ownerId: folioId } }),
+  });
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [send, setSend] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const issue = useMutation({
+    mutationFn: () =>
+      api.call('createVirtualAccount', {
+        body: {
+          ownerType: 'FOLIO',
+          ownerId: folioId,
+          email: email.trim(),
+          phone: phone.trim(),
+          send,
+        },
+      }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: key }),
+  });
+  const account = accounts.data?.data.find((a) => a.active);
+  return (
+    <section aria-label={t('virtualAccount.title')} className="mt-6">
+      <h2 className="font-semibold">{t('virtualAccount.title')}</h2>
+      {account ? (
+        <div className="mt-2 flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface p-3 text-sm">
+          <span>
+            {t('virtualAccount.details', {
+              bank: account.bankName,
+              number: account.accountNumber,
+              name: account.accountName,
+            })}
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() =>
+              void navigator.clipboard
+                .writeText(`${account.bankName} ${account.accountNumber} ${account.accountName}`)
+                .then(() => setCopied(true))
+                .catch(() => setCopied(false))
+            }
+          >
+            {copied ? t('paymentLinks.copied') : t('virtualAccount.copy')}
+          </Button>
+          {issue.data?.id === account.id && send && (
+            <span className="text-text-muted">{t('virtualAccount.emailed', { email })}</span>
+          )}
+        </div>
+      ) : (
+        accounts.data && (
+          <form
+            aria-label={t('virtualAccount.issue')}
+            className="mt-2 flex flex-wrap items-end gap-3 rounded-md border border-border bg-surface p-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (email.trim() && phone.trim()) issue.mutate();
+            }}
+          >
+            <p className="w-full text-sm text-text-muted">{t('virtualAccount.intro')}</p>
+            <Field id="va-email" label={t('paymentLinks.email')}>
+              <Input
+                id="va-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+            <Field id="va-phone" label={t('virtualAccount.phone')}>
+              <Input
+                id="va-phone"
+                inputMode="tel"
+                placeholder="+234…"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={send} onChange={(e) => setSend(e.target.checked)} />
+              {t('virtualAccount.sendByEmail')}
+            </label>
+            <Button
+              type="submit"
+              disabled={email.trim() === '' || phone.trim() === '' || issue.isPending}
+            >
+              {t('virtualAccount.issue')}
+            </Button>
+            {issue.error && (
+              <Alert tone="critical" className="w-full">
+                {errorMessage(issue.error)}
+              </Alert>
+            )}
+          </form>
+        )
+      )}
+    </section>
+  );
+}

@@ -600,6 +600,38 @@ async function bIntentsUnchanged(db: Db, world: TenantWorld) {
   expect(intents.map((i) => i.status)).toEqual(['CREATED']);
 }
 
+/** B's virtual account on its folio, and a transfer waiting in its queue (T-071). */
+async function bAccount(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bFolio(db, world, propertyId);
+  const account = await db.virtualAccount.create({
+    data: {
+      propertyId,
+      provider: 'FAKE',
+      accountNumber: `99${propertyId.slice(0, 8).replace(/D/g, '1').padEnd(8, '1')}`,
+      bankName: 'Fake Bank',
+      accountName: 'HOTEL/B GUEST',
+      ownerType: 'FOLIO',
+      ownerId: theirs['folioId'] ?? '',
+    },
+  });
+  const transfer = await db.unmatchedTransfer.create({
+    data: {
+      propertyId,
+      provider: 'FAKE',
+      externalRef: `T-b-${propertyId}`,
+      amountMinor: 100n,
+      receivedAt: new Date('2099-01-01'),
+    },
+  });
+  return { ...theirs, accountId: account.id, unmatchedTransferId: transfer.id };
+}
+
+async function bAccountUnchanged(db: Db, world: TenantWorld) {
+  expect(await db.virtualAccount.count({ where: { propertyId: world.b1.id } })).toBe(1);
+  const transfers = await db.unmatchedTransfer.findMany({ where: { propertyId: world.b1.id } });
+  expect(transfers.map((t) => t.matchedPaymentId)).toEqual([null]);
+}
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -1298,4 +1330,29 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     listIds: (body) => (body as { data: { id: string }[] }).data.map((i) => i.id),
   },
   checkPaymentIntent: { seed: bIntent, untouched: bIntentsUnchanged },
+  createVirtualAccount: {
+    seed: bAccount,
+    creates: true,
+    body: (theirs) => ({
+      ownerType: 'FOLIO',
+      ownerId: theirs['folioId'],
+      email: 'leak@example.com',
+      phone: '+2348000000000',
+    }),
+    untouched: bAccountUnchanged,
+  },
+  listVirtualAccounts: {
+    seed: bAccount,
+    query: (theirs) => ({ ownerType: 'FOLIO', ownerId: theirs['folioId'] ?? '' }),
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((a) => a.id),
+  },
+  listUnmatchedTransfers: {
+    seed: bAccount,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((t) => t.id),
+  },
+  matchUnmatchedTransfer: {
+    seed: bAccount,
+    body: (theirs) => ({ folioId: theirs['folioId'] }),
+    untouched: bAccountUnchanged,
+  },
 };

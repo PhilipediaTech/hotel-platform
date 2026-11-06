@@ -220,7 +220,7 @@ export async function checkPaymentIntent(deps: IntentDeps, id: string) {
 }
 
 /** The property's system shift for provider money (M4 rule 4), opened on first use. */
-async function systemShift(
+export async function systemShift(
   tx: Parameters<Parameters<Db['$transaction']>[0]>[0],
   propertyId: string,
   now: Date,
@@ -247,13 +247,15 @@ async function systemShift(
 export async function settleIntent(
   deps: Pick<IntentDeps, 'db' | 'clock' | 'provider'>,
   intentId: string,
+  /** The charge as a signed webhook told it (T-071): no need to ask the provider again. */
+  known?: Charge,
 ): Promise<string> {
   const { db } = deps;
   const intent = await db.paymentIntent.findUniqueOrThrow({ where: { id: intentId } });
   if (intent.status === 'SUCCEEDED') return intent.status;
   let charge: Charge;
   try {
-    charge = await deps.provider.verify(intent.providerRef);
+    charge = known ?? (await deps.provider.verify(intent.providerRef));
   } catch (err) {
     unavailable(err);
   }

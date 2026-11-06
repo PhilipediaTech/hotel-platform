@@ -32,7 +32,8 @@
     "postinstall": "prisma generate",
     "check:size": "npm run build -w apps/web && npm run size -w apps/web",
     "openapi": "node apps/api/scripts/openapi.ts",
-    "openapi:check": "node apps/api/scripts/openapi.ts --check"
+    "openapi:check": "node apps/api/scripts/openapi.ts --check",
+    "simulate:webhook": "node apps/api/scripts/simulate-webhook.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [

@@ -8,7 +8,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import type { z } from 'zod';
 import { useSession } from '../app/session.ts';
 import { Alert } from '../components/ui/alert.tsx';
@@ -21,7 +21,8 @@ import { toMinor } from '../lib/money.ts';
 import { errorMessage } from '../lib/form.ts';
 import { Payments, PrintInvoice, TakePayment } from './folio-payments.tsx';
 import { TransferForm } from './folio-transfer.tsx';
-import { PaymentLinks } from './payment-links.tsx';
+import { PaymentLinks, VirtualAccountPanel } from './payment-links.tsx';
+import { UnmatchedTransfers } from './unmatched-transfers.tsx';
 import { useFormats } from './reservations.tsx';
 
 // S11 Folio (PRD M4-01–M4-05; T-060): windows as tabs, lines with their taxes, balance; post a
@@ -94,7 +95,13 @@ function NewHouseAccount() {
 
 // ── List ──────────────────────────────────────────────────────────────────────────────
 
+/** The folios screen, or its unmatched-transfers view (T-071). */
 export function FoliosPage() {
+  const [params] = useSearchParams();
+  return params.get('view') === 'unmatched' ? <UnmatchedTransfers /> : <FolioList />;
+}
+
+function FolioList() {
   const { t } = useTranslation();
   const f = useFormats();
   const { currentPropertyId, permissions } = useSession();
@@ -315,6 +322,7 @@ export function FolioPage() {
           onPaid={() => void folio.refetch()}
         />
       )}
+      {open && can('payment.request') && <VirtualAccountPanel folioId={data.id} />}
       {open && can('folio.charge') && (
         <PostCharge folio={data} onPending={() => setMessage(t('folios.sentForApproval'))} />
       )}

@@ -16,7 +16,11 @@ import { fileScanJob } from './modules/files/jobs.ts';
 import { inventoryJob } from './modules/availability/inventory.ts';
 import { idPurgeJob } from './modules/reservations/check-in.ts';
 import { holdExpiryJob } from './modules/reservations/jobs.ts';
-import { paymentLinkCheckJob } from './modules/payments/jobs.ts';
+import {
+  paymentLinkCheckJob,
+  paymentWebhookJob,
+  unmatchedTransferJob,
+} from './modules/payments/jobs.ts';
 import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
@@ -36,6 +40,8 @@ export function workerJobs(deps: {
     idPurgeJob({ store: deps.files }),
     // The fake keeps its links in the API process: nothing for the worker to ask.
     ...(deps.payments.name === 'FAKE' ? [] : [paymentLinkCheckJob({ provider: deps.payments })]),
+    paymentWebhookJob({ provider: deps.payments }),
+    unmatchedTransferJob,
   ];
 }
 

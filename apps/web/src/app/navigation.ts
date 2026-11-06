@@ -120,6 +120,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-060',
   },
   {
+    id: 'unmatched-transfers',
+    path: '/folios?view=unmatched',
+    anyOf: ['payment.capture'],
+    group: 'revenue',
+    screen: 'S11',
+    ticket: 'T-071',
+  },
+  {
     id: 'shift',
     path: '/shift',
     anyOf: ['shift.open', 'shift.signoff'],

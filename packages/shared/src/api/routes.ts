@@ -21,6 +21,7 @@ import { RESERVATION_ROUTES } from './reservations.ts';
 import { ROOM_ROUTES } from './rooms.ts';
 import { SHIFT_ROUTES } from './shifts.ts';
 import { TAX_ROUTES } from './tax.ts';
+import { VIRTUAL_ACCOUNT_ROUTES } from './virtual-accounts.ts';
 
 // The API surface, one entry per endpoint in spec tab 4. Modules add their routes here as
 // they are built; `npm run openapi` regenerates apps/api/openapi.json from this list.
@@ -57,6 +58,7 @@ export const API_ROUTES = {
   ...SHIFT_ROUTES,
   ...PAYMENT_ROUTES,
   ...PAYMENT_INTENT_ROUTES,
+  ...VIRTUAL_ACCOUNT_ROUTES,
   ...FX_ROUTES,
 } as const;
 

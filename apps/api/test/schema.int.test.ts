@@ -77,7 +77,10 @@ describe('migrations', () => {
       'stays',
       'tax_rule_versions',
       'tax_rules',
+      'unmatched_transfers',
       'users',
+      'virtual_accounts',
+      'webhook_events',
     ]);
   });
 });

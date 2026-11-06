@@ -63,7 +63,8 @@
     "settings-imports": "Imports",
     "settings-billing": "Billing",
     "audit-log": "Audit log",
-    "platform": "Platform admin"
+    "platform": "Platform admin",
+    "unmatched-transfers": "Unmatched transfers"
   },
   "offline": {
     "banner": "You're offline. Lists show the last saved copy. Payments, check-in, check-out, postings and night audit are paused until you reconnect."
@@ -1539,5 +1540,31 @@
       "FAILED": "Failed",
       "EXPIRED": "Expired"
     }
+  },
+  "virtualAccount": {
+    "title": "Bank transfer account",
+    "intro": "A bank account number for this bill alone: what the guest transfers to it is recorded here automatically.",
+    "phone": "Guest phone",
+    "sendByEmail": "Email the details to the guest",
+    "issue": "Get an account number",
+    "details": "{{bank}} · {{number}} · {{name}}",
+    "copy": "Copy details",
+    "emailed": "Details emailed to {{email}}."
+  },
+  "unmatched": {
+    "title": "Unmatched transfers",
+    "intro": "Money sent to a bank transfer account that no open bill could take. Match each one to a folio within 24 hours.",
+    "none": "Nothing waiting to be matched.",
+    "toMatch": "Transfers to match",
+    "matched": "Matched",
+    "unknownSender": "Unknown sender",
+    "overdue": "Over 24 hours",
+    "findFolio": "Find a folio for {{amount}}",
+    "find": "Folio, guest or room",
+    "note": "Note (optional)",
+    "search": "Find",
+    "noFolio": "No open folio found.",
+    "room": "room {{room}}",
+    "matchHere": "Match here"
   }
 }

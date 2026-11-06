@@ -27,7 +27,7 @@ export const TEST_CONFIG: Config = {
   cookieDomain: undefined,
   cookieSecure: false,
   localFilesDir: path.join(os.tmpdir(), 'hotel-test-files'),
-  payments: { provider: 'fake', secretKey: null },
+  payments: { provider: 'fake', secretKey: null, webhookSecret: null },
 };
 
 /** `Origin` the API accepts on non-GET requests (middleware step 6). */

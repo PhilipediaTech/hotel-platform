@@ -43,6 +43,11 @@ export const DEMO_DAY_USE = 2_000_000n;
 export interface SeedOptions {
   /** Password for demo users that have none yet (local sign-in). Omit to leave them without. */
   password?: string | undefined;
+  /**
+   * The demo owner's WhatsApp number (T-024), so approval codes reach a real phone. Must be
+   * in international format; a number another user already has is left alone.
+   */
+  ownerPhone?: string | undefined;
 }
 
 export async function seed(db: Db, options: SeedOptions = {}): Promise<void> {
@@ -112,6 +117,15 @@ export async function seed(db: Db, options: SeedOptions = {}): Promise<void> {
     });
     if (passwordHash && !user.passwordHash) {
       await db.user.update({ where: { id: user.id }, data: { passwordHash } });
+    }
+    if (r.slug === 'owner' && options.ownerPhone && user.phone !== options.ownerPhone) {
+      if (!/^\+[1-9]\d{6,14}$/.test(options.ownerPhone)) {
+        throw new Error('SEED_OWNER_PHONE must be in international format, e.g. +2348012345678');
+      }
+      const taken = await db.user.findUnique({ where: { phone: options.ownerPhone } });
+      if (!taken) {
+        await db.user.update({ where: { id: user.id }, data: { phone: options.ownerPhone } });
+      }
     }
 
     const propertyId = r.orgWide ? null : DEMO_PROPERTY_ID;
@@ -393,7 +407,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   }
   const db = createDb(url);
   try {
-    await seed(db, { password: process.env.SEED_USER_PASSWORD });
+    await seed(db, {
+      password: process.env.SEED_USER_PASSWORD,
+      ownerPhone: process.env.SEED_OWNER_PHONE,
+    });
     const how = process.env.SEED_USER_PASSWORD
       ? 'sign in with SEED_USER_PASSWORD from .env'
       : 'SEED_USER_PASSWORD is not set, so demo users have no password';

@@ -44,6 +44,24 @@ const envSchema = z.object({
     .optional(),
   // Webhook signing key (runbook); Paystack signs with the secret key, the default.
   PAYMENT_WEBHOOK_SECRET: z.string().min(16).optional(),
+  // WhatsApp (T-024, ADR-016; Meta Cloud API): `fake` locally and in tests, `meta` with the
+  // system-user token and the sender's phone number ID from the developer site.
+  WHATSAPP_PROVIDER: z.enum(['fake', 'meta']).default('fake'),
+  WHATSAPP_TOKEN: z.string().min(20, 'WHATSAPP_TOKEN looks too short').optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z
+    .string()
+    .regex(/^\d{5,20}$/, 'WHATSAPP_PHONE_NUMBER_ID is the number ID, digits only')
+    .optional(),
+  WHATSAPP_BUSINESS_ACCOUNT_ID: z
+    .string()
+    .regex(/^\d{5,20}$/, 'WHATSAPP_BUSINESS_ACCOUNT_ID is digits only')
+    .optional(),
+  WHATSAPP_APP_SECRET: z.string().min(16).optional(),
+  WHATSAPP_VERIFY_TOKEN: z.string().min(16).optional(),
+  WHATSAPP_GRAPH_VERSION: z
+    .string()
+    .regex(/^v\d+\.\d+$/, 'WHATSAPP_GRAPH_VERSION looks like v23.0')
+    .default('v23.0'),
 });
 
 const PLACEHOLDER_SECRET = /^dev-only-/;
@@ -74,6 +92,16 @@ export interface Config {
     secretKey: string | null;
     /** Signs webhooks; null = the secret key (Paystack). */
     webhookSecret: string | null;
+  };
+  /** The WhatsApp provider and its Meta settings (null for the fake). */
+  whatsapp: {
+    provider: 'fake' | 'meta';
+    token: string | null;
+    phoneNumberId: string | null;
+    businessAccountId: string | null;
+    appSecret: string | null;
+    verifyToken: string | null;
+    graphVersion: string;
   };
 }
 
@@ -115,6 +143,14 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   if (e.NODE_ENV === 'production' && e.PAYMENT_PROVIDER === 'fake') {
     throw new Error('Invalid environment configuration:\n✖ PAYMENT_PROVIDER=fake in production');
   }
+  if (e.WHATSAPP_PROVIDER === 'meta' && (!e.WHATSAPP_TOKEN || !e.WHATSAPP_PHONE_NUMBER_ID)) {
+    throw new Error(
+      'Invalid environment configuration:\n✖ WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID are required with WHATSAPP_PROVIDER=meta',
+    );
+  }
+  if (e.NODE_ENV === 'production' && e.WHATSAPP_PROVIDER === 'fake') {
+    throw new Error('Invalid environment configuration:\n✖ WHATSAPP_PROVIDER=fake in production');
+  }
   return {
     nodeEnv: e.NODE_ENV,
     port: e.PORT,
@@ -134,6 +170,15 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       provider: e.PAYMENT_PROVIDER,
       secretKey: e.PAYMENT_SECRET_KEY ?? null,
       webhookSecret: e.PAYMENT_WEBHOOK_SECRET ?? null,
+    },
+    whatsapp: {
+      provider: e.WHATSAPP_PROVIDER,
+      token: e.WHATSAPP_TOKEN ?? null,
+      phoneNumberId: e.WHATSAPP_PHONE_NUMBER_ID ?? null,
+      businessAccountId: e.WHATSAPP_BUSINESS_ACCOUNT_ID ?? null,
+      appSecret: e.WHATSAPP_APP_SECRET ?? null,
+      verifyToken: e.WHATSAPP_VERIFY_TOKEN ?? null,
+      graphVersion: e.WHATSAPP_GRAPH_VERSION,
     },
   };
 }

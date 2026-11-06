@@ -11,6 +11,7 @@ import { createFakeEmailProvider } from '../src/core/email.ts';
 import { createLocalFileStore } from '../src/core/files.ts';
 import { createLogger } from '../src/core/logger.ts';
 import { createFakePaymentProvider } from '../src/core/payments.ts';
+import { createFakeMessageProvider } from '../src/core/messaging.ts';
 import type { ApprovalActionHandler } from '../src/core/approvals.ts';
 
 export const TEST_CONFIG: Config = {
@@ -28,6 +29,15 @@ export const TEST_CONFIG: Config = {
   cookieSecure: false,
   localFilesDir: path.join(os.tmpdir(), 'hotel-test-files'),
   payments: { provider: 'fake', secretKey: null, webhookSecret: null },
+  whatsapp: {
+    provider: 'fake',
+    token: null,
+    phoneNumberId: null,
+    businessAccountId: null,
+    appSecret: null,
+    verifyToken: null,
+    graphVersion: 'v23.0',
+  },
 };
 
 /** `Origin` the API accepts on non-GET requests (middleware step 6). */
@@ -63,18 +73,20 @@ export function buildTestApp(routes?: Router, options: TestAppOptions = {}) {
     secret: TEST_CONFIG.sessionSecret,
     clock: options.clock ?? systemClock,
   });
+  const messages = createFakeMessageProvider();
   const app = createApp({
     config: TEST_CONFIG,
     logger,
     db: options.db ?? unusedDb,
     email,
     payments,
+    messages,
     files,
     ...(options.clock ? { clock: options.clock } : {}),
     ...(routes ? { routes } : {}),
     ...(options.approvalHandlers ? { approvalHandlers: options.approvalHandlers } : {}),
   });
-  return { app, logLines, logger, email, payments, files };
+  return { app, logLines, logger, email, payments, messages, files };
 }
 
 /** Typed access to an error envelope in a Supertest response. */

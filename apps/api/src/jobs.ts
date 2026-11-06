@@ -7,11 +7,11 @@ import type { FileStore } from './core/files.ts';
 import type { JobDefinition } from './core/jobs.ts';
 import type { EventHandler } from './core/outbox.ts';
 import type { PaymentProvider } from './core/payments.ts';
-import {
-  approvalExpiryJob,
-  approvalOtpHandler,
-  createLoggingOtpChannel,
-} from './modules/approvals/jobs.ts';
+import type { Clock } from './core/clock.ts';
+import type { EmailProvider } from './core/email.ts';
+import type { MessageProvider } from './core/messaging.ts';
+import { approvalExpiryJob, approvalOtpHandler } from './modules/approvals/jobs.ts';
+import { notificationSendHandler, whatsappOtpChannel } from './modules/notifications/delivery.ts';
 import { fileScanJob } from './modules/files/jobs.ts';
 import { inventoryJob } from './modules/availability/inventory.ts';
 import { idPurgeJob } from './modules/reservations/check-in.ts';
@@ -47,17 +47,28 @@ export function workerJobs(deps: {
   ];
 }
 
-export function eventHandlers(deps: { db: Db; config: Config; logger: Logger }): EventHandler[] {
+export function eventHandlers(deps: {
+  db: Db;
+  config: Config;
+  logger: Logger;
+  clock: Clock;
+  messages: MessageProvider;
+  email: EmailProvider;
+}): EventHandler[] {
+  const send = {
+    db: deps.db,
+    messages: deps.messages,
+    email: deps.email,
+    clock: deps.clock,
+    logger: deps.logger,
+  };
   return [
-    // Stub channel until WhatsApp (T-024); never logs codes in production.
-    ...(deps.config.nodeEnv === 'production'
-      ? []
-      : [
-          approvalOtpHandler({
-            db: deps.db,
-            otpSecret: deps.config.sessionSecret,
-            channel: createLoggingOtpChannel(deps.logger),
-          }),
-        ]),
+    // Approval codes by WhatsApp (T-024; production refuses the fake, which logs them).
+    approvalOtpHandler({
+      db: deps.db,
+      otpSecret: deps.config.sessionSecret,
+      channel: whatsappOtpChannel(send),
+    }),
+    notificationSendHandler(send),
   ];
 }

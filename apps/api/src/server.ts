@@ -6,6 +6,7 @@ import { createFakeEmailProvider } from './core/email.ts';
 import { createLocalFileStore } from './core/files.ts';
 import { createLogger } from './core/logger.ts';
 import { createPaymentProvider } from './core/payment-provider.ts';
+import { createMessageProvider } from './core/message-provider.ts';
 
 let config;
 try {
@@ -34,7 +35,9 @@ const files = createLocalFileStore({
 });
 // Payment links: Paystack with its key, or the fake (its links open a development page).
 const payments = createPaymentProvider(config, logger);
-const app = createApp({ config, logger, db, email, payments, files });
+// WhatsApp: Meta with its token, or the fake (the API only checks webhooks; the worker sends).
+const messages = createMessageProvider(config, logger);
+const app = createApp({ config, logger, db, email, payments, messages, files });
 
 const server = app.listen(config.port, (err?: Error) => {
   if (err) {

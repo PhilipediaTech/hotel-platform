@@ -148,6 +148,10 @@ export function mountRoute<R extends RouteContract>(
       res.status(204).end();
       return;
     }
+    if (route.produces === 'text/plain') {
+      res.status(status).type('text/plain').send(String(out));
+      return;
+    }
     if (route.produces) {
       const file = out as { filename: string; content: Uint8Array };
       res

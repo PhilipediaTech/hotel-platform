@@ -68,6 +68,10 @@ export const TENANT_MODELS: Record<string, Scope> = {
   CashierShift: { kind: 'property' },
   LeakageAlert: { kind: 'property' },
   LeakageRule: { kind: 'property' },
+  // An organisation's own wording of its messages (T-024).
+  MessageTemplate: { kind: 'organisation' },
+  // Messages sent for a property; organisation-level ones (no property) are the worker's.
+  NotificationDelivery: { kind: 'property' },
   // Alert outcomes have no property column (tab 3): reach them through their (scoped) alert.
   // Steps are written through their run.
   NightAuditRun: { kind: 'property' },

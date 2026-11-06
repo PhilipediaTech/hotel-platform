@@ -1,0 +1,55 @@
+{
+  "messages": {
+    "title": "Messages",
+    "intro": "The wording of every message the hotel sends. Email wording can be changed per language; WhatsApp wording is approved by Meta.",
+    "noAccess": "Template settings need the “Manage message templates” permission. Sending messages to guests from their booking comes later.",
+    "templates": "Templates",
+    "audience": {
+      "GUEST": "To guests",
+      "STAFF": "To staff"
+    },
+    "channel": {
+      "EMAIL": "Email",
+      "WHATSAPP": "WhatsApp",
+      "SMS": "SMS"
+    },
+    "customised": "Your wording",
+    "default": "Default wording",
+    "readOnly": "Approved by Meta as {{name}} ({{category}}). It can’t be changed here.",
+    "language": "Language",
+    "addLanguage": "Write it in",
+    "subject": "Subject",
+    "body": "Text",
+    "variables": "You can use",
+    "save": "Save",
+    "saved": "Saved.",
+    "reset": "Back to the default",
+    "resetDone": "Back to the default wording.",
+    "preview": "With sample values",
+    "test": {
+      "title": "Send a test",
+      "to": "Send to",
+      "toPhone": "Phone, e.g. +2348012345678",
+      "toEmail": "Email address",
+      "send": "Send test",
+      "queued": "Test queued. Its status shows below.",
+      "codes": "Approval codes are sent only with a real approval request."
+    },
+    "deliveries": {
+      "title": "Recent messages",
+      "empty": "No messages yet.",
+      "test": "test",
+      "attempts_one": "{{count}} try",
+      "attempts_other": "{{count}} tries",
+      "more": "Show more",
+      "refresh": "Refresh"
+    },
+    "status": {
+      "QUEUED": "Queued",
+      "SENT": "Sent",
+      "DELIVERED": "Delivered",
+      "READ": "Read",
+      "FAILED": "Failed"
+    }
+  }
+}

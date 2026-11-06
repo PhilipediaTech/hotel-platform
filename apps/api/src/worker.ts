@@ -7,6 +7,8 @@ import { createFakeFileScanner } from './core/file-scan.ts';
 import { createLocalFileStore } from './core/files.ts';
 import { eventHandlers, workerJobs } from './jobs.ts';
 import { createPaymentProvider } from './core/payment-provider.ts';
+import { createMessageProvider } from './core/message-provider.ts';
+import { createFakeEmailProvider } from './core/email.ts';
 
 // Worker entry (tab 2: one process for HTTP, one for jobs; T-021): scheduled jobs, outbox
 // handlers and the outbox publisher. Needs the same environment as the API.
@@ -45,7 +47,15 @@ try {
       scanner: createFakeFileScanner(),
       payments: createPaymentProvider(config, logger),
     }),
-    handlers: eventHandlers({ db, config, logger }),
+    // Email: the fake logs messages until the SES adapter (AWS account; production stops above).
+    handlers: eventHandlers({
+      db,
+      config,
+      logger,
+      clock: systemClock,
+      messages: createMessageProvider(config, logger),
+      email: createFakeEmailProvider(logger),
+    }),
   });
 } catch (err) {
   logger.fatal({ err }, 'Worker failed to start');

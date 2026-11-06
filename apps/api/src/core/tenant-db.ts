@@ -77,6 +77,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   RoomStatusReport: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
+  HandoverNote: { kind: 'property' },
   // Task events have no property column (tab 3): reach them through their (scoped) task.
   RegistrationCard: { kind: 'property' },
   // Components have no property column: reach them through their (scoped) rate plan.

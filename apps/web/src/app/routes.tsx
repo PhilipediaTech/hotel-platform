@@ -69,6 +69,9 @@ const QrFaultPage = lazy(() =>
 const HandoversPage = lazy(() =>
   import('../routes/handovers.tsx').then((m) => ({ default: m.HandoversPage })),
 );
+const LeakagePage = lazy(() =>
+  import('../routes/leakage.tsx').then((m) => ({ default: m.LeakagePage })),
+);
 const CheckOutPage = lazy(() =>
   import('../routes/check-out.tsx').then((m) => ({ default: m.CheckOutPage })),
 );
@@ -93,6 +96,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/tasks': <TasksPage />,
   '/tasks/new': <NewTaskPage />,
   '/handovers': <HandoversPage />,
+  '/leakage': <LeakagePage />,
   '/reservations': <ReservationsPage />,
   '/calendar': <CalendarPage />,
   '/bookings/new': <NewBookingPage />,

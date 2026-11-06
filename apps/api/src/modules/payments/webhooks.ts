@@ -9,6 +9,7 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { PaymentEvent, PaymentProvider } from '../../core/payments.ts';
 import { parsePaystackEvent } from '../../core/paystack-events.ts';
+import { numberParam, raiseAlert, ruleSettings, type RuleSettings } from '../leakage/engine.ts';
 import { settleIntent, systemShift } from './intents.ts';
 
 // Payment webhooks (tab 4 POST /webhooks/payments/{provider}; M4 rules 4–7 and the AC
@@ -317,50 +318,121 @@ async function payToAccount(deps: WebhookDeps, account: Account, event: Charged)
   }
 }
 
+const HOUR_MS = 3_600_000;
+/** Manual transfers older than the longest setting plus a week were looked at already. */
+const MANUAL_LOOKBACK_MS = (720 + 168) * HOUR_MS;
+
 /**
- * M4 rule 7: a transfer unmatched for 24 hours raises one Leakage Guard alert. Answers how
- * many were raised.
+ * Core rule "unmatched transfer" (M4 rule 7; M6 leakage rules; T-071, T-090), checked hourly.
+ * One alert per transfer still waiting in the queue after the rule's hours (default 24), and,
+ * as Philip decided on 2026-11-10 (spec issue 20), one per bank transfer typed in at the desk
+ * (provider MANUAL) that many hours after it was recorded: no provider confirmed it, and bank
+ * matching is V1.1, so the owner checks it against the bank. Answers how many were raised.
  */
 export async function unmatchedTransferAlerts(db: Db, clock: Clock): Promise<number> {
-  const now = clock();
-  const overdue = await db.unmatchedTransfer.findMany({
-    where: { matchedPaymentId: null, receivedAt: { lte: new Date(now.getTime() - 86_400_000) } },
-    include: { property: true },
+  const now = clock().getTime();
+  const settings = new Map<string, Promise<RuleSettings>>();
+  const settingsOf = (propertyId: string) => {
+    let s = settings.get(propertyId);
+    if (!s) {
+      s = ruleSettings(db, propertyId, 'UNMATCHED_TRANSFER');
+      settings.set(propertyId, s);
+    }
+    return s;
+  };
+  const due = async (propertyId: string, at: Date) => {
+    const s = await settingsOf(propertyId);
+    return s.enabled && at.getTime() <= now - numberParam(s, 'hours') * HOUR_MS;
+  };
+
+  const waiting = await db.unmatchedTransfer.findMany({
+    where: { matchedPaymentId: null, receivedAt: { lte: new Date(now - HOUR_MS) } },
+    include: { property: { select: { organisationId: true } } },
   });
+  const manual = await db.payment.findMany({
+    where: {
+      method: 'BANK_TRANSFER',
+      provider: 'MANUAL',
+      amountMinor: { gt: 0 },
+      matchedTransfer: null,
+      createdAt: { lte: new Date(now - HOUR_MS), gte: new Date(now - MANUAL_LOOKBACK_MS) },
+    },
+    include: {
+      property: { select: { organisationId: true } },
+      folio: { select: { number: true } },
+    },
+  });
+  const keys = [
+    ...waiting.map((t) => `UNMATCHED_TRANSFER:${t.id}`),
+    ...manual.map((p) => `UNMATCHED_TRANSFER:payment:${p.id}`),
+  ];
+  const raisedBefore = new Set(
+    (
+      await db.leakageAlert.findMany({
+        where: { dedupeKey: { in: keys } },
+        select: { propertyId: true, dedupeKey: true },
+      })
+    ).map((a) => `${a.propertyId} ${a.dedupeKey}`),
+  );
+
   let raised = 0;
-  for (const t of overdue) {
-    const date = await businessDate(db, t.propertyId, clock);
+  for (const t of waiting) {
     const dedupeKey = `UNMATCHED_TRANSFER:${t.id}`;
-    const exists = await db.leakageAlert.findFirst({
-      where: { propertyId: t.propertyId, dedupeKey },
-    });
-    if (exists) continue;
-    await db.$transaction(async (tx) => {
-      const alert = await tx.leakageAlert.create({
-        data: {
-          propertyId: t.propertyId,
-          ruleCode: 'UNMATCHED_TRANSFER',
-          businessDate: dbDate(date),
-          severity: 'HIGH',
-          entityType: 'unmatched_transfer',
-          entityId: t.id,
-          evidence: {
-            reference: t.externalRef,
-            amountMinor: t.amountMinor.toString(),
-            senderName: t.senderName,
-            receivedAt: t.receivedAt.toISOString(),
-          },
-          dedupeKey,
-        },
-      });
-      await recordEvent(tx, {
-        organisationId: t.property.organisationId,
+    if (raisedBefore.has(`${t.propertyId} ${dedupeKey}`)) continue;
+    if (!(await due(t.propertyId, t.receivedAt))) continue;
+    const date = await businessDate(db, t.propertyId, clock);
+    const id = await db.$transaction((tx) =>
+      raiseAlert(tx, {
         propertyId: t.propertyId,
-        type: 'leakage.alert_raised',
-        payload: { alertId: alert.id, ruleCode: 'UNMATCHED_TRANSFER', transferId: t.id },
-      });
-    });
-    raised += 1;
+        organisationId: t.property.organisationId,
+        ruleCode: 'UNMATCHED_TRANSFER',
+        businessDate: date,
+        severity: 'HIGH',
+        entityType: 'unmatched_transfer',
+        entityId: t.id,
+        evidence: {
+          source: 'QUEUE',
+          reference: t.externalRef,
+          amountMinor: t.amountMinor.toString(),
+          senderName: t.senderName,
+          receivedAt: t.receivedAt.toISOString(),
+        },
+        dedupeKey,
+        event: { transferId: t.id },
+      }),
+    );
+    if (id) raised += 1;
+  }
+  for (const p of manual) {
+    const dedupeKey = `UNMATCHED_TRANSFER:payment:${p.id}`;
+    if (raisedBefore.has(`${p.propertyId} ${dedupeKey}`)) continue;
+    if (!(await due(p.propertyId, p.createdAt))) continue;
+    const date = await businessDate(db, p.propertyId, clock);
+    const id = await db.$transaction((tx) =>
+      raiseAlert(tx, {
+        propertyId: p.propertyId,
+        organisationId: p.property.organisationId,
+        ruleCode: 'UNMATCHED_TRANSFER',
+        businessDate: date,
+        severity: 'NORMAL',
+        entityType: 'payment',
+        entityId: p.id,
+        subjectUserId: p.receivedById,
+        evidence: {
+          source: 'MANUAL',
+          reference: p.externalRef,
+          amountMinor: p.amountMinor.toString(),
+          currency: p.currency,
+          folioId: p.folioId,
+          folio: p.folio?.number ?? null,
+          reservationId: p.reservationId,
+          recordedAt: p.createdAt.toISOString(),
+        },
+        dedupeKey,
+        event: { paymentId: p.id },
+      }),
+    );
+    if (id) raised += 1;
   }
   return raised;
 }

@@ -67,6 +67,8 @@ export const TENANT_MODELS: Record<string, Scope> = {
   // Counts and handovers are written through their shift.
   CashierShift: { kind: 'property' },
   LeakageAlert: { kind: 'property' },
+  LeakageRule: { kind: 'property' },
+  // Alert outcomes have no property column (tab 3): reach them through their (scoped) alert.
   // Steps are written through their run.
   NightAuditRun: { kind: 'property' },
   RoomChargePosting: { kind: 'property' },

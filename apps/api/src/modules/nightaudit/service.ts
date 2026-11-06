@@ -1,4 +1,5 @@
 import {
+  LEAKAGE_ALERT_LABELS,
   localDate,
   NIGHT_AUDIT_REPORTS,
   NIGHT_AUDIT_STEPS,
@@ -21,7 +22,7 @@ import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { money } from '../payments/documents.ts';
-import { reversalPattern } from './leakage.ts';
+import { rateOverride, reversalPattern } from './leakage.ts';
 import { markNoShow } from './no-shows.ts';
 import {
   buildReports,
@@ -368,14 +369,11 @@ async function lockRates({ deps, date }: Env): Promise<Outcome> {
   return { exceptions: [], result: { lockedNow: locked.count, rates } };
 }
 
-const RULE_LABEL: Record<string, string> = {
-  SHIFT_VARIANCE: 'Cash variance',
-  REVERSAL_PATTERN: 'Reversal pattern',
-};
-
 /** Step 8: the leakage rules that look at the day; the day's alerts are listed for review. */
 async function leakage({ deps, date }: Env): Promise<Outcome> {
-  const raised = await deps.tenantDb.$transaction((tx) => reversalPattern(tx, date));
+  const raised = await deps.tenantDb.$transaction(
+    async (tx) => (await reversalPattern(tx, date)) + (await rateOverride(tx, date)),
+  );
   const alerts = await deps.tenantDb.leakageAlert.findMany({
     where: { businessDate: dbDate(date) },
     include: { subjectUser: { select: { name: true } } },
@@ -388,11 +386,13 @@ async function leakage({ deps, date }: Env): Promise<Outcome> {
     const detail =
       a.ruleCode === 'REVERSAL_PATTERN'
         ? `${who}: ${String(evidence['reversals'])} reversals, ${money(BigInt(total), 'NGN')}`
-        : who;
+        : a.ruleCode === 'RATE_OVERRIDE'
+          ? `room ${String(evidence['room'])}, night of ${String(evidence['night'])}`
+          : who;
     return {
       type: a.ruleCode,
       blocking: false,
-      message: `${RULE_LABEL[a.ruleCode] ?? a.ruleCode} (${a.severity.toLowerCase()}): ${detail}`,
+      message: `${LEAKAGE_ALERT_LABELS[a.ruleCode] ?? a.ruleCode} (${a.severity.toLowerCase()}): ${detail}`,
       ...(a.entityType === 'cashier_shift' ? { shiftId: a.entityId } : {}),
       subject: who,
     };

@@ -11,6 +11,10 @@ import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
+import housekeepingStrings from '../i18n/en/housekeeping.json';
+import { registerStrings } from '../i18n/index.ts';
+
+registerStrings(housekeepingStrings);
 
 // S16 Room board and S17 My rooms (PRD M5-01–M5-04; T-080). The board shows every room with
 // its housekeeping and front-office status, today's clean, attendant and priority, by floor;

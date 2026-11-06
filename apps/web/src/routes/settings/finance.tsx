@@ -29,6 +29,10 @@ import { apiFieldErrors, errorMessage } from '../../lib/form.ts';
 import { Field } from '../auth/layout.tsx';
 import { ExchangeRatesTab } from './exchange-rates.tsx';
 import { fieldErrorsOf, serverErrors, validated, type FieldErrors } from './room-form.ts';
+import financeStrings from '../../i18n/en/finance.json';
+import { registerStrings } from '../../i18n/index.ts';
+
+registerStrings(financeStrings);
 
 // S25 Tax, revenue codes and FX (PRD M4-17; T-032): tax rules with dated versions, the
 // revenue codes they apply to, and a worked example from the shared calculator. New

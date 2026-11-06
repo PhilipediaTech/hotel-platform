@@ -11,6 +11,10 @@ import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { useFormats } from './reservations.tsx';
+import paymentsStrings from '../i18n/en/payments.json';
+import { registerStrings } from '../i18n/index.ts';
+
+registerStrings(paymentsStrings);
 
 // S14 Cashier shift (PRD M4-10–M4-12; T-061): open with a float, hand cash to a colleague or
 // the safe, close with a blind count (the expected amounts appear only after counting), give a

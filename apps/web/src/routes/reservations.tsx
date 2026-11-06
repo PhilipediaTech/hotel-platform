@@ -17,13 +17,19 @@ import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
-import { BookingDeposit, PrintProforma } from './folio-payments.tsx';
 import { canCheckIn, CheckInPanel, StayKeys, usePropertyToday } from './check-in.tsx';
 import { DayUseTimes, EndDayUse } from './day-use.tsx';
 
-// Loads on first use: the reservation screen is part of the first load (T-070).
+// Load on first use: the reservation screen is part of the first load (T-070), and these
+// bring the payment screens' code and strings with them.
 const PaymentLinks = lazy(() =>
   import('./payment-links.tsx').then((m) => ({ default: m.PaymentLinks })),
+);
+const BookingDeposit = lazy(() =>
+  import('./folio-payments.tsx').then((m) => ({ default: m.BookingDeposit })),
+);
+const PrintProforma = lazy(() =>
+  import('./folio-payments.tsx').then((m) => ({ default: m.PrintProforma })),
 );
 
 // S09 Reservations (PRD M3-01–M3-05; T-042): find reservations; a reservation's stays,
@@ -233,7 +239,9 @@ export function ReservationPage() {
       {can('folio.invoice') &&
         r.stays.some((s) => s.status !== 'CANCELLED' && s.status !== 'NO_SHOW') && (
           <div className="mt-2">
-            <PrintProforma reservationId={r.id} confirmationNo={r.confirmationNo} />
+            <Suspense fallback={null}>
+              <PrintProforma reservationId={r.id} confirmationNo={r.confirmationNo} />
+            </Suspense>
           </div>
         )}
       <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
@@ -261,7 +269,9 @@ export function ReservationPage() {
         )}
       </dl>
 
-      <BookingDeposit reservation={r} onPaid={refresh} />
+      <Suspense fallback={null}>
+        <BookingDeposit reservation={r} onPaid={refresh} />
+      </Suspense>
       {(r.status === 'TENTATIVE' || r.status === 'CONFIRMED') && can('payment.request') && (
         <Suspense fallback={null}>
           <PaymentLinks

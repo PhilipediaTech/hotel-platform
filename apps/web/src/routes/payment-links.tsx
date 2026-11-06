@@ -12,6 +12,12 @@ import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
 import { useFormats } from './reservations.tsx';
+import paymentLinksStrings from '../i18n/en/payment-links.json';
+import paymentsStrings from '../i18n/en/payments.json';
+import { registerStrings } from '../i18n/index.ts';
+
+registerStrings(paymentLinksStrings);
+registerStrings(paymentsStrings);
 
 // Payment links (PRD M4-08 "I send a payment link … to a guest by WhatsApp or email"; T-070):
 // the links asked for on a folio window or a booking's deposit, with their status; a new link

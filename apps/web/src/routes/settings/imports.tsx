@@ -18,6 +18,10 @@ import { api, ApiError } from '../../lib/api.ts';
 import { cn } from '../../lib/cn.ts';
 import { errorMessage } from '../../lib/form.ts';
 import { FileUploadError, uploadFile } from '../../lib/files.ts';
+import importsStrings from '../../i18n/en/imports.json';
+import { registerStrings } from '../../i18n/index.ts';
+
+registerStrings(importsStrings);
 
 // S03 Imports (PRD M1-03; T-034): download a template, upload the filled file, read the check
 // report, then apply it. Nothing is written until the user confirms.

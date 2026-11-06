@@ -1,0 +1,32 @@
+{
+  "paymentLinks": {
+    "title": "Payment links",
+    "new": "New payment link",
+    "email": "Guest email",
+    "sendByEmail": "Email it to the guest",
+    "create": "Create payment link",
+    "emailed": "Link emailed to {{email}}:",
+    "ready": "Link ready: copy it to the guest.",
+    "copy": "Copy link",
+    "copied": "Copied",
+    "check": "Check payment",
+    "sentTo": "sent to {{email}}, {{when}}",
+    "made": "made {{when}}",
+    "status": {
+      "CREATED": "Waiting",
+      "SUCCEEDED": "Paid",
+      "FAILED": "Failed",
+      "EXPIRED": "Expired"
+    }
+  },
+  "virtualAccount": {
+    "title": "Bank transfer account",
+    "intro": "A bank account number for this bill alone: what the guest transfers to it is recorded here automatically.",
+    "phone": "Guest phone",
+    "sendByEmail": "Email the details to the guest",
+    "issue": "Get an account number",
+    "details": "{{bank}} · {{number}} · {{name}}",
+    "copy": "Copy details",
+    "emailed": "Details emailed to {{email}}."
+  }
+}

@@ -13,6 +13,10 @@ import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
 import { PdfError, usePdf } from '../lib/pdf.tsx';
 import { useFormats } from './reservations.tsx';
+import paymentsStrings from '../i18n/en/payments.json';
+import { registerStrings } from '../i18n/index.ts';
+
+registerStrings(paymentsStrings);
 
 // Payments on the folio and its documents (PRD M4-08 and the receipt/invoice/proforma story;
 // S11 "take payment", "print/send invoice"; T-062): the window's payments with a receipt each,

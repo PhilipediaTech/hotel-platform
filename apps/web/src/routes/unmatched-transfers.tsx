@@ -11,6 +11,10 @@ import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { useFormats } from './reservations.tsx';
+import foliosStrings from '../i18n/en/folios.json';
+import { registerStrings } from '../i18n/index.ts';
+
+registerStrings(foliosStrings);
 
 // Unmatched transfers (PRD M4 rule 7; tab 4 GET /unmatched-transfers, POST
 // /unmatched-transfers/{id}/match; T-071), a view of the folios screen (S11): money that came

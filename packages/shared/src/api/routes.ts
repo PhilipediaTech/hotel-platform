@@ -21,6 +21,7 @@ import { RATE_ROUTES } from './rates.ts';
 import { RESERVATION_ROUTES } from './reservations.ts';
 import { ROOM_ROUTES } from './rooms.ts';
 import { SHIFT_ROUTES } from './shifts.ts';
+import { TASK_ROUTES } from './tasks.ts';
 import { TAX_ROUTES } from './tax.ts';
 import { VIRTUAL_ACCOUNT_ROUTES } from './virtual-accounts.ts';
 
@@ -61,6 +62,7 @@ export const API_ROUTES = {
   ...PAYMENT_INTENT_ROUTES,
   ...VIRTUAL_ACCOUNT_ROUTES,
   ...HOUSEKEEPING_ROUTES,
+  ...TASK_ROUTES,
   ...FX_ROUTES,
 } as const;
 

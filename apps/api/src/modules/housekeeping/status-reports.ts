@@ -12,6 +12,7 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
+import { dueFrom, insertTask, templateOfType } from '../tasks/service.ts';
 import type { HousekeepingDeps } from './service.ts';
 
 // Morning room-status report (PRD M5-05, M5 rule 6, M5 AC "a morning report marking a
@@ -20,8 +21,8 @@ import type { HousekeepingDeps } from './service.ts';
 // room; the latest of the business date is the room's report. A room reported in use (occupied,
 // slept-out, luggage, do-not-disturb) with no guest checked in raises OCCUPIED_NO_FOLIO; a room
 // reported vacant with a guest checked in raises VACANT_IN_HOUSE. The alert's dedupe key is
-// rule, date and room, so a room raises at most one per day. M5 rule 6's front-desk task is
-// made from the alert when the task engine lands (T-082).
+// rule, date and room, so a room raises at most one per day. Each alert also makes M5 rule 6's
+// DISCREPANCY task for the front desk (T-082), from the property's discrepancy template.
 
 type Client = TenantDb | Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
 type Rule = typeof OCCUPIED_NO_FOLIO | typeof VACANT_IN_HOUSE;
@@ -52,7 +53,12 @@ async function checkedIn(db: Client, roomIds?: string[]) {
       status: 'CHECKED_IN',
       roomId: roomIds ? { in: roomIds } : { not: null },
     },
-    select: { id: true, roomId: true, guest: { select: { firstName: true, lastName: true } } },
+    select: {
+      id: true,
+      roomId: true,
+      guestId: true,
+      guest: { select: { firstName: true, lastName: true } },
+    },
   });
   return new Map(stays.flatMap((s) => (s.roomId ? [[s.roomId, s] as const] : [])));
 }
@@ -170,6 +176,27 @@ export async function submitStatusReport(
           dedupeKey,
         } as unknown as Prisma.LeakageAlertUncheckedCreateInput, // tenant IDs come from the client
       });
+      // M5 rule 6: the front desk gets a task to sort it out.
+      const template = await templateOfType(tx, tenant.propertyId, 'DISCREPANCY');
+      if (template) {
+        const seen = e.observed.toLowerCase().replaceAll('_', ' ');
+        const guest = stay ? `${stay.guest.firstName} ${stay.guest.lastName}`.trim() : null;
+        await insertTask(tx, tenant.propertyId, {
+          type: 'DISCREPANCY',
+          templateId: template.id,
+          departmentId: template.departmentId,
+          title: `Room ${room?.number ?? ''}: reported ${seen}, front desk shows ${stay ? 'occupied' : 'vacant'}`,
+          description: guest
+            ? `Checked in: ${guest}. Check whether the guest has left.`
+            : 'No guest is checked in. Check who is using the room.',
+          priority: template.priority,
+          roomId: e.roomId,
+          stayId: stay?.id ?? null,
+          guestId: stay?.guestId ?? null,
+          dueAt: dueFrom(deps.clock(), template.slaMinutes),
+          reportedById: tenant.userId,
+        });
+      }
       discrepancy.set(e.roomId, rule);
       await recordEvent(tx, {
         type: 'leakage.alert_raised',

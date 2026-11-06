@@ -58,6 +58,14 @@ const HousekeepingPage = lazy(() =>
 const MyRoomsPage = lazy(() =>
   import('../routes/housekeeping.tsx').then((m) => ({ default: m.MyRoomsPage })),
 );
+const TasksPage = lazy(() => import('../routes/tasks.tsx').then((m) => ({ default: m.TasksPage })));
+const NewTaskPage = lazy(() =>
+  import('../routes/tasks.tsx').then((m) => ({ default: m.NewTaskPage })),
+);
+const TaskPage = lazy(() => import('../routes/tasks.tsx').then((m) => ({ default: m.TaskPage })));
+const QrFaultPage = lazy(() =>
+  import('../routes/tasks.tsx').then((m) => ({ default: m.QrFaultPage })),
+);
 const CheckOutPage = lazy(() =>
   import('../routes/check-out.tsx').then((m) => ({ default: m.CheckOutPage })),
 );
@@ -79,6 +87,8 @@ const SCREENS: Record<string, ReactElement> = {
   '/night-audit': <NightAuditPage />,
   '/housekeeping': <HousekeepingPage />,
   '/my-rooms': <MyRoomsPage />,
+  '/tasks': <TasksPage />,
+  '/tasks/new': <NewTaskPage />,
   '/reservations': <ReservationsPage />,
   '/calendar': <CalendarPage />,
   '/bookings/new': <NewBookingPage />,
@@ -157,6 +167,23 @@ export function buildRoutes(
                 </Suspense>
               ),
             },
+            {
+              path: 'tasks/:taskId',
+              element: (
+                <Suspense fallback={<Loading />}>
+                  <TaskPage />
+                </Suspense>
+              ),
+            },
+            // S19 is /q/:token (tab 5); the S24 stickers print /qr/<token>, so both open it.
+            ...['q/:token', 'qr/:token'].map((path) => ({
+              path,
+              element: (
+                <Suspense fallback={<Loading />}>
+                  <QrFaultPage />
+                </Suspense>
+              ),
+            })),
             {
               path: 'folios/:folioId',
               element: (

@@ -235,7 +235,7 @@ export const submitStatusReport = defineRoute({
     'Needs hk.work (attendants, M5-05) or hk.report. A room reported occupied (or slept-out, ' +
     'luggage, do-not-disturb) with no guest checked in raises OCCUPIED_NO_FOLIO; a room ' +
     'reported vacant with a guest checked in raises VACANT_IN_HOUSE. At most one alert per ' +
-    'room and business date. The front-desk task for it comes with the task engine (T-082).',
+    'room and business date; each alert also makes a DISCREPANCY task for the front desk.',
   tags: ['Housekeeping'],
   propertyScoped: true,
   idempotent: true,

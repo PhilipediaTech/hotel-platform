@@ -65,6 +65,15 @@ export const FILE_KINDS = [
     maxBytes: 1 * MB,
     retentionClass: 'STANDARD',
   }),
+  // Task photos: the fault, the work, the fix (M5-07, M6-03; T-082). Every member who
+  // reports or works tasks holds task.report.
+  k({
+    entityType: 'Task',
+    permission: 'task.report',
+    contentTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    maxBytes: 5 * MB,
+    retentionClass: 'STANDARD',
+  }),
 ] as const;
 
 export const FILE_ENTITY_TYPES = FILE_KINDS.map((kind) => kind.entityType) as [

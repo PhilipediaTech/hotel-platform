@@ -22,6 +22,7 @@ import {
   unmatchedTransferJob,
 } from './modules/payments/jobs.ts';
 import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
+import { taskEscalationJob } from './modules/tasks/jobs.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
 
@@ -42,6 +43,7 @@ export function workerJobs(deps: {
     ...(deps.payments.name === 'FAKE' ? [] : [paymentLinkCheckJob({ provider: deps.payments })]),
     paymentWebhookJob({ provider: deps.payments }),
     unmatchedTransferJob,
+    taskEscalationJob,
   ];
 }
 

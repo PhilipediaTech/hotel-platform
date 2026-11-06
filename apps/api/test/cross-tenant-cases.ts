@@ -632,6 +632,25 @@ async function bAccountUnchanged(db: Db, world: TenantWorld) {
   expect(transfers.map((t) => t.matchedPaymentId)).toEqual([null]);
 }
 
+/** B's room on its cleaning list (T-080). */
+async function bAssignment(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bRoom(db, world, propertyId);
+  const a = await db.hkAssignment.create({
+    data: {
+      propertyId,
+      businessDate: new Date('2099-01-01'),
+      roomId: theirs.roomId,
+      kind: 'DEPARTURE',
+    },
+  });
+  return { ...theirs, assignmentId: a.id };
+}
+
+async function bAssignmentUnchanged(db: Db, world: TenantWorld) {
+  const rows = await db.hkAssignment.findMany({ where: { propertyId: world.b1.id } });
+  expect(rows.map((r) => [r.status, r.attendantId, r.notes])).toEqual([['PENDING', null, null]]);
+}
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -1355,5 +1374,27 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bAccount,
     body: (theirs) => ({ folioId: theirs['folioId'] }),
     untouched: bAccountUnchanged,
+  },
+  getHousekeepingBoard: {
+    seed: bAssignment,
+    listIds: (body) =>
+      (body as { rooms: { roomId: string; assignment: { id: string } | null }[] }).rooms.flatMap(
+        (r) => [r.roomId, ...(r.assignment ? [r.assignment.id] : [])],
+      ),
+  },
+  assignRooms: {
+    seed: bAssignment,
+    creates: true,
+    body: (theirs) => ({ roomIds: [theirs['roomId']], attendantId: null }),
+    untouched: bAssignmentUnchanged,
+  },
+  listMyAssignments: {
+    seed: bAssignment,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((a) => a.id),
+  },
+  updateAssignment: {
+    seed: bAssignment,
+    body: () => ({ notes: 'Leak' }),
+    untouched: bAssignmentUnchanged,
   },
 };

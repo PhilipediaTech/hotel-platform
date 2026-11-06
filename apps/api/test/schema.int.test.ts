@@ -40,6 +40,7 @@ describe('migrations', () => {
       'folio_windows',
       'folios',
       'guests',
+      'hk_assignments',
       'id_documents',
       'idempotency_keys',
       'import_jobs',

@@ -9,6 +9,7 @@ import { FOLIO_ROUTES } from './folios.ts';
 import { FRONT_DESK_ROUTES } from './front-desk.ts';
 import { FX_ROUTES } from './fx.ts';
 import { GUEST_ROUTES } from './guests.ts';
+import { HOUSEKEEPING_ROUTES } from './housekeeping.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
 import { NIGHT_AUDIT_ROUTES } from './night-audit.ts';
@@ -59,6 +60,7 @@ export const API_ROUTES = {
   ...PAYMENT_ROUTES,
   ...PAYMENT_INTENT_ROUTES,
   ...VIRTUAL_ACCOUNT_ROUTES,
+  ...HOUSEKEEPING_ROUTES,
   ...FX_ROUTES,
 } as const;
 

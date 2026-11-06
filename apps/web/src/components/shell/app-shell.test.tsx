@@ -82,8 +82,8 @@ describe('routing', () => {
   });
 
   it('shows which ticket builds a screen', async () => {
-    renderApp('/my-rooms');
-    expect(await screen.findByText('Screen S17 arrives with T-080.')).toBeInTheDocument();
+    renderApp('/tasks');
+    expect(await screen.findByText('Screen S18 arrives with T-082.')).toBeInTheDocument();
   });
 
   it('shows a not-found page for unknown paths', async () => {
@@ -94,7 +94,7 @@ describe('routing', () => {
 
 describe('navigation by permission', () => {
   it('lists only permitted items in the left rail', async () => {
-    renderApp('/my-rooms', { permissions: ['hk.read', 'hk.work'] });
+    renderApp('/tasks', { permissions: ['hk.read', 'hk.work'] });
     const rail = await screen.findByRole('navigation', { name: 'Main navigation' });
     expect(
       within(rail)

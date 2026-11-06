@@ -29,6 +29,7 @@ import {
   type AuditReports,
 } from './reports.ts';
 import { postPackageNight, postRoomNight, PostingProblem } from './room-charges.ts';
+import { ensureCleaningList } from '../housekeeping/service.ts';
 
 // Night audit (PRD M4 rule 8 and its acceptance criteria; tab 4 POST /night-audits ●, GET
 // /night-audits/{id}, POST /night-audits/{id}/resume ●; open issue 14; T-073). A run walks
@@ -460,9 +461,16 @@ async function closeDay({ deps, tenant, date }: Env): Promise<Outcome> {
     });
     return true;
   });
+  // M5-02: the new day's cleaning list (every departure and stayover; M5 AC).
+  const listed = await ensureCleaningList(deps.tenantDb, tenant.propertyId, nextDate(date));
   return {
     exceptions: [],
-    result: { closed: date, opened: nextDate(date), closedNow: closed ? 1 : 0 },
+    result: {
+      closed: date,
+      opened: nextDate(date),
+      closedNow: closed ? 1 : 0,
+      cleaningList: listed,
+    },
   };
 }
 

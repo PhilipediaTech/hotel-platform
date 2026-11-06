@@ -281,8 +281,13 @@ export const CancelBody = z.object({
 });
 
 export const ReservationCancelled = ReservationItem.extend({
-  /** Cancellation fee per the plans' policies; posted to the folio with T-060. */
+  /** Cancellation fee per the plans' policies. */
   feeMinor: AmountMinor,
+  /**
+   * The folio the fee was posted on (T-074): only a guaranteed booking is charged; null when
+   * nothing was posted.
+   */
+  feeFolioId: Uuid.nullable(),
 }).meta({ id: 'ReservationCancelled' });
 
 export const cancelReservation = defineRoute({
@@ -300,11 +305,40 @@ export const cancelReservation = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+export const NoShowBody = z.object({
+  note: z.string().trim().max(500).nullable().default(null),
+});
+
+export const ReservationNoShow = ReservationItem.extend({
+  /** The no-show fee posted (guaranteed bookings only). */
+  feeMinor: AmountMinor,
+  feeFolioId: Uuid.nullable(),
+}).meta({ id: 'ReservationNoShow' });
+
+export const markNoShow = defineRoute({
+  operationId: 'markNoShow',
+  method: 'post',
+  path: '/reservations/{reservationId}/no-show',
+  summary: 'Mark the guests who did not arrive as no-shows; guaranteed bookings pay the fee',
+  description:
+    'Only after night audit of the arrival date (M3 rule); night audit does it for every ' +
+    'unarrived guest (step 6), so this is for one it has not handled.',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.noshow',
+  idempotent: true,
+  params: ReservationParams,
+  body: NoShowBody,
+  response: ReservationNoShow,
+  errors: ['STATE_TRANSITION_INVALID', 'AUDIT_IN_PROGRESS'],
+});
+
 export const reinstateReservation = defineRoute({
   operationId: 'reinstateReservation',
   method: 'post',
   path: '/reservations/{reservationId}/reinstate',
   summary: 'Bring back a cancelled reservation if its rooms are still free',
+  description: 'Its cancellation fees, if any were posted, are reversed (T-074).',
   tags: ['Reservations'],
   propertyScoped: true,
   permission: 'reservation.modify',
@@ -809,6 +843,7 @@ export const RESERVATION_ROUTES = {
   getReservation,
   updateReservation,
   cancelReservation,
+  markNoShow,
   reinstateReservation,
   getReservationHistory,
   getCalendar,

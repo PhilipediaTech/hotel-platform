@@ -14,6 +14,8 @@ export const SYSTEM_CODES = {
   FX: { name: 'Exchange difference', group: 'FX' },
   /** A guaranteed guest who never came (night audit step 6, T-073). */
   NOSHOW: { name: 'No-show fee', group: 'FEE' },
+  /** A cancellation fee per the plan's policy (T-074). */
+  CANCEL: { name: 'Cancellation fee', group: 'FEE' },
 } as const satisfies Record<string, { name: string; group: RevenueGroup }>;
 
 export type SystemCode = keyof typeof SYSTEM_CODES;

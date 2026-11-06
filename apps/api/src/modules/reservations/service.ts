@@ -33,6 +33,9 @@ import { propertyToday, releaseInventory, takeInventory } from '../availability/
 import type { QuoteNight } from '../availability/quotes.ts';
 import { enabledMethods } from '../folios/service.ts';
 import { followRoom, releaseAllocations } from './rooms.ts';
+import { postBookingFee, reverseBookingFees } from './fees.ts';
+import { markNoShow } from '../nightaudit/no-shows.ts';
+import { businessDate, postingDate } from '../../core/business-day.ts';
 
 // Reservations (PRD M3-01–M3-05, M3 rules 1 and 8; tab 4 row "Reservations"; T-042).
 // A stay is booked from a quote, so it keeps the quoted nights and prices (M2 rule 4). Every
@@ -869,8 +872,10 @@ export async function cancelReservation(
     const before = await loadFull(tx, reservationId);
     if (!canTransition(before.status, 'CANCELLED')) throw notAllowed(before.status, 'CANCELLED');
     const now = deps.clock();
-    const today = await propertyToday(tx, tenant.propertyId, deps.clock);
+    // The policy runs on the business date (night audit moves it, T-073).
+    const today = await businessDate(tx, tenant.propertyId, deps.clock);
     let feeMinor = 0n;
+    const fees: { stay: (typeof before.stays)[number]; fee: bigint }[] = [];
     const stays = live(before);
     for (const stay of stays) {
       const field = inventoryFieldOf(stay.status);
@@ -879,12 +884,14 @@ export async function cancelReservation(
       }
       // Only a confirmed booking owes a fee; a hold never does.
       if (stay.status === 'CONFIRMED' && !NO_FEE_REASONS.has(body.reason)) {
-        feeMinor += cancellationFee(
+        const fee = cancellationFee(
           stay.ratePlan.cancellationPolicy.rules as unknown as FeeRule[],
           stay.nights.map((n) => n.amountMinor),
           today,
           day(stay.arrival),
         ).feeMinor;
+        feeMinor += fee;
+        if (fee > 0n) fees.push({ stay, fee });
       }
     }
     await releaseAllocations(
@@ -896,6 +903,24 @@ export async function cancelReservation(
       data: { status: 'CANCELLED', roomId: null, version: { increment: 1 } },
     });
     const reason = body.note ? `${body.reason}: ${body.note}` : body.reason;
+    // T-074: a guaranteed booking is charged its fee on the stay's folio (the deposit moves
+    // onto it and pays it); a booking without a guarantee is only told what it would owe.
+    let folioId: string | null = null;
+    if (before.guarantee !== 'NONE' && fees.length > 0) {
+      const date = await postingDate(tx, tenant.propertyId, deps.clock);
+      const ctx = { tx, tenant, approvalRequestId: null, now };
+      for (const { stay, fee } of fees) {
+        const posted = await postBookingFee(ctx, {
+          stay,
+          code: 'CANCEL',
+          amountMinor: fee,
+          description: `Cancellation fee, arrival ${day(stay.arrival)}`,
+          businessDate: date,
+          clock: deps.clock,
+        });
+        folioId ??= posted;
+      }
+    }
     await tx.reservation.update({
       where: { id: reservationId },
       data: {
@@ -921,13 +946,74 @@ export async function cancelReservation(
       entityId: reservationId,
       reason,
       before: { status: before.status },
-      after: { status: 'CANCELLED', cancelReason: body.reason, feeMinor: feeMinor.toString() },
+      after: {
+        status: 'CANCELLED',
+        cancelReason: body.reason,
+        feeMinor: feeMinor.toString(),
+        feePosted: folioId !== null,
+        folioId,
+      },
     });
     await recordEvent(tx, {
       type: 'reservation.cancelled',
       payload: { reservationId, reason: body.reason, feeMinor: feeMinor.toString() },
     });
-    return { ...toItem(await loadFull(tx, reservationId)), feeMinor: feeMinor.toString() };
+    return {
+      ...toItem(await loadFull(tx, reservationId)),
+      feeMinor: feeMinor.toString(),
+      feeFolioId: folioId,
+    };
+  });
+}
+
+/**
+ * Marks a booking's unarrived stays as no-shows by hand (tab 4 POST /reservations/{id}/no-show
+ * ●; T-074): only once night audit has closed their arrival date (M3 rule). Night audit's
+ * step 6 does this for every unarrived guest; this is for one it has not handled.
+ */
+export async function noShowReservation(
+  deps: ReservationDeps,
+  tenant: TenantContext,
+  reservationId: string,
+  body: { note: string | null },
+) {
+  return deps.tenantDb.$transaction(async (tx) => {
+    const before = await loadFull(tx, reservationId);
+    const today = await businessDate(tx, tenant.propertyId, deps.clock);
+    const unarrived = before.stays.filter((s) => s.status === 'CONFIRMED');
+    const due = unarrived.filter((s) => day(s.arrival) < today);
+    if (due.length === 0) {
+      throw new AppError(
+        'STATE_TRANSITION_INVALID',
+        unarrived.length > 0
+          ? 'A no-show is marked once night audit has closed the arrival date'
+          : 'No guest on this booking is waiting to arrive',
+        { status: before.status },
+      );
+    }
+    const date = await postingDate(tx, tenant.propertyId, deps.clock);
+    const now = deps.clock();
+    let feeMinor = 0n;
+    let feeFolioId: string | null = null;
+    for (const stay of due) {
+      const done = await markNoShow(
+        { tx, tenant, approvalRequestId: null, now },
+        {
+          stayId: stay.id,
+          businessDate: date,
+          clock: deps.clock,
+          reason: body.note ? `Marked by the desk: ${body.note}` : 'Marked by the desk',
+        },
+      );
+      if (!done) continue;
+      feeMinor += done.feeMinor;
+      feeFolioId ??= done.folioId;
+    }
+    return {
+      ...toItem(await loadFull(tx, reservationId)),
+      feeMinor: feeMinor.toString(),
+      feeFolioId,
+    };
   });
 }
 
@@ -949,7 +1035,7 @@ export async function reinstateReservation(
       );
     }
     const now = deps.clock();
-    const today = await propertyToday(tx, tenant.propertyId, deps.clock);
+    const today = await businessDate(tx, tenant.propertyId, deps.clock);
     if (before.stays.some((s) => s.isDayUse)) {
       throw new AppError(
         'STATE_TRANSITION_INVALID',
@@ -989,12 +1075,21 @@ export async function reinstateReservation(
         },
       },
     });
+    // The booking stands again: its cancellation fees are reversed (T-074).
+    const reversed = await reverseBookingFees(
+      { tx, tenant, approvalRequestId: null, now },
+      {
+        stayIds: before.stays.map((s) => s.id),
+        reason: 'Reinstated',
+        businessDate: await postingDate(tx, tenant.propertyId, deps.clock),
+      },
+    );
     await recordAudit(tx, {
       action: 'reservation.reinstated',
       entityType: 'reservation',
       entityId: reservationId,
       before: { status: before.status, cancelReason: before.cancelReason },
-      after: { status: 'CONFIRMED' },
+      after: { status: 'CONFIRMED', feesReversed: reversed },
     });
     await recordEvent(tx, { type: 'reservation.reinstated', payload: { reservationId } });
     return toItem(await loadFull(tx, reservationId));

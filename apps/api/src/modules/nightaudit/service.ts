@@ -312,8 +312,8 @@ async function noShows({ deps, tenant, date }: Env): Promise<Outcome> {
     );
     if (fee !== null) {
       marked += 1;
-      if (fee > 0n) charged += 1;
-      fees += fee;
+      if (fee.feeMinor > 0n) charged += 1;
+      fees += fee.feeMinor;
     }
     fault(`no-show:${i + 1}`);
   }

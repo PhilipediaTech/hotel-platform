@@ -51,6 +51,12 @@ export function reservationRoutes(deps: checkIns.CheckInDeps): Router {
       await reservations.cancelReservation(deps, tenantFrom(tenant), params.reservationId, body),
     ),
   );
+  mountRoute(router, r.markNoShow, async ({ params, body }, { tenant, res }) =>
+    etag(
+      res,
+      await reservations.noShowReservation(deps, tenantFrom(tenant), params.reservationId, body),
+    ),
+  );
   mountRoute(router, r.reinstateReservation, async ({ params }, { tenant, res }) =>
     etag(
       res,

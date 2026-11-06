@@ -1038,6 +1038,7 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({ reason: 'OTHER' }),
     untouched: bReservationUnchanged,
   },
+  markNoShow: { seed: bReservation, body: () => ({}), untouched: bReservationUnchanged },
   reinstateReservation: { seed: bReservation, untouched: bReservationUnchanged },
   getReservationHistory: { seed: bReservation },
   listAssignableRooms: { seed: bReservation },

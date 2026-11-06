@@ -3603,6 +3603,19 @@
           },
           "feeMinor": {
             "$ref": "#/components/schemas/AmountMinor"
+          },
+          "feeFolioId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           }
         },
         "required": [
@@ -3625,7 +3638,307 @@
           "createdAt",
           "updatedAt",
           "version",
-          "feeMinor"
+          "feeMinor",
+          "feeFolioId"
+        ]
+      },
+      "ReservationNoShow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "confirmationNo": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ENQUIRY",
+              "TENTATIVE",
+              "CONFIRMED",
+              "CHECKED_IN",
+              "CHECKED_OUT",
+              "NO_SHOW",
+              "CANCELLED"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "WALK_IN",
+              "PHONE",
+              "EMAIL",
+              "WHATSAPP",
+              "DIRECT",
+              "OTA_MANUAL",
+              "OTA_CHANNEL",
+              "CORPORATE",
+              "TRAVEL_AGENT"
+            ]
+          },
+          "guarantee": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "DEPOSIT",
+              "CARD_ON_FILE",
+              "COMPANY"
+            ]
+          },
+          "holdExpiresAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "booker": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "firstName",
+              "lastName",
+              "phone",
+              "email"
+            ]
+          },
+          "company": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cancelReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cancelledAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "totalMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "depositDueMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "deposit": {
+            "type": "object",
+            "properties": {
+              "heldMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "receivedMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "paymentMethods": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CASH",
+                    "BANK_TRANSFER",
+                    "POS_TERMINAL",
+                    "MOBILE_MONEY",
+                    "VOUCHER"
+                  ]
+                }
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "RECEIVED",
+                        "APPLIED",
+                        "REFUNDED",
+                        "FORFEITED"
+                      ]
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    "businessDate": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "paymentId": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "method": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "externalRef": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "currency": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "refundableMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "amountMinor",
+                    "businessDate",
+                    "paymentId",
+                    "method",
+                    "externalRef",
+                    "currency",
+                    "refundableMinor"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "heldMinor",
+              "receivedMinor",
+              "paymentMethods",
+              "entries"
+            ]
+          },
+          "stays": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Stay"
+            }
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "feeMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "feeFolioId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "confirmationNo",
+          "status",
+          "source",
+          "guarantee",
+          "holdExpiresAt",
+          "booker",
+          "company",
+          "notes",
+          "cancelReason",
+          "cancelledAt",
+          "currency",
+          "totalMinor",
+          "depositDueMinor",
+          "deposit",
+          "stays",
+          "createdAt",
+          "updatedAt",
+          "version",
+          "feeMinor",
+          "feeFolioId"
         ]
       },
       "ReservationHistoryItem": {
@@ -17826,6 +18139,157 @@
         }
       }
     },
+    "/reservations/{reservationId}/no-show": {
+      "post": {
+        "operationId": "markNoShow",
+        "summary": "Mark the guests who did not arrive as no-shows; guaranteed bookings pay the fee",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Only after night audit of the arrival date (M3 rule); night audit does it for every unarrived guest (step 6), so this is for one it has not handled.",
+        "x-permission": "reservation.noshow",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "reservationId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "default": null
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationNoShow"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`, `AUDIT_IN_PROGRESS`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/reservations/{reservationId}/reinstate": {
       "post": {
         "operationId": "reinstateReservation",
@@ -17838,6 +18302,7 @@
             "session": []
           }
         ],
+        "description": "Its cancellation fees, if any were posted, are reversed (T-074).",
         "x-permission": "reservation.modify",
         "x-idempotent": true,
         "parameters": [

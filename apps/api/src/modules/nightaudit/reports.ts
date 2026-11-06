@@ -2,7 +2,6 @@ import type { NightAuditReportName } from '@hotel/shared';
 import type { Property } from '../../generated/prisma/client.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { folioBalances } from '../folios/service.ts';
-import { isSystemCode } from '../folios/system-codes.ts';
 import {
   facts,
   footer,
@@ -168,12 +167,7 @@ export async function buildReports(
   const byGroup = new Map<string, bigint>();
   for (const l of lines) {
     // Deposits and transfers move money between ledgers: they are not revenue.
-    if (
-      isSystemCode(l.revenueCode.code) &&
-      l.revenueCode.code !== 'FX' &&
-      l.revenueCode.code !== 'NOSHOW'
-    )
-      continue;
+    if (l.revenueCode.code === 'DEPOSIT' || l.revenueCode.code === 'TRANSFER') continue;
     byGroup.set(l.revenueCode.group, (byGroup.get(l.revenueCode.group) ?? 0n) + l.amountMinor);
   }
   const byMethod = (ps: typeof payments) => {

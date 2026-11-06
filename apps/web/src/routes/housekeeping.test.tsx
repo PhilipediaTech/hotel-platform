@@ -9,7 +9,7 @@ import { routes } from '../app/routes.tsx';
 import { setApiPropertyId } from '../lib/api.ts';
 import { LAGOS, makeMe, membership } from '../test/me-fixture.ts';
 
-// S16 Room board and S17 My rooms (PRD M5-01–M5-04; T-080).
+// S16 Room board and S17 My rooms (PRD M5-01–M5-05; T-080, morning report T-081).
 
 const json = (status: number, body?: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
@@ -52,6 +52,19 @@ const room = (n: number, extra: object = {}) => ({
   arrival: false,
   priority: 'NORMAL',
   assignment: assignment(n),
+  observed: null,
+  discrepancy: null,
+  ...extra,
+});
+
+const reported = (n: number, extra: object = {}) => ({
+  roomId: id(n),
+  number: String(100 + n),
+  floor: '1',
+  foStatus: 'VACANT',
+  observed: null,
+  reportedAt: null,
+  discrepancy: null,
   ...extra,
 });
 
@@ -66,6 +79,8 @@ beforeEach(() => {
   handlers = {
     'GET /me': () => json(200, makeMe({ memberships: [membership(LAGOS, permissions)] })),
     'GET /auth/device': () => json(200, { pinSwitchAvailable: false, deviceLabel: null }),
+    'GET /housekeeping/status-reports': () =>
+      json(200, { businessDate: '2026-11-10', floors: [], data: [] }),
   };
   vi.stubGlobal(
     'fetch',
@@ -104,6 +119,7 @@ describe('Room board (S16)', () => {
         rooms: [
           room(1, { foStatus: 'OCCUPIED', dueOut: true }),
           room(2, { arrival: true, priority: 'HIGH' }),
+          room(3, { observed: 'OCCUPIED', discrepancy: 'OCCUPIED_NO_FOLIO' }),
         ],
         attendants: [KEMI],
       });
@@ -113,6 +129,10 @@ describe('Room board (S16)', () => {
     const rooms = await screen.findByRole('list', { name: 'Rooms' });
     expect(within(rooms).getByText(/occupied · due out/)).toBeInTheDocument();
     expect(within(rooms).getByText('Priority: guest arriving')).toBeInTheDocument();
+    expect(within(rooms).getByText('Morning report: Occupied')).toBeInTheDocument();
+    expect(
+      within(rooms).getByText('Discrepancy: in use, but no guest is checked in'),
+    ).toBeInTheDocument();
     await user.click(within(rooms).getByRole('checkbox', { name: 'Select room 101' }));
     await user.click(within(rooms).getByRole('checkbox', { name: 'Select room 102' }));
     await user.selectOptions(screen.getByLabelText('Attendant'), KEMI.id);
@@ -158,5 +178,44 @@ describe('My rooms (S17)', () => {
         (c) => (c.body as { action?: string }).action ?? 'checklist',
       ),
     ).toEqual(['START', 'checklist', 'checklist', 'COMPLETE']);
+  }, 15_000);
+});
+
+describe('Morning report (S17)', () => {
+  it('sends what the attendant saw and says when a discrepancy is raised', async () => {
+    permissions = ['hk.work'];
+    handlers['GET /housekeeping/my-assignments'] = () =>
+      json(200, { businessDate: '2026-11-10', data: [] });
+    let rows = [reported(1, { foStatus: 'OCCUPIED' }), reported(2)];
+    handlers['GET /housekeeping/status-reports'] = () =>
+      json(200, { businessDate: '2026-11-10', floors: ['1'], data: rows });
+    handlers['POST /housekeeping/status-reports'] = () => {
+      rows = [
+        reported(1, { foStatus: 'OCCUPIED', observed: 'SLEPT_OUT' }),
+        reported(2, { observed: 'OCCUPIED', discrepancy: 'OCCUPIED_NO_FOLIO' }),
+      ];
+      return json(201, { businessDate: '2026-11-10', data: rows, alertsRaised: 1 });
+    };
+    const user = userEvent.setup();
+    renderAt('/my-rooms');
+    const send = await screen.findByRole('button', { name: 'Send report (0)' });
+    expect(send).toBeDisabled();
+    expect(screen.getByText('Front desk: occupied')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Room 101 status'), 'SLEPT_OUT');
+    await user.selectOptions(screen.getByLabelText('Room 102 status'), 'OCCUPIED');
+    await user.click(screen.getByRole('button', { name: 'Send report (2)' }));
+    expect(
+      await screen.findByText('Report sent. 1 discrepancy raised for the front desk.'),
+    ).toBeInTheDocument();
+    expect(sent('POST /housekeeping/status-reports')[0]?.body).toEqual({
+      entries: [
+        { roomId: id(1), observed: 'SLEPT_OUT' },
+        { roomId: id(2), observed: 'OCCUPIED' },
+      ],
+    });
+    expect(
+      await screen.findByText('Discrepancy: in use, but no guest is checked in'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send report (0)' })).toBeDisabled();
   }, 15_000);
 });

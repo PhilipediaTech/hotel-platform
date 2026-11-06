@@ -69,6 +69,7 @@ describe('migrations', () => {
       'room_allocations',
       'room_blocks',
       'room_charge_postings',
+      'room_status_reports',
       'room_type_inventory',
       'room_types',
       'rooms',

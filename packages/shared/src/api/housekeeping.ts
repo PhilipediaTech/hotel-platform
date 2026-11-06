@@ -9,11 +9,20 @@ import { Instant, IsoDate, Uuid } from './primitives.ts';
 // date has a cleaning list, one assignment per room: departures, stayovers, arrivals and a few
 // deep cleans, made when night audit opens the day (or on first look at the board). A
 // supervisor assigns rooms to attendants; the attendant starts, pauses and completes a room
-// against its checklist. Inspection (M5-06) and the morning room-status report (T-081) follow.
+// against its checklist. Inspection (M5-06) follows with V1.1.
 
 export const HK_TASK_KINDS = ['DEPARTURE', 'STAYOVER', 'ARRIVAL', 'DEEP_CLEAN'] as const;
 export const ASSIGNMENT_STATUSES = ['PENDING', 'IN_PROGRESS', 'PAUSED', 'DONE'] as const;
 export const HK_PRIORITIES = ['HIGH', 'NORMAL', 'LOW'] as const;
+/** What an attendant sees in a room on the morning round (tab 3 ObservedStatus). */
+export const OBSERVED_STATUSES = [
+  'OCCUPIED',
+  'VACANT',
+  'SLEPT_OUT',
+  'LUGGAGE_NO_GUEST',
+  'DO_NOT_DISTURB',
+] as const;
+export type ObservedStatus = (typeof OBSERVED_STATUSES)[number];
 export type HkTaskKind = (typeof HK_TASK_KINDS)[number];
 
 /** What an attendant ticks off for each kind of clean. */
@@ -79,6 +88,10 @@ export const BoardRoom = z
     /** HIGH when a guest arrives today and the room is not ready yet. */
     priority: z.enum(HK_PRIORITIES),
     assignment: HkAssignmentItem.nullable(),
+    /** The morning report of the business date (T-081), if any. */
+    observed: z.enum(OBSERVED_STATUSES).nullable(),
+    /** The discrepancy raised for the room today (T-081), if any. */
+    discrepancy: z.enum(['OCCUPIED_NO_FOLIO', 'VACANT_IN_HOUSE']).nullable(),
   })
   .meta({ id: 'BoardRoom' });
 
@@ -159,9 +172,88 @@ export const updateAssignment = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+// Morning room-status report (PRD M5-05, M5 rule 6 and the AC "a morning report marking a
+// PMS-vacant room as occupied creates exactly one discrepancy alert"; core leakage rule
+// "occupied without folio"; T-081). An attendant says what each room looks like; where that
+// disagrees with the front office, a discrepancy alert is raised once per room and day.
+
+/** Report says someone uses the room; the PMS has no guest in it (core leakage rule). */
+export const OCCUPIED_NO_FOLIO = 'OCCUPIED_NO_FOLIO';
+/** Report says vacant; the PMS has a guest in it (possible walk-out). */
+export const VACANT_IN_HOUSE = 'VACANT_IN_HOUSE';
+export const DISCREPANCY_RULES = [OCCUPIED_NO_FOLIO, VACANT_IN_HOUSE] as const;
+
+export const ReportedRoom = z
+  .object({
+    roomId: Uuid,
+    number: z.string(),
+    floor: z.string().nullable(),
+    /** Front office: a guest checked in to the room, or not. */
+    foStatus: z.enum(['OCCUPIED', 'VACANT']),
+    /** The latest report of the business date, if any. */
+    observed: z.enum(OBSERVED_STATUSES).nullable(),
+    reportedAt: Instant.nullable(),
+    /** The discrepancy raised for the room today, if any. */
+    discrepancy: z.enum(DISCREPANCY_RULES).nullable(),
+  })
+  .meta({ id: 'ReportedRoom' });
+
+export const listStatusReports = defineRoute({
+  operationId: 'listStatusReports',
+  method: 'get',
+  path: '/housekeeping/status-reports',
+  summary: 'Rooms with their morning report and discrepancy for the business date',
+  description:
+    'Added beyond tab 4 (T-081): the rooms to report on (S17). Needs hk.work (attendants) or ' +
+    'hk.report (supervisors).',
+  tags: ['Housekeeping'],
+  propertyScoped: true,
+  query: z.object({ floor: z.string().trim().max(20).optional() }),
+  response: z.object({
+    businessDate: IsoDate,
+    floors: z.array(z.string()),
+    data: z.array(ReportedRoom),
+  }),
+});
+
+export const StatusReportBody = z.object({
+  entries: z
+    .array(z.object({ roomId: Uuid, observed: z.enum(OBSERVED_STATUSES) }))
+    .min(1)
+    .max(300)
+    .refine((e) => new Set(e.map((x) => x.roomId)).size === e.length, {
+      message: 'Each room once',
+    }),
+});
+
+export const submitStatusReport = defineRoute({
+  operationId: 'submitStatusReport',
+  method: 'post',
+  path: '/housekeeping/status-reports',
+  summary: 'Submit the morning room-status report; mismatches raise discrepancy alerts',
+  description:
+    'Needs hk.work (attendants, M5-05) or hk.report. A room reported occupied (or slept-out, ' +
+    'luggage, do-not-disturb) with no guest checked in raises OCCUPIED_NO_FOLIO; a room ' +
+    'reported vacant with a guest checked in raises VACANT_IN_HOUSE. At most one alert per ' +
+    'room and business date. The front-desk task for it comes with the task engine (T-082).',
+  tags: ['Housekeeping'],
+  propertyScoped: true,
+  idempotent: true,
+  status: 201,
+  body: StatusReportBody,
+  response: z.object({
+    businessDate: IsoDate,
+    data: z.array(ReportedRoom),
+    /** Alerts raised by this report (repeats raise none). */
+    alertsRaised: z.number().int(),
+  }),
+});
+
 export const HOUSEKEEPING_ROUTES = {
   getHousekeepingBoard,
   assignRooms,
   listMyAssignments,
   updateAssignment,
+  listStatusReports,
+  submitStatusReport,
 } as const;

@@ -44,6 +44,27 @@
     "quantity": "Quantity",
     "addMinibar": "Add",
     "notes": "Notes (linen, lost items, faults)",
-    "saveNotes": "Save notes"
+    "saveNotes": "Save notes",
+    "observed": {
+      "OCCUPIED": "Occupied",
+      "VACANT": "Vacant",
+      "SLEPT_OUT": "Slept out",
+      "LUGGAGE_NO_GUEST": "Luggage, no guest",
+      "DO_NOT_DISTURB": "Do not disturb"
+    },
+    "reported": "Morning report: {{status}}",
+    "discrepancy": {
+      "OCCUPIED_NO_FOLIO": "Discrepancy: in use, but no guest is checked in",
+      "VACANT_IN_HOUSE": "Discrepancy: vacant, but a guest is checked in"
+    },
+    "morningReport": "Morning report",
+    "morningReportHint": "Choose what you see in each room. Rooms left on “Not reported” are skipped.",
+    "notReported": "Not reported",
+    "statusFor": "Room {{room}} status",
+    "frontOffice": "Front desk: {{status}}",
+    "sendReport": "Send report ({{count}})",
+    "reportSentNone": "Report sent. No discrepancies.",
+    "reportSent_one": "Report sent. {{count}} discrepancy raised for the front desk.",
+    "reportSent_other": "Report sent. {{count}} discrepancies raised for the front desk."
   }
 }

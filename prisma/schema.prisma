@@ -128,6 +128,7 @@ model Property {
   virtualAccounts      VirtualAccount[]
   unmatchedTransfers   UnmatchedTransfer[]
   hkAssignments        HkAssignment[]
+  roomStatusReports    RoomStatusReport[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -246,6 +247,7 @@ model User {
   nightAuditsStarted NightAuditRun[]
   paymentIntents     PaymentIntent[]
   hkAssignments      HkAssignment[]
+  roomStatusReports  RoomStatusReport[]
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -610,17 +612,18 @@ model Room {
   active           Boolean  @default(true)
   version          Int      @default(0)
 
-  organisation   Organisation     @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  property       Property         @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
-  roomType       RoomType         @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
+  organisation   Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property       Property           @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  roomType       RoomType           @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
   // Same property is checked by the service (Prisma can't mix a required and an optional column in one relation).
-  connectingRoom Room?            @relation("ConnectingRoom", fields: [connectingRoomId], references: [id], onDelete: SetNull)
-  connectedFrom  Room[]           @relation("ConnectingRoom")
+  connectingRoom Room?              @relation("ConnectingRoom", fields: [connectingRoomId], references: [id], onDelete: SetNull)
+  connectedFrom  Room[]             @relation("ConnectingRoom")
   blocks         RoomBlock[]
   stays          Stay[]
   allocations    RoomAllocation[]
   keyIssues      KeyIssue[]
   hkAssignments  HkAssignment[]
+  statusReports  RoomStatusReport[]
 
   @@unique([propertyId, number])
   // Target of composite foreign keys: blocks and connecting rooms stay within the property.
@@ -1845,4 +1848,34 @@ model HkAssignment {
   @@unique([propertyId, businessDate, roomId])
   @@index([attendantId, businessDate])
   @@map("hk_assignments")
+}
+
+/// What an attendant saw in a room on the morning round (PRD M5-05; T-081).
+enum ObservedStatus {
+  OCCUPIED
+  VACANT
+  SLEPT_OUT
+  LUGGAGE_NO_GUEST
+  DO_NOT_DISTURB
+
+  @@map("observed_status")
+}
+
+/// Morning room-status report (tab 3; T-081): one row per room each time it is reported; the
+/// latest of the business date counts.
+model RoomStatusReport {
+  id           String         @id @default(uuid()) @db.Uuid
+  propertyId   String         @map("property_id") @db.Uuid
+  businessDate DateTime       @map("business_date") @db.Date
+  roomId       String         @map("room_id") @db.Uuid
+  observed     ObservedStatus
+  reportedById String         @map("reported_by_id") @db.Uuid
+  at           DateTime       @default(now()) @db.Timestamptz(6)
+
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  room       Room     @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+  reportedBy User     @relation(fields: [reportedById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, businessDate, roomId])
+  @@map("room_status_reports")
 }

@@ -132,6 +132,7 @@ model Property {
   roomStatusReports    RoomStatusReport[]
   taskTemplates        TaskTemplate[]
   tasks                Task[]
+  handoverNotes        HandoverNote[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -151,6 +152,7 @@ model Department {
   memberships   Membership[]
   taskTemplates TaskTemplate[]
   tasks         Task[]
+  handoverNotes HandoverNote[]
 
   @@unique([propertyId, code])
   @@unique([propertyId, id])
@@ -257,6 +259,8 @@ model User {
   tasksAssigned      Task[]             @relation("TaskAssignee")
   tasksVerified      Task[]             @relation("TaskVerifier")
   taskEvents         TaskEvent[]
+  handoversWritten   HandoverNote[]     @relation("HandoverWriter")
+  handoversAcked     HandoverNote[]     @relation("HandoverAcknowledger")
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
 
   @@map("users")
@@ -1987,6 +1991,29 @@ model Task {
   @@index([propertyId, status])
   @@index([assigneeId, status])
   @@map("tasks")
+}
+
+/// A supervisor's shift handover (PRD M6-06; T-083): their own notes plus what was open when
+/// it was written (content: notes, open tasks, pending approvals, cash in drawers, VIPs). Never
+/// edited; another supervisor acknowledges it once (a guarded update on acknowledgedAt).
+model HandoverNote {
+  id               String    @id @default(uuid()) @db.Uuid
+  propertyId       String    @map("property_id") @db.Uuid
+  departmentId     String    @map("department_id") @db.Uuid
+  businessDate     DateTime  @map("business_date") @db.Date
+  content          Json
+  writtenById      String    @map("written_by_id") @db.Uuid
+  acknowledgedById String?   @map("acknowledged_by_id") @db.Uuid
+  acknowledgedAt   DateTime? @map("acknowledged_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property       Property   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  department     Department @relation(fields: [propertyId, departmentId], references: [propertyId, id], onDelete: Restrict)
+  writtenBy      User       @relation("HandoverWriter", fields: [writtenById], references: [id], onDelete: Restrict)
+  acknowledgedBy User?      @relation("HandoverAcknowledger", fields: [acknowledgedById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, createdAt])
+  @@map("handover_notes")
 }
 
 /// A task's timeline, append-only: STATUS, COMMENT, ASSIGN, ESCALATE, ATTACH. No property

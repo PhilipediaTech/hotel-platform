@@ -722,6 +722,32 @@ async function bQrUnchanged(db: Db, world: TenantWorld) {
   expect(rooms.map((r) => r.hkStatus)).not.toContain('OUT_OF_ORDER');
 }
 
+/** B's department and a handover written there, not acknowledged (T-083). */
+async function bHandover(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  const department = await db.department.create({
+    data: { organisationId, propertyId, code: 'HK', name: 'Housekeeping' },
+  });
+  const writer = organisationId === world.orgB.id ? world.bStaff : world.aStaff;
+  const note = await db.handoverNote.create({
+    data: {
+      propertyId,
+      departmentId: department.id,
+      businessDate: new Date('2026-11-10T00:00:00Z'),
+      content: { notes: 'Their handover', snapshot: {} },
+      writtenById: writer.id,
+    },
+  });
+  return { departmentId: department.id, handoverId: note.id };
+}
+
+async function bHandoverUnchanged(db: Db, world: TenantWorld) {
+  const notes = await db.handoverNote.findMany({ where: { propertyId: world.b1.id } });
+  expect(notes.map((n) => [(n.content as { notes: string }).notes, n.acknowledgedAt])).toEqual([
+    ['Their handover', null],
+  ]);
+}
+
 const taskWrite = (body?: object) => ({
   seed: bTask,
   ...(body ? { body: () => body } : {}),
@@ -1526,4 +1552,16 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({ category: 'OTHER', severity: 'CRITICAL', outOfOrderUntil: '2099-01-02' }),
     untouched: bQrUnchanged,
   },
+  listHandoverNotes: { seed: bHandover, listIds: ids },
+  getHandoverDraft: {
+    seed: bHandover,
+    query: (theirs) => ({ departmentId: theirs['departmentId'] ?? '' }),
+  },
+  writeHandoverNote: {
+    seed: bHandover,
+    creates: true,
+    body: (theirs) => ({ departmentId: theirs['departmentId'], notes: 'Leak test' }),
+    untouched: bHandoverUnchanged,
+  },
+  acknowledgeHandoverNote: { seed: bHandover, untouched: bHandoverUnchanged },
 };

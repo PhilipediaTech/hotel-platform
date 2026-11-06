@@ -1,0 +1,55 @@
+{
+  "handovers": {
+    "title": "Handovers",
+    "write": {
+      "title": "Write a handover",
+      "department": "Department",
+      "businessDate": "Business day {{date}}",
+      "openNow": "What is open now",
+      "openNowHint": "This is kept with your notes as it is when you write.",
+      "notes": "Notes for the incoming supervisor",
+      "notesHint": "What they need to know: guests to watch, jobs half done, anything promised.",
+      "submit": "Write handover",
+      "written": "Handover written. The incoming supervisor acknowledges it."
+    },
+    "list": {
+      "title": "Handovers written",
+      "label": "Handover list",
+      "pendingOnly": "Waiting for acknowledgement only",
+      "empty": "No handovers here.",
+      "loadMore": "Show more"
+    },
+    "item": {
+      "heading": "{{department}} · {{date}}",
+      "writtenBy": "Written by {{name}} at {{when}}",
+      "acknowledgedBy": "Acknowledged by {{name}} at {{when}}",
+      "waiting": "Waiting for acknowledgement",
+      "yours": "Another supervisor acknowledges your handover.",
+      "acknowledge": "Acknowledge",
+      "snapshot": "What was open then"
+    },
+    "snapshot": {
+      "tasks": "Open tasks ({{n}})",
+      "noTasks": "No open tasks.",
+      "taskLine": "#{{number}} {{title}}",
+      "overdue": "Overdue",
+      "unassigned": "Not assigned",
+      "room": "Room {{number}}",
+      "approvals": "Approvals waiting ({{n}})",
+      "noApprovals": "No approvals waiting.",
+      "requestedBy": "asked by {{name}}",
+      "cash": "Cash in drawers",
+      "noCash": "No cashier drawer is open.",
+      "drawerStatus": {
+        "OPEN": "Open",
+        "CLOSING": "Counted, waiting for sign-off"
+      },
+      "total": "Total",
+      "vips": "VIP guests ({{n}})",
+      "noVips": "No VIP guests in house or arriving.",
+      "inHouse": "In house, leaves {{date}}",
+      "arriving": "Arriving today",
+      "more": "and {{n}} more"
+    }
+  }
+}

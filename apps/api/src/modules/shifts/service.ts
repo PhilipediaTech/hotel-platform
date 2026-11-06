@@ -188,6 +188,39 @@ async function lockShift(tx: Tx, shiftId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM cashier_shifts WHERE id = ${shiftId}::uuid FOR UPDATE`;
 }
 
+/**
+ * Cash in each cashier's drawer now (T-083 handovers): what an open shift should hold, or what
+ * a closing shift counted. Desk shifts only (not outlets, not the system shift).
+ */
+export async function drawerCash(db: Client) {
+  const shifts = await db.cashierShift.findMany({
+    where: { status: { in: ['OPEN', 'CLOSING'] }, userId: { not: null }, outletId: null },
+    include: SHIFT,
+    orderBy: [{ openedAt: 'asc' }, { id: 'asc' }],
+  });
+  return Promise.all(
+    shifts.map(async (s) => {
+      const cash = new Map<string, bigint>();
+      if (s.counts.length > 0) {
+        for (const c of s.counts) if (c.method === 'CASH') cash.set(c.currency, c.countedMinor);
+      } else {
+        const exp = await expected(db, s, await baseCurrency(db, s.propertyId));
+        for (const [key, amount] of exp) {
+          const [method, currency] = key.split(' ') as [PayMethod, string];
+          if (method === 'CASH') cash.set(currency, amount);
+        }
+      }
+      return {
+        shiftId: s.id,
+        cashier: cashierName(s),
+        status: s.status,
+        openedAt: s.openedAt,
+        cash: [...cash].sort(([a], [b]) => a.localeCompare(b)),
+      };
+    }),
+  );
+}
+
 const openShiftOf = (db: Client, userId: string) =>
   db.cashierShift.findFirst({ where: { userId, status: 'OPEN', outletId: null }, include: SHIFT });
 

@@ -82,8 +82,8 @@ describe('routing', () => {
   });
 
   it('shows which ticket builds a screen', async () => {
-    renderApp('/handovers');
-    expect(await screen.findByText('Screen S20 arrives with T-083.')).toBeInTheDocument();
+    renderApp('/leakage');
+    expect(await screen.findByText('Screen S22 arrives with T-090.')).toBeInTheDocument();
   });
 
   it('shows a not-found page for unknown paths', async () => {

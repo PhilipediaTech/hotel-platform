@@ -9,6 +9,10 @@ import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { PdfError, usePdf } from '../lib/pdf.tsx';
 import { useFormats } from './reservations.tsx';
+import paymentsStrings from '../i18n/en/payments.json';
+import { registerStrings } from '../i18n/index.ts';
+
+registerStrings(paymentsStrings);
 
 // S12 Check-out (PRD M3 check-out story, M3 rules 3–4; T-064): the bill per window, warnings
 // that don't stop the guest leaving (keys not returned, leaving early: the stay is shortened),

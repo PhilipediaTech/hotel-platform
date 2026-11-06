@@ -11,6 +11,12 @@ import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
 import { useFormats } from './reservations.tsx';
+import foliosStrings from '../i18n/en/folios.json';
+import paymentsStrings from '../i18n/en/payments.json';
+import { registerStrings } from '../i18n/index.ts';
+
+registerStrings(foliosStrings);
+registerStrings(paymentsStrings);
 
 // Folio transfer (tab 4 POST /folios/{id}/transfer; T-065): move an amount a window owes to
 // another window of the folio, or to another open folio by its number (a company or paymaster

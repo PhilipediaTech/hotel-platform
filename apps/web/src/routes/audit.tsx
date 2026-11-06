@@ -11,6 +11,10 @@ import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
+import auditStrings from '../i18n/en/audit.json';
+import { registerStrings } from '../i18n/index.ts';
+
+registerStrings(auditStrings);
 
 // S27 Audit log (PRD M1-11; T-014): who did what to which record, newest first, filtered
 // by person, record, action and date. Rows open to the before/after values.

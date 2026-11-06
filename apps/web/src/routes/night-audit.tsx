@@ -10,6 +10,10 @@ import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { PdfError, usePdf } from '../lib/pdf.tsx';
 import { useFormats } from './reservations.tsx';
+import nightAuditStrings from '../i18n/en/night-audit.json';
+import { registerStrings } from '../i18n/index.ts';
+
+registerStrings(nightAuditStrings);
 
 // S15 Night audit (PRD M4 rule 8; T-073): the ten steps of tonight's run with their status,
 // the exceptions to resolve (with a link to where they are resolved), run and resume, and the

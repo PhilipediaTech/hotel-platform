@@ -10,6 +10,10 @@ import { Label } from '../../components/ui/label.tsx';
 import { api } from '../../lib/api.ts';
 import { errorMessage } from '../../lib/form.ts';
 import { useFormats } from '../reservations.tsx';
+import financeStrings from '../../i18n/en/finance.json';
+import { registerStrings } from '../../i18n/index.ts';
+
+registerStrings(financeStrings);
 
 // S25 Exchange rates tab (PRD M4-18; T-065): the rates in force on the business date (set for
 // it or carried from an earlier day) and, for fx.manage, setting a rate for today or later.

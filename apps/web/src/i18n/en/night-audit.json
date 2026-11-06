@@ -1,0 +1,43 @@
+{
+  "nightAudit": {
+    "title": "Night audit",
+    "businessDate": "Business date: {{date}}",
+    "ready": "Night audit for {{date}} has not run yet. Run it when the day’s trading is done.",
+    "run": "Run night audit",
+    "running": "Running…",
+    "resume": "Resume at step {{step}}",
+    "completed": "Night audit for {{date}} is complete: the day is closed and the next one is open.",
+    "steps": "Night audit steps",
+    "noExceptions": "No exceptions in this run.",
+    "mustResolve": "Resolve",
+    "forReview": "Review",
+    "open": "Open",
+    "status": {
+      "PENDING": "Not yet",
+      "DONE": "Done",
+      "SKIPPED": "Skipped",
+      "BLOCKED": "Exceptions",
+      "FAILED": "Failed"
+    },
+    "step": {
+      "OPEN_SHIFTS": "Check open shifts",
+      "ARRIVALS_DEPARTURES": "Review unarrived arrivals and due-outs",
+      "ROOM_STATUS": "Reconcile front office and housekeeping",
+      "ROOM_AND_TAX": "Post room and tax",
+      "PACKAGES": "Post package and fixed charges",
+      "NO_SHOWS": "Post no-show fees",
+      "FX_LOCK": "Lock exchange rates",
+      "LEAKAGE": "Run leakage rules",
+      "REPORTS": "Generate reports",
+      "CLOSE_DAY": "Close the day and open the next"
+    },
+    "reports": "Reports of the closed day",
+    "report": {
+      "flash": "Flash report",
+      "trial-balance": "Trial balance",
+      "cashier": "Cashier summary",
+      "high-balance": "High balance",
+      "discrepancy": "Discrepancies"
+    }
+  }
+}

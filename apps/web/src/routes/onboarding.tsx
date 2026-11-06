@@ -28,6 +28,10 @@ import { api, ApiError } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { apiFieldErrors, errorMessage, zodResolver } from '../lib/form.ts';
 import { Field } from './auth/layout.tsx';
+import setupStrings from '../i18n/en/setup.json';
+import { registerStrings } from '../i18n/index.ts';
+
+registerStrings(setupStrings);
 
 // S02 setup wizard (PRD M1-02; T-030): the checklist an owner completes before the property
 // takes bookings, then go-live. Each step saves on its own; the checklist comes from the API.

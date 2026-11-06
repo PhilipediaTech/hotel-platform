@@ -1,0 +1,29 @@
+{
+  "transfer": {
+    "title": "Transfer",
+    "heading": "Transfer from window {{n}} (owes {{owes}})",
+    "to": "To",
+    "window": "Another window",
+    "folio": "Another folio",
+    "number": "Folio number",
+    "button": "Transfer",
+    "done": "Transferred.",
+    "noFolio": "No open folio numbered {{number}}."
+  },
+  "unmatched": {
+    "title": "Unmatched transfers",
+    "intro": "Money sent to a bank transfer account that no open bill could take. Match each one to a folio within 24 hours.",
+    "none": "Nothing waiting to be matched.",
+    "toMatch": "Transfers to match",
+    "matched": "Matched",
+    "unknownSender": "Unknown sender",
+    "overdue": "Over 24 hours",
+    "findFolio": "Find a folio for {{amount}}",
+    "find": "Folio, guest or room",
+    "note": "Note (optional)",
+    "search": "Find",
+    "noFolio": "No open folio found.",
+    "room": "room {{room}}",
+    "matchHere": "Match here"
+  }
+}

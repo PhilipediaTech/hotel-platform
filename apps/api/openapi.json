@@ -6358,6 +6358,31 @@
           },
           "assignment": {
             "$ref": "#/components/schemas/HkAssignment"
+          },
+          "observed": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "OCCUPIED",
+              "VACANT",
+              "SLEPT_OUT",
+              "LUGGAGE_NO_GUEST",
+              "DO_NOT_DISTURB",
+              null
+            ]
+          },
+          "discrepancy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "OCCUPIED_NO_FOLIO",
+              "VACANT_IN_HOUSE",
+              null
+            ]
           }
         },
         "required": [
@@ -6370,7 +6395,9 @@
           "dueOut",
           "arrival",
           "priority",
-          "assignment"
+          "assignment",
+          "observed",
+          "discrepancy"
         ]
       },
       "HkAssignment": {
@@ -6526,6 +6553,77 @@
           "minibar",
           "notes",
           "hkStatus"
+        ]
+      },
+      "ReportedRoom": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "number": {
+            "type": "string"
+          },
+          "floor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "foStatus": {
+            "type": "string",
+            "enum": [
+              "OCCUPIED",
+              "VACANT"
+            ]
+          },
+          "observed": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "OCCUPIED",
+              "VACANT",
+              "SLEPT_OUT",
+              "LUGGAGE_NO_GUEST",
+              "DO_NOT_DISTURB",
+              null
+            ]
+          },
+          "reportedAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "discrepancy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "OCCUPIED_NO_FOLIO",
+              "VACANT_IN_HOUSE",
+              null
+            ]
+          }
+        },
+        "required": [
+          "roomId",
+          "number",
+          "floor",
+          "foStatus",
+          "observed",
+          "reportedAt",
+          "discrepancy"
         ]
       },
       "ExchangeRates": {
@@ -26725,6 +26823,298 @@
           },
           "409": {
             "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/housekeeping/status-reports": {
+      "get": {
+        "operationId": "listStatusReports",
+        "summary": "Rooms with their morning report and discrepancy for the business date",
+        "tags": [
+          "Housekeeping"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Added beyond tab 4 (T-081): the rooms to report on (S17). Needs hk.work (attendants) or hk.report (supervisors).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 20
+            },
+            "required": false,
+            "name": "floor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "businessDate": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "floors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReportedRoom"
+                      }
+                    }
+                  },
+                  "required": [
+                    "businessDate",
+                    "floors",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "submitStatusReport",
+        "summary": "Submit the morning room-status report; mismatches raise discrepancy alerts",
+        "tags": [
+          "Housekeeping"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Needs hk.work (attendants, M5-05) or hk.report. A room reported occupied (or slept-out, luggage, do-not-disturb) with no guest checked in raises OCCUPIED_NO_FOLIO; a room reported vacant with a guest checked in raises VACANT_IN_HOUSE. At most one alert per room and business date. The front-desk task for it comes with the task engine (T-082).",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entries": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "roomId": {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        "observed": {
+                          "type": "string",
+                          "enum": [
+                            "OCCUPIED",
+                            "VACANT",
+                            "SLEPT_OUT",
+                            "LUGGAGE_NO_GUEST",
+                            "DO_NOT_DISTURB"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "roomId",
+                        "observed"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 300
+                  }
+                },
+                "required": [
+                  "entries"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "businessDate": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReportedRoom"
+                      }
+                    },
+                    "alertsRaised": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "businessDate",
+                    "data",
+                    "alertsRaised"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`",
             "content": {
               "application/json": {
                 "schema": {

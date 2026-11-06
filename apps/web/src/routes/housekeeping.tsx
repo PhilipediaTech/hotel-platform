@@ -1,5 +1,11 @@
-import type { BoardRoom, HkAssignmentItem } from '@hotel/shared';
+import {
+  OBSERVED_STATUSES,
+  type BoardRoom,
+  type HkAssignmentItem,
+  type ObservedStatus,
+} from '@hotel/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
@@ -16,10 +22,11 @@ import { registerStrings } from '../i18n/index.ts';
 
 registerStrings(housekeepingStrings);
 
-// S16 Room board and S17 My rooms (PRD M5-01–M5-04; T-080). The board shows every room with
-// its housekeeping and front-office status, today's clean, attendant and priority, by floor;
-// the supervisor selects rooms and gives them to an attendant. My rooms is the attendant's
-// phone screen: start, pause and complete each room, tick its checklist, note minibar use.
+// S16 Room board and S17 My rooms (PRD M5-01–M5-05; T-080, T-081). The board shows every room
+// with its housekeeping and front-office status, today's clean, attendant and priority, by
+// floor, plus its morning report and any discrepancy; the supervisor selects rooms and gives
+// them to an attendant. My rooms is the attendant's phone screen: start, pause and complete
+// each room, tick its checklist, note minibar use, and send the morning room-status report.
 
 type Room = z.output<typeof BoardRoom>;
 type Assignment = z.output<typeof HkAssignmentItem>;
@@ -201,7 +208,24 @@ function RoomTile(props: {
       ) : (
         <p className="mt-1 text-text-muted">{t('hk.notListed')}</p>
       )}
+      {r.observed && (
+        <p className="mt-1 text-text-muted">
+          {t('hk.reported', { status: t(`hk.observed.${r.observed}`) })}
+        </p>
+      )}
+      {r.discrepancy && <Discrepancy rule={r.discrepancy} />}
     </li>
+  );
+}
+
+/** A morning-report discrepancy (T-081): text and icon, never colour alone. */
+function Discrepancy({ rule }: { rule: string }) {
+  const { t } = useTranslation();
+  return (
+    <p className="mt-1 flex items-start gap-1 text-xs font-medium text-critical">
+      <AlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+      {t(`hk.discrepancy.${rule}`)}
+    </p>
   );
 }
 
@@ -229,6 +253,130 @@ export function MyRoomsPage() {
           <MyRoom key={a.id} assignment={a} queryKey={key} />
         ))}
       </ul>
+      <MorningReport />
+    </section>
+  );
+}
+
+/** S17 morning room-status report (PRD M5-05; T-081): what the attendant sees in each room. */
+function MorningReport() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const key = useHkKey('status-reports');
+  const [floor, setFloor] = useState('');
+  const [chosen, setChosen] = useState<Record<string, ObservedStatus>>({});
+  const list = useQuery({
+    queryKey: [...key, floor],
+    queryFn: () => api.call('listStatusReports', { query: floor ? { floor } : {} }),
+  });
+  const send = useMutation({
+    mutationFn: () =>
+      api.call('submitStatusReport', {
+        body: {
+          entries: Object.entries(chosen).map(([roomId, observed]) => ({ roomId, observed })),
+        },
+      }),
+    onSuccess: () => {
+      setChosen({});
+      void queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+  const count = Object.keys(chosen).length;
+  const data = list.data;
+  return (
+    <section aria-labelledby="hk-morning" className="mt-8">
+      <h2 id="hk-morning" className="text-lg font-semibold">
+        {t('hk.morningReport')}
+      </h2>
+      <p className="mt-1 text-sm text-text-muted">{t('hk.morningReportHint')}</p>
+      {list.error && (
+        <Alert tone="critical" className="mt-3">
+          {errorMessage(list.error)}
+        </Alert>
+      )}
+      {data && (
+        <form
+          className="mt-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (count > 0) send.mutate();
+          }}
+        >
+          {data.floors.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="hk-report-floor">{t('hk.floor')}</Label>
+              <select
+                id="hk-report-floor"
+                className={selectClass}
+                value={floor}
+                onChange={(e) => setFloor(e.target.value)}
+              >
+                <option value="">{t('hk.allFloors')}</option>
+                {data.floors.map((f) => (
+                  <option key={f} value={f}>
+                    {t('hk.floorN', { floor: f })}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <ul className="mt-3 flex flex-col gap-3">
+            {data.data.map((r) => (
+              <li key={r.roomId} className="rounded-md border border-border bg-surface p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-base font-semibold">
+                    {t('hk.roomN', { room: r.number })}
+                  </span>
+                  <span className="text-xs text-text-muted">
+                    {t('hk.frontOffice', { status: t(`hk.fo.${r.foStatus}`) })}
+                  </span>
+                </div>
+                <select
+                  aria-label={t('hk.statusFor', { room: r.number })}
+                  className={cn(selectClass, 'mt-2 w-full')}
+                  value={chosen[r.roomId] ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value as ObservedStatus | '';
+                    setChosen((c) => {
+                      const next = { ...c };
+                      if (value) next[r.roomId] = value;
+                      else delete next[r.roomId];
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="">
+                    {r.observed
+                      ? t('hk.reported', { status: t(`hk.observed.${r.observed}`) })
+                      : t('hk.notReported')}
+                  </option>
+                  {OBSERVED_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {t(`hk.observed.${s}`)}
+                    </option>
+                  ))}
+                </select>
+                {r.discrepancy && <Discrepancy rule={r.discrepancy} />}
+              </li>
+            ))}
+          </ul>
+          <Button type="submit" className="mt-3 h-11 px-5" disabled={count === 0 || send.isPending}>
+            {t('hk.sendReport', { count })}
+          </Button>
+        </form>
+      )}
+      {send.data && (
+        <Alert tone={send.data.alertsRaised > 0 ? 'critical' : 'success'} className="mt-3">
+          {send.data.alertsRaised > 0
+            ? t('hk.reportSent', { count: send.data.alertsRaised })
+            : t('hk.reportSentNone')}
+        </Alert>
+      )}
+      {send.error && (
+        <Alert tone="critical" className="mt-3">
+          {errorMessage(send.error)}
+        </Alert>
+      )}
     </section>
   );
 }

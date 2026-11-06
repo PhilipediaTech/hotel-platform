@@ -651,6 +651,28 @@ async function bAssignmentUnchanged(db: Db, world: TenantWorld) {
   expect(rows.map((r) => [r.status, r.attendantId, r.notes])).toEqual([['PENDING', null, null]]);
 }
 
+/** B's room with a morning report on it (T-081). */
+async function bReport(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bRoom(db, world, propertyId);
+  const reporter = await db.user.findFirstOrThrow();
+  await db.roomStatusReport.create({
+    data: {
+      propertyId,
+      businessDate: new Date('2099-01-01'),
+      roomId: theirs.roomId,
+      observed: 'VACANT',
+      reportedById: reporter.id,
+    },
+  });
+  return theirs;
+}
+
+async function bReportUnchanged(db: Db, world: TenantWorld) {
+  const rows = await db.roomStatusReport.findMany({ where: { propertyId: world.b1.id } });
+  expect(rows.map((r) => r.observed)).toEqual(['VACANT']);
+  expect(await db.leakageAlert.count({ where: { propertyId: world.b1.id } })).toBe(0);
+}
+
 /** Stay and reservation IDs on a front desk list (T-053). */
 const frontDeskIds = (body: unknown) =>
   (body as { data: { stayId: string; reservationId: string }[] }).data.flatMap((r) => [
@@ -1396,5 +1418,15 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bAssignment,
     body: () => ({ notes: 'Leak' }),
     untouched: bAssignmentUnchanged,
+  },
+  listStatusReports: {
+    seed: bReport,
+    listIds: (body) => (body as { data: { roomId: string }[] }).data.map((r) => r.roomId),
+  },
+  submitStatusReport: {
+    seed: bReport,
+    creates: true,
+    body: (theirs) => ({ entries: [{ roomId: theirs['roomId'], observed: 'OCCUPIED' }] }),
+    untouched: bReportUnchanged,
   },
 };

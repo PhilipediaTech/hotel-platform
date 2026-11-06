@@ -302,3 +302,179 @@ describe('housekeeping', () => {
     expect(free.data.find((r) => r.id === h.room['103'])?.problems).toEqual([]);
   });
 });
+
+// Morning room-status report (PRD M5-05, M5 rule 6, M5 AC "a morning report marking a
+// PMS-vacant room as occupied creates exactly one discrepancy alert"; T-081).
+type Reported = {
+  roomId: string;
+  number: string;
+  foStatus: string;
+  observed: string | null;
+  discrepancy: string | null;
+};
+
+describe('morning room-status report', () => {
+  it('raises exactly one discrepancy alert for a PMS-vacant room reported occupied (M5 AC)', async () => {
+    const h = await hotel();
+    const kemi = await h.as(h.kemiUser.id);
+    const list = await h.ok<{ businessDate: string; data: Reported[] }>(
+      kemi.get('/housekeeping/status-reports'),
+    );
+    expect(list.businessDate).toBe(TODAY);
+    expect(list.data.map((r) => [r.number, r.foStatus, r.observed])).toEqual([
+      // By floor (101 has none, so last), then number.
+      ['102', 'OCCUPIED', null],
+      ['103', 'VACANT', null],
+      ['104', 'VACANT', null],
+      ['101', 'OCCUPIED', null],
+    ]);
+
+    const sent = await kemi.send('/housekeeping/status-reports', {
+      entries: [
+        { roomId: h.room['101'], observed: 'OCCUPIED' },
+        { roomId: h.room['103'], observed: 'OCCUPIED' },
+        { roomId: h.room['104'], observed: 'VACANT' },
+      ],
+    });
+    expect(sent.status).toBe(201);
+    const first = sent.body as { alertsRaised: number; data: Reported[] };
+    expect(first.alertsRaised).toBe(1);
+    expect(first.data.map((r) => [r.number, r.observed, r.discrepancy])).toEqual([
+      ['103', 'OCCUPIED', 'OCCUPIED_NO_FOLIO'],
+      ['104', 'VACANT', null],
+      ['101', 'OCCUPIED', null],
+    ]);
+    const alerts = await db.leakageAlert.findMany();
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      ruleCode: 'OCCUPIED_NO_FOLIO',
+      severity: 'HIGH',
+      entityType: 'room',
+      entityId: h.room['103'],
+      status: 'OPEN',
+    });
+    expect(alerts[0]?.evidence).toMatchObject({ roomNumber: '103', observed: 'OCCUPIED' });
+    expect(await db.domainEvent.count({ where: { type: 'leakage.alert_raised' } })).toBe(1);
+
+    // Reported again (and as luggage), still one alert; every report is kept, the latest counts.
+    const again = await h.ok<{ alertsRaised: number; data: Reported[] }>(
+      kemi.send('/housekeeping/status-reports', {
+        entries: [{ roomId: h.room['103'], observed: 'LUGGAGE_NO_GUEST' }],
+      }),
+    );
+    expect(again.alertsRaised).toBe(0);
+    expect(again.data[0]).toMatchObject({
+      observed: 'LUGGAGE_NO_GUEST',
+      discrepancy: 'OCCUPIED_NO_FOLIO',
+    });
+    expect(await db.leakageAlert.count()).toBe(1);
+    expect(await db.roomStatusReport.count({ where: { roomId: h.room['103'] } })).toBe(2);
+
+    // The supervisor sees it on the board.
+    const sup = await h.as(
+      (await db.membership.findFirstOrThrow({ where: { roleId: h.role('hk-supervisor') } })).userId,
+    );
+    const board = await h.ok<{
+      rooms: { number: string; observed: string | null; discrepancy: string | null }[];
+    }>(sup.get('/housekeeping/board'));
+    expect(board.rooms.find((r) => r.number === '103')).toMatchObject({
+      observed: 'LUGGAGE_NO_GUEST',
+      discrepancy: 'OCCUPIED_NO_FOLIO',
+    });
+  });
+
+  it('raises VACANT_IN_HOUSE the other way round; slept-out is no discrepancy; who may report', async () => {
+    const h = await hotel();
+    const kemi = await h.as(h.kemiUser.id);
+    const r = await h.ok<{ alertsRaised: number; data: Reported[] }>(
+      kemi.send('/housekeeping/status-reports', {
+        entries: [
+          { roomId: h.room['101'], observed: 'SLEPT_OUT' },
+          { roomId: h.room['102'], observed: 'VACANT' },
+        ],
+      }),
+    );
+    expect(r.alertsRaised).toBe(1);
+    expect(r.data.map((x) => [x.number, x.discrepancy])).toEqual([
+      ['102', 'VACANT_IN_HOUSE'],
+      ['101', null],
+    ]);
+    expect(await db.leakageAlert.findFirstOrThrow()).toMatchObject({
+      ruleCode: 'VACANT_IN_HOUSE',
+      severity: 'NORMAL',
+      entityId: h.room['102'],
+    });
+
+    // Supervisors (hk.report) may report too; front desk may not.
+    const sup = await h.as(
+      (await db.membership.findFirstOrThrow({ where: { roleId: h.role('hk-supervisor') } })).userId,
+    );
+    await h.ok(sup.get('/housekeeping/status-reports'));
+    expect((await h.fd.get('/housekeeping/status-reports')).status).toBe(403);
+    expect(
+      (
+        await h.fd.send('/housekeeping/status-reports', {
+          entries: [{ roomId: h.room['103'], observed: 'OCCUPIED' }],
+        })
+      ).status,
+    ).toBe(403);
+    // An unknown room or the same room twice is refused, and nothing is kept.
+    const before = await db.roomStatusReport.count();
+    const unknown = await kemi.send('/housekeeping/status-reports', {
+      entries: [
+        { roomId: h.room['103'], observed: 'OCCUPIED' },
+        { roomId: '00000000-0000-4000-8000-000000000000', observed: 'VACANT' },
+      ],
+    });
+    expect(errorOf(unknown).code).toBe('VALIDATION_ERROR');
+    const twice = await kemi.send('/housekeeping/status-reports', {
+      entries: [
+        { roomId: h.room['103'], observed: 'OCCUPIED' },
+        { roomId: h.room['103'], observed: 'VACANT' },
+      ],
+    });
+    expect(errorOf(twice).code).toBe('VALIDATION_ERROR');
+    expect(await db.roomStatusReport.count()).toBe(before);
+    expect(await db.leakageAlert.count()).toBe(1);
+  });
+
+  it('lists the day’s discrepancies at night audit step 3 without blocking the close', async () => {
+    const h = await hotel();
+    const kemi = await h.as(h.kemiUser.id);
+    await h.ok(
+      kemi.send('/housekeeping/status-reports', {
+        entries: [
+          { roomId: h.room['103'], observed: 'DO_NOT_DISTURB' },
+          { roomId: h.room['102'], observed: 'VACANT' },
+        ],
+      }),
+    );
+    now = new Date('2026-11-10T21:00:00Z');
+    const auditor = await h.as(
+      (await db.membership.findFirstOrThrow({ where: { roleId: h.role('night-auditor') } })).userId,
+    );
+    const run = await h.ok<{
+      status: string;
+      steps: {
+        step: number;
+        result: Record<string, unknown>;
+        exceptions: { type: string; blocking: boolean; message: string }[];
+      }[];
+    }>(auditor.send('/night-audits', { businessDate: TODAY }));
+    expect(run.status).toBe('COMPLETED');
+    const step3 = run.steps.find((s) => s.step === 3);
+    expect(step3?.result).toMatchObject({ reportDiscrepancies: 2 });
+    expect(step3?.exceptions.map((e) => [e.type, e.blocking, e.message])).toEqual([
+      [
+        'ROOM_STATUS_MISMATCH',
+        false,
+        'Morning report: room 103 do not disturb, but no guest is checked in',
+      ],
+      [
+        'ROOM_STATUS_MISMATCH',
+        false,
+        'Morning report: room 102 vacant, but Bola Ade is checked in',
+      ],
+    ]);
+  });
+});

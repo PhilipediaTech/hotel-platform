@@ -2,6 +2,7 @@ import {
   localDate,
   NIGHT_AUDIT_REPORTS,
   NIGHT_AUDIT_STEPS,
+  OCCUPIED_NO_FOLIO,
   type NightAuditReportName,
   type STEP_STATUSES,
   type NightAuditBody,
@@ -30,6 +31,7 @@ import {
 } from './reports.ts';
 import { postPackageNight, postRoomNight, PostingProblem } from './room-charges.ts';
 import { ensureCleaningList } from '../housekeeping/service.ts';
+import { reportsOf as morningReports } from '../housekeeping/status-reports.ts';
 
 // Night audit (PRD M4 rule 8 and its acceptance criteria; tab 4 POST /night-audits ●, GET
 // /night-audits/{id}, POST /night-audits/{id}/resume ●; open issue 14; T-073). A run walks
@@ -161,8 +163,8 @@ function inHouse(deps: NightAuditDeps, date: string) {
 }
 
 /**
- * Step 3: the front office's occupied rooms against housekeeping. Until room status reports
- * arrive with housekeeping, the room's own status and blocks are what housekeeping says.
+ * Step 3: the front office's occupied rooms against housekeeping: rooms in house that are out
+ * of order or blocked, and the morning report's discrepancies (T-081), each listed once.
  */
 async function roomStatus({ deps, date }: Env): Promise<Outcome> {
   const on = dbDate(date);
@@ -192,7 +194,31 @@ async function roomStatus({ deps, date }: Env): Promise<Outcome> {
       });
     }
   }
-  return { exceptions, result: { occupied: stays.length, discrepancies: exceptions.length } };
+  // The morning report's discrepancies (T-081): one alert per room, raised when reported.
+  const { alerts } = await morningReports(deps.tenantDb, date);
+  for (const a of alerts) {
+    const evidence = a.evidence as { roomNumber?: string; observed?: string; guest?: string };
+    const room = evidence.roomNumber ?? '';
+    const seen = (evidence.observed ?? '').toLowerCase().replaceAll('_', ' ');
+    exceptions.push({
+      type: 'ROOM_STATUS_MISMATCH',
+      blocking: false,
+      message:
+        a.ruleCode === OCCUPIED_NO_FOLIO
+          ? `Morning report: room ${room} ${seen}, but no guest is checked in`
+          : `Morning report: room ${room} vacant, but ${evidence.guest ?? 'a guest'} is checked in`,
+      roomId: a.entityId,
+      subject: `Room ${room}`,
+    });
+  }
+  return {
+    exceptions,
+    result: {
+      occupied: stays.length,
+      discrepancies: exceptions.length,
+      reportDiscrepancies: alerts.length,
+    },
+  };
 }
 
 /** Day-use stays of `date` (checked in or out): posted at check-in; posted here if not. */

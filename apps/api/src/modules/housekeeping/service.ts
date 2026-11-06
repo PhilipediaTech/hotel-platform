@@ -16,6 +16,7 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
+import { reportsOf } from './status-reports.ts';
 
 // Housekeeping (PRD M5-01–M5-04, M5 rules 1–2; tab 4 row "Housekeeping"; T-080). A business
 // date's cleaning list has one assignment per room: a DEPARTURE for a room whose guest leaves
@@ -171,7 +172,7 @@ export async function getBoard(
 ) {
   const date = await businessDate(deps.tenantDb, tenant.propertyId, deps.clock);
   await ensureCleaningList(deps.tenantDb, tenant.propertyId, date);
-  const [rooms, assignments, fo, attendants] = await Promise.all([
+  const [rooms, assignments, fo, attendants, reports] = await Promise.all([
     deps.tenantDb.room.findMany({
       where: { active: true },
       include: { roomType: true },
@@ -180,6 +181,7 @@ export async function getBoard(
     deps.tenantDb.hkAssignment.findMany({ where: { businessDate: dbDate(date) }, include: WITH }),
     frontOffice(deps.tenantDb, date),
     attendantsOf(deps, tenant),
+    reportsOf(deps.tenantDb, date),
   ]);
   const byRoom = new Map(assignments.map((a) => [a.roomId, a]));
   const floors = [...new Set(rooms.flatMap((r) => (r.floor ? [r.floor] : [])))];
@@ -205,6 +207,8 @@ export async function getBoard(
             ? 'NORMAL'
             : 'LOW',
       assignment: a ? assignmentItem(a) : null,
+      observed: reports.latest.get(r.id)?.observed ?? null,
+      discrepancy: reports.discrepancy.get(r.id) ?? null,
     };
   });
   return { businessDate: date, floors, rooms: data, attendants };

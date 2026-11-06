@@ -1,0 +1,110 @@
+{
+  "leakage": {
+    "title": "Leakage alerts",
+    "totals": {
+      "open": "Open",
+      "reviewed": "Reviewed",
+      "recovered": "Recovered"
+    },
+    "byRule": {
+      "title": "By rule",
+      "rule": "Rule",
+      "open": "Open",
+      "reviewed": "Reviewed",
+      "recovered": "Recovered",
+      "off": "Off"
+    },
+    "filters": {
+      "status": "Status",
+      "rule": "Rule",
+      "all": "All",
+      "allRules": "All rules",
+      "OPEN": "Open",
+      "REVIEWED": "Reviewed"
+    },
+    "list": {
+      "label": "Alerts",
+      "empty": "No alerts here.",
+      "loadMore": "Show more",
+      "about": "About {{name}}",
+      "outcomes_one": "{{count}} outcome",
+      "outcomes_other": "{{count}} outcomes"
+    },
+    "severity": {
+      "LOW": "Low",
+      "NORMAL": "Normal",
+      "HIGH": "High",
+      "CRITICAL": "Critical"
+    },
+    "status": {
+      "OPEN": "Open",
+      "REVIEWED": "Reviewed"
+    },
+    "detail": {
+      "label": "Alert",
+      "close": "Close",
+      "raised": "Raised {{when}} · business day {{date}}",
+      "evidence": "Evidence",
+      "outcomes": "Outcomes",
+      "noOutcomes": "No outcome yet.",
+      "by": "{{name}}, {{when}}",
+      "recovered": "Recovered {{amount}}",
+      "line": "Charge on folio {{folio}}: {{description}}",
+      "payment": "Payment {{method}} {{amount}}"
+    },
+    "evidence": {
+      "roomNumber": "Room",
+      "room": "Room",
+      "observed": "Housekeeping saw",
+      "frontOffice": "Front office shows",
+      "guest": "Guest",
+      "reservation": "Booking",
+      "night": "Night",
+      "ratePlan": "Rate plan",
+      "amountMinor": "Amount",
+      "floorMinor": "Plan floor",
+      "reversals": "Reversals",
+      "totalMinor": "Total",
+      "toleranceMinor": "Tolerance",
+      "reference": "Reference",
+      "senderName": "Sender",
+      "receivedAt": "Received",
+      "recordedAt": "Recorded",
+      "source": "Source",
+      "folio": "Folio",
+      "currency": "Currency",
+      "lines": "Counts"
+    },
+    "outcome": {
+      "title": "Add an outcome",
+      "kind": "Outcome",
+      "EXPLAINED": "Explained",
+      "RECOVERED": "Recovered amount",
+      "ACTION_TAKEN": "Action taken",
+      "FALSE_POSITIVE": "False positive",
+      "amount": "Amount recovered",
+      "folio": "Folio that recovered it",
+      "folioHint": "Folio number, guest or room",
+      "find": "Find",
+      "noFolios": "No open folio matches.",
+      "recoveredBy": "Charge or payment",
+      "choose": "Choose…",
+      "charges": "Charges",
+      "payments": "Payments",
+      "note": "Note",
+      "noteHint": "What you found. Outcomes are added, never changed.",
+      "submit": "Add outcome",
+      "added": "Outcome added.",
+      "badAmount": "Enter the amount recovered."
+    },
+    "rules": {
+      "title": "Rule settings",
+      "on": "On",
+      "instant": "Tell me at once",
+      "instantHint": "Off: waits for the flash report. Messages start when WhatsApp is connected.",
+      "required": "Always on: other controls rely on it.",
+      "save": "Save",
+      "saved": "Saved."
+    }
+  }
+}

@@ -1,5 +1,4 @@
 import {
-  DEFAULT_SHIFT_TOLERANCE_MINOR,
   type CloseShiftBody,
   type CurrentShift,
   type HandoverItem,
@@ -13,7 +12,7 @@ import { businessDate } from '../../core/business-day.ts';
 import type { Clock } from '../../core/clock.ts';
 import { pgErrorInfo, type Db } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
-import { recordEvent } from '../../core/outbox.ts';
+import { amountParam, raiseAlert, ruleSettings } from '../leakage/engine.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 
@@ -35,7 +34,6 @@ type Tx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
 type Client = Tx | TenantDb;
 
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
-const dbDate = (date: string) => new Date(`${date}T00:00:00Z`);
 const abs = (n: bigint) => (n < 0n ? -n : n);
 
 const SHIFT = {
@@ -47,16 +45,12 @@ const SHIFT = {
 
 type FullShift = Prisma.CashierShiftGetPayload<{ include: typeof SHIFT }>;
 
-/** The property's variance tolerance per method (settings.shiftVarianceToleranceMinor). */
+/**
+ * The variance tolerance per method: the cash variance rule's threshold (S22, T-090), else the
+ * property's settings.shiftVarianceToleranceMinor, else ₦500.
+ */
 async function toleranceOf(db: Client, propertyId: string): Promise<bigint> {
-  const property = await db.property.findUniqueOrThrow({ where: { id: propertyId } });
-  const settings = (property.settings ?? {}) as Record<string, unknown>;
-  const value = settings.shiftVarianceToleranceMinor;
-  const text =
-    typeof value === 'string' || typeof value === 'number'
-      ? String(value)
-      : DEFAULT_SHIFT_TOLERANCE_MINOR;
-  return /^\d{1,18}$/.test(text) ? BigInt(text) : BigInt(DEFAULT_SHIFT_TOLERANCE_MINOR);
+  return amountParam(await ruleSettings(db, propertyId, 'SHIFT_VARIANCE'), 'toleranceMinor');
 }
 
 async function baseCurrency(db: Client, propertyId: string): Promise<string> {
@@ -387,21 +381,17 @@ export async function closeShift(
     if (over.length > 0) {
       // The shift acceptance criterion: a variance above tolerance raises a leakage alert.
       const worst = over.reduce((a, b) => (abs(b.varianceMinor) > abs(a.varianceMinor) ? b : a));
-      const alert = await tx.leakageAlert.create({
-        data: {
-          ruleCode: 'SHIFT_VARIANCE',
-          businessDate: dbDate(date),
-          severity: abs(worst.varianceMinor) > tolerance * 10n ? 'HIGH' : 'NORMAL',
-          entityType: 'cashier_shift',
-          entityId: shift.id,
-          subjectUserId: shift.userId,
-          evidence,
-          dedupeKey: `SHIFT_VARIANCE:${shift.id}`,
-        } as unknown as Prisma.LeakageAlertUncheckedCreateInput, // tenant IDs come from the client
-      });
-      await recordEvent(tx, {
-        type: 'leakage.alert_raised',
-        payload: { alertId: alert.id, ruleCode: 'SHIFT_VARIANCE', shiftId: shift.id },
+      await raiseAlert(tx, {
+        propertyId: shift.propertyId,
+        ruleCode: 'SHIFT_VARIANCE',
+        businessDate: date,
+        severity: abs(worst.varianceMinor) > tolerance * 10n ? 'HIGH' : 'NORMAL',
+        entityType: 'cashier_shift',
+        entityId: shift.id,
+        subjectUserId: shift.userId,
+        evidence,
+        dedupeKey: `SHIFT_VARIANCE:${shift.id}`,
+        event: { shiftId: shift.id },
       });
     }
   });

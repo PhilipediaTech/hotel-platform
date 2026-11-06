@@ -7760,6 +7760,328 @@
           "vips"
         ]
       },
+      "LeakageAlert": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "ruleCode": {
+            "type": "string"
+          },
+          "rule": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "OCCUPIED_NO_FOLIO",
+              "RATE_OVERRIDE",
+              "REVERSAL_PATTERN",
+              "SHIFT_VARIANCE",
+              "UNMATCHED_TRANSFER",
+              null
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "businessDate": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "subject": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "REVIEWED"
+            ]
+          },
+          "raisedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "outcomes": {
+            "type": "integer"
+          },
+          "recoveredMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          }
+        },
+        "required": [
+          "id",
+          "ruleCode",
+          "rule",
+          "label",
+          "businessDate",
+          "severity",
+          "entityType",
+          "entityId",
+          "subject",
+          "evidence",
+          "status",
+          "raisedAt",
+          "outcomes",
+          "recoveredMinor"
+        ]
+      },
+      "LeakageAlertDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "ruleCode": {
+            "type": "string"
+          },
+          "rule": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "OCCUPIED_NO_FOLIO",
+              "RATE_OVERRIDE",
+              "REVERSAL_PATTERN",
+              "SHIFT_VARIANCE",
+              "UNMATCHED_TRANSFER",
+              null
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "businessDate": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "subject": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "REVIEWED"
+            ]
+          },
+          "raisedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "outcomes": {
+            "type": "integer"
+          },
+          "recoveredMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "outcomeList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "EXPLAINED",
+                    "RECOVERED",
+                    "ACTION_TAKEN",
+                    "FALSE_POSITIVE"
+                  ]
+                },
+                "recoveredMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "linkedLine": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "folioId": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "folioNumber": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    "businessDate": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "folioId",
+                    "folioNumber",
+                    "description",
+                    "amountMinor",
+                    "businessDate"
+                  ]
+                },
+                "linkedPayment": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    "reference": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "businessDate": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "method",
+                    "amountMinor",
+                    "reference",
+                    "businessDate"
+                  ]
+                },
+                "note": {
+                  "type": "string"
+                },
+                "by": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "at": {
+                  "$ref": "#/components/schemas/Instant"
+                }
+              },
+              "required": [
+                "id",
+                "outcome",
+                "recoveredMinor",
+                "linkedLine",
+                "linkedPayment",
+                "note",
+                "by",
+                "at"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "ruleCode",
+          "rule",
+          "label",
+          "businessDate",
+          "severity",
+          "entityType",
+          "entityId",
+          "subject",
+          "evidence",
+          "status",
+          "raisedAt",
+          "outcomes",
+          "recoveredMinor",
+          "outcomeList"
+        ]
+      },
       "ExchangeRates": {
         "type": "object",
         "properties": {
@@ -31222,6 +31544,986 @@
           },
           "409": {
             "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leakage/alerts": {
+      "get": {
+        "operationId": "listLeakageAlerts",
+        "summary": "Leakage alerts, newest first",
+        "tags": [
+          "Leakage"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "leakage.review",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "REVIEWED"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OCCUPIED_NO_FOLIO",
+                "RATE_OVERRIDE",
+                "REVERSAL_PATTERN",
+                "SHIFT_VARIANCE",
+                "UNMATCHED_TRANSFER"
+              ]
+            },
+            "required": false,
+            "name": "rule",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LeakageAlert"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "nextCursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leakage/alerts/{alertId}": {
+      "get": {
+        "operationId": "getLeakageAlert",
+        "summary": "A leakage alert with its evidence and outcomes",
+        "tags": [
+          "Leakage"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "leakage.review",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "alertId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeakageAlertDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leakage/alerts/{alertId}/outcomes": {
+      "post": {
+        "operationId": "addLeakageAlertOutcome",
+        "summary": "Record what the review found (M6-08)",
+        "tags": [
+          "Leakage"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Outcomes are added, never edited (M6 rule 3). The first one marks the alert REVIEWED. A recovered amount links to the folio line or payment that recovered it.",
+        "x-permission": "leakage.review",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "alertId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "EXPLAINED",
+                      "RECOVERED",
+                      "ACTION_TAKEN",
+                      "FALSE_POSITIVE"
+                    ]
+                  },
+                  "recoveredMinor": {
+                    "$ref": "#/components/schemas/AmountMinor"
+                  },
+                  "linkedLineId": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Uuid"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "linkedPaymentId": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Uuid"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "outcome",
+                  "note"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "alertId": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "outcomeId": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "OPEN",
+                        "REVIEWED"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "alertId",
+                    "outcomeId",
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leakage/rules": {
+      "get": {
+        "operationId": "listLeakageRules",
+        "summary": "The leakage rules, their settings and alert counts",
+        "tags": [
+          "Leakage"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "leakage.review",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string"
+                    },
+                    "rules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "OCCUPIED_NO_FOLIO",
+                              "RATE_OVERRIDE",
+                              "REVERSAL_PATTERN",
+                              "SHIFT_VARIANCE",
+                              "UNMATCHED_TRANSFER"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "trigger": {
+                            "type": "string"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "canDisable": {
+                            "type": "boolean"
+                          },
+                          "notifyInstant": {
+                            "type": "boolean"
+                          },
+                          "params": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "amount",
+                                    "count",
+                                    "hours"
+                                  ]
+                                },
+                                "value": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                },
+                                "default": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "label",
+                                "kind",
+                                "value",
+                                "default"
+                              ]
+                            }
+                          },
+                          "open": {
+                            "type": "integer"
+                          },
+                          "reviewed": {
+                            "type": "integer"
+                          },
+                          "recoveredMinor": {
+                            "$ref": "#/components/schemas/AmountMinor"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "label",
+                          "trigger",
+                          "enabled",
+                          "canDisable",
+                          "notifyInstant",
+                          "params",
+                          "open",
+                          "reviewed",
+                          "recoveredMinor"
+                        ]
+                      }
+                    },
+                    "totals": {
+                      "type": "object",
+                      "properties": {
+                        "open": {
+                          "type": "integer"
+                        },
+                        "reviewed": {
+                          "type": "integer"
+                        },
+                        "recoveredMinor": {
+                          "$ref": "#/components/schemas/AmountMinor"
+                        }
+                      },
+                      "required": [
+                        "open",
+                        "reviewed",
+                        "recoveredMinor"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "rules",
+                    "totals"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateLeakageRules",
+        "summary": "Change rules: on or off, thresholds, instant notification",
+        "tags": [
+          "Leakage"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Changing `notifyInstant` also needs `leakage.notify` (M6-09).",
+        "x-permission": "leakage.review",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "OCCUPIED_NO_FOLIO",
+                            "RATE_OVERRIDE",
+                            "REVERSAL_PATTERN",
+                            "SHIFT_VARIANCE",
+                            "UNMATCHED_TRANSFER"
+                          ]
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "notifyInstant": {
+                          "type": "boolean"
+                        },
+                        "params": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 5
+                  }
+                },
+                "required": [
+                  "rules"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string"
+                    },
+                    "rules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "OCCUPIED_NO_FOLIO",
+                              "RATE_OVERRIDE",
+                              "REVERSAL_PATTERN",
+                              "SHIFT_VARIANCE",
+                              "UNMATCHED_TRANSFER"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "trigger": {
+                            "type": "string"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "canDisable": {
+                            "type": "boolean"
+                          },
+                          "notifyInstant": {
+                            "type": "boolean"
+                          },
+                          "params": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "amount",
+                                    "count",
+                                    "hours"
+                                  ]
+                                },
+                                "value": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                },
+                                "default": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "label",
+                                "kind",
+                                "value",
+                                "default"
+                              ]
+                            }
+                          },
+                          "open": {
+                            "type": "integer"
+                          },
+                          "reviewed": {
+                            "type": "integer"
+                          },
+                          "recoveredMinor": {
+                            "$ref": "#/components/schemas/AmountMinor"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "label",
+                          "trigger",
+                          "enabled",
+                          "canDisable",
+                          "notifyInstant",
+                          "params",
+                          "open",
+                          "reviewed",
+                          "recoveredMinor"
+                        ]
+                      }
+                    },
+                    "totals": {
+                      "type": "object",
+                      "properties": {
+                        "open": {
+                          "type": "integer"
+                        },
+                        "reviewed": {
+                          "type": "integer"
+                        },
+                        "recoveredMinor": {
+                          "$ref": "#/components/schemas/AmountMinor"
+                        }
+                      },
+                      "required": [
+                        "open",
+                        "reviewed",
+                        "recoveredMinor"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "rules",
+                    "totals"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
             "content": {
               "application/json": {
                 "schema": {

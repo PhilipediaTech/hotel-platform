@@ -123,6 +123,7 @@ model Property {
   depositEntries       DepositLedgerEntry[]
   exchangeRates        ExchangeRate[]
   leakageAlerts        LeakageAlert[]
+  leakageRules         LeakageRule[]
   nightAuditRuns       NightAuditRun[]
   roomChargePostings   RoomChargePosting[]
   paymentIntents       PaymentIntent[]
@@ -249,6 +250,7 @@ model User {
   shiftsSignedOff    CashierShift[]     @relation("ShiftSignedOff")
   cashReceived       CashHandover[]
   leakageAlerts      LeakageAlert[]
+  alertOutcomes      AlertOutcome[]
   paymentsReceived   Payment[]
   exchangeRatesSet   ExchangeRate[]
   nightAuditsStarted NightAuditRun[]
@@ -1434,6 +1436,7 @@ model FolioLine {
   reverses       FolioLine?         @relation("LineReversal", fields: [reversesLineId], references: [id], onDelete: Restrict)
   reversedBy     FolioLine?         @relation("LineReversal")
   roomCharge     RoomChargePosting?
+  alertOutcomes  AlertOutcome[]
   shift          CashierShift?      @relation(fields: [propertyId, shiftId], references: [propertyId, id], onDelete: Restrict)
 
   @@index([folioId])
@@ -1531,7 +1534,8 @@ model CashHandover {
   @@map("cash_handovers")
 }
 
-// ── Leakage (M-control; tab 3). Rules and review come later; T-061 raises shift variances. ──
+// ── Leakage (PRD M6-07–M6-09, M6 rule 3; tab 3). Alerts are raised by the rules (T-090), by
+// shift close (T-061), room-status reports (T-081) and the transfer job (T-071). ──
 
 enum Priority {
   LOW
@@ -1557,12 +1561,62 @@ model LeakageAlert {
   status        String   @default("OPEN")
   raisedAt      DateTime @default(now()) @map("raised_at") @db.Timestamptz(6)
 
-  property    Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  subjectUser User?    @relation(fields: [subjectUserId], references: [id], onDelete: SetNull)
+  property    Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  subjectUser User?          @relation(fields: [subjectUserId], references: [id], onDelete: SetNull)
+  outcomes    AlertOutcome[]
 
   @@unique([propertyId, dedupeKey])
   @@index([propertyId, status])
   @@map("leakage_alerts")
+}
+
+enum AlertOutcomeKind {
+  EXPLAINED
+  RECOVERED
+  ACTION_TAKEN
+  FALSE_POSITIVE
+
+  @@map("alert_outcome_kind")
+}
+
+/// A property's settings of one leakage rule (T-090). No row = the rule's defaults (on, its
+/// default thresholds, waiting for the flash report).
+model LeakageRule {
+  id            String  @id @default(uuid()) @db.Uuid
+  propertyId    String  @map("property_id") @db.Uuid
+  /// OCCUPIED_NO_FOLIO, RATE_OVERRIDE, REVERSAL_PATTERN, SHIFT_VARIANCE, UNMATCHED_TRANSFER
+  code          String
+  enabled       Boolean @default(true)
+  params        Json    @default("{}")
+  notifyInstant Boolean @default(false) @map("notify_instant")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, code])
+  @@map("leakage_rules")
+}
+
+/// What a reviewer found (M6-08). Append-only (tab 3 trigger 4): outcomes are added, never
+/// edited (M6 rule 3). A recovered amount links to the folio line or payment that recovered it.
+/// No property column (tab 3): reach outcomes through their (scoped) alert.
+model AlertOutcome {
+  id              String           @id @default(uuid()) @db.Uuid
+  alertId         String           @map("alert_id") @db.Uuid
+  outcome         AlertOutcomeKind
+  recoveredMinor  BigInt?          @map("recovered_minor")
+  linkedLineId    String?          @map("linked_line_id") @db.Uuid
+  linkedPaymentId String?          @map("linked_payment_id") @db.Uuid
+  note            String
+  byUserId        String           @map("by_user_id") @db.Uuid
+  at              DateTime         @default(now()) @db.Timestamptz(6)
+
+  alert         LeakageAlert @relation(fields: [alertId], references: [id], onDelete: Restrict)
+  linkedLine    FolioLine?   @relation(fields: [linkedLineId], references: [id], onDelete: Restrict)
+  linkedPayment Payment?     @relation(fields: [linkedPaymentId], references: [id], onDelete: Restrict)
+  byUser        User         @relation(fields: [byUserId], references: [id], onDelete: Restrict)
+
+  @@index([alertId])
+  @@map("alert_outcomes")
 }
 
 // ── Payments (M4-08, M4 rules 1, 4, 5; tab 3; T-062) ───────────────────────────────────
@@ -1607,6 +1661,7 @@ model Payment {
   intent          PaymentIntent?
   matchedTransfer UnmatchedTransfer?
   depositEntries  DepositLedgerEntry[]
+  alertOutcomes   AlertOutcome[]
 
   @@index([propertyId, businessDate])
   @@index([folioId])

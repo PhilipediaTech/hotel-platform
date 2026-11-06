@@ -9,7 +9,7 @@ import type { z } from 'zod';
 import type { Prisma } from '../../generated/prisma/client.ts';
 import { businessDate } from '../../core/business-day.ts';
 import { AppError } from '../../core/errors.ts';
-import { recordEvent } from '../../core/outbox.ts';
+import { raiseAlert } from '../leakage/engine.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { dueFrom, insertTask, templateOfType } from '../tasks/service.ts';
@@ -158,23 +158,24 @@ export async function submitStatusReport(
       if (!rule || discrepancy.has(e.roomId)) continue;
       const room = rooms.find((r) => r.id === e.roomId);
       const dedupeKey = `${rule}:${date}:${e.roomId}`;
-      const alert = await tx.leakageAlert.create({
-        data: {
-          ruleCode: rule,
-          businessDate: dbDate(date),
-          severity: rule === OCCUPIED_NO_FOLIO ? 'HIGH' : 'NORMAL',
-          entityType: 'room',
-          entityId: e.roomId,
-          evidence: {
-            roomNumber: room?.number ?? null,
-            observed: e.observed,
-            frontOffice: stay ? 'OCCUPIED' : 'VACANT',
-            stayId: stay?.id ?? null,
-            guest: stay ? `${stay.guest.firstName} ${stay.guest.lastName}`.trim() : null,
-            reportedById: tenant.userId,
-          },
-          dedupeKey,
-        } as unknown as Prisma.LeakageAlertUncheckedCreateInput, // tenant IDs come from the client
+      // Always on (canDisable false): M5 rule 6 relies on it.
+      await raiseAlert(tx, {
+        propertyId: tenant.propertyId,
+        ruleCode: rule,
+        businessDate: date,
+        severity: rule === OCCUPIED_NO_FOLIO ? 'HIGH' : 'NORMAL',
+        entityType: 'room',
+        entityId: e.roomId,
+        evidence: {
+          roomNumber: room?.number ?? null,
+          observed: e.observed,
+          frontOffice: stay ? 'OCCUPIED' : 'VACANT',
+          stayId: stay?.id ?? null,
+          guest: stay ? `${stay.guest.firstName} ${stay.guest.lastName}`.trim() : null,
+          reportedById: tenant.userId,
+        },
+        dedupeKey,
+        event: { roomId: e.roomId },
       });
       // M5 rule 6: the front desk gets a task to sort it out.
       const template = await templateOfType(tx, tenant.propertyId, 'DISCREPANCY');
@@ -198,10 +199,6 @@ export async function submitStatusReport(
         });
       }
       discrepancy.set(e.roomId, rule);
-      await recordEvent(tx, {
-        type: 'leakage.alert_raised',
-        payload: { alertId: alert.id, ruleCode: rule, roomId: e.roomId },
-      });
       raised += 1;
     }
     const { data } = await reportedRooms(tx, date, roomIds);

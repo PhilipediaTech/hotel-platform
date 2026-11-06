@@ -20,6 +20,7 @@ describe('migrations', () => {
       SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`;
     expect(rows.map((r) => r.tablename)).toEqual([
       '_prisma_migrations',
+      'alert_outcomes',
       'approval_policies',
       'approval_requests',
       'audit_events',
@@ -48,6 +49,7 @@ describe('migrations', () => {
       'invitations',
       'key_issues',
       'leakage_alerts',
+      'leakage_rules',
       'memberships',
       'mfa_recovery_codes',
       'night_audit_runs',

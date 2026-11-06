@@ -748,6 +748,38 @@ async function bHandoverUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** B's open leakage alert and B's reversal rule, switched off with instant alerts (T-090). */
+async function bLeakage(db: Db, _world: TenantWorld, propertyId: string) {
+  const alert = await db.leakageAlert.create({
+    data: {
+      propertyId,
+      ruleCode: 'OCCUPIED_NO_FOLIO',
+      businessDate: new Date('2026-11-10T00:00:00Z'),
+      severity: 'HIGH',
+      entityType: 'room',
+      entityId: crypto.randomUUID(),
+      evidence: { roomNumber: '999' },
+      dedupeKey: 'OCCUPIED_NO_FOLIO:leak-test',
+    },
+  });
+  await db.leakageRule.create({
+    data: { propertyId, code: 'REVERSAL_PATTERN', enabled: false, notifyInstant: true },
+  });
+  return { alertId: alert.id, code: 'REVERSAL_PATTERN' };
+}
+
+async function bLeakageUnchanged(db: Db, world: TenantWorld) {
+  const alerts = await db.leakageAlert.findMany({
+    where: { propertyId: world.b1.id },
+    include: { outcomes: true },
+  });
+  expect(alerts.map((a) => [a.status, a.outcomes.length])).toEqual([['OPEN', 0]]);
+  const rules = await db.leakageRule.findMany({ where: { propertyId: world.b1.id } });
+  expect(rules.map((r) => [r.code, r.enabled, r.notifyInstant])).toEqual([
+    ['REVERSAL_PATTERN', false, true],
+  ]);
+}
+
 const taskWrite = (body?: object) => ({
   seed: bTask,
   ...(body ? { body: () => body } : {}),
@@ -1564,4 +1596,25 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bHandoverUnchanged,
   },
   acknowledgeHandoverNote: { seed: bHandover, untouched: bHandoverUnchanged },
+  listLeakageAlerts: { seed: bLeakage, listIds: ids },
+  getLeakageAlert: { seed: bLeakage },
+  addLeakageAlertOutcome: {
+    seed: bLeakage,
+    body: () => ({ outcome: 'EXPLAINED', note: 'Leak test' }),
+    untouched: bLeakageUnchanged,
+  },
+  listLeakageRules: {
+    seed: bLeakage,
+    // A rule switched off would be B's: A's are all on.
+    listIds: (body) =>
+      (body as { rules: { code: string; enabled: boolean }[] }).rules
+        .filter((r) => !r.enabled)
+        .map((r) => r.code),
+  },
+  updateLeakageRules: {
+    seed: bLeakage,
+    creates: true,
+    body: () => ({ rules: [{ code: 'REVERSAL_PATTERN', enabled: true, notifyInstant: false }] }),
+    untouched: bLeakageUnchanged,
+  },
 };

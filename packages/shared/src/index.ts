@@ -5,6 +5,7 @@ export * from './dates.ts';
 export * from './errors.ts';
 export * from './files.ts';
 export * from './imports.ts';
+export * from './leakage.ts';
 export * from './permissions.ts';
 export * from './rates.ts';
 export * from './registration.ts';

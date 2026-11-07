@@ -1680,4 +1680,9 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bMessagesUnchanged,
   },
   listMessageDeliveries: { seed: bMessages, listIds: ids },
+  // The home spans properties: B's property must never be one of A's cards (T-091).
+  getOwnerHome: {
+    seed: (_db, _world, propertyId) => Promise.resolve({ propertyId }),
+    listIds: (body) => (body as { properties: { id: string }[] }).properties.map((p) => p.id),
+  },
 };

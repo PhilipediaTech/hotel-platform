@@ -8269,6 +8269,116 @@
           "sentAt"
         ]
       },
+      "OwnerPropertyCard": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "businessDate": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "roomsAvailable": {
+            "type": "integer"
+          },
+          "roomsOccupied": {
+            "type": "integer"
+          },
+          "occupancyBps": {
+            "type": "integer"
+          },
+          "revenueTodayMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "revenueMonthMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "cashTodayMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "transfersTodayMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "openAlerts": {
+            "type": "integer"
+          },
+          "pendingApprovals": {
+            "type": "integer"
+          },
+          "lastFlash": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "businessDate": {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              "roomsAvailable": {
+                "type": "integer"
+              },
+              "roomsSold": {
+                "type": "integer"
+              },
+              "occupancyBps": {
+                "type": "integer"
+              },
+              "roomRevenueMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "adrMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "revparMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "paymentsMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              }
+            },
+            "required": [
+              "businessDate",
+              "roomsAvailable",
+              "roomsSold",
+              "occupancyBps",
+              "roomRevenueMinor",
+              "adrMinor",
+              "revparMinor",
+              "paymentsMinor"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "currency",
+          "status",
+          "businessDate",
+          "roomsAvailable",
+          "roomsOccupied",
+          "occupancyBps",
+          "revenueTodayMinor",
+          "revenueMonthMinor",
+          "cashTodayMinor",
+          "transfersTodayMinor",
+          "openAlerts",
+          "pendingApprovals",
+          "lastFlash"
+        ]
+      },
       "ExchangeRates": {
         "type": "object",
         "properties": {
@@ -33630,6 +33740,98 @@
           },
           "404": {
             "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/owner/home": {
+      "get": {
+        "operationId": "getOwnerHome",
+        "summary": "Owner home: a card per property (M6-11)",
+        "tags": [
+          "Owner"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Every property of the organisation where the caller holds owner.read, whichever property the request names. Figures are live for the open business day; the flash report is the last closed day’s, as night audit kept it.",
+        "x-permission": "owner.read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "properties": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnerPropertyCard"
+                      }
+                    }
+                  },
+                  "required": [
+                    "properties"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
             "content": {
               "application/json": {
                 "schema": {

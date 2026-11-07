@@ -191,6 +191,11 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   whatsappWebhookVerify: {"operationId":"whatsappWebhookVerify","method":"get","path":"/webhooks/whatsapp/{provider}","produces":"text/plain"},
   whatsappWebhook: {"operationId":"whatsappWebhook","method":"post","path":"/webhooks/whatsapp/{provider}","body":true},
   getOwnerHome: {"operationId":"getOwnerHome","method":"get","path":"/owner/home","propertyScoped":true},
+  getDashboardReport: {"operationId":"getDashboardReport","method":"get","path":"/reports/dashboard","propertyScoped":true,"exports":true},
+  getFlashReport: {"operationId":"getFlashReport","method":"get","path":"/reports/flash","propertyScoped":true,"exports":true},
+  getTrialBalanceReport: {"operationId":"getTrialBalanceReport","method":"get","path":"/reports/trial-balance","propertyScoped":true,"exports":true},
+  getCashierReport: {"operationId":"getCashierReport","method":"get","path":"/reports/cashier","propertyScoped":true,"exports":true},
+  getTaxReport: {"operationId":"getTaxReport","method":"get","path":"/reports/tax","propertyScoped":true,"exports":true},
   getExchangeRates: {"operationId":"getExchangeRates","method":"get","path":"/exchange-rates/{date}","propertyScoped":true},
   putExchangeRates: {"operationId":"putExchangeRates","method":"put","path":"/exchange-rates/{date}","body":true,"propertyScoped":true},
 };

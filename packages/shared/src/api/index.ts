@@ -29,5 +29,6 @@ export * from './handovers.ts';
 export * from './leakage.ts';
 export * from './messages.ts';
 export * from './owner.ts';
+export * from './reports.ts';
 export * from './route-meta-source.ts';
 export * from './route-meta.ts';

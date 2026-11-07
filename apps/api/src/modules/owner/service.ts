@@ -54,7 +54,7 @@ export async function propertiesWith(
 }
 
 /** Rooms that can be sold on `date`: active, not out of order or service, not blocked. */
-async function roomsAvailable(db: Db, propertyId: string, date: string): Promise<number> {
+export async function roomsAvailable(db: Db, propertyId: string, date: string): Promise<number> {
   const on = dbDate(date);
   const [rooms, blocked] = await Promise.all([
     db.room.findMany({ where: { propertyId, active: true }, select: { id: true, hkStatus: true } }),

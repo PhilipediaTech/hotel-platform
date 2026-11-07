@@ -75,6 +75,12 @@ const LeakagePage = lazy(() =>
 const AccountPhonePage = lazy(() =>
   import('../routes/account-phone.tsx').then((m) => ({ default: m.AccountPhonePage })),
 );
+const ReportsPage = lazy(() =>
+  import('../routes/reports.tsx').then((m) => ({ default: m.ReportsPage })),
+);
+const DashboardPage = lazy(() =>
+  import('../routes/reports.tsx').then((m) => ({ default: m.DashboardPage })),
+);
 const OwnerHomePage = lazy(() =>
   import('../routes/owner.tsx').then((m) => ({ default: m.OwnerHomePage })),
 );
@@ -108,6 +114,8 @@ const SCREENS: Record<string, ReactElement> = {
   '/leakage': <LeakagePage />,
   '/messages': <MessagesPage />,
   '/owner': <OwnerHomePage />,
+  '/reports': <ReportsPage />,
+  '/dashboard': <DashboardPage />,
   '/reservations': <ReservationsPage />,
   '/calendar': <CalendarPage />,
   '/bookings/new': <NewBookingPage />,

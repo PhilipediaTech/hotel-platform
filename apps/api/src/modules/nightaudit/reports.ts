@@ -94,7 +94,7 @@ export interface AuditReports {
  * its payments (base currency). Deposit ledger, as the guest sees it: what is held is owed to
  * them, so it counts negative.
  */
-async function ledgers(db: TenantDb, through: Date) {
+export async function ledgers(db: TenantDb, through: Date) {
   const [lines, folioPayments, deposits] = await Promise.all([
     db.folioLine.aggregate({
       where: { businessDate: { lte: through } },

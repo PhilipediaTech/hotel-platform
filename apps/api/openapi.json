@@ -8380,6 +8380,598 @@
           "lastFlash"
         ]
       },
+      "DashboardReport": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "businessDate": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "today": {
+            "type": "object",
+            "properties": {
+              "roomsAvailable": {
+                "type": "integer"
+              },
+              "roomsOccupied": {
+                "type": "integer"
+              },
+              "occupancyBps": {
+                "type": "integer"
+              },
+              "revenueMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "revenueByGroup": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "group": {
+                      "type": "string"
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    }
+                  },
+                  "required": [
+                    "group",
+                    "amountMinor"
+                  ]
+                }
+              },
+              "paymentsByMethod": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "method": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    }
+                  },
+                  "required": [
+                    "method",
+                    "count",
+                    "amountMinor"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "roomsAvailable",
+              "roomsOccupied",
+              "occupancyBps",
+              "revenueMinor",
+              "revenueByGroup",
+              "paymentsByMethod"
+            ]
+          },
+          "monthToDate": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              "through": {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              "days": {
+                "type": "integer"
+              },
+              "roomsAvailable": {
+                "type": "integer"
+              },
+              "roomsSold": {
+                "type": "integer"
+              },
+              "occupancyBps": {
+                "type": "integer"
+              },
+              "roomRevenueMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "adrMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "revparMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "revenueByGroup": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "group": {
+                      "type": "string"
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    }
+                  },
+                  "required": [
+                    "group",
+                    "amountMinor"
+                  ]
+                }
+              },
+              "paymentsByMethod": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "method": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    }
+                  },
+                  "required": [
+                    "method",
+                    "count",
+                    "amountMinor"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "from",
+              "through",
+              "days",
+              "roomsAvailable",
+              "roomsSold",
+              "occupancyBps",
+              "roomRevenueMinor",
+              "adrMinor",
+              "revparMinor",
+              "revenueByGroup",
+              "paymentsByMethod"
+            ]
+          },
+          "balances": {
+            "type": "object",
+            "properties": {
+              "guestLedgerMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "depositLedgerMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "openFolios": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "guestLedgerMinor",
+              "depositLedgerMinor",
+              "openFolios"
+            ]
+          },
+          "alerts": {
+            "type": "object",
+            "properties": {
+              "open": {
+                "type": "integer"
+              },
+              "byRule": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "rule": {
+                      "type": "string"
+                    },
+                    "open": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "rule",
+                    "open"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "open",
+              "byRule"
+            ]
+          },
+          "definitions": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "businessDate",
+          "today",
+          "monthToDate",
+          "balances",
+          "alerts",
+          "definitions"
+        ]
+      },
+      "FlashReport": {
+        "type": "object",
+        "properties": {
+          "businessDate": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "nightAuditId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "definitions": {
+            "type": "string"
+          },
+          "roomsTotal": {
+            "type": "integer"
+          },
+          "outOfOrder": {
+            "type": "integer"
+          },
+          "roomsAvailable": {
+            "type": "integer"
+          },
+          "roomsSold": {
+            "type": "integer"
+          },
+          "occupancyBps": {
+            "type": "integer"
+          },
+          "roomRevenueMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "dayUses": {
+            "type": "integer"
+          },
+          "dayUseRevenueMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "adrMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "revparMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "revenueByGroup": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "group": {
+                  "type": "string"
+                },
+                "amountMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                }
+              },
+              "required": [
+                "group",
+                "amountMinor"
+              ]
+            }
+          },
+          "paymentsByMethod": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                },
+                "amountMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                }
+              },
+              "required": [
+                "method",
+                "count",
+                "amountMinor"
+              ]
+            }
+          },
+          "arrivals": {
+            "type": "integer"
+          },
+          "departures": {
+            "type": "integer"
+          },
+          "noShows": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "businessDate",
+          "nightAuditId",
+          "currency",
+          "definitions",
+          "roomsTotal",
+          "outOfOrder",
+          "roomsAvailable",
+          "roomsSold",
+          "occupancyBps",
+          "roomRevenueMinor",
+          "dayUses",
+          "dayUseRevenueMinor",
+          "adrMinor",
+          "revparMinor",
+          "revenueByGroup",
+          "paymentsByMethod",
+          "arrivals",
+          "departures",
+          "noShows"
+        ]
+      },
+      "TrialBalanceReport": {
+        "type": "object",
+        "properties": {
+          "businessDate": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "nightAuditId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "definitions": {
+            "type": "string"
+          },
+          "chargesMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "paymentsMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "arTransfersMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "guestLedgerOpeningMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "guestLedgerClosingMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "depositLedgerOpeningMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "depositLedgerClosingMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "differenceMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "balanced": {
+            "type": "boolean"
+          },
+          "openingMatchesPreviousClose": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "businessDate",
+          "nightAuditId",
+          "currency",
+          "definitions",
+          "chargesMinor",
+          "paymentsMinor",
+          "arTransfersMinor",
+          "guestLedgerOpeningMinor",
+          "guestLedgerClosingMinor",
+          "depositLedgerOpeningMinor",
+          "depositLedgerClosingMinor",
+          "differenceMinor",
+          "balanced",
+          "openingMatchesPreviousClose"
+        ]
+      },
+      "CashierReport": {
+        "type": "object",
+        "properties": {
+          "businessDate": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "nightAuditId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "definitions": {
+            "type": "string"
+          },
+          "shifts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cashier": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "openedAt": {
+                  "type": "string"
+                },
+                "closedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "payments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "method": {
+                        "type": "string"
+                      },
+                      "count": {
+                        "type": "integer"
+                      },
+                      "amountMinor": {
+                        "$ref": "#/components/schemas/AmountMinor"
+                      }
+                    },
+                    "required": [
+                      "method",
+                      "count",
+                      "amountMinor"
+                    ]
+                  }
+                },
+                "counts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "method": {
+                        "type": "string"
+                      },
+                      "expectedMinor": {
+                        "$ref": "#/components/schemas/AmountMinor"
+                      },
+                      "countedMinor": {
+                        "$ref": "#/components/schemas/AmountMinor"
+                      },
+                      "varianceMinor": {
+                        "$ref": "#/components/schemas/AmountMinor"
+                      }
+                    },
+                    "required": [
+                      "method",
+                      "expectedMinor",
+                      "countedMinor",
+                      "varianceMinor"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "cashier",
+                "status",
+                "openedAt",
+                "closedAt",
+                "payments",
+                "counts"
+              ]
+            }
+          }
+        },
+        "required": [
+          "businessDate",
+          "nightAuditId",
+          "currency",
+          "definitions",
+          "shifts"
+        ]
+      },
+      "TaxReport": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "through": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "authorities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "authority": {
+                  "type": "string"
+                },
+                "taxMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "taxRuleId": {
+                        "$ref": "#/components/schemas/Uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "ratesBps": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer"
+                        }
+                      },
+                      "taxableMinor": {
+                        "$ref": "#/components/schemas/AmountMinor"
+                      },
+                      "taxMinor": {
+                        "$ref": "#/components/schemas/AmountMinor"
+                      },
+                      "lines": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "taxRuleId",
+                      "name",
+                      "ratesBps",
+                      "taxableMinor",
+                      "taxMinor",
+                      "lines"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "authority",
+                "taxMinor",
+                "rules"
+              ]
+            }
+          },
+          "totalTaxMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "definitions": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "through",
+          "currency",
+          "authorities",
+          "totalTaxMinor",
+          "definitions"
+        ]
+      },
       "ExchangeRates": {
         "type": "object",
         "properties": {
@@ -34031,6 +34623,626 @@
                   "required": [
                     "properties"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/dashboard": {
+      "get": {
+        "operationId": "getDashboardReport",
+        "summary": "Dashboard: today and month to date (M12-01)",
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Today is live; month to date counts closed days only. `?format=csv|pdf` answers the file and needs report.export (M12-06).",
+        "x-permission": "report.dashboard",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv",
+                "pdf"
+              ],
+              "default": "json"
+            },
+            "required": false,
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. With ?format=csv or pdf, the file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardReport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/flash": {
+      "get": {
+        "operationId": "getFlashReport",
+        "summary": "Flash report of a closed day (M12-02)",
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "As night audit kept it: never changes. 404 for a day without a night audit. `?format=csv|pdf` answers the file and needs report.export (M12-06).",
+        "x-permission": "report.audit",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv",
+                "pdf"
+              ],
+              "default": "json"
+            },
+            "required": false,
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. With ?format=csv or pdf, the file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlashReport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/trial-balance": {
+      "get": {
+        "operationId": "getTrialBalanceReport",
+        "summary": "Trial balance of a closed day (M12-02)",
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "As night audit kept it. `?format=csv|pdf` answers the file and needs report.export (M12-06).",
+        "x-permission": "report.audit",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv",
+                "pdf"
+              ],
+              "default": "json"
+            },
+            "required": false,
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. With ?format=csv or pdf, the file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialBalanceReport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/cashier": {
+      "get": {
+        "operationId": "getCashierReport",
+        "summary": "Cashier summary of a closed day (M12-02)",
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "As night audit kept it. `?format=csv|pdf` answers the file and needs report.export (M12-06).",
+        "x-permission": "report.audit",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv",
+                "pdf"
+              ],
+              "default": "json"
+            },
+            "required": false,
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. With ?format=csv or pdf, the file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashierReport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/tax": {
+      "get": {
+        "operationId": "getTaxReport",
+        "summary": "Tax by authority and period (M12-03)",
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Tax lines posted on closed business days from `from` to `to` (at most a year), by authority and rule, with the amounts they were charged on. `?format=csv|pdf` answers the file and needs report.export (M12-06).",
+        "x-permission": "report.tax",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": true,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": true,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv",
+                "pdf"
+              ],
+              "default": "json"
+            },
+            "required": false,
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. With ?format=csv or pdf, the file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxReport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }

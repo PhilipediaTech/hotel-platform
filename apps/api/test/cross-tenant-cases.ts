@@ -818,6 +818,52 @@ async function bMessagesUnchanged(db: Db, world: TenantWorld, theirs: Record<str
   expect(sent.map((d) => d.id)).toEqual([theirs['deliveryId']]);
 }
 
+/** B's closed day with its kept reports, an open alert and a tax rule (T-092). */
+async function bReports(db: Db, _world: TenantWorld, propertyId: string) {
+  const date = '2026-11-10';
+  await db.nightAuditRun.create({
+    data: {
+      propertyId,
+      businessDate: new Date(`${date}T00:00:00Z`),
+      status: 'COMPLETED',
+      finishedAt: new Date(),
+      summary: { reports: { flash: {}, trialBalance: {}, cashier: { shifts: [] } } },
+    },
+  });
+  await db.businessDay.create({
+    data: {
+      propertyId,
+      date: new Date(`${date}T00:00:00Z`),
+      status: 'CLOSED',
+      closedAt: new Date(),
+    },
+  });
+  await db.leakageAlert.create({
+    data: {
+      propertyId,
+      ruleCode: 'OCCUPIED_NO_FOLIO',
+      businessDate: new Date(`${date}T00:00:00Z`),
+      severity: 'HIGH',
+      entityType: 'room',
+      entityId: crypto.randomUUID(),
+      evidence: {},
+      dedupeKey: 'OCCUPIED_NO_FOLIO:reports-leak-test',
+    },
+  });
+  const code = await db.revenueCode.create({
+    data: { propertyId, code: 'BTAX', name: 'B tax', group: 'TAX' },
+  });
+  await db.taxRule.create({
+    data: { propertyId, name: 'B tax', authority: 'B Revenue Service', revenueCodeId: code.id },
+  });
+  return { date, rule: 'Occupied without folio', authority: 'B Revenue Service' };
+}
+
+const closedDay = {
+  seed: bReports,
+  query: (t: Record<string, string>) => ({ date: t['date'] ?? '' }),
+};
+
 const taskWrite = (body?: object) => ({
   seed: bTask,
   ...(body ? { body: () => body } : {}),
@@ -1680,6 +1726,20 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bMessagesUnchanged,
   },
   listMessageDeliveries: { seed: bMessages, listIds: ids },
+  getDashboardReport: {
+    seed: bReports,
+    listIds: (body) =>
+      (body as { alerts: { byRule: { rule: string }[] } }).alerts.byRule.map((r) => r.rule),
+  },
+  getFlashReport: closedDay,
+  getTrialBalanceReport: closedDay,
+  getCashierReport: closedDay,
+  getTaxReport: {
+    seed: bReports,
+    query: () => ({ from: '2026-11-01', to: '2026-11-30' }),
+    listIds: (body) =>
+      (body as { authorities: { authority: string }[] }).authorities.map((a) => a.authority),
+  },
   // The home spans properties: B's property must never be one of A's cards (T-091).
   getOwnerHome: {
     seed: (_db, _world, propertyId) => Promise.resolve({ propertyId }),

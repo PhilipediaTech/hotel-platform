@@ -1,3 +1,4 @@
+import { EXPORT_PERMISSION, isExportFile, type ExportFile } from './exports.ts';
 import { ApprovalPending, type ParsedRouteInput, type RouteContract } from '@hotel/shared';
 import type { Request, Response, Router } from 'express';
 import type { z } from 'zod';
@@ -21,7 +22,11 @@ export interface RouteContext {
  * performOrRequest's pending result, sent as 202 (only routes marked `approval`; checked
  * when it happens, since contract flags are not literal types).
  */
-type HandlerResult<R extends RouteContract> = z.input<R['response']> | ApprovalPendingResult;
+type HandlerResult<R extends RouteContract> =
+  | z.input<R['response']>
+  | ApprovalPendingResult
+  // Only an `exports` route may answer a file (checked when it runs).
+  | ExportFile;
 export type RouteHandler<R extends RouteContract> = (
   input: ParsedRouteInput<R>,
   ctx: RouteContext,
@@ -118,6 +123,15 @@ export function mountRoute<R extends RouteContract>(
         permission: route.permission,
       });
     }
+    // M12-06: a report as CSV or PDF also needs the export permission.
+    const format = (query as { format?: unknown } | undefined)?.format;
+    if (route.exports && format !== undefined && format !== 'json') {
+      if (!tenant?.permissions.has(EXPORT_PERMISSION)) {
+        throw new AppError('FORBIDDEN', 'Your role does not allow exports.', {
+          permission: EXPORT_PERMISSION,
+        });
+      }
+    }
 
     const run = async (): Promise<{ status: number; body: unknown }> => {
       const result = await handler({ params, query, body } as ParsedRouteInput<R>, {
@@ -133,6 +147,7 @@ export function mountRoute<R extends RouteContract>(
       }
       const status = route.status ?? 200;
       if (status === 204) return { status, body: undefined };
+      if (route.exports && isExportFile(result)) return { status, body: result };
       const parsed = route.response.safeParse(result);
       if (!parsed.success) {
         // A server bug, not a client error: surfaces as 500 INTERNAL and is logged.
@@ -146,6 +161,18 @@ export function mountRoute<R extends RouteContract>(
       route.idempotent && auth ? await withIdempotency(req, res, auth.user.id, run) : await run();
     if (status === 204) {
       res.status(204).end();
+      return;
+    }
+    if (isExportFile(out)) {
+      res
+        .status(status)
+        .type(out.contentType)
+        .set(
+          'Content-Disposition',
+          `attachment; filename="${out.filename.replace(/[^\w.-]/g, '_')}"`,
+        )
+        .set('Cache-Control', 'no-store')
+        .send(Buffer.from(out.content));
       return;
     }
     if (route.produces === 'text/plain') {

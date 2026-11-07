@@ -71,7 +71,7 @@ export interface ApiClient<Routes extends RouteTable = ApiRoutes> {
     operationId: K,
     ...args: CallArgs<Routes[K]>
   ): Promise<RouteResponse<Routes[K]>>;
-  /** A `produces` route (a PDF): the file, to open or save. */
+  /** A `produces` route (a PDF), or a report with `format` csv or pdf: the file. */
   download<K extends keyof Routes & string>(
     operationId: K,
     ...args: CallArgs<Routes[K]>
@@ -145,6 +145,7 @@ export function createApiClient<Routes extends RouteTable = ApiRoutes>(
     route: RouteMeta | RouteContract,
     input: { params?: unknown; query?: unknown; body?: unknown } = {},
     callOptions: CallOptions = {},
+    asFile = false,
   ): Promise<unknown> {
     const url =
       baseUrl +
@@ -178,7 +179,7 @@ export function createApiClient<Routes extends RouteTable = ApiRoutes>(
     const response = await doFetch(url, init);
     if (!response.ok) throw await toApiError(response);
     if (response.status === 204) return undefined;
-    if (route.produces) return response.blob();
+    if (route.produces || asFile) return response.blob();
     // 202 ApprovalPending is a success the caller checks for (tab 4, "Approvals").
     return response.json();
   }
@@ -195,12 +196,14 @@ export function createApiClient<Routes extends RouteTable = ApiRoutes>(
     },
     download(operationId, ...args) {
       const route = routes[operationId];
-      if (!route?.produces) throw new Error(`${operationId} does not produce a file`);
+      if (!route?.produces && !route?.exports) {
+        throw new Error(`${operationId} does not produce a file`);
+      }
       const [input, callOptions] = args as [
         { params?: unknown; query?: unknown; body?: unknown } | undefined,
         CallOptions | undefined,
       ];
-      return request(route, input, callOptions) as Promise<Blob>;
+      return request(route, input, callOptions, true) as Promise<Blob>;
     },
   };
 }

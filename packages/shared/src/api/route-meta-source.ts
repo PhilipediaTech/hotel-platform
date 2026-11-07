@@ -12,6 +12,7 @@ export interface RouteMeta {
   propertyScoped?: true;
   idempotent?: true;
   ifMatch?: true;
+  exports?: true;
   produces?: RouteContract['produces'];
 }
 
@@ -24,6 +25,7 @@ export function routeMetaOf(route: RouteContract): RouteMeta {
     ...(route.propertyScoped ? { propertyScoped: true as const } : {}),
     ...(route.idempotent ? { idempotent: true as const } : {}),
     ...(route.ifMatch ? { ifMatch: true as const } : {}),
+    ...(route.exports ? { exports: true as const } : {}),
     ...(route.produces ? { produces: route.produces } : {}),
   };
 }

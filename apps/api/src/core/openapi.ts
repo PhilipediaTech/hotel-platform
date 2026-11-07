@@ -91,7 +91,16 @@ function toRouteConfig(route: RouteContract): RouteConfig {
                 },
               },
             }
-          : { description: STATUS_TEXT[status] ?? '', content: json(route.response) },
+          : route.exports
+            ? {
+                description: `${STATUS_TEXT[status] ?? ''}. With ?format=csv or pdf, the file.`,
+                content: {
+                  ...json(route.response),
+                  'text/csv': { schema: { type: 'string' } },
+                  'application/pdf': { schema: { type: 'string', format: 'binary' } },
+                },
+              }
+            : { description: STATUS_TEXT[status] ?? '', content: json(route.response) },
     ...errorResponses(routeErrorCodes(route)),
   };
   if (route.approval) {

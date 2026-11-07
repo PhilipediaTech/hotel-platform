@@ -82,8 +82,8 @@ describe('routing', () => {
   });
 
   it('shows which ticket builds a screen', async () => {
-    renderApp('/reports', { permissions: ['report.flash'] });
-    expect(await screen.findByText('Screen S28 arrives with T-092.')).toBeInTheDocument();
+    renderApp('/settings/billing', { permissions: ['subscription.read'] });
+    expect(await screen.findByText('Screen S30 arrives with T-100.')).toBeInTheDocument();
   });
 
   it('shows a not-found page for unknown paths', async () => {

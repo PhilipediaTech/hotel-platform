@@ -45,6 +45,11 @@ export interface RouteContract<
    * file name, or plain text (`text/plain`, `response` is a string; webhook checks).
    */
   produces?: 'application/pdf' | 'text/plain';
+  /**
+   * A report (PRD M12-06; tab 4 Reports, `?format=csv|pdf`): its query has `format`; csv and
+   * pdf answer a file and need `report.export` as well as `permission`.
+   */
+  exports?: true;
   /** Success status; 204 means no body (use `z.void()` as `response`). */
   status?: 200 | 201 | 202 | 204;
   response: Response;

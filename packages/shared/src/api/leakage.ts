@@ -71,6 +71,7 @@ export const listLeakageAlerts = defineRoute({
   tags: ['Leakage'],
   propertyScoped: true,
   permission: 'leakage.review',
+  module: 'leakage',
   query: PageQuery.extend({
     status: z.enum(['OPEN', 'REVIEWED']).optional(),
     rule: z.enum(LEAKAGE_RULE_CODES).optional(),
@@ -88,6 +89,7 @@ export const getLeakageAlert = defineRoute({
   tags: ['Leakage'],
   propertyScoped: true,
   permission: 'leakage.review',
+  module: 'leakage',
   params: z.object({ alertId: Uuid }),
   response: LeakageAlertDetail,
 });
@@ -139,6 +141,7 @@ export const addLeakageAlertOutcome = defineRoute({
   tags: ['Leakage'],
   propertyScoped: true,
   permission: 'leakage.review',
+  module: 'leakage',
   idempotent: true,
   status: 201,
   params: z.object({ alertId: Uuid }),
@@ -188,6 +191,7 @@ export const listLeakageRules = defineRoute({
   tags: ['Leakage'],
   propertyScoped: true,
   permission: 'leakage.review',
+  module: 'leakage',
   response: LeakageRules,
 });
 
@@ -214,6 +218,7 @@ export const updateLeakageRules = defineRoute({
   tags: ['Leakage'],
   propertyScoped: true,
   permission: 'leakage.review',
+  module: 'leakage',
   body: LeakageRulesBody,
   response: LeakageRules,
 });

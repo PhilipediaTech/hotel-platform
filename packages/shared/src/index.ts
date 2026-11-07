@@ -7,6 +7,7 @@ export * from './files.ts';
 export * from './imports.ts';
 export * from './leakage.ts';
 export * from './messages.ts';
+export * from './platform.ts';
 export * from './permissions.ts';
 export * from './rates.ts';
 export * from './registration.ts';

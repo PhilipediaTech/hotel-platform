@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createQueryClient } from '../../app/query-client.ts';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { buildRoutes } from '../../app/routes.tsx';
+import { NAV_ITEMS } from '../../app/navigation.ts';
+import { buildRoutes, SCREEN_PATHS } from '../../app/routes.tsx';
 import { PREVIEW_SESSION, SessionContext, type ShellSession } from '../../app/session.ts';
 import { swState, updateServiceWorker } from '../../test/pwa-register-stub.ts';
 import { formatBusinessDate } from './top-bar.tsx';
@@ -65,6 +66,15 @@ describe('app shell landmarks', () => {
     expect(screen.getByRole('main')).toHaveAttribute('id', 'main');
   });
 
+  it('says when a support session is reading this hotel, read-only (T-100)', async () => {
+    renderApp('/front-desk', {
+      support: { organisationName: 'Obi Hotels', expiresAt: '2026-11-14T10:30:00Z' },
+    });
+    expect(
+      await screen.findByText(/Support session for Obi Hotels: read-only until/),
+    ).toBeInTheDocument();
+  });
+
   it('offers a skip link to the main content', async () => {
     renderApp('/front-desk');
     expect(await screen.findByRole('link', { name: 'Skip to content' })).toHaveAttribute(
@@ -81,9 +91,11 @@ describe('routing', () => {
     expect(router.state.location.pathname).toBe('/front-desk');
   });
 
-  it('shows which ticket builds a screen', async () => {
-    renderApp('/settings/billing', { permissions: ['subscription.read'] });
-    expect(await screen.findByText('Screen S30 arrives with T-100.')).toBeInTheDocument();
+  it('every screen in the navigation is built (T-100 built the last placeholders)', () => {
+    const missing = NAV_ITEMS.map((i) => i.path.split('?')[0] ?? '').filter(
+      (p) => !SCREEN_PATHS.includes(p),
+    );
+    expect(missing).toEqual([]);
   });
 
   it('shows a not-found page for unknown paths', async () => {

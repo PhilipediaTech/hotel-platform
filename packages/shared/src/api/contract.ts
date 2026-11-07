@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { ErrorCode } from '../errors.ts';
+import type { ModuleCode } from '../platform.ts';
 
 // An API route defined once as data. The API mounts it (validation in, schema-shaped
 // output), the OpenAPI document is generated from it, and the web client is typed by it.
@@ -50,6 +51,10 @@ export interface RouteContract<
    * pdf answer a file and need `report.export` as well as `permission`.
    */
   exports?: true;
+  /** Platform staff only (PLATFORM_ADMIN_EMAILS, MFA on); never property-scoped (T-100). */
+  platform?: true;
+  /** The module a route belongs to: switched off for the tenant, it answers MODULE_DISABLED. */
+  module?: ModuleCode;
   /** Success status; 204 means no body (use `z.void()` as `response`). */
   status?: 200 | 201 | 202 | 204;
   response: Response;

@@ -131,7 +131,25 @@ export const Me = z
       pinSwitchAvailable: z.boolean(),
       expiresAt: Instant,
     }),
-    organisations: z.array(z.object({ id: Uuid, name: z.string() })),
+    organisations: z.array(
+      z.object({
+        id: Uuid,
+        name: z.string(),
+        /** Modules the platform switched off for this group (T-100). */
+        disabledModules: z.array(z.string()),
+      }),
+    ),
+    /** Platform staff (PLATFORM_ADMIN_EMAILS): may open S31 (T-100). */
+    platformAdmin: z.boolean(),
+    /** Open support sessions: their groups appear in properties, read-only (T-100). */
+    support: z.array(
+      z.object({
+        sessionId: Uuid,
+        organisationId: Uuid,
+        organisationName: z.string(),
+        expiresAt: Instant,
+      }),
+    ),
     /** Every property the user can open, through property or organisation-wide roles. */
     properties: z.array(MeProperty),
     memberships: z.array(MeMembership),

@@ -1,0 +1,53 @@
+{
+  "platform": {
+    "title": "Platform",
+    "tenants": "Hotel groups",
+    "noTenants": "No hotel group yet.",
+    "properties_one": "{{count}} property",
+    "properties_other": "{{count}} properties",
+    "noPlan": "No plan",
+    "usage": "{{rooms}} active rooms · {{messages}} WhatsApp this month",
+    "inSupport": "support session open",
+    "plan": "Plan and prices",
+    "planName": "Plan",
+    "plans": {
+      "ESSENTIALS": "Essentials",
+      "PROFESSIONAL": "Professional",
+      "GROUP": "Group"
+    },
+    "pricePerRoom": "Price per active room (₦)",
+    "minimum": "Monthly minimum (₦)",
+    "status": "Status",
+    "statuses": {
+      "TRIAL": "Trial",
+      "ACTIVE": "Active",
+      "PAST_DUE": "Payment overdue",
+      "SUSPENDED": "Suspended"
+    },
+    "periodEnd": "Current period ends",
+    "savePlan": "Save plan",
+    "saved": "Saved.",
+    "modules": "Modules",
+    "on": "On",
+    "invoices": "Invoices",
+    "month": "Month",
+    "issue": "Issue invoice",
+    "noInvoices": "No invoice yet.",
+    "markPaid": "Mark paid",
+    "void": "Void",
+    "invoiceStatus": {
+      "ISSUED": "Due",
+      "PAID": "Paid",
+      "VOID": "Void"
+    },
+    "support": "Support sessions",
+    "supportIntro": "Opening a session shows this group in your app, read-only, until it ends. Everything you open is logged in their audit log and the owner sees the session and its reason.",
+    "reason": "Reason (shown to the owner)",
+    "minutes": "Minutes (at most 60)",
+    "start": "Start session",
+    "end": "End now",
+    "noSupport": "No support session yet.",
+    "sessionLine": "{{name}} · {{start}} → {{end}} · {{views}} records opened",
+    "open": "open"
+  }
+}

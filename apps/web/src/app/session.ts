@@ -1,3 +1,4 @@
+import { MODULE_PERMISSIONS, PLATFORM_PERMISSION_CODES, type ModuleCode } from '@hotel/shared';
 import type { Me, RegistrationField } from '@hotel/shared';
 import { createContext, useContext } from 'react';
 import type { z } from 'zod';
@@ -32,6 +33,8 @@ export interface ShellSession {
   preview: boolean;
   /** A manager-opened shared device: offer "Switch user" (PIN, M1-07). */
   pinSwitchAvailable: boolean;
+  /** The current property is open through a read-only support session (T-100). */
+  support: { organisationName: string; expiresAt: string } | null;
 }
 
 export type MeResponse = z.output<typeof Me>;
@@ -57,7 +60,17 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
         (m.propertyId === null || m.propertyId === property.id);
       if (applies) for (const code of m.role.permissions) permissions.add(code);
     }
+    // A module the platform switched off takes its screens with it (T-100).
+    const org = me.organisations.find((o) => o.id === property.organisationId);
+    for (const module of org?.disabledModules ?? []) {
+      for (const code of MODULE_PERMISSIONS[module as ModuleCode] ?? []) permissions.delete(code);
+    }
   }
+  // Platform staff reach S31 (T-100).
+  if (me.platformAdmin) for (const code of PLATFORM_PERMISSION_CODES) permissions.add(code);
+  const support = property
+    ? me.support.find((s) => s.organisationId === property.organisationId)
+    : undefined;
   return {
     userName: me.user.name,
     permissions: [...permissions].sort(),
@@ -90,6 +103,9 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
     openAlerts: 0, // T-090
     preview: false,
     pinSwitchAvailable: me.session.pinSwitchAvailable,
+    support: support
+      ? { organisationName: support.organisationName, expiresAt: support.expiresAt }
+      : null,
   };
 }
 
@@ -161,6 +177,7 @@ export const PREVIEW_SESSION: ShellSession = {
   pendingApprovals: 0,
   openAlerts: 0,
   preview: true,
+  support: null,
   pinSwitchAvailable: false,
 };
 

@@ -81,6 +81,12 @@ const ReportsPage = lazy(() =>
 const DashboardPage = lazy(() =>
   import('../routes/reports.tsx').then((m) => ({ default: m.DashboardPage })),
 );
+const BillingPage = lazy(() =>
+  import('../routes/billing.tsx').then((m) => ({ default: m.BillingPage })),
+);
+const PlatformPage = lazy(() =>
+  import('../routes/platform.tsx').then((m) => ({ default: m.PlatformPage })),
+);
 const OwnerHomePage = lazy(() =>
   import('../routes/owner.tsx').then((m) => ({ default: m.OwnerHomePage })),
 );
@@ -114,6 +120,8 @@ const SCREENS: Record<string, ReactElement> = {
   '/leakage': <LeakagePage />,
   '/messages': <MessagesPage />,
   '/owner': <OwnerHomePage />,
+  '/settings/billing': <BillingPage />,
+  '/platform': <PlatformPage />,
   '/reports': <ReportsPage />,
   '/dashboard': <DashboardPage />,
   '/reservations': <ReservationsPage />,
@@ -125,6 +133,9 @@ const SCREENS: Record<string, ReactElement> = {
   '/approvals': <ApprovalsPage />,
   '/onboarding': <SetupWizardPage />,
 };
+
+/** Paths that have their own screen (the rest show a placeholder naming their ticket). */
+export const SCREEN_PATHS: readonly string[] = Object.keys(SCREENS);
 
 function Loading() {
   const { t } = useTranslation();

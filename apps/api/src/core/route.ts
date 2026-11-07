@@ -94,6 +94,10 @@ export function mountRoute<R extends RouteContract>(
   if (route.permission && !route.propertyScoped) {
     throw new Error(`${route.operationId}: a permission needs a propertyScoped route`);
   }
+  // Platform routes span every tenant: never one property's (T-100).
+  if (route.platform && (route.propertyScoped || route.auth === 'none')) {
+    throw new Error(`${route.operationId}: a platform route is signed in and not property-scoped`);
+  }
   // Keys belong to the signed-in user (T-020).
   if (route.idempotent && route.auth === 'none') {
     throw new Error(`${route.operationId}: idempotent routes need a signed-in user`);
@@ -121,6 +125,12 @@ export function mountRoute<R extends RouteContract>(
     if (route.permission && !tenant?.permissions.has(route.permission)) {
       throw new AppError('FORBIDDEN', 'Your role does not allow this.', {
         permission: route.permission,
+      });
+    }
+    // M13-05 (tab 2): a module switched off for the group answers MODULE_DISABLED.
+    if (route.module && tenant?.disabledModules?.has(route.module)) {
+      throw new AppError('MODULE_DISABLED', 'This module is switched off for your hotel.', {
+        module: route.module,
       });
     }
     // M12-06: a report as CSV or PDF also needs the export permission.

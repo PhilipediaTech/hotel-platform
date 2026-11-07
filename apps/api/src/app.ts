@@ -43,6 +43,7 @@ import { leakageRoutes } from './modules/leakage/routes.ts';
 import { messagingRoutes } from './modules/notifications/routes.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
+import { platformRoutes } from './modules/platform/routes.ts';
 import type { MessageProvider } from './core/messaging.ts';
 import { paymentIntentRoutes } from './modules/payments/intent-routes.ts';
 import { RAW_BODY, webhookRoutes } from './modules/payments/webhook-routes.ts';
@@ -127,7 +128,7 @@ export function createApp({
   // 6. CSRF: Origin must be allow-listed on every non-GET
   app.use(originCheck(config));
   // 7. Tenancy context: X-Property-Id → membership → AsyncLocalStorage
-  app.use(tenancyContext({ db }));
+  app.use(tenancyContext({ db, clock, config }));
   // 8. Rate limiter (per IP on auth routes, per user)
   app.use(rateLimiter({ db, clock, logger }));
 
@@ -176,6 +177,7 @@ export function createApp({
   api.use(messagingRoutes({ db, tenantDb, clock, messages }));
   api.use(ownerRoutes({ db, clock }));
   api.use(reportRoutes({ db, tenantDb, clock }));
+  api.use(platformRoutes({ db, clock, config }));
   api.use(
     paymentIntentRoutes({
       db,

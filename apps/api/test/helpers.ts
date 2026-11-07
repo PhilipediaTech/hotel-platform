@@ -29,6 +29,7 @@ export const TEST_CONFIG: Config = {
   cookieSecure: false,
   localFilesDir: path.join(os.tmpdir(), 'hotel-test-files'),
   payments: { provider: 'fake', secretKey: null, webhookSecret: null },
+  platformAdminEmails: ['platform-admin@example.test'],
   whatsapp: {
     provider: 'fake',
     token: null,

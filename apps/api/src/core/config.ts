@@ -58,6 +58,9 @@ const envSchema = z.object({
     .optional(),
   WHATSAPP_APP_SECRET: z.string().min(16).optional(),
   WHATSAPP_VERIFY_TOKEN: z.string().min(16).optional(),
+  // Platform staff (T-100; Philip, 2026-11-14): comma-separated emails. Only they reach the
+  // platform routes and support sessions, and only with MFA on; no hotel role can grant it.
+  PLATFORM_ADMIN_EMAILS: z.string().default(''),
   WHATSAPP_GRAPH_VERSION: z
     .string()
     .regex(/^v\d+\.\d+$/, 'WHATSAPP_GRAPH_VERSION looks like v23.0')
@@ -93,6 +96,8 @@ export interface Config {
     /** Signs webhooks; null = the secret key (Paystack). */
     webhookSecret: string | null;
   };
+  /** Platform staff, lower-cased emails (PLATFORM_ADMIN_EMAILS). */
+  platformAdminEmails: readonly string[];
   /** The WhatsApp provider and its Meta settings (null for the fake). */
   whatsapp: {
     provider: 'fake' | 'meta';
@@ -171,6 +176,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       secretKey: e.PAYMENT_SECRET_KEY ?? null,
       webhookSecret: e.PAYMENT_WEBHOOK_SECRET ?? null,
     },
+    platformAdminEmails: e.PLATFORM_ADMIN_EMAILS.split(',')
+      .map((x) => x.trim().toLowerCase())
+      .filter((x) => x.includes('@')),
     whatsapp: {
       provider: e.WHATSAPP_PROVIDER,
       token: e.WHATSAPP_TOKEN ?? null,

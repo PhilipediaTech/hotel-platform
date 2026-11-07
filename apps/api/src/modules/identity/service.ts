@@ -11,6 +11,8 @@ import type { EmailProvider } from '../../core/email.ts';
 import { AppError } from '../../core/errors.ts';
 import { burnPasswordCheck, hashPassword, verifyPassword } from '../../core/passwords.ts';
 import { hashToken, newToken } from '../../core/tokens.ts';
+import { isPlatformAdmin } from '../../core/platform-admin.ts';
+import { openSupportSessions, SUPPORT_PERMISSIONS, SUPPORT_ROLE_NAME } from '../../core/support.ts';
 import { accountExistsMessage, passwordResetMessage, verifyEmailMessage } from './emails.ts';
 import { createDefaultApprovalPolicies } from '../approvals/defaults.ts';
 import { registrationOf } from '../setup/service.ts';
@@ -460,14 +462,27 @@ export async function buildMe(
   db: Db,
   user: User,
   session: Session,
-  options: { pinSwitchAvailable: boolean; clock: Clock },
+  options: {
+    pinSwitchAvailable: boolean;
+    clock: Clock;
+    config: Pick<Config, 'platformAdminEmails'>;
+  },
 ) {
   const memberships = await db.membership.findMany({
     where: { userId: user.id, active: true },
     include: { role: true, organisation: true },
     orderBy: { createdAt: 'asc' },
   });
-  const orgWide = memberships.filter((m) => m.propertyId === null).map((m) => m.organisationId);
+  // Platform staff in an open support session see that group read-only (T-100).
+  const platformAdmin = isPlatformAdmin(options.config, user);
+  const support = platformAdmin ? await openSupportSessions(db, user.id, options.clock()) : [];
+  const supportOrgs = support
+    .map((s) => s.organisationId)
+    .filter((id) => !memberships.some((m) => m.organisationId === id));
+  const orgWide = [
+    ...memberships.filter((m) => m.propertyId === null).map((m) => m.organisationId),
+    ...supportOrgs,
+  ];
   const propertyIds = memberships.flatMap((m) => (m.propertyId ? [m.propertyId] : []));
   const properties = await db.property.findMany({
     where: {
@@ -476,7 +491,16 @@ export async function buildMe(
     },
     orderBy: { name: 'asc' },
   });
-  const organisations = new Map(memberships.map((m) => [m.organisation.id, m.organisation]));
+  const organisations = new Map<string, { id: string; name: string }>(
+    memberships.map((m) => [m.organisation.id, m.organisation]),
+  );
+  for (const s of support) {
+    if (supportOrgs.includes(s.organisationId))
+      organisations.set(s.organisation.id, s.organisation);
+  }
+  const switchedOff = await db.featureFlag.findMany({
+    where: { organisationId: { in: [...organisations.keys()] }, enabled: false },
+  });
   const businessDates = new Map<string, string>();
   for (const p of properties.filter((x) => x.status === 'LIVE')) {
     businessDates.set(p.id, await businessDate(db, p.id, options.clock));
@@ -497,7 +521,18 @@ export async function buildMe(
       pinSwitchAvailable: options.pinSwitchAvailable,
       expiresAt: session.expiresAt.toISOString(),
     },
-    organisations: [...organisations.values()].map((o) => ({ id: o.id, name: o.name })),
+    organisations: [...organisations.values()].map((o) => ({
+      id: o.id,
+      name: o.name,
+      disabledModules: switchedOff.filter((f) => f.organisationId === o.id).map((f) => f.module),
+    })),
+    platformAdmin,
+    support: support.map((s) => ({
+      sessionId: s.id,
+      organisationId: s.organisationId,
+      organisationName: s.organisation.name,
+      expiresAt: s.expiresAt.toISOString(),
+    })),
     properties: properties.map((p) => ({
       id: p.id,
       organisationId: p.organisationId,
@@ -510,16 +545,31 @@ export async function buildMe(
       registrationFields: registrationOf(p).requiredFields,
       businessDate: businessDates.get(p.id) ?? null,
     })),
-    memberships: memberships.map((m) => ({
-      organisationId: m.organisationId,
-      propertyId: m.propertyId,
-      role: {
-        id: m.role.id,
-        name: m.role.name,
-        requiresMfa: m.role.requiresMfa,
-        permissions: m.role.permissions,
-      },
-    })),
+    memberships: [
+      ...memberships.map((m) => ({
+        organisationId: m.organisationId,
+        propertyId: m.propertyId,
+        role: {
+          id: m.role.id,
+          name: m.role.name,
+          requiresMfa: m.role.requiresMfa,
+          permissions: m.role.permissions,
+        },
+      })),
+      // The support session acts as an organisation-wide, read-only membership.
+      ...support
+        .filter((s) => supportOrgs.includes(s.organisationId))
+        .map((s) => ({
+          organisationId: s.organisationId,
+          propertyId: null,
+          role: {
+            id: s.id,
+            name: SUPPORT_ROLE_NAME,
+            requiresMfa: true,
+            permissions: [...SUPPORT_PERMISSIONS],
+          },
+        })),
+    ],
   };
 }
 

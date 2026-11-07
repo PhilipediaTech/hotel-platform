@@ -14,6 +14,8 @@ export default tseslint.config(
       '**/playwright-report/**',
       '**/test-results/**',
       'apps/api/src/generated/**',
+      // k6 scripts run in k6, not Node (T-101).
+      'load/k6/**',
     ],
   },
   js.configs.recommended,
@@ -40,7 +42,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**/*.{js,mjs,ts}', 'apps/*/scripts/**/*.{js,mjs,ts}'],
+    files: ['scripts/**/*.{js,mjs,ts}', 'apps/*/scripts/**/*.{js,mjs,ts}', 'load/*.ts'],
     rules: { 'no-console': 'off' },
   },
   {

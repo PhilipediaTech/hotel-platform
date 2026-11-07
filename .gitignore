@@ -15,3 +15,5 @@ Thumbs.db
 # Local file store (T-023)
 .data/
 apps/api/src/generated/
+# Load-test sessions (T-101)
+load/.session.json

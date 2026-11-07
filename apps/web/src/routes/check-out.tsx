@@ -11,6 +11,7 @@ import { PdfError, usePdf } from '../lib/pdf.tsx';
 import { useFormats } from './reservations.tsx';
 import paymentsStrings from '../i18n/en/payments.json';
 import { registerStrings } from '../i18n/index.ts';
+import { useOnlineStatus } from '../offline/use-online-status.ts';
 
 registerStrings(paymentsStrings);
 
@@ -20,6 +21,7 @@ registerStrings(paymentsStrings);
 // with notifications (T-024).
 
 export function CheckOutPage() {
+  const online = useOnlineStatus();
   const { t } = useTranslation();
   const f = useFormats();
   const { stayId = '' } = useParams();
@@ -155,7 +157,7 @@ export function CheckOutPage() {
           )}
           <div>
             <Button
-              disabled={p.blockers.length > 0 || leave.isPending}
+              disabled={!online || p.blockers.length > 0 || leave.isPending}
               onClick={() => leave.mutate(p.version)}
             >
               {t('checkOut.confirm')}

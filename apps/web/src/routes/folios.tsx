@@ -24,6 +24,7 @@ import { TransferForm } from './folio-transfer.tsx';
 import { PaymentLinks, VirtualAccountPanel } from './payment-links.tsx';
 import { UnmatchedTransfers } from './unmatched-transfers.tsx';
 import { useFormats } from './reservations.tsx';
+import { useOnlineStatus } from '../offline/use-online-status.ts';
 
 // S11 Folio (PRD M4-01–M4-05; T-060): windows as tabs, lines with their taxes, balance; post a
 // charge, discount or reverse a line, add a window and route revenue to it. Payments,
@@ -572,6 +573,7 @@ function DiscountForm(props: { folio: Folio; line: Line; onDone: (pending: boole
 }
 
 function PostCharge({ folio, onPending }: { folio: Folio; onPending: () => void }) {
+  const online = useOnlineStatus();
   const { t } = useTranslation();
   const refresh = useRefresh(folio.id);
   const [code, setCode] = useState(folio.revenueCodes[0]?.code ?? '');
@@ -671,7 +673,7 @@ function PostCharge({ folio, onPending }: { folio: Folio; onPending: () => void 
         </select>
       </Field>
       <div className="flex items-center gap-3 sm:col-span-6">
-        <Button type="submit" disabled={!ready || post.isPending}>
+        <Button type="submit" disabled={!online || !ready || post.isPending}>
           {t('folios.post')}
         </Button>
         <span className="text-xs text-text-muted">{t('folios.taxHint')}</span>

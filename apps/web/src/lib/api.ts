@@ -48,6 +48,20 @@ export interface CallOptions {
   /** `ETag` from the last read, for versioned PATCHes. */
   ifMatch?: string;
   signal?: AbortSignal;
+  /** The property for X-Property-Id instead of the current one (offline queue replays). */
+  propertyId?: string;
+}
+
+/**
+ * A change attempted with no connection (T-093): only the offline queue's whitelisted actions
+ * may wait; everything else (payments, check-in and out, postings, night audit) is refused
+ * before it is sent, so nothing is half-done.
+ */
+export class OfflineError extends Error {
+  constructor() {
+    super('You are offline: this needs a connection and was not sent.');
+    this.name = 'OfflineError';
+  }
 }
 
 export interface ApiClientOptions {
@@ -154,8 +168,16 @@ export function createApiClient<Routes extends RouteTable = ApiRoutes>(
 
     const headers = new Headers({ Accept: route.produces ?? 'application/json' });
     if (route.body) headers.set('Content-Type', 'application/json');
+    if (
+      route.method !== 'get' &&
+      typeof navigator !== 'undefined' &&
+      navigator.onLine === false &&
+      route.operationId !== 'signOut'
+    ) {
+      throw new OfflineError();
+    }
     if (route.propertyScoped) {
-      const propertyId = options.propertyId?.();
+      const propertyId = callOptions.propertyId ?? options.propertyId?.();
       if (!propertyId) throw new Error(`${route.operationId} needs a current property.`);
       headers.set('X-Property-Id', propertyId);
     }

@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -251,5 +251,32 @@ describe('Front desk (S06)', () => {
     const table = await screen.findByRole('table', { name: 'In-house' });
     expect(rowOf(table, 'Musa Test')).toHaveTextContent('Overdue');
     expect(screen.queryByLabelText('Business date')).not.toBeInTheDocument();
+  });
+});
+
+describe('Offline (T-093)', () => {
+  it('shows the lists from the device when the network is gone, saying how old they are', async () => {
+    let online = true;
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => online });
+    const real = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string, init: RequestInit) =>
+        online ? real(input, init) : Promise.reject(new TypeError('Failed to fetch')),
+      ),
+    );
+    renderAt('/front-desk');
+    await screen.findByRole('table', { name: 'Arrivals' });
+    cleanup();
+
+    // The app reopens with no network: the person and the lists come from the device.
+    online = false;
+    window.dispatchEvent(new Event('offline'));
+    renderAt('/front-desk');
+    const table = await screen.findByRole('table', { name: 'Arrivals' });
+    expect(rowOf(table, 'Ada')).toBeDefined();
+    expect(await screen.findByText(/Offline: saved copy from/)).toBeInTheDocument();
+    online = true;
+    window.dispatchEvent(new Event('online'));
   });
 });

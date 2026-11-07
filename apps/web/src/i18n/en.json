@@ -68,7 +68,27 @@
     "unmatched-transfers": "Unmatched transfers"
   },
   "offline": {
-    "banner": "You're offline. Lists show the last saved copy. Payments, check-in, check-out, postings and night audit are paused until you reconnect."
+    "banner": "You're offline. Lists show the last saved copy. Payments, check-in, check-out, postings and night audit are paused until you reconnect. Notes, task updates and room status are kept on this device and sent when you're back.",
+    "savedCopy": "Offline: saved copy from {{time}}.",
+    "labels": {
+      "task": "Task {{number}}: {{what}}",
+      "room": "Room {{room}}: status",
+      "report_one": "Morning report ({{count}} room)",
+      "report_other": "Morning report ({{count}} rooms)",
+      "note": "Booking {{ref}}: note"
+    },
+    "queuedNow": "Saved on this device. It will be sent when you're back online.",
+    "pending": {
+      "title": "Waiting to send",
+      "waiting_one": "{{count}} change waiting to send",
+      "waiting_other": "{{count}} changes waiting to send",
+      "conflicts_one": "{{count}} change was refused",
+      "conflicts_other": "{{count}} changes were refused",
+      "sendNow": "Send now",
+      "queued": "waiting",
+      "refused": "refused: {{reason}}",
+      "discard": "Discard"
+    }
   },
   "update": {
     "available": "A new version is available.",
@@ -187,6 +207,7 @@
   },
   "errors": {
     "network": "Can’t reach the server. Check the connection and try again.",
+    "offline": "You’re offline. This needs a connection, so it wasn’t sent: try again when you’re back online.",
     "rateLimited": "Too many attempts. Wait a minute and try again.",
     "internal": "Something went wrong on our side. If it keeps happening, quote reference {{requestId}}.",
     "retry": "Try again"

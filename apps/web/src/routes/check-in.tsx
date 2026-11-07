@@ -19,6 +19,7 @@ import { api, ApiError } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { uploadFile } from '../lib/files.ts';
 import { useFormats } from './reservations.tsx';
+import { useOnlineStatus } from '../offline/use-online-status.ts';
 
 // Check-in (PRD M3-08, M3-19, M3 rules 2 and 6; T-051): on the reservation page, a confirmed
 // guest arriving today gets their room, the registration fields the property requires, a
@@ -65,6 +66,7 @@ export function CheckInPanel({
   /** Open at once (a walk-in or day-use just sold: T-052). */
   startOpen?: boolean;
 }) {
+  const online = useOnlineStatus();
   const { t } = useTranslation();
   const property = useProperty();
   const required = property?.registrationFields ?? [];
@@ -287,7 +289,7 @@ export function CheckInPanel({
 
       {checkIn.error && <Alert tone="critical">{fieldError ?? errorMessage(checkIn.error)}</Alert>}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={!ready || checkIn.isPending}>
+        <Button type="submit" disabled={!online || !ready || checkIn.isPending}>
           {t('checkIn.submit')}
         </Button>
         <Button variant="ghost" onClick={() => setOpen(false)}>

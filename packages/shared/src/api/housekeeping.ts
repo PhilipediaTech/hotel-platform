@@ -166,6 +166,8 @@ export const updateAssignment = defineRoute({
   tags: ['Housekeeping'],
   propertyScoped: true,
   permission: 'hk.work',
+  // ● beyond tab 4 (T-093): the offline queue replays room status safely.
+  idempotent: true,
   params: z.object({ assignmentId: Uuid }),
   body: AssignmentPatch,
   response: HkAssignmentItem,

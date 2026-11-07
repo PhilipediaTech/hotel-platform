@@ -688,3 +688,46 @@ describe('Advance deposit (M4-13; T-063)', () => {
     expect(within(section).queryByRole('button', { name: /^Receipt/ })).not.toBeInTheDocument();
   });
 });
+
+describe('Offline (T-093; QA "network cut → note queued → reconnect → note synced")', () => {
+  it(
+    'keeps a note on the device while offline and sends it on reconnect',
+    { timeout: 20_000 },
+    async () => {
+      let online = true;
+      Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => online });
+      const real = globalThis.fetch;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: string, init: RequestInit) =>
+          online ? real(input, init) : Promise.reject(new TypeError('Failed to fetch')),
+        ),
+      );
+      const user = userEvent.setup();
+      renderAt(`/reservations/${RES}`);
+      const form = await screen.findByRole('form', { name: 'Details' });
+
+      online = false;
+      window.dispatchEvent(new Event('offline'));
+      const notes = within(form).getByLabelText('Notes');
+      await user.clear(notes);
+      await user.type(notes, 'Early check-in promised');
+      await user.click(within(form).getByRole('button', { name: 'Save' }));
+      expect(await within(form).findByText(/Saved on this device/)).toBeInTheDocument();
+      expect(sent(`PATCH /reservations/${RES}`)).toHaveLength(0);
+      const waiting = await screen.findByRole('region', { name: 'Waiting to send' });
+      expect(waiting).toHaveTextContent('1 change waiting to send');
+      expect(waiting).toHaveTextContent('Booking LAG-00001: note');
+
+      online = true;
+      window.dispatchEvent(new Event('online'));
+      await waitFor(() => expect(sent(`PATCH /reservations/${RES}`)).toHaveLength(1));
+      const patch = sent(`PATCH /reservations/${RES}`)[0];
+      expect(patch?.body).toEqual({ notes: 'Early check-in promised' });
+      expect(patch?.headers.get('If-Match')).toBe('"3"');
+      await waitFor(() =>
+        expect(screen.queryByRole('region', { name: 'Waiting to send' })).not.toBeInTheDocument(),
+      );
+    },
+  );
+});

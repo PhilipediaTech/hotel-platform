@@ -1,10 +1,11 @@
 import {
-  API_ROUTES,
   isErrorCode,
+  ROUTE_META,
   type ApiRoutes,
   type ErrorCode,
   type RouteContract,
   type RouteInput,
+  type RouteMeta,
   type RouteResponse,
 } from '@hotel/shared';
 
@@ -14,6 +15,8 @@ import {
  * resolves to the contract's response type.
  *
  * Responses are not re-parsed: the server already sends them through the response schema.
+ * At runtime it reads only ROUTE_META (method, path, flags): the contracts are types here,
+ * so their schemas stay out of the first-load bundle (T-091b).
  */
 
 /** A non-2xx answer from the API (or an unreadable one). `status` drives Query retries. */
@@ -133,13 +136,13 @@ async function toApiError(response: Response): Promise<ApiError> {
 /** `routes` defaults to the whole API; tests pass their own table. */
 export function createApiClient<Routes extends RouteTable = ApiRoutes>(
   options: ApiClientOptions = {},
-  routes: Routes = API_ROUTES as unknown as Routes,
+  routes: Routes = ROUTE_META as unknown as Routes,
 ): ApiClient<Routes> {
   const baseUrl = (options.baseUrl ?? '/api/v1').replace(/\/$/, '');
   const doFetch = options.fetch ?? ((input, init) => fetch(input, init));
 
   async function request(
-    route: RouteContract,
+    route: RouteMeta | RouteContract,
     input: { params?: unknown; query?: unknown; body?: unknown } = {},
     callOptions: CallOptions = {},
   ): Promise<unknown> {

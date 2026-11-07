@@ -33,6 +33,8 @@
     "check:size": "npm run build -w apps/web && npm run size -w apps/web",
     "openapi": "node apps/api/scripts/openapi.ts",
     "openapi:check": "node apps/api/scripts/openapi.ts --check",
+    "routes:meta": "node apps/api/scripts/route-meta.ts",
+    "routes:meta:check": "node apps/api/scripts/route-meta.ts --check",
     "simulate:webhook": "node apps/api/scripts/simulate-webhook.ts",
     "whatsapp:templates": "node --env-file-if-exists=.env apps/api/scripts/whatsapp-templates.ts"
   },

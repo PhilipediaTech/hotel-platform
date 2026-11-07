@@ -323,6 +323,41 @@ export const setMyPin = defineRoute({
   errors: ['UNAUTHENTICATED'],
 });
 
+// ---------------------------------------------------------------------------------------
+// My phone (T-091b): approval codes, instant alerts and the flash report go to it by
+// WhatsApp, and phone-only staff sign in with it. A change needs the password and a code
+// sent by WhatsApp to the new number.
+
+export const requestPhoneChange = defineRoute({
+  operationId: 'requestPhoneChange',
+  method: 'post',
+  path: '/me/phone',
+  summary: 'Set or change my phone: sends a WhatsApp code to the new number',
+  description:
+    'Added beyond tab 4 (T-091b). Needs the current password (a wrong one counts towards the ' +
+    'sign-in lockout). Returns a challenge to send back with the code within 10 minutes; at ' +
+    'most 5 codes an hour. Nothing changes until /me/phone/confirm.',
+  tags: ['Me'],
+  body: z.object({ phone: Phone, password: z.string().min(1).max(PASSWORD_MAX_LENGTH) }),
+  status: 201,
+  response: z.object({ challenge: z.string(), expiresAt: Instant }),
+  errors: ['UNAUTHENTICATED', 'RATE_LIMITED', 'MESSAGE_PROVIDER_UNAVAILABLE'],
+});
+
+export const confirmPhoneChange = defineRoute({
+  operationId: 'confirmPhoneChange',
+  method: 'post',
+  path: '/me/phone/confirm',
+  summary: 'Finish setting my phone with the code from WhatsApp',
+  description:
+    'A wrong code counts towards the sign-in lockout (5 failures, 15 minutes). The number must ' +
+    'still be free.',
+  tags: ['Me'],
+  body: z.object({ challenge: z.string().min(20).max(1000), code: TotpCode }),
+  response: z.object({ phone: z.string() }),
+  errors: ['UNAUTHENTICATED'],
+});
+
 export const getDevice = defineRoute({
   operationId: 'getDevice',
   method: 'get',
@@ -367,6 +402,8 @@ export const AUTH_ROUTES = {
   enrolMfa,
   confirmMfa,
   setMyPin,
+  requestPhoneChange,
+  confirmPhoneChange,
   getDevice,
   pinSwitch,
 } as const;

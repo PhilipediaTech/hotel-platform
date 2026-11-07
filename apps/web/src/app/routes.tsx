@@ -72,6 +72,9 @@ const HandoversPage = lazy(() =>
 const LeakagePage = lazy(() =>
   import('../routes/leakage.tsx').then((m) => ({ default: m.LeakagePage })),
 );
+const AccountPhonePage = lazy(() =>
+  import('../routes/account-phone.tsx').then((m) => ({ default: m.AccountPhonePage })),
+);
 const OwnerHomePage = lazy(() =>
   import('../routes/owner.tsx').then((m) => ({ default: m.OwnerHomePage })),
 );
@@ -171,6 +174,14 @@ export function buildRoutes(
           children: [
             { index: true, element: <HomeRedirect /> },
             { path: 'account/pin', element: <SetPinPage /> },
+            {
+              path: 'account/phone',
+              element: (
+                <Suspense fallback={<Loading />}>
+                  <AccountPhonePage />
+                </Suspense>
+              ),
+            },
             { path: 'guests/:guestId', element: <GuestProfilePage /> },
             { path: 'companies/:companyId', element: <CompanyProfilePage /> },
             { path: 'reservations/:reservationId', element: <ReservationPage /> },

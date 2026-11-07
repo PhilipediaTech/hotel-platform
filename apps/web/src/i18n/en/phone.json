@@ -1,0 +1,17 @@
+{
+  "phone": {
+    "title": "My phone",
+    "intro": "Approval codes, instant alerts and the flash report come to this number by WhatsApp. If you sign in with your phone, this is the number you use.",
+    "current": "Your number: {{phone}}",
+    "none": "No number yet.",
+    "number": "New number",
+    "numberHint": "International format, e.g. +2348012345678",
+    "password": "Password",
+    "send": "Send code by WhatsApp",
+    "sent": "We sent a 6-digit code by WhatsApp to {{phone}}. It works for 10 minutes.",
+    "code": "Code from WhatsApp",
+    "confirm": "Confirm",
+    "another": "Use another number",
+    "saved": "Saved. Your number is now {{phone}}."
+  }
+}

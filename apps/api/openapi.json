@@ -54,6 +54,7 @@
                   "APPROVAL_EXPIRED",
                   "RATE_LIMITED",
                   "PAYMENT_PROVIDER_UNAVAILABLE",
+                  "MESSAGE_PROVIDER_UNAVAILABLE",
                   "INTERNAL"
                 ]
               },
@@ -9641,6 +9642,220 @@
         "responses": {
           "204": {
             "description": "No content"
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/phone": {
+      "post": {
+        "operationId": "requestPhoneChange",
+        "summary": "Set or change my phone: sends a WhatsApp code to the new number",
+        "tags": [
+          "Me"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Added beyond tab 4 (T-091b). Needs the current password (a wrong one counts towards the sign-in lockout). Returns a challenge to send back with the code within 10 minutes; at most 5 codes an hour. Nothing changes until /me/phone/confirm.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^\\+[1-9]\\d{6,14}$"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "phone",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "$ref": "#/components/schemas/Instant"
+                    }
+                  },
+                  "required": [
+                    "challenge",
+                    "expiresAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Error: `MESSAGE_PROVIDER_UNAVAILABLE`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/phone/confirm": {
+      "post": {
+        "operationId": "confirmPhoneChange",
+        "summary": "Finish setting my phone with the code from WhatsApp",
+        "tags": [
+          "Me"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "A wrong code counts towards the sign-in lockout (5 failures, 15 minutes). The number must still be free.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challenge": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 1000
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "challenge",
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "phone": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "phone"
+                  ]
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad request: `VALIDATION_ERROR`",

@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Zod schemas, state machines, permission and error codes, money and date helpers",
   "exports": {
     ".": "./src/index.ts",

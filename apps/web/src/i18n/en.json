@@ -21,7 +21,8 @@
     "devPreview": "Preview data: not a signed-in account.",
     "loading": "Loading your account",
     "switchUser": "Switch user",
-    "setPin": "Set my PIN"
+    "setPin": "Set my PIN",
+    "myPhone": "My phone"
   },
   "navGroup": {
     "operations": "Operations",

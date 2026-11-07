@@ -140,7 +140,7 @@ export function createApp({
   const api = express.Router();
   // Spread: the generator types the document as an interface, which lacks an index signature.
   mountRoute(api, getOpenApiDocument, () => ({ ...openApiDocument() }));
-  api.use(identityRoutes({ db, config, clock, email, logger }));
+  api.use(identityRoutes({ db, config, clock, email, logger, messages }));
   // Module code reads and writes tenant tables through the tenant-scoped client (T-012).
   const tenantDb = createTenantDb(db);
   api.use(accessRoutes({ db, tenantDb, config, clock, email, logger }));

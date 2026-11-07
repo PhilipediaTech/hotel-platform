@@ -169,6 +169,9 @@ export function TopBar() {
             <DropdownMenuItem onSelect={() => void navigate('/account/pin')}>
               {t('shell.setPin')}
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void navigate('/account/phone')}>
+              {t('shell.myPhone')}
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={signOut}>{t('shell.signOut')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

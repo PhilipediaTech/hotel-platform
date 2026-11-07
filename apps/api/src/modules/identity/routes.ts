@@ -14,11 +14,12 @@ import {
 import { AppError } from '../../core/errors.ts';
 import { mountRoute } from '../../core/route.ts';
 import * as mfa from './mfa.ts';
+import * as phone from './phone.ts';
 import * as pin from './pin.ts';
 import * as identity from './service.ts';
 
 /** Auth and "me" endpoints (tab 4 rows Auth and Me; T-010, T-011). */
-export function identityRoutes(deps: identity.IdentityDeps): Router {
+export function identityRoutes(deps: phone.PhoneDeps): Router {
   const router = express.Router();
   const r = AUTH_ROUTES;
 
@@ -160,6 +161,12 @@ export function identityRoutes(deps: identity.IdentityDeps): Router {
   // PIN switch on shared devices (M1-07) --------------------------------------------------
 
   mountRoute(router, r.setMyPin, ({ body }, { req }) => pin.setMyPin(deps, requireAuth(req), body));
+  mountRoute(router, r.requestPhoneChange, ({ body }, { req }) =>
+    phone.requestPhoneChange(deps, requireAuth(req), body),
+  );
+  mountRoute(router, r.confirmPhoneChange, ({ body }, { req }) =>
+    phone.confirmPhoneChange(deps, requireAuth(req), body),
+  );
 
   mountRoute(router, r.getDevice, async (_input, { req }) => {
     const device = await activeDevice(req);

@@ -38,6 +38,8 @@ export const ERROR_HTTP_STATUS = {
 
   // Not in tab 4 (T-070): the payment provider could not be reached or refused the call.
   PAYMENT_PROVIDER_UNAVAILABLE: 502,
+  // Not in tab 4 (T-091b): WhatsApp could not be reached; trying again may work.
+  MESSAGE_PROVIDER_UNAVAILABLE: 502,
 
   // Never carries details.
   INTERNAL: 500,

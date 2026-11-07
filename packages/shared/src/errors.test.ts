@@ -25,7 +25,8 @@ const SPEC_TABLE: Record<number, string[]> = {
   422: ['RATE_BELOW_LIMIT', 'RESTRICTION_VIOLATED', 'APPROVAL_EXPIRED'],
   429: ['RATE_LIMITED'],
   // Added in T-070 (not in tab 4): the payment provider is down or refused the call.
-  502: ['PAYMENT_PROVIDER_UNAVAILABLE'],
+  // T-091b (not in tab 4): WhatsApp could not be reached.
+  502: ['PAYMENT_PROVIDER_UNAVAILABLE', 'MESSAGE_PROVIDER_UNAVAILABLE'],
   500: ['INTERNAL'],
 };
 

@@ -44,6 +44,9 @@ const envSchema = z.object({
     .optional(),
   // Webhook signing key (runbook); Paystack signs with the secret key, the default.
   PAYMENT_WEBHOOK_SECRET: z.string().min(16).optional(),
+  // Breached-password check (T-102, ASVS 6.2.12): Have I Been Pwned's free range API, or
+  // `fake` (a few well-known passwords, no network) for tests and offline work.
+  PASSWORD_BREACH_CHECK: z.enum(['hibp', 'fake']).default('hibp'),
   // WhatsApp (T-024, ADR-016; Meta Cloud API): `fake` locally and in tests, `meta` with the
   // system-user token and the sender's phone number ID from the developer site.
   WHATSAPP_PROVIDER: z.enum(['fake', 'meta']).default('fake'),
@@ -98,6 +101,8 @@ export interface Config {
   };
   /** Platform staff, lower-cased emails (PLATFORM_ADMIN_EMAILS). */
   platformAdminEmails: readonly string[];
+  /** Where new passwords are checked against known breaches (T-102). */
+  passwordBreachCheck: 'hibp' | 'fake';
   /** The WhatsApp provider and its Meta settings (null for the fake). */
   whatsapp: {
     provider: 'fake' | 'meta';
@@ -153,6 +158,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       'Invalid environment configuration:\n✖ WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID are required with WHATSAPP_PROVIDER=meta',
     );
   }
+  if (e.NODE_ENV === 'production' && e.PASSWORD_BREACH_CHECK === 'fake') {
+    throw new Error(
+      'Invalid environment configuration:\n✖ PASSWORD_BREACH_CHECK=fake in production',
+    );
+  }
   if (e.NODE_ENV === 'production' && e.WHATSAPP_PROVIDER === 'fake') {
     throw new Error('Invalid environment configuration:\n✖ WHATSAPP_PROVIDER=fake in production');
   }
@@ -179,6 +189,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     platformAdminEmails: e.PLATFORM_ADMIN_EMAILS.split(',')
       .map((x) => x.trim().toLowerCase())
       .filter((x) => x.includes('@')),
+    passwordBreachCheck: e.PASSWORD_BREACH_CHECK,
     whatsapp: {
       provider: e.WHATSAPP_PROVIDER,
       token: e.WHATSAPP_TOKEN ?? null,

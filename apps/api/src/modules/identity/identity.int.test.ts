@@ -124,6 +124,44 @@ describe('sign-up (M1-01)', () => {
   });
 });
 
+describe('breached passwords (T-102, ASVS 6.2.12)', () => {
+  const breached = (res: { body: unknown }) =>
+    (errorOf(res).details?.['issues'] as { path: string; code: string }[] | undefined) ?? [];
+
+  it('refuses a sign-up with a breached password, and the same for an email that has an account', async () => {
+    const api = setup();
+    const res = await api.post('/auth/sign-up', { ...SIGN_UP, password: 'password123' });
+    expect(res.status).toBe(400);
+    expect(breached(res)).toEqual([
+      expect.objectContaining({ path: 'body.password', code: 'breached_password' }),
+    ]);
+    expect(await db.user.count()).toBe(0);
+
+    await verifiedUser({ email: 'taken@example.test' });
+    const taken = await api.post('/auth/sign-up', {
+      ...SIGN_UP,
+      email: 'taken@example.test',
+      password: 'password123',
+    });
+    expect(taken.status).toBe(400);
+    expect(breached(taken)).toEqual(breached(res));
+    expect(api.email.sent).toHaveLength(0);
+  });
+
+  it('refuses a breached password on reset and keeps the link usable', async () => {
+    const api = setup();
+    const user = await verifiedUser();
+    await api.post('/auth/password/reset-request', { email: user.email }).expect(202);
+    const token = tokenFromEmail(api, user.email ?? '');
+    const res = await api.post('/auth/password/reset', { token, password: 'qwerty12345' });
+    expect(res.status).toBe(400);
+    expect(breached(res)[0]).toMatchObject({ path: 'body.password', code: 'breached_password' });
+    await api
+      .post('/auth/password/reset', { token, password: 'a brand new passphrase' })
+      .expect(204);
+  });
+});
+
 describe('email verification', () => {
   it('verifies once with the emailed token', async () => {
     const api = setup();

@@ -3,6 +3,10 @@ import cors from 'cors';
 import express, { type Express, type Router } from 'express';
 import helmet from 'helmet';
 import type { Logger } from 'pino';
+import {
+  createBreachedPasswordCheck,
+  type BreachedPasswordCheck,
+} from './core/breached-passwords.ts';
 import { auditContext } from './core/audit.ts';
 import { idempotencyStore } from './core/idempotency.ts';
 import { sessionLoader } from './core/auth.ts';
@@ -67,6 +71,8 @@ export interface AppOptions {
   /** File storage (R2 in production); the local store also serves its signed links. */
   files: FileStore | LocalFileStore;
   clock?: Clock;
+  /** New passwords against known breaches (T-102); built from config when left out. */
+  breachedPasswords?: BreachedPasswordCheck;
   /** Extra routes mounted under /api/v1 after the modules (tests use this). */
   routes?: Router;
   /** Protected actions the approvals engine executes (tests add their own). */
@@ -85,6 +91,7 @@ export function createApp({
   clock = systemClock,
   routes,
   approvalHandlers,
+  breachedPasswords = createBreachedPasswordCheck(config, logger),
 }: AppOptions): Express {
   const app = express();
   app.disable('x-powered-by');
@@ -142,10 +149,10 @@ export function createApp({
   const api = express.Router();
   // Spread: the generator types the document as an interface, which lacks an index signature.
   mountRoute(api, getOpenApiDocument, () => ({ ...openApiDocument() }));
-  api.use(identityRoutes({ db, config, clock, email, logger, messages }));
+  api.use(identityRoutes({ db, config, clock, email, logger, messages, breachedPasswords }));
   // Module code reads and writes tenant tables through the tenant-scoped client (T-012).
   const tenantDb = createTenantDb(db);
-  api.use(accessRoutes({ db, tenantDb, config, clock, email, logger }));
+  api.use(accessRoutes({ db, tenantDb, config, clock, email, logger, breachedPasswords }));
   api.use(auditRoutes({ tenantDb }));
   api.use(
     approvalRoutes({

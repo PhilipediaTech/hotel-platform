@@ -325,6 +325,16 @@ describe('invitations (M1-04)', () => {
     expect((errorOf(missing).details?.['issues'] as { path: string }[]).map((i) => i.path)).toEqual(
       ['body.name', 'body.password'],
     );
+    // T-102: a password from a known breach is refused, and the invitation stays open.
+    const breached = await c.anon.post('/auth/invitations/accept', {
+      token,
+      name: 'Chidi Eze',
+      password: 'password123',
+    });
+    expect(breached.status).toBe(400);
+    expect(errorOf(breached).details?.['issues']).toEqual([
+      expect.objectContaining({ path: 'body.password', code: 'breached_password' }),
+    ]);
     await c.anon
       .post('/auth/invitations/accept', { token, name: 'Chidi Eze', password: PASSWORD })
       .expect(204);

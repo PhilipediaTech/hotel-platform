@@ -36,6 +36,7 @@ describe('loadConfig', () => {
       localFilesDir: path.resolve(import.meta.dirname, '../../../../.data/files'),
       payments: { provider: 'fake', secretKey: null, webhookSecret: null },
       platformAdminEmails: [],
+      passwordBreachCheck: 'hibp',
       whatsapp: {
         provider: 'fake',
         token: null,
@@ -53,6 +54,22 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...ORIGINS, LOCAL_FILES_DIR: 'tmp/files' }).localFilesDir).toBe(
       path.join(root, 'tmp', 'files'),
     );
+  });
+
+  it('checks passwords with Have I Been Pwned, and never the fake in production (T-102)', () => {
+    expect(loadConfig({ ...ORIGINS, PASSWORD_BREACH_CHECK: 'fake' }).passwordBreachCheck).toBe(
+      'fake',
+    );
+    expect(() =>
+      loadConfig({
+        ...ORIGINS,
+        ...META,
+        NODE_ENV: 'production',
+        PAYMENT_PROVIDER: 'paystack',
+        PAYMENT_SECRET_KEY: 'sk_live_abc123',
+        PASSWORD_BREACH_CHECK: 'fake',
+      }),
+    ).toThrow(/PASSWORD_BREACH_CHECK=fake in production/);
   });
 
   it('requires a long SESSION_SECRET and refuses the placeholder in production', () => {

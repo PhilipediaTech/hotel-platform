@@ -9,7 +9,7 @@ import { Alert } from '../../components/ui/alert.tsx';
 import { Button, buttonVariants } from '../../components/ui/button.tsx';
 import { api } from '../../lib/api.ts';
 import { cn } from '../../lib/cn.ts';
-import { errorMessage, zodResolver } from '../../lib/form.ts';
+import { apiFieldErrors, errorMessage, zodResolver } from '../../lib/form.ts';
 import { AuthHeading, Field } from './layout.tsx';
 
 const EmailForm = z.object({ email: Email });
@@ -149,7 +149,14 @@ export function ResetPasswordPage() {
   const form = useForm({ resolver: zodResolver(ResetForm) });
   const reset = useMutation({
     mutationFn: (password: string) => api.call('resetPassword', { body: { token, password } }),
+    // A password the server refuses (e.g. found in a breach, T-102) goes on its field.
+    onError: (error) => {
+      for (const { field, message } of apiFieldErrors(error)) {
+        if (field === 'password') form.setError('password', { message });
+      }
+    },
   });
+  const fieldError = apiFieldErrors(reset.error).some((e) => e.field === 'password');
   const confirmError = form.formState.errors.confirm?.message;
 
   if (reset.isSuccess) {
@@ -190,7 +197,7 @@ export function ResetPasswordPage() {
           error={confirmError === 'mismatch' ? t('auth.reset.mismatch') : confirmError}
           {...form.register('confirm')}
         />
-        {reset.error && (
+        {reset.error && !fieldError && (
           <Alert tone="critical" className="mb-4">
             <p>{errorMessage(reset.error)}</p>
             <Link to="/forgot-password" className="mt-1 inline-block underline">

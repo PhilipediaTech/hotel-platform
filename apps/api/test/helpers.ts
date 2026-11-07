@@ -30,6 +30,7 @@ export const TEST_CONFIG: Config = {
   localFilesDir: path.join(os.tmpdir(), 'hotel-test-files'),
   payments: { provider: 'fake', secretKey: null, webhookSecret: null },
   platformAdminEmails: ['platform-admin@example.test'],
+  passwordBreachCheck: 'fake',
   whatsapp: {
     provider: 'fake',
     token: null,

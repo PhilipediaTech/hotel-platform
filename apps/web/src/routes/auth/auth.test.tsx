@@ -266,6 +266,21 @@ describe('email links', () => {
       password: 'a brand new passphrase',
     });
   });
+
+  it('shows a refused password on its field, not as a broken link (T-102)', async () => {
+    const message =
+      'This password has appeared in a data breach elsewhere. Choose a different one.';
+    handlers['POST /auth/password/reset'] = () =>
+      apiError(400, 'VALIDATION_ERROR', 'Request validation failed.', {
+        issues: [{ path: 'body.password', code: 'breached_password', message }],
+      });
+    renderAt('/reset-password?token=abcdefghijklmnopqrstuvwxyz');
+    await userEvent.type(await screen.findByLabelText('New password'), 'password123');
+    await userEvent.type(screen.getByLabelText('Repeat the new password'), 'password123');
+    await userEvent.click(screen.getByRole('button', { name: 'Save new password' }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /new link/i })).not.toBeInTheDocument();
+  });
 });
 
 describe('signed-in actions', () => {

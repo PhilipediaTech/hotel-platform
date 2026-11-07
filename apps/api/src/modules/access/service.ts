@@ -2,6 +2,7 @@ import { HOTEL_PERMISSION_CODES, permissionDef, type RoleLimitsValue } from '@ho
 import type { Logger } from 'pino';
 import type { Invitation, Membership, Role, User } from '../../generated/prisma/client.ts';
 import type { AuthContext } from '../../core/auth.ts';
+import { assertNotBreached, type BreachedPasswordCheck } from '../../core/breached-passwords.ts';
 import type { Clock } from '../../core/clock.ts';
 import type { Config } from '../../core/config.ts';
 import { recordAudit } from '../../core/audit.ts';
@@ -30,6 +31,8 @@ export interface AccessDeps {
   clock: Clock;
   email: EmailProvider;
   logger: Logger;
+  /** New passwords against known breaches (T-102). */
+  breachedPasswords: BreachedPasswordCheck;
 }
 
 const DAY = 24 * 60 * 60_000;
@@ -719,6 +722,7 @@ export async function acceptInvitation(
   }
 
   const newAccount = !user;
+  if (!user) await assertNotBreached(deps.breachedPasswords, body.password ?? '');
   const passwordHash = user ? null : await hashPassword(body.password ?? '');
   await deps.db.$transaction(async (tx) => {
     // Single use, even when two tabs accept at once.

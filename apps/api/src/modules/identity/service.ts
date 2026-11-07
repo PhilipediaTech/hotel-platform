@@ -3,6 +3,7 @@ import type { Logger } from 'pino';
 import type { AuthTokenPurpose, Session, User } from '../../generated/prisma/client.ts';
 import { recordAudit, recordUserEvent } from '../../core/audit.ts';
 import { createSession, isSessionOver, type AuthContext } from '../../core/auth.ts';
+import { assertNotBreached, type BreachedPasswordCheck } from '../../core/breached-passwords.ts';
 import { businessDate } from '../../core/business-day.ts';
 import type { Clock } from '../../core/clock.ts';
 import type { Config } from '../../core/config.ts';
@@ -25,6 +26,8 @@ export interface IdentityDeps {
   clock: Clock;
   email: EmailProvider;
   logger: Logger;
+  /** New passwords against known breaches (T-102). */
+  breachedPasswords: BreachedPasswordCheck;
 }
 
 const MINUTE = 60_000;
@@ -142,6 +145,8 @@ export function propertyCodeFor(name: string): string {
  * An email that already has an account gets a notice instead; the response is the same.
  */
 export async function signUp(deps: IdentityDeps, input: SignUpInput): Promise<void> {
+  // Before the account lookup, so the answer is the same whether the email has one or not.
+  await assertNotBreached(deps.breachedPasswords, input.password);
   const existing = await deps.db.user.findUnique({ where: { email: input.email } });
   if (existing) {
     await notifyExistingAccount(deps, existing);
@@ -435,6 +440,7 @@ export async function resetPassword(
   token: string,
   password: string,
 ): Promise<void> {
+  await assertNotBreached(deps.breachedPasswords, password);
   const passwordHash = await hashPassword(password);
   const now = deps.clock();
   await deps.db.$transaction(async (tx) => {

@@ -109,15 +109,24 @@ export function mountRoute<R extends RouteContract>(
         ? getAuth(req)
         : requireAuth(req, { allowPendingMfa: route.allowPendingMfa ?? false });
     const issues: Issue[] = [];
+    const validate = () => {
+      const parts = {
+        params: parsePart('params', route.params, req.params, issues),
+        query: parsePart('query', route.query, req.query, issues),
+        body: parsePart('body', route.body, req.body, issues),
+      };
+      if (issues.length > 0) {
+        throw new AppError('VALIDATION_ERROR', 'Request validation failed.', { issues });
+      }
+      return parts;
+    };
+    // Bad headers: no property to check permissions in, so report every problem at once.
     checkHeaders(route, req, issues);
-    const params = parsePart('params', route.params, req.params, issues);
-    const query = parsePart('query', route.query, req.query, issues);
-    const body = parsePart('body', route.body, req.body, issues);
-    if (issues.length > 0) {
-      throw new AppError('VALIDATION_ERROR', 'Request validation failed.', { issues });
-    }
+    if (issues.length > 0) validate();
 
-    // Middleware step 7 has already answered 404 for a property the user can't see.
+    // Who may call this comes before what they sent (T-102, ASVS V8): a caller without
+    // the permission is refused without learning the route's parameters from validation
+    // messages. Middleware step 7 has already answered 404 for a property the user can't see.
     const tenant = tenantOf(req);
     if (route.propertyScoped && !tenant) {
       throw new AppError('NOT_FOUND', 'Property not found.');
@@ -133,6 +142,9 @@ export function mountRoute<R extends RouteContract>(
         module: route.module,
       });
     }
+
+    const { params, query, body } = validate();
+
     // M12-06: a report as CSV or PDF also needs the export permission.
     const format = (query as { format?: unknown } | undefined)?.format;
     if (route.exports && format !== undefined && format !== 'json') {

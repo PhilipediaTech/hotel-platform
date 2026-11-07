@@ -34,13 +34,17 @@
     "openapi": "node apps/api/scripts/openapi.ts",
     "openapi:check": "node apps/api/scripts/openapi.ts --check",
     "routes:meta": "node apps/api/scripts/route-meta.ts",
+    "load:api": "node --env-file-if-exists=.env load/api.ts",
+    "load:prepare": "node --env-file-if-exists=.env load/prepare.ts",
+    "load:night-audit": "node --env-file-if-exists=.env load/night-audit.ts",
+    "load:verify": "node --env-file-if-exists=.env load/verify.ts",
     "routes:meta:check": "node apps/api/scripts/route-meta.ts --check",
     "simulate:webhook": "node apps/api/scripts/simulate-webhook.ts",
     "whatsapp:templates": "node --env-file-if-exists=.env apps/api/scripts/whatsapp-templates.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
-      "eslint --fix --max-warnings 0",
+      "eslint --fix --max-warnings 0 --no-warn-ignored",
       "prettier --write"
     ],
     "*.{json,md,yml,yaml,css,html}": "prettier --write"

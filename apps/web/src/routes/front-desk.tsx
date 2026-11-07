@@ -13,6 +13,9 @@ import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { cn } from '../lib/cn.ts';
 import { STATUS_TONE, useFormats } from './reservations.tsx';
+import { SNAPSHOT_REFRESH_MS, withSnapshot } from '../offline/snapshots.ts';
+import { SavedCopyNote } from '../offline/saved-copy-note.tsx';
+import { useOfflineKey } from '../offline/use-offline-key.ts';
 
 // S06 Front desk (PRD M3-06; T-053): arrivals, departures and in-house guests for the business
 // date, with balance and flags per row and quick check-in / check-out. The business date is
@@ -41,14 +44,21 @@ const frontDeskKey = (propertyId: string | null) => ['front-desk', propertyId ??
 
 function useList(tab: Tab, date: string) {
   const { currentPropertyId } = useSession();
-  return useQuery({
-    queryKey: [...frontDeskKey(currentPropertyId), tab, tab === 'in-house' ? '' : date],
-    queryFn: () =>
-      tab === 'in-house'
-        ? api.call(OPERATION[tab], {})
-        : api.call(OPERATION[tab], { query: { date } }),
-    placeholderData: keepPreviousData,
-  });
+  // Kept on the device for offline use and refreshed every minute (T-093).
+  const savedAs = useOfflineKey(`front-desk:${tab}:${tab === 'in-house' ? '' : date}`);
+  return {
+    savedAs,
+    ...useQuery({
+      queryKey: [...frontDeskKey(currentPropertyId), tab, tab === 'in-house' ? '' : date],
+      queryFn: withSnapshot(savedAs, () =>
+        tab === 'in-house'
+          ? api.call(OPERATION[tab], {})
+          : api.call(OPERATION[tab], { query: { date } }),
+      ),
+      placeholderData: keepPreviousData,
+      refetchInterval: SNAPSHOT_REFRESH_MS,
+    }),
+  };
 }
 
 /** Quick check-in: as on the reservation page (M3 rule 2; day-use until its end time). */
@@ -138,6 +148,7 @@ export function FrontDeskPage() {
         </div>
       </div>
 
+      <SavedCopyNote savedAs={current.savedAs} />
       {current.error && (
         <Alert tone="critical" className="mt-3">
           {errorMessage(current.error)}

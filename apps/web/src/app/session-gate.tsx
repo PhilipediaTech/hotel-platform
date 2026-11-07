@@ -15,6 +15,7 @@ import {
   toShellSession,
   type SessionActions,
 } from './session.ts';
+import { clearSnapshots, withSnapshot } from '../offline/snapshots.ts';
 
 const propertyKey = (userId: string) => `hotel.currentProperty.${userId}`;
 
@@ -55,7 +56,8 @@ export function SessionGate({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const me = useQuery({
     queryKey: ME_QUERY_KEY,
-    queryFn: () => api.call('getMe'),
+    // A saved copy lets the app open offline (T-093); sign-out forgets it.
+    queryFn: withSnapshot('me', () => api.call('getMe')),
     staleTime: 5 * 60_000,
   });
   const [chosenProperty, setChosenProperty] = useState<string | null>(null);
@@ -68,6 +70,8 @@ export function SessionGate({ children }: { children: ReactNode }) {
       // Whatever the server said, this browser forgets the user.
       setApiPropertyId(null);
       queryClient.clear();
+      // Saved lists hold guests' names: they go with the person (T-093).
+      void clearSnapshots();
       void navigate(next, { replace: true });
     },
   });

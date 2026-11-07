@@ -15,6 +15,7 @@ import { PdfError, usePdf } from '../lib/pdf.tsx';
 import { useFormats } from './reservations.tsx';
 import paymentsStrings from '../i18n/en/payments.json';
 import { registerStrings } from '../i18n/index.ts';
+import { useOnlineStatus } from '../offline/use-online-status.ts';
 
 registerStrings(paymentsStrings);
 
@@ -328,6 +329,7 @@ function PaymentForm({
   doneText: (balance: string) => string;
   onPaid: () => void;
 }) {
+  const online = useOnlineStatus();
   const { t } = useTranslation();
   const f = useFormats();
   const [method, setMethod] = useState<Method>(methods[0] ?? 'CASH');
@@ -452,7 +454,7 @@ function PaymentForm({
         />
       </Field>
       <div className="sm:col-span-4">
-        <Button type="submit" disabled={!ready || take.isPending}>
+        <Button type="submit" disabled={!online || !ready || take.isPending}>
           {t('payments.takeButton')}
         </Button>
       </div>

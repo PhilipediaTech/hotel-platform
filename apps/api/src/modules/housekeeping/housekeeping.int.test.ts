@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDb, testDb } from '../../../test/db.ts';
 import { errorOf } from '../../../test/helpers.ts';
@@ -245,7 +246,7 @@ describe('housekeeping', () => {
     ).toEqual([]);
     const [stayover, departure] = mine.data as [Assignment, Assignment];
     const patch = (who: typeof kemi, a: Assignment, body: object) =>
-      who.patch(`/housekeeping/assignments/${a.id}`, body);
+      who.patch(`/housekeeping/assignments/${a.id}`, body).set('Idempotency-Key', randomUUID());
 
     expect((await patch(tunde, departure, { action: 'START' })).status).toBe(403);
     expect(errorOf(await patch(kemi, departure, { action: 'COMPLETE' })).code).toBe(
@@ -300,6 +301,36 @@ describe('housekeeping', () => {
       h.fd.get(`/stays/${h.chi.id}/rooms`),
     );
     expect(free.data.find((r) => r.id === h.room['103'])?.problems).toEqual([]);
+  });
+
+  it('a room update sent again with the same key applies once (offline replay, T-093)', async () => {
+    const h = await hotel();
+    const sup = await h.as(
+      (await db.membership.findFirstOrThrow({ where: { roleId: h.role('hk-supervisor') } })).userId,
+    );
+    await h.ok(
+      sup.send('/housekeeping/assignments', {
+        roomIds: [h.room['101']],
+        attendantId: h.kemiUser.id,
+      }),
+    );
+    const kemi = await h.as(h.kemiUser.id);
+    const [a] = (await h.ok<{ data: Assignment[] }>(kemi.get('/housekeeping/my-assignments'))).data;
+    const key = randomUUID();
+    const send = () =>
+      kemi
+        .patch(`/housekeeping/assignments/${a?.id ?? ''}`, { action: 'START' })
+        .set('Idempotency-Key', key);
+    const first = await send();
+    expect(first.status).toBe(200);
+    // The replay answers the first result instead of failing on "already started".
+    const again = await send();
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual(first.body);
+    const without = await kemi.patch(`/housekeeping/assignments/${a?.id ?? ''}`, {
+      action: 'PAUSE',
+    });
+    expect(without.status).toBe(400);
   });
 });
 

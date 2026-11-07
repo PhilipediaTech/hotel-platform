@@ -21,10 +21,19 @@ export function shouldRetry(failureCount: number, error: unknown): boolean {
 export function createQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
-      queries: { staleTime: 30_000, retry: shouldRetry, refetchOnWindowFocus: true },
+      // offlineFirst (T-093): offline, a query still runs once, so saved lists answer
+      // instead of the screen waiting for the network; retries wait for the connection.
+      queries: {
+        staleTime: 30_000,
+        retry: shouldRetry,
+        refetchOnWindowFocus: true,
+        networkMode: 'offlineFirst',
+      },
       // Writes are never retried automatically: money and room actions use idempotency keys
-      // and the user decides whether to resend.
-      mutations: { retry: false },
+      // and the user decides whether to resend. They always run (T-093): offline, the
+      // whitelisted ones are queued and the rest are refused at once with a clear message,
+      // instead of waiting silently for the connection.
+      mutations: { retry: false, networkMode: 'always' },
     },
   });
 }

@@ -25,6 +25,8 @@ import { DayUseTimes, EndDayUse } from './day-use.tsx';
 const PaymentLinks = lazy(() =>
   import('./payment-links.tsx').then((m) => ({ default: m.PaymentLinks })),
 );
+import { sendOrQueue } from '../offline/queue.ts';
+import { useOfflineWho } from '../offline/use-offline-key.ts';
 const BookingDeposit = lazy(() =>
   import('./folio-payments.tsx').then((m) => ({ default: m.BookingDeposit })),
 );
@@ -822,17 +824,34 @@ function DetailsForm({ reservation, queryKey }: Props) {
   const saved = useSaved(queryKey);
   const [notes, setNotes] = useState(reservation.notes ?? '');
   const [guarantee, setGuarantee] = useState<Guarantee>(reservation.guarantee);
+  const who = useOfflineWho();
+  const [queued, setQueued] = useState(false);
   const save = useMutation({
-    mutationFn: () =>
-      api.call(
+    mutationFn: async () => {
+      const note = notes.trim() === '' ? null : notes.trim();
+      // A note alone can wait offline (T-093); the guarantee needs the connection.
+      if (guarantee === reservation.guarantee) {
+        const sent = await sendOrQueue<Reservation>(
+          who,
+          'updateReservation',
+          { params: { reservationId: reservation.id }, body: { notes: note } },
+          {
+            label: t('offline.labels.note', { ref: reservation.confirmationNo }),
+            ifMatch: `"${reservation.version}"`,
+          },
+        );
+        return sent.queued ? null : sent.result;
+      }
+      return api.call(
         'updateReservation',
-        {
-          params: { reservationId: reservation.id },
-          body: { notes: notes.trim() === '' ? null : notes.trim(), guarantee },
-        },
+        { params: { reservationId: reservation.id }, body: { notes: note, guarantee } },
         { ifMatch: `"${reservation.version}"` },
-      ),
-    onSuccess: saved,
+      );
+    },
+    onSuccess: (result) => {
+      setQueued(result === null);
+      if (result !== null) saved(result);
+    },
   });
   return (
     <form
@@ -868,6 +887,11 @@ function DetailsForm({ reservation, queryKey }: Props) {
           onChange={(e) => setNotes(e.target.value)}
         />
       </div>
+      {queued && (
+        <Alert tone="info" className="mb-3">
+          {t('offline.queuedNow')}
+        </Alert>
+      )}
       {save.error && (
         <Alert tone="critical" className="mb-3">
           {errorMessage(save.error)}
@@ -877,7 +901,7 @@ function DetailsForm({ reservation, queryKey }: Props) {
         <Button type="submit" disabled={save.isPending}>
           {t('guests.save')}
         </Button>
-        {save.isSuccess && (
+        {save.isSuccess && !queued && (
           <span role="status" className="text-sm">
             {t('guests.saved')}
           </span>

@@ -19,6 +19,10 @@ import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
 import housekeepingStrings from '../i18n/en/housekeeping.json';
 import { registerStrings } from '../i18n/index.ts';
+import { SNAPSHOT_REFRESH_MS, withSnapshot } from '../offline/snapshots.ts';
+import { SavedCopyNote } from '../offline/saved-copy-note.tsx';
+import { useOfflineKey, useOfflineWho } from '../offline/use-offline-key.ts';
+import { sendOrQueue } from '../offline/queue.ts';
 
 registerStrings(housekeepingStrings);
 
@@ -56,9 +60,13 @@ export function HousekeepingPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [attendantId, setAttendantId] = useState('');
   const key = useHkKey('board');
+  const savedAs = useOfflineKey(`hk-board:${floor}`);
   const board = useQuery({
     queryKey: [...key, floor],
-    queryFn: () => api.call('getHousekeepingBoard', { query: floor ? { floor } : {} }),
+    queryFn: withSnapshot(savedAs, () =>
+      api.call('getHousekeepingBoard', { query: floor ? { floor } : {} }),
+    ),
+    refetchInterval: SNAPSHOT_REFRESH_MS,
   });
   const assign = useMutation({
     mutationFn: (to: string | null) =>
@@ -80,6 +88,7 @@ export function HousekeepingPage() {
   return (
     <section className="max-w-6xl">
       <h1 className="text-xl font-semibold">{t('hk.title')}</h1>
+      <SavedCopyNote savedAs={savedAs} />
       {board.error && (
         <Alert tone="critical" className="mt-3">
           {errorMessage(board.error)}
@@ -234,14 +243,17 @@ function Discrepancy({ rule }: { rule: string }) {
 export function MyRoomsPage() {
   const { t } = useTranslation();
   const key = useHkKey('mine');
+  const savedAs = useOfflineKey('hk-mine');
   const mine = useQuery({
     queryKey: key,
-    queryFn: () => api.call('listMyAssignments', {}),
+    queryFn: withSnapshot(savedAs, () => api.call('listMyAssignments', {})),
+    refetchInterval: SNAPSHOT_REFRESH_MS,
   });
   const data = mine.data?.data ?? [];
   return (
     <section className="max-w-xl">
       <h1 className="text-xl font-semibold">{t('hk.myRooms')}</h1>
+      <SavedCopyNote savedAs={savedAs} />
       {mine.error && (
         <Alert tone="critical" className="mt-3">
           {errorMessage(mine.error)}
@@ -269,16 +281,24 @@ function MorningReport() {
     queryKey: [...key, floor],
     queryFn: () => api.call('listStatusReports', { query: floor ? { floor } : {} }),
   });
+  const who = useOfflineWho();
+  const [queued, setQueued] = useState(false);
   const send = useMutation({
     mutationFn: () =>
-      api.call('submitStatusReport', {
-        body: {
-          entries: Object.entries(chosen).map(([roomId, observed]) => ({ roomId, observed })),
+      sendOrQueue<{ alertsRaised: number }>(
+        who,
+        'submitStatusReport',
+        {
+          body: {
+            entries: Object.entries(chosen).map(([roomId, observed]) => ({ roomId, observed })),
+          },
         },
-      }),
-    onSuccess: () => {
+        { label: t('offline.labels.report', { count: Object.keys(chosen).length }) },
+      ),
+    onSuccess: (sent) => {
       setChosen({});
-      void queryClient.invalidateQueries({ queryKey: key });
+      setQueued(sent.queued);
+      if (!sent.queued) void queryClient.invalidateQueries({ queryKey: key });
     },
   });
   const count = Object.keys(chosen).length;
@@ -365,11 +385,16 @@ function MorningReport() {
           </Button>
         </form>
       )}
-      {send.data && (
-        <Alert tone={send.data.alertsRaised > 0 ? 'critical' : 'success'} className="mt-3">
-          {send.data.alertsRaised > 0
-            ? t('hk.reportSent', { count: send.data.alertsRaised })
+      {send.data && !send.data.queued && (
+        <Alert tone={send.data.result.alertsRaised > 0 ? 'critical' : 'success'} className="mt-3">
+          {send.data.result.alertsRaised > 0
+            ? t('hk.reportSent', { count: send.data.result.alertsRaised })
             : t('hk.reportSentNone')}
+        </Alert>
+      )}
+      {queued && (
+        <Alert tone="info" className="mt-3">
+          {t('offline.queuedNow')}
         </Alert>
       )}
       {send.error && (
@@ -387,10 +412,20 @@ function MyRoom({ assignment: a, queryKey }: { assignment: Assignment; queryKey:
   const [item, setItem] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [notes, setNotes] = useState(a.notes ?? '');
+  const who = useOfflineWho();
+  const [queued, setQueued] = useState(false);
   const update = useMutation({
     mutationFn: (body: object) =>
-      api.call('updateAssignment', { params: { assignmentId: a.id }, body }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
+      sendOrQueue(
+        who,
+        'updateAssignment',
+        { params: { assignmentId: a.id }, body },
+        { label: t('offline.labels.room', { room: a.roomNumber }) },
+      ),
+    onSuccess: (sent) => {
+      setQueued(sent.queued);
+      if (!sent.queued) void queryClient.invalidateQueries({ queryKey });
+    },
   });
   const done = a.status === 'DONE';
   const working = a.status === 'IN_PROGRESS';
@@ -513,6 +548,11 @@ function MyRoom({ assignment: a, queryKey }: { assignment: Assignment; queryKey:
             </Button>
           </form>
         </>
+      )}
+      {queued && (
+        <Alert tone="info" className="mt-3">
+          {t('offline.queuedNow')}
+        </Alert>
       )}
       {update.error && (
         <Alert tone="critical" className="mt-2">

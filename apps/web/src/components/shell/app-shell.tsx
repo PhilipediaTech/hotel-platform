@@ -4,6 +4,7 @@ import { bottomBarItems, railItems, type NavItem } from '../../app/navigation.ts
 import { useSession } from '../../app/session.ts';
 import { cn } from '../../lib/cn.ts';
 import { OfflineBanner, UpdateBanner } from './banners.tsx';
+import { PendingChanges } from '../../offline/pending-changes.tsx';
 import { PropertyContext, TopBar } from './top-bar.tsx';
 
 function railLinkClass({ isActive }: { isActive: boolean }) {
@@ -90,6 +91,7 @@ export function AppShell() {
         {/* Phones: the property context chip does not fit in the top bar. */}
         <PropertyContext className="flex border-b border-border bg-surface px-4 py-1 sm:hidden" />
         <OfflineBanner />
+        <PendingChanges />
         <UpdateBanner />
         {session.preview && (
           <p className="bg-surface-sunken px-4 py-1 text-xs text-text-muted">

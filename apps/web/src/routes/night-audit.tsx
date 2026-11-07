@@ -12,6 +12,7 @@ import { PdfError, usePdf } from '../lib/pdf.tsx';
 import { useFormats } from './reservations.tsx';
 import nightAuditStrings from '../i18n/en/night-audit.json';
 import { registerStrings } from '../i18n/index.ts';
+import { useOnlineStatus } from '../offline/use-online-status.ts';
 
 registerStrings(nightAuditStrings);
 
@@ -41,6 +42,7 @@ function fixLink(e: Exception): string | null {
 }
 
 export function NightAuditPage() {
+  const online = useOnlineStatus();
   const { t } = useTranslation();
   const f = useFormats();
   const queryClient = useQueryClient();
@@ -95,7 +97,7 @@ export function NightAuditPage() {
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface p-4">
           <p className="text-sm">{t('nightAudit.ready', { date: f.date(day.data.date) })}</p>
           <Button
-            disabled={start.isPending}
+            disabled={!online || start.isPending}
             onClick={() => day.data && start.mutate(day.data.date)}
           >
             {start.isPending ? t('nightAudit.running') : t('nightAudit.run')}

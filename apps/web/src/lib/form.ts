@@ -1,7 +1,7 @@
 import type { FieldErrors, FieldValues, Resolver } from 'react-hook-form';
 import type { z } from 'zod';
 import i18n from '../i18n/index.ts';
-import { ApiError } from './api.ts';
+import { ApiError, OfflineError } from './api.ts';
 
 // Forms validate with the same Zod schemas the API uses (from @hotel/shared), so the
 // browser and the server agree on every rule.
@@ -51,6 +51,7 @@ export function apiFieldErrors(error: unknown): { field: string; message: string
 
 /** A sentence for the user about a failed call, in the UI language. */
 export function errorMessage(error: unknown): string {
+  if (error instanceof OfflineError) return i18n.t('errors.offline');
   if (!(error instanceof ApiError)) return i18n.t('errors.network');
   if (error.code === 'RATE_LIMITED') return i18n.t('errors.rateLimited');
   if (error.code === 'INTERNAL') {

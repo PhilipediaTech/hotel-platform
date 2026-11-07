@@ -29239,6 +29239,7 @@
         ],
         "description": "An attendant works only the rooms given to them (with hk.assign as well, any room). Completing needs every checklist item ticked and sets the room CLEAN (inspection comes with V1.1).",
         "x-permission": "hk.work",
+        "x-idempotent": true,
         "parameters": [
           {
             "schema": {
@@ -29257,6 +29258,17 @@
             "required": true,
             "description": "Property the call acts on.",
             "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
             "in": "header"
           }
         ],
@@ -29383,7 +29395,7 @@
             }
           },
           "409": {
-            "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
             "content": {
               "application/json": {
                 "schema": {

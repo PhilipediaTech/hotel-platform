@@ -24,6 +24,8 @@ import { errorMessage } from '../lib/form.ts';
 import tasksStrings from '../i18n/en/tasks.json';
 import { registerStrings } from '../i18n/index.ts';
 import { useFormats } from './reservations.tsx';
+import { sendOrQueue, type Queueable } from '../offline/queue.ts';
+import { useOfflineWho } from '../offline/use-offline-key.ts';
 
 registerStrings(tasksStrings);
 
@@ -549,7 +551,7 @@ export function TaskPage() {
           </li>
         ))}
       </ol>
-      {d.canComment && <CommentForm taskId={d.id} onDone={onDone} />}
+      {d.canComment && <CommentForm taskId={d.id} number={d.number} onDone={onDone} />}
     </section>
   );
 }
@@ -570,17 +572,48 @@ function eventText(t: T, e: Detail['events'][number]): string {
   });
 }
 
+/**
+ * Sends a task update now, or keeps it on the device offline (T-093): answers the task, or
+ * null when it waits.
+ */
+function useTaskSender(number: number) {
+  const { t } = useTranslation();
+  const who = useOfflineWho();
+  return async (
+    operationId: Queueable,
+    input: { params: { taskId: string }; body?: unknown },
+    what: string,
+  ): Promise<Detail | null> => {
+    const sent = await sendOrQueue<Detail>(who, operationId, input, {
+      label: t('offline.labels.task', { number, what }),
+    });
+    return sent.queued ? null : sent.result;
+  };
+}
+
+function QueuedNote({ show }: { show: boolean }) {
+  const { t } = useTranslation();
+  return show ? <Alert tone="info">{t('offline.queuedNow')}</Alert> : null;
+}
+
 function Actions({ task, onDone }: { task: Detail; onDone: (d: Detail) => void }) {
   const { t } = useTranslation();
   const has = (a: TaskAction) => task.actions.includes(a);
   const params = { taskId: task.id };
+  const sendTask = useTaskSender(task.number);
+  const [queued, setQueued] = useState(false);
   const simple = useMutation({
     mutationFn: (action: 'acknowledgeTask' | 'startTask' | 'verifyTask') =>
       action === 'verifyTask'
         ? api.call('verifyTask', { params, body: {} })
-        : api.call(action, { params }),
-    onSuccess: onDone,
+        : sendTask(
+            action,
+            { params },
+            t(`tasks.action.${action === 'startTask' ? 'start' : 'acknowledge'}`),
+          ),
+    onSuccess: (d: Detail | null) => (d ? onDone(d) : setQueued(true)),
   });
+  const done = (d: Detail | null) => (d ? onDone(d) : setQueued(true));
   if (task.actions.length === 0) return null;
   return (
     <div className="mt-4 flex flex-col gap-3 rounded-md border border-border bg-surface-muted p-3">
@@ -602,14 +635,17 @@ function Actions({ task, onDone }: { task: Detail; onDone: (d: Detail) => void }
         )}
       </div>
       {simple.error && <Alert tone="critical">{errorMessage(simple.error)}</Alert>}
-      {has('resolve') && <ResolveForm task={task} onDone={onDone} />}
+      <QueuedNote show={queued} />
+      {has('resolve') && <ResolveForm task={task} onDone={done} />}
       {has('hold') && (
         <ReasonForm
           id="hold"
           label={t('tasks.action.holdReason')}
           button={t('tasks.action.hold')}
-          send={(reason) => api.call('holdTask', { params, body: { reason } })}
-          onDone={onDone}
+          send={(reason) =>
+            sendTask('holdTask', { params, body: { reason } }, t('tasks.action.hold'))
+          }
+          onDone={done}
         />
       )}
       {has('reopen') && (
@@ -618,7 +654,7 @@ function Actions({ task, onDone }: { task: Detail; onDone: (d: Detail) => void }
           label={t('tasks.action.reopenReason')}
           button={t('tasks.action.reopen')}
           send={(reason) => api.call('reopenTask', { params, body: { reason } })}
-          onDone={onDone}
+          onDone={done}
         />
       )}
       {has('assign') && <AssignForm task={task} onDone={onDone} />}
@@ -630,8 +666,8 @@ function ReasonForm(props: {
   id: string;
   label: string;
   button: string;
-  send: (reason: string) => Promise<Detail>;
-  onDone: (d: Detail) => void;
+  send: (reason: string) => Promise<Detail | null>;
+  onDone: (d: Detail | null) => void;
 }) {
   const [reason, setReason] = useState('');
   const send = useMutation({
@@ -668,12 +704,21 @@ function ReasonForm(props: {
   );
 }
 
-function ResolveForm({ task, onDone }: { task: Detail; onDone: (d: Detail) => void }) {
+function ResolveForm({ task, onDone }: { task: Detail; onDone: (d: Detail | null) => void }) {
   const { t } = useTranslation();
   const [note, setNote] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const sendResolve = useTaskSender(task.number);
   const resolve = useMutation({
     mutationFn: async () => {
+      // Without photos it can wait offline; photos need the connection to upload.
+      if (files.length === 0) {
+        return sendResolve(
+          'resolveTask',
+          { params: { taskId: task.id }, body: { note: note.trim() } },
+          t('tasks.action.resolve'),
+        );
+      }
       const fileIds = await uploadAll(files);
       return api.call('resolveTask', {
         params: { taskId: task.id },
@@ -802,13 +847,31 @@ function AssignForm({ task, onDone }: { task: Detail; onDone: (d: Detail) => voi
   );
 }
 
-function CommentForm({ taskId, onDone }: { taskId: string; onDone: (d: Detail) => void }) {
+function CommentForm({
+  taskId,
+  number,
+  onDone,
+}: {
+  taskId: string;
+  number: number;
+  onDone: (d: Detail) => void;
+}) {
   const { t } = useTranslation();
   const [note, setNote] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [formKey, setFormKey] = useState(0);
+  const sendComment = useTaskSender(number);
+  const [queued, setQueued] = useState(false);
   const comment = useMutation({
     mutationFn: async () => {
+      // A note alone can wait offline (the QA journey's "note queued"); photos cannot.
+      if (files.length === 0) {
+        return sendComment(
+          'addTaskComment',
+          { params: { taskId }, body: { note: note.trim() } },
+          t('tasks.action.comment'),
+        );
+      }
       const fileIds = await uploadAll(files);
       return api.call('addTaskComment', {
         params: { taskId },
@@ -818,11 +881,12 @@ function CommentForm({ taskId, onDone }: { taskId: string; onDone: (d: Detail) =
         },
       });
     },
-    onSuccess: (d) => {
+    onSuccess: (d: Detail | null) => {
       setNote('');
       setFiles([]);
       setFormKey((k) => k + 1);
-      onDone(d);
+      setQueued(d === null);
+      if (d) onDone(d);
     },
   });
   return (
@@ -843,6 +907,7 @@ function CommentForm({ taskId, onDone }: { taskId: string; onDone: (d: Detail) =
       />
       <PhotoInput id="task-comment-photos" files={files} onChange={setFiles} />
       {comment.error && <Alert tone="critical">{errorMessage(comment.error)}</Alert>}
+      <QueuedNote show={queued} />
       <Button type="submit" variant="secondary" className="self-start" disabled={comment.isPending}>
         {t('tasks.action.comment')}
       </Button>

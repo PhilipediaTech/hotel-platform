@@ -155,7 +155,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   getHousekeepingBoard: {"operationId":"getHousekeepingBoard","method":"get","path":"/housekeeping/board","propertyScoped":true},
   assignRooms: {"operationId":"assignRooms","method":"post","path":"/housekeeping/assignments","body":true,"propertyScoped":true,"idempotent":true},
   listMyAssignments: {"operationId":"listMyAssignments","method":"get","path":"/housekeeping/my-assignments","propertyScoped":true},
-  updateAssignment: {"operationId":"updateAssignment","method":"patch","path":"/housekeeping/assignments/{assignmentId}","body":true,"propertyScoped":true},
+  updateAssignment: {"operationId":"updateAssignment","method":"patch","path":"/housekeeping/assignments/{assignmentId}","body":true,"propertyScoped":true,"idempotent":true},
   listStatusReports: {"operationId":"listStatusReports","method":"get","path":"/housekeeping/status-reports","propertyScoped":true},
   submitStatusReport: {"operationId":"submitStatusReport","method":"post","path":"/housekeeping/status-reports","body":true,"propertyScoped":true,"idempotent":true},
   listTasks: {"operationId":"listTasks","method":"get","path":"/tasks","propertyScoped":true},

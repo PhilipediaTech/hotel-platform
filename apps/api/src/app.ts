@@ -41,6 +41,7 @@ import { taskRoutes } from './modules/tasks/routes.ts';
 import { handoverRoutes } from './modules/handovers/routes.ts';
 import { leakageRoutes } from './modules/leakage/routes.ts';
 import { messagingRoutes } from './modules/notifications/routes.ts';
+import { ownerRoutes } from './modules/owner/routes.ts';
 import type { MessageProvider } from './core/messaging.ts';
 import { paymentIntentRoutes } from './modules/payments/intent-routes.ts';
 import { RAW_BODY, webhookRoutes } from './modules/payments/webhook-routes.ts';
@@ -172,6 +173,7 @@ export function createApp({
   api.use(handoverRoutes({ db, tenantDb, clock }));
   api.use(leakageRoutes({ db, tenantDb, clock }));
   api.use(messagingRoutes({ db, tenantDb, clock, messages }));
+  api.use(ownerRoutes({ db, clock }));
   api.use(
     paymentIntentRoutes({
       db,

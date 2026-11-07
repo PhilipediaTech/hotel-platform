@@ -72,6 +72,9 @@ const HandoversPage = lazy(() =>
 const LeakagePage = lazy(() =>
   import('../routes/leakage.tsx').then((m) => ({ default: m.LeakagePage })),
 );
+const OwnerHomePage = lazy(() =>
+  import('../routes/owner.tsx').then((m) => ({ default: m.OwnerHomePage })),
+);
 const MessagesPage = lazy(() =>
   import('../routes/messages.tsx').then((m) => ({ default: m.MessagesPage })),
 );
@@ -101,6 +104,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/handovers': <HandoversPage />,
   '/leakage': <LeakagePage />,
   '/messages': <MessagesPage />,
+  '/owner': <OwnerHomePage />,
   '/reservations': <ReservationsPage />,
   '/calendar': <CalendarPage />,
   '/bookings/new': <NewBookingPage />,

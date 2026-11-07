@@ -12,6 +12,7 @@ import type { EmailProvider } from './core/email.ts';
 import type { MessageProvider } from './core/messaging.ts';
 import { approvalExpiryJob, approvalOtpHandler } from './modules/approvals/jobs.ts';
 import { notificationSendHandler, whatsappOtpChannel } from './modules/notifications/delivery.ts';
+import { flashReportHandler, instantAlertHandler } from './modules/owner/notify.ts';
 import { fileScanJob } from './modules/files/jobs.ts';
 import { inventoryJob } from './modules/availability/inventory.ts';
 import { idPurgeJob } from './modules/reservations/check-in.ts';
@@ -70,5 +71,8 @@ export function eventHandlers(deps: {
       channel: whatsappOtpChannel(send),
     }),
     notificationSendHandler(send),
+    // To the owner (T-091): instant leakage alerts and the flash report at day close.
+    instantAlertHandler({ db: deps.db, logger: deps.logger }),
+    flashReportHandler({ db: deps.db, logger: deps.logger }),
   ];
 }

@@ -1,0 +1,29 @@
+{
+  "owner": {
+    "title": "Owner home",
+    "empty": "No property to show yet.",
+    "today": "Business day {{date}}",
+    "occupancy": "Occupancy",
+    "rooms": "{{occupied}} of {{available}} rooms",
+    "revenueToday": "Revenue today",
+    "revenueMonth": "This month",
+    "cash": "Cash today",
+    "transfers": "Transfers today",
+    "alerts": "Open alerts",
+    "approvals": "Waiting approvals",
+    "openAlerts": "Alerts",
+    "openApprovals": "Approvals",
+    "flash": {
+      "title": "Flash report, {{date}}",
+      "none": "No closed day yet: the flash report comes after the first night audit.",
+      "occupancy": "Occupancy",
+      "roomsSold": "Rooms sold",
+      "roomRevenue": "Room revenue",
+      "adr": "ADR",
+      "revpar": "RevPAR",
+      "payments": "Payments taken",
+      "definitions": "Occupancy: rooms sold ÷ rooms available (out of order left out). ADR: room revenue ÷ rooms sold. RevPAR: room revenue ÷ rooms available. Day-use counts in room revenue, not in rooms sold."
+    },
+    "refresh": "Refresh"
+  }
+}

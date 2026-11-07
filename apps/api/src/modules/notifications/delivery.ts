@@ -41,6 +41,10 @@ export interface QueueClient extends OutboxClient {
       data: Prisma.NotificationDeliveryUncheckedCreateInput;
       select: { id: true };
     }): PromiseLike<{ id: string }>;
+    findFirst(args: {
+      where: Prisma.NotificationDeliveryWhereInput;
+      select: { id: true };
+    }): PromiseLike<{ id: string } | null>;
   };
 }
 
@@ -56,6 +60,11 @@ export interface QueueInput {
   language?: string;
   /** A test message from S29. */
   test?: boolean;
+  /**
+   * What the message is about (e.g. `leakage_alert:<id>`): queued once per recipient, so a
+   * repeated event (outbox delivery is at least once) sends nothing more.
+   */
+  ref?: string;
 }
 
 function definition(code: string, channel: SendingChannel): MessageTemplateDef {
@@ -77,6 +86,17 @@ export async function queueMessage(client: QueueClient, input: QueueInput): Prom
   if (missing.length) {
     throw new Error(`${def.code}: missing ${missing.map((x) => x.name).join(', ')}`);
   }
+  if (input.ref) {
+    const queued = await client.notificationDelivery.findFirst({
+      where: {
+        templateCode: def.code,
+        recipient: input.recipient,
+        payload: { path: ['ref'], equals: input.ref },
+      },
+      select: { id: true },
+    });
+    if (queued) return queued.id;
+  }
   const row = await client.notificationDelivery.create({
     data: {
       propertyId: input.propertyId,
@@ -87,6 +107,7 @@ export async function queueMessage(client: QueueClient, input: QueueInput): Prom
         vars: input.vars,
         language: input.language ?? DEFAULT_MESSAGE_LANGUAGE,
         ...(input.test ? { test: true } : {}),
+        ...(input.ref ? { ref: input.ref } : {}),
       },
     },
     select: { id: true },

@@ -6,6 +6,7 @@ import {
   LAGOS_PROPERTY,
   makeMe,
   membership,
+  ORG,
 } from '../test/me-fixture.ts';
 import { safeNext } from './session-gate.tsx';
 import { toShellSession } from './session.ts';
@@ -73,6 +74,38 @@ describe('toShellSession', () => {
     });
     expect(toShellSession(live, LAGOS).businessDate).toBe('2026-11-12');
     expect(toShellSession(live, ABUJA).businessDate).toBeNull();
+  });
+
+  it('a module the platform switched off takes its permissions away (T-100)', () => {
+    const off = makeMe({
+      organisations: [{ id: ORG, name: 'Obi Hotels', disabledModules: ['leakage'] }],
+      memberships: [membership(null, ['owner.read', 'leakage.review', 'leakage.notify'])],
+    });
+    expect(toShellSession(off, LAGOS).permissions).toEqual(['owner.read']);
+  });
+
+  it('platform staff get the platform codes; a support session shows its group (T-100)', () => {
+    const admin = makeMe({
+      platformAdmin: true,
+      support: [
+        {
+          sessionId: '99999999-0000-4000-8000-000000000001',
+          organisationId: ORG,
+          organisationName: 'Obi Hotels',
+          expiresAt: '2026-11-14T10:30:00Z',
+        },
+      ],
+      memberships: [membership(null, ['frontdesk.read'])],
+    });
+    const session = toShellSession(admin, LAGOS);
+    expect(session.permissions).toEqual(
+      expect.arrayContaining(['platform.admin', 'platform.support', 'frontdesk.read']),
+    );
+    expect(session.support).toEqual({
+      organisationName: 'Obi Hotels',
+      expiresAt: '2026-11-14T10:30:00Z',
+    });
+    expect(toShellSession(me, LAGOS).support).toBeNull();
   });
 
   it('handles a user with no property yet', () => {

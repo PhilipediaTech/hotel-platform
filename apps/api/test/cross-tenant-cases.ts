@@ -864,6 +864,31 @@ const closedDay = {
   query: (t: Record<string, string>) => ({ date: t['date'] ?? '' }),
 };
 
+/** B's invoice and legal name (T-100). */
+async function bBilling(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  await db.organisation.update({ where: { id: organisationId }, data: { legalName: 'B Legal' } });
+  const invoice = await db.platformInvoice.create({
+    data: {
+      organisationId,
+      periodStart: new Date('2026-10-01T00:00:00Z'),
+      periodEnd: new Date('2026-10-31T00:00:00Z'),
+      activeRooms: 3,
+      lines: [],
+      totalMinor: 100n,
+      currency: 'NGN',
+      status: 'ISSUED',
+      issuedAt: new Date(),
+    },
+  });
+  return { invoiceId: invoice.id };
+}
+
+async function bBillingUnchanged(db: Db, world: TenantWorld) {
+  const org = await db.organisation.findUniqueOrThrow({ where: { id: world.orgB.id } });
+  expect(org.legalName).toBe('B Legal');
+}
+
 const taskWrite = (body?: object) => ({
   seed: bTask,
   ...(body ? { body: () => body } : {}),
@@ -1740,6 +1765,17 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     listIds: (body) =>
       (body as { authorities: { authority: string }[] }).authorities.map((a) => a.authority),
   },
+  getSubscription: {
+    seed: bBilling,
+    listIds: (body) => (body as { invoices: { id: string }[] }).invoices.map((i) => i.id),
+  },
+  updateBillingDetails: {
+    seed: bBilling,
+    creates: true,
+    body: () => ({ legalName: 'A Legal' }),
+    untouched: bBillingUnchanged,
+  },
+  getPlatformInvoicePdf: { seed: bBilling },
   // The home spans properties: B's property must never be one of A's cards (T-091).
   getOwnerHome: {
     seed: (_db, _world, propertyId) => Promise.resolve({ propertyId }),

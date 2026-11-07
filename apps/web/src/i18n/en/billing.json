@@ -1,0 +1,41 @@
+{
+  "billing": {
+    "title": "Plan and billing",
+    "noPlan": "Your plan hasn’t been set up yet. We’ll set it with you before the first invoice.",
+    "plan": "Plan",
+    "plans": {
+      "ESSENTIALS": "Essentials",
+      "PROFESSIONAL": "Professional",
+      "GROUP": "Group"
+    },
+    "statuses": {
+      "TRIAL": "Trial",
+      "ACTIVE": "Active",
+      "PAST_DUE": "Payment overdue",
+      "SUSPENDED": "Suspended"
+    },
+    "price": "{{price}} per active room per month, minimum {{minimum}}",
+    "periodEnd": "Current period ends {{date}}",
+    "usage": "This month ({{month}})",
+    "activeRooms": "Active rooms",
+    "whatsapp": "WhatsApp messages",
+    "estimate": "Estimate at today’s rooms",
+    "invoices": "Invoices",
+    "noInvoices": "No invoice yet.",
+    "invoiceStatus": {
+      "ISSUED": "Due",
+      "PAID": "Paid",
+      "VOID": "Void"
+    },
+    "pdf": "PDF",
+    "details": "Billing details",
+    "legalName": "Legal name on invoices",
+    "save": "Save",
+    "saved": "Saved.",
+    "support": "Support sessions",
+    "supportIntro": "Our staff can only see your data through a support session you can see here: it has a reason, ends on its own within an hour, and everything opened is in your audit log.",
+    "noSupport": "No support session yet.",
+    "sessionLine": "{{name}} · {{start}} to {{end}} · {{views}} records opened",
+    "open": "open now"
+  }
+}

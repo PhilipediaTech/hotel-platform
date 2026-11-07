@@ -69,6 +69,9 @@ model Organisation {
   companies        Company[]
   reservations     Reservation[]
   messageTemplates MessageTemplate[]
+  subscription     Subscription?
+  platformInvoices PlatformInvoice[]
+  supportSessions  SupportSession[]
 
   @@map("organisations")
 }
@@ -266,6 +269,7 @@ model User {
   handoversWritten   HandoverNote[]     @relation("HandoverWriter")
   handoversAcked     HandoverNote[]     @relation("HandoverAcknowledger")
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
+  supportSessions    SupportSession[]
 
   @@map("users")
 }
@@ -2136,4 +2140,62 @@ model NotificationDelivery {
   @@index([providerRef])
   @@index([propertyId, createdAt])
   @@map("notification_deliveries")
+}
+
+/// What a hotel group pays (M13-03, M13-04; tab 3 as written). Prices are typed per tenant by
+/// the platform admin (Philip, 2026-11-14: ADR-019 stays Proposed, nothing priced in code).
+model Subscription {
+  organisationId    String   @id @map("organisation_id") @db.Uuid
+  /// ESSENTIALS | PROFESSIONAL | GROUP
+  plan              String
+  pricePerRoomMinor BigInt   @map("price_per_room_minor")
+  minimumMinor      BigInt   @map("minimum_minor")
+  currency          String   @db.Char(3)
+  /// TRIAL | ACTIVE | PAST_DUE | SUSPENDED
+  status            String
+  currentPeriodEnd  DateTime @map("current_period_end") @db.Date
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  @@map("subscriptions")
+}
+
+/// The monthly invoice to a hotel group (M13-03; tab 3 as written). Issued by the platform
+/// admin; the amount is never changed afterwards (paid or voided instead).
+model PlatformInvoice {
+  id             String   @id @default(uuid()) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  periodStart    DateTime @map("period_start") @db.Date
+  periodEnd      DateTime @map("period_end") @db.Date
+  activeRooms    Int      @map("active_rooms")
+  lines          Json
+  totalMinor     BigInt   @map("total_minor")
+  currency       String   @db.Char(3)
+  /// ISSUED | PAID | VOID
+  status         String
+  issuedAt       DateTime @map("issued_at") @db.Timestamptz(6)
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  @@index([organisationId, periodStart])
+  @@map("platform_invoices")
+}
+
+/// A platform admin's time-limited, reason-logged access to one hotel group (M13-02; added
+/// beyond tab 3, approved by Philip 2026-11-14). Read-only; every record viewed is audited.
+model SupportSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  organisationId String    @map("organisation_id") @db.Uuid
+  adminUserId    String    @map("admin_user_id") @db.Uuid
+  reason         String
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
+  endedAt        DateTime? @map("ended_at") @db.Timestamptz(6)
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  admin        User         @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+
+  @@index([organisationId, startedAt])
+  @@index([adminUserId, expiresAt])
+  @@map("support_sessions")
 }

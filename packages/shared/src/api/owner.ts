@@ -58,6 +58,7 @@ export const getOwnerHome = defineRoute({
   tags: ['Owner'],
   propertyScoped: true,
   permission: 'owner.read',
+  module: 'owner',
   response: z.object({ properties: z.array(OwnerPropertyCard) }),
 });
 

@@ -90,6 +90,9 @@
       "discard": "Discard"
     }
   },
+  "support": {
+    "banner": "Support session for {{org}}: read-only until {{time}}. Everything you open is logged and the owner can see it."
+  },
   "update": {
     "available": "A new version is available.",
     "reload": "Reload"

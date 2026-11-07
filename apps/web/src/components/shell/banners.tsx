@@ -1,6 +1,7 @@
-import { RefreshCw, WifiOff } from 'lucide-react';
+import { RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { useSession } from '../../app/session.ts';
 import { useOnlineStatus } from '../../offline/use-online-status.ts';
 import { Button } from '../ui/button.tsx';
 
@@ -34,6 +35,25 @@ export function UpdateBanner() {
       <Button size="sm" onClick={() => void updateServiceWorker(true)}>
         {t('update.reload')}
       </Button>
+    </div>
+  );
+}
+
+/** A platform admin reading this hotel through a support session (T-100): read-only. */
+export function SupportBanner() {
+  const { t, i18n } = useTranslation();
+  const { support } = useSession();
+  if (!support) return null;
+  const time = new Intl.DateTimeFormat(i18n.language, { timeStyle: 'short' }).format(
+    new Date(support.expiresAt),
+  );
+  return (
+    <div
+      role="status"
+      className="flex items-center gap-2 bg-critical-subtle px-4 py-2 text-sm text-critical"
+    >
+      <ShieldAlert aria-hidden className="size-4 shrink-0" />
+      <span>{t('support.banner', { org: support.organisationName, time })}</span>
     </div>
   );
 }

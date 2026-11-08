@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "description": "Astro booking engine and marketing site",
-  "exports": {
-    ".": "./src/index.ts"
-  },
   "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "astro": "7.4.7"
   }
 }

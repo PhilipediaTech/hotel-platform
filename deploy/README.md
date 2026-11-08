@@ -46,4 +46,4 @@ Each step costs money or creates an account, so it's yours. Secrets go only in t
 - The web app reads `VITE_API_BASE_URL`, not `VITE_API_URL`, because that's the name in `apps/web/src/lib/api.ts`.
 - There's no `RUN_JOBS_IN_WEB` yet, so the worker is its own Render service.
 - `COOKIE_DOMAIN` stays unset. The session cookie belongs to the API host only. `app.` and `api.` count as the same site, so the browser still sends it. A parent-domain cookie would be shared between staging and production.
-- The marketing and booking site (`apps/site`) has no build yet, so it has no Pages project.
+- The booking site (`apps/site`) needs its own Cloudflare Pages project: build `npm run build -w apps/site`, output `apps/site/dist`, and the build variable `PUBLIC_API_ORIGIN` set to the API address. Its address must match `SITE_ORIGIN` on the API.

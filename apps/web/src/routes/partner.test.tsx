@@ -8,6 +8,7 @@ import { createQueryClient } from '../app/query-client.ts';
 import { routes } from '../app/routes.tsx';
 import { setApiPropertyId } from '../lib/api.ts';
 import { makeMe } from '../test/me-fixture.ts';
+import { CountryPackForm } from './platform.tsx';
 
 // Referral partners: the partner's own page, the staff panel and the sign-up code (T-110).
 
@@ -147,5 +148,26 @@ describe('Referral partners', { timeout: 20_000 }, () => {
     expect(
       await screen.findByLabelText('Referral code (optional)', {}, { timeout: 10_000 }),
     ).toHaveValue('ABCD2345');
+  });
+});
+
+describe('Country pack form (M14-09; T-111)', () => {
+  it('sends the chosen pack and says what it did', async () => {
+    const user = userEvent.setup();
+    const org = '77777777-0000-4000-8000-000000000001';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(json(200, { pack: 'KE', applied: ['Mara View'], keptAsTheyAre: [] })),
+      ),
+    );
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <CountryPackForm tenant={{ id: org, countryPack: 'NG' }} />
+      </QueryClientProvider>,
+    );
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Country pack' }), 'KE');
+    await user.click(screen.getByRole('button', { name: 'Apply pack' }));
+    expect(await screen.findByText(/Kenya applied to Mara View/)).toBeInTheDocument();
   });
 });

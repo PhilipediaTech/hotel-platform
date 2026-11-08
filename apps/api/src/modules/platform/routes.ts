@@ -36,6 +36,9 @@ export function platformRoutes(deps: platform.PlatformDeps & { config: Config })
   mountRoute(router, r.setTenantSubscription, ({ params, body }, { req }) =>
     platform.setSubscription(deps, requireAuth(req), params.organisationId, body),
   );
+  mountRoute(router, r.setTenantCountryPack, ({ params, body }, { req }) =>
+    platform.setCountryPack(deps, requireAuth(req), params.organisationId, body.pack),
+  );
   mountRoute(router, r.updateTenantFlags, ({ params, body }, { req }) =>
     platform.updateFlags(deps, requireAuth(req), params.organisationId, body.flags),
   );

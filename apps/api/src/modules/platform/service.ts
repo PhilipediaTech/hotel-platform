@@ -1,4 +1,5 @@
 import {
+  COUNTRY_PACKS,
   MODULES,
   type PlatformInvoiceItem,
   type PlatformTenantItem,
@@ -172,6 +173,7 @@ async function tenantOf(deps: PlatformDeps, organisationId: string): Promise<Ten
     name: org.name,
     legalName: org.legalName,
     country: org.country,
+    countryPack: org.countryPack ?? org.country,
     createdAt: iso(org.createdAt),
     properties,
     subscription: subscriptionOf(subscription),
@@ -251,6 +253,54 @@ export async function setSubscription(
       after: subscriptionOf(row),
     });
     return subscriptionOf(row) as Subscription;
+  });
+}
+
+// ── Country packs (M14-09) ───────────────────────────────────────────────────────────────
+
+export async function setCountryPack(
+  deps: PlatformDeps,
+  auth: AuthContext,
+  organisationId: string,
+  code: keyof typeof COUNTRY_PACKS,
+) {
+  const org = await organisation(deps.db, organisationId);
+  const pack = COUNTRY_PACKS[code];
+  return deps.db.$transaction(async (tx) => {
+    await tx.organisation.update({ where: { id: org.id }, data: { countryPack: code } });
+    const properties = await tx.property.findMany({
+      where: { organisationId, status: { not: 'ARCHIVED' } },
+      orderBy: { name: 'asc' },
+    });
+    const setup = properties.filter((p) => p.status === 'SETUP');
+    for (const p of setup) {
+      const settings = (p.settings ?? {}) as Record<string, unknown>;
+      const registration = (settings['registration'] ?? {}) as Record<string, unknown>;
+      await tx.property.update({
+        where: { id: p.id },
+        data: {
+          baseCurrency: pack.currency,
+          timeZone: pack.timeZone,
+          locale: pack.locale,
+          settings: {
+            ...settings,
+            registration: { ...registration, idRetentionMonths: pack.idRetentionMonths },
+          },
+        },
+      });
+    }
+    await audit(tx as unknown as Db, auth, organisationId, {
+      action: 'platform.country_pack_set',
+      entityType: 'organisation',
+      entityId: organisationId,
+      before: { countryPack: org.countryPack ?? org.country },
+      after: { countryPack: code, applied: setup.map((p) => p.id) },
+    });
+    return {
+      pack: code,
+      applied: setup.map((p) => p.name),
+      keptAsTheyAre: properties.filter((p) => p.status !== 'SETUP').map((p) => p.name),
+    };
   });
 }
 

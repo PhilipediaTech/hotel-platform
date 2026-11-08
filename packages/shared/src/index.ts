@@ -14,5 +14,6 @@ export * from './registration.ts';
 export * from './reservations.ts';
 export * from './setup.ts';
 export * from './tasks.ts';
+export * from './country-packs.ts';
 export * from './tax.ts';
 export * from './tax.fixtures.ts';

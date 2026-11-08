@@ -794,6 +794,25 @@
                     ]
                   }
                 },
+                "idTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "PASSPORT",
+                      "NATIONAL_ID",
+                      "DRIVERS_LICENCE",
+                      "VOTERS_CARD",
+                      "OTHER"
+                    ]
+                  }
+                },
+                "dataProtectionNotice": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "businessDate": {
                   "allOf": [
                     {
@@ -818,6 +837,8 @@
                 "baseCurrency",
                 "locale",
                 "registrationFields",
+                "idTypes",
+                "dataProtectionNotice",
                 "businessDate"
               ]
             }
@@ -9491,6 +9512,9 @@
           "country": {
             "type": "string"
           },
+          "countryPack": {
+            "type": "string"
+          },
           "createdAt": {
             "$ref": "#/components/schemas/Instant"
           },
@@ -9528,6 +9552,7 @@
           "name",
           "legalName",
           "country",
+          "countryPack",
           "createdAt",
           "properties",
           "subscription",
@@ -9674,6 +9699,9 @@
           "country": {
             "type": "string"
           },
+          "countryPack": {
+            "type": "string"
+          },
           "createdAt": {
             "$ref": "#/components/schemas/Instant"
           },
@@ -9749,6 +9777,7 @@
           "name",
           "legalName",
           "country",
+          "countryPack",
           "createdAt",
           "properties",
           "subscription",
@@ -38433,6 +38462,145 @@
           },
           "403": {
             "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/tenants/{organisationId}/country-pack": {
+      "put": {
+        "operationId": "setTenantCountryPack",
+        "summary": "Give a hotel group a country pack (M14-09)",
+        "tags": [
+          "Platform"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Sets the ID documents offered, the data-protection notice and the defaults. Properties still in setup take its currency, time zone, locale and ID retention; live properties keep theirs, because their books are in their currency.",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "organisationId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pack": {
+                    "type": "string",
+                    "enum": [
+                      "NG",
+                      "GH",
+                      "KE",
+                      "ZA"
+                    ]
+                  }
+                },
+                "required": [
+                  "pack"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pack": {
+                      "type": "string",
+                      "enum": [
+                        "NG",
+                        "GH",
+                        "KE",
+                        "ZA"
+                      ]
+                    },
+                    "applied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "keptAsTheyAre": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "pack",
+                    "applied",
+                    "keptAsTheyAre"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
             "content": {
               "application/json": {
                 "schema": {

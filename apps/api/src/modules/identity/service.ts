@@ -1,4 +1,4 @@
-import { localDate, SIGN_UP_COUNTRIES, type SignUpCountry } from '@hotel/shared';
+import { ID_TYPES, localDate, packFor, SIGN_UP_COUNTRIES, type SignUpCountry } from '@hotel/shared';
 import type { Logger } from 'pino';
 import type { AuthTokenPurpose, Session, User } from '../../generated/prisma/client.ts';
 import { recordAudit, recordUserEvent } from '../../core/audit.ts';
@@ -509,6 +509,7 @@ export async function buildMe(
       status: { not: 'ARCHIVED' },
       OR: [{ id: { in: propertyIds } }, { organisationId: { in: orgWide } }],
     },
+    include: { organisation: { select: { country: true, countryPack: true } } },
     orderBy: { name: 'asc' },
   });
   const organisations = new Map<string, { id: string; name: string }>(
@@ -567,6 +568,8 @@ export async function buildMe(
       baseCurrency: p.baseCurrency,
       locale: p.locale,
       registrationFields: registrationOf(p).requiredFields,
+      idTypes: [...(packFor(p.organisation)?.idTypes ?? ID_TYPES)],
+      dataProtectionNotice: packFor(p.organisation)?.dataProtectionNotice ?? null,
       businessDate: businessDates.get(p.id) ?? null,
     })),
     memberships: [

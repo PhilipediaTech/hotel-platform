@@ -1,4 +1,6 @@
 import {
+  COUNTRY_PACKS,
+  COUNTRY_PACK_CODES,
   PLANS,
   SUBSCRIPTION_STATUSES,
   type PlatformTenantDetail,
@@ -38,6 +40,64 @@ function useMoney() {
     new Intl.NumberFormat(i18n.language, { style: 'currency', currency }).format(
       Number(minor) / 100,
     );
+}
+
+/** M14-09: the group's country pack. */
+export function CountryPackForm({ tenant }: { tenant: Pick<Detail, 'id' | 'countryPack'> }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [pack, setPack] = useState(tenant.countryPack);
+  const save = useMutation({
+    mutationFn: () =>
+      api.call('setTenantCountryPack', {
+        params: { organisationId: tenant.id },
+        body: { pack: pack as (typeof COUNTRY_PACK_CODES)[number] },
+      }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: KEY }),
+  });
+  return (
+    <section aria-label={t('platform.countryPack')}>
+      <h3 className="font-semibold">{t('platform.countryPack')}</h3>
+      <p className="text-sm text-text-muted">{t('platform.packHint')}</p>
+      <form
+        className="mt-2 flex items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+      >
+        <select
+          aria-label={t('platform.countryPack')}
+          className={selectClass}
+          value={pack}
+          onChange={(e) => setPack(e.target.value)}
+        >
+          {COUNTRY_PACK_CODES.map((code) => (
+            <option key={code} value={code}>
+              {COUNTRY_PACKS[code].name}
+            </option>
+          ))}
+        </select>
+        <Button type="submit" disabled={save.isPending}>
+          {t('platform.applyPack')}
+        </Button>
+      </form>
+      {save.data && (
+        <Alert tone="success" className="mt-2">
+          {t('platform.packResult', {
+            pack: COUNTRY_PACKS[save.data.pack].name,
+            applied: save.data.applied.join(', ') || t('platform.packNone'),
+            kept: save.data.keptAsTheyAre.join(', ') || t('platform.packNone'),
+          })}
+        </Alert>
+      )}
+      {save.error && (
+        <Alert tone="critical" className="mt-2">
+          {errorMessage(save.error)}
+        </Alert>
+      )}
+    </section>
+  );
 }
 
 function PlanForm({ tenant }: { tenant: Detail }) {
@@ -389,6 +449,7 @@ function TenantDetail({ id }: { id: string }) {
     >
       <h2 className="text-lg font-semibold">{q.data.name}</h2>
       <PlanForm key={JSON.stringify(q.data.subscription)} tenant={q.data} />
+      <CountryPackForm key={q.data.countryPack} tenant={q.data} />
       <Modules tenant={q.data} />
       <Invoices tenant={q.data} />
       <Support tenant={q.data} />

@@ -43,12 +43,14 @@ enum PropertyStatus {
 }
 
 model Organisation {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  legalName String?  @map("legal_name")
-  country   String   @db.Char(2)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  legalName   String?  @map("legal_name")
+  country     String   @db.Char(2)
+  /// A country pack given by platform staff (M14-09); null = the sign-up country's.
+  countryPack String?  @map("country_pack") @db.Char(2)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   properties         Property[]
   tasks              Task[]

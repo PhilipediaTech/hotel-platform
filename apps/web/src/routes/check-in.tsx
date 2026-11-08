@@ -216,7 +216,10 @@ export function CheckInPanel({
               label={t('checkIn.fields.idType')}
               value={reg.idType ?? ''}
               onChange={set('idType')}
-              options={ID_TYPES.map((p) => ({ value: p, label: t(`checkIn.idTypes.${p}`) }))}
+              options={(property?.idTypes ?? ID_TYPES).map((p) => ({
+                value: p,
+                label: t(`checkIn.idTypes.${p}`),
+              }))}
             />
           )}
           {required.includes('idNumber') && (
@@ -248,7 +251,9 @@ export function CheckInPanel({
                 className="text-sm"
                 onChange={(e) => setScan(e.target.files?.[0] ?? null)}
               />
-              <p className="text-xs text-text-muted">{t('checkIn.idPrivacy')}</p>
+              <p className="text-xs text-text-muted">
+                {property?.dataProtectionNotice ?? t('checkIn.idPrivacy')}
+              </p>
             </div>
           )}
         </fieldset>

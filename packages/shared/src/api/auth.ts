@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { SIGN_UP_COUNTRY_CODES } from '../countries.ts';
-import { REGISTRATION_FIELDS } from '../registration.ts';
+import { ID_TYPES, REGISTRATION_FIELDS } from '../registration.ts';
 import { defineRoute } from './contract.ts';
 import { Instant, IsoDate, Uuid } from './primitives.ts';
 
@@ -110,6 +110,10 @@ const MeProperty = z.object({
   locale: z.string(),
   /** What the desk must collect at check-in (T-051). */
   registrationFields: z.array(z.enum(REGISTRATION_FIELDS)),
+  /** From the group's country pack (M14-09): the ID documents offered at check-in. */
+  idTypes: z.array(z.enum(ID_TYPES)),
+  /** From the country pack; null falls back to the general wording. */
+  dataProtectionNotice: z.string().nullable(),
   /** The business date the property trades on (T-054); null until it goes live. */
   businessDate: IsoDate.nullable(),
 });

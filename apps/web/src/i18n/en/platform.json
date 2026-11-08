@@ -1,5 +1,10 @@
 {
   "platform": {
+    "countryPack": "Country pack",
+    "applyPack": "Apply pack",
+    "packResult": "{{pack}} applied to {{applied}}. Left as they are: {{kept}}.",
+    "packNone": "none",
+    "packHint": "Sets the ID documents and privacy notice. Hotels still in setup also take its currency, time zone and locale; live hotels keep theirs. Tax rates are always entered by the hotel.",
     "title": "Platform",
     "tenants": "Hotel groups",
     "noTenants": "No hotel group yet.",

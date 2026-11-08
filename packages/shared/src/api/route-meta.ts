@@ -208,6 +208,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   whatsappWebhookVerify: {"operationId":"whatsappWebhookVerify","method":"get","path":"/webhooks/whatsapp/{provider}","produces":"text/plain"},
   whatsappWebhook: {"operationId":"whatsappWebhook","method":"post","path":"/webhooks/whatsapp/{provider}","body":true},
   getOwnerHome: {"operationId":"getOwnerHome","method":"get","path":"/owner/home","propertyScoped":true},
+  setTenantCountryPack: {"operationId":"setTenantCountryPack","method":"put","path":"/platform/tenants/{organisationId}/country-pack","body":true},
   listPlatformTenants: {"operationId":"listPlatformTenants","method":"get","path":"/platform/tenants"},
   getPlatformTenant: {"operationId":"getPlatformTenant","method":"get","path":"/platform/tenants/{organisationId}"},
   setTenantSubscription: {"operationId":"setTenantSubscription","method":"put","path":"/platform/tenants/{organisationId}/subscription","body":true},

@@ -877,7 +877,7 @@
     },
     "idTypes": {
       "PASSPORT": "Passport",
-      "NATIONAL_ID": "National ID (NIN)",
+      "NATIONAL_ID": "National ID",
       "DRIVERS_LICENCE": "Driver’s licence",
       "VOTERS_CARD": "Voter’s card",
       "OTHER": "Other"

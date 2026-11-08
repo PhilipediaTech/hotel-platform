@@ -12,10 +12,14 @@ import { AppError } from './errors.ts';
 export const RATE_LIMITS = {
   authPerIp: 20,
   perUser: 300,
+  publicPerIp: 120,
+  /** A booking holds a room: one visitor must not be able to hold a whole hotel (T-112). */
+  publicBookingsPerIp: 10,
 } as const;
 
 const WINDOW_MS = 60_000;
 const AUTH_PREFIX = '/api/v1/auth/';
+const PUBLIC_PREFIX = '/api/v1/public/';
 
 /** Counts one hit for `key` in the current window and returns the new count. */
 export async function hit(db: Db, key: string, windowStart: Date): Promise<number> {
@@ -31,6 +35,15 @@ export function rateLimiter(deps: { db: Db; clock: Clock; logger: Logger }): Req
     const checks: { key: string; limit: number }[] = [];
     if (req.path.startsWith(AUTH_PREFIX)) {
       checks.push({ key: `ip:auth:${req.ip ?? 'unknown'}`, limit: RATE_LIMITS.authPerIp });
+    }
+    if (req.path.startsWith(PUBLIC_PREFIX)) {
+      checks.push({ key: `ip:public:${req.ip ?? 'unknown'}`, limit: RATE_LIMITS.publicPerIp });
+      if (req.method === 'POST' && req.path === `${PUBLIC_PREFIX}bookings`) {
+        checks.push({
+          key: `ip:public-book:${req.ip ?? 'unknown'}`,
+          limit: RATE_LIMITS.publicBookingsPerIp,
+        });
+      }
     }
     const auth = getAuth(req);
     if (auth) checks.push({ key: `user:${auth.user.id}`, limit: RATE_LIMITS.perUser });

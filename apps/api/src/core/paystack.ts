@@ -111,6 +111,12 @@ export function createPaystackProvider(options: {
       }
       return { reference: request.reference, checkoutUrl: parsed.data.data.authorization_url };
     },
+    async refund(reference, amountMinor) {
+      await call('/refund', {
+        method: 'POST',
+        body: JSON.stringify({ transaction: reference, amount: amountMinor.toString() }),
+      });
+    },
     async verify(reference) {
       const body = await call(`/transaction/verify/${encodeURIComponent(reference)}`);
       const parsed = Verified.safeParse(body);

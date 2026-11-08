@@ -39,6 +39,15 @@ export const FILE_KINDS = [
     maxBytes: 10 * MB,
     retentionClass: 'STANDARD',
   }),
+  // Booking page photos (M11-03; T-112): public once clean.
+  k({
+    entityType: 'BookingEngine',
+    permission: 'bookingengine.manage',
+    readPermission: null,
+    contentTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    maxBytes: 5 * MB,
+    retentionClass: 'STANDARD',
+  }),
   // Room type photos (tab 3 `room_types.photoFileIds`; T-031). Shown to every member.
   k({
     entityType: 'RoomType',

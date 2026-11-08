@@ -96,6 +96,24 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplateDef[] = [
     },
   },
   {
+    code: 'BOOKING_REFUNDED',
+    label: 'Booking refunded',
+    audience: 'GUEST',
+    variables: [
+      GUEST,
+      PROPERTY,
+      v('confirmation_no', 'Confirmation number', 'LAG-10234'),
+      v('amount', 'Amount', '₦40,500.00'),
+    ],
+    email: {
+      subject: 'Your payment to {{property_name}} is being refunded',
+      body:
+        'Dear {{guest_name}},\n\nYour payment for booking {{confirmation_no}} arrived after the ' +
+        'room hold had ended, and no room is left for those dates. We have refunded {{amount}}; ' +
+        'your bank may take a few days to show it.\n\nWe are sorry for the trouble.',
+    },
+  },
+  {
     code: 'PRE_ARRIVAL',
     label: 'Before arrival',
     audience: 'GUEST',
@@ -273,6 +291,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplateDef[] = [
  */
 export const MESSAGE_TEMPLATE_CODES = [
   'BOOKING_CONFIRMED',
+  'BOOKING_REFUNDED',
   'PRE_ARRIVAL',
   'PAYMENT_REQUEST',
   'FOLIO',

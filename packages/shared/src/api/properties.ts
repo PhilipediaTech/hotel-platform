@@ -4,6 +4,7 @@ import { RegistrationSettings } from '../registration.ts';
 import { Phone } from './auth.ts';
 import { defineRoute } from './contract.ts';
 import { CurrencyCode, Uuid } from './primitives.ts';
+import { StayAlertSettings } from './stay-alerts.ts';
 
 // Organisation and properties (tab 4 row "Organisation"; PRD M1-02; S02 setup wizard;
 // T-030). Every route acts in the property named by X-Property-Id: the organisation is that
@@ -162,6 +163,8 @@ export const PropertyDetail = z
     paymentMethods: z.array(PayMethodManual),
     /** What to collect at check-in and how long ID details are kept (T-051). */
     registration: RegistrationSettings,
+    /** Front desk alert timings, the late check-out fee and the WhatsApp choice (T-055). */
+    stayAlerts: StayAlertSettings,
     checklist: SetupChecklist,
   })
   .meta({ id: 'Property' });
@@ -250,6 +253,7 @@ export const PropertyPatchBody = z.object({
     .refine((m) => new Set(m).size === m.length, 'Each method once')
     .optional(),
   registration: RegistrationSettings.optional(),
+  stayAlerts: StayAlertSettings.optional(),
 });
 
 export const updateProperty = defineRoute({

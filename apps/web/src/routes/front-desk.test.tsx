@@ -127,6 +127,8 @@ beforeEach(() => {
         data: [row(6, 'Musa', { status: 'CHECKED_IN', roomNumber: '106', flags: ['OVERDUE'] })],
       }),
     [`POST /stays/${id(5)}/check-out`]: () => json(200, {}),
+    'GET /front-desk/alerts': () =>
+      json(200, { date: TODAY, lateCheckOutFeeMinor: null, data: [] }),
   };
   vi.stubGlobal(
     'fetch',
@@ -278,5 +280,147 @@ describe('Offline (T-093)', () => {
     expect(await screen.findByText(/Offline: saved copy from/)).toBeInTheDocument();
     online = true;
     window.dispatchEvent(new Event('online'));
+  });
+});
+
+// Front desk alerts (PRD M14-01; T-055): the Alerts tab, the one-tap late fee, the settings.
+
+const alert = (n: number, kind: string, extra: object = {}) => ({
+  kind,
+  stayId: id(n),
+  reservationId: id(100 + n),
+  confirmationNo: `LAG-0000${n}`,
+  guestName: `Guest${n} Test`,
+  roomNumber: `10${n}`,
+  arrival: '2026-11-08',
+  departure: TODAY,
+  at: '2026-11-10T11:00:00Z',
+  depositDueMinor: '0',
+  lateFeePosted: false,
+  version: 4,
+  ...extra,
+});
+
+describe('Front desk alerts (M14-01)', () => {
+  let posted = false;
+  beforeEach(() => {
+    posted = false;
+    handlers['GET /front-desk/alerts'] = () =>
+      json(200, {
+        date: TODAY,
+        lateCheckOutFeeMinor: '500000',
+        data: [
+          alert(1, 'LATE_CHECK_OUT', { lateFeePosted: posted }),
+          alert(2, 'DUE_OUT_SOON', { at: '2026-11-10T10:45:00Z' }),
+          alert(3, 'HOLD_EXPIRING', { roomNumber: null, at: '2026-11-10T15:30:00Z' }),
+          alert(4, 'DEPOSIT_MISSING', {
+            at: null,
+            arrival: '2026-11-11',
+            depositDueMinor: '4500000',
+          }),
+        ],
+      });
+    handlers[`POST /stays/${id(1)}/late-check-out-fee`] = () => {
+      posted = true;
+      return json(201, { folioId: id(900), amountMinor: '500000' });
+    };
+  });
+
+  it('counts the alerts on the top bar and lists them on the Alerts tab', async () => {
+    renderAt('/front-desk');
+    const bell = await screen.findByRole('link', { name: 'Front desk alerts, 4 now' });
+    expect(bell).toHaveAttribute('href', '/front-desk?tab=alerts');
+    const tab = await screen.findByRole('tab', { name: 'Alerts (4)' });
+
+    await userEvent.click(tab);
+    const list = await screen.findByRole('list', { name: 'Front desk alerts' });
+    const items = within(list).getAllByRole('listitem');
+    expect(items.map((i) => i.textContent)).toEqual([
+      expect.stringMatching(/^Late check-out101 · Guest1 Test.*Check-out was due at 12:00/),
+      expect.stringMatching(/^Due out soon102 · Guest2 Test.*Checks out at 11:45/),
+      expect.stringMatching(/^Hold expiringGuest3 Test.*Hold ends at 16:30/),
+      expect.stringMatching(
+        /^Deposit not received104 · Guest4 Test.*Arrives 11 Nov 2026; deposit ₦45,000\.00 not received/,
+      ),
+    ]);
+    // Leaving guests go to check-out; the others to their booking.
+    expect(
+      within(items[1] as HTMLElement).getByRole('link', { name: 'Check out Guest2 Test' }),
+    ).toHaveAttribute('href', `/stays/${id(2)}/check-out`);
+    expect(
+      within(items[2] as HTMLElement).getByRole('link', {
+        name: 'Open the booking for Guest3 Test',
+      }),
+    ).toHaveAttribute('href', `/reservations/${id(103)}`);
+    // No folio.charge: no fee button; no property.setup: no settings.
+    expect(screen.queryByRole('button', { name: /late check-out fee/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Alert settings' })).not.toBeInTheDocument();
+  });
+
+  it('posts the late check-out fee in one tap', async () => {
+    permissions.push('folio.charge');
+    renderAt('/front-desk?tab=alerts');
+    const button = await screen.findByRole('button', {
+      name: 'Post the late check-out fee of ₦5,000.00 for Guest1 Test',
+    });
+    await userEvent.click(button);
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Late check-out fee of ₦5,000.00 posted to Guest1 Test’s folio.',
+    );
+    const fee = sent(`POST /stays/${id(1)}/late-check-out-fee`);
+    expect(fee).toHaveLength(1);
+    expect(fee[0]?.headers.get('Idempotency-Key')).toBeTruthy();
+    expect(await screen.findByText('Late check-out fee posted')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Post the late check-out fee/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('a manager changes the timings, the fee and the WhatsApp kinds', async () => {
+    permissions.push('property.setup');
+    let saved: unknown = null;
+    const property = {
+      stayAlerts: {
+        dueOutMinutes: 60,
+        holdWarningMinutes: 120,
+        lateCheckOutFeeMinor: null,
+        whatsapp: [],
+      },
+    };
+    handlers[`GET /properties/${LAGOS}`] = () => json(200, property);
+    handlers[`PATCH /properties/${LAGOS}`] = (body) => {
+      saved = body;
+      return json(200, property);
+    };
+    renderAt('/front-desk?tab=alerts');
+    await userEvent.click(await screen.findByRole('button', { name: 'Alert settings' }));
+    const form = await screen.findByRole('form', { name: 'Alert settings' });
+    const dueOut = within(form).getByLabelText(
+      'Show departures due out (minutes before check-out)',
+    );
+    await userEvent.clear(dueOut);
+    await userEvent.type(dueOut, '90');
+    const fee = within(form).getByLabelText('Late check-out fee');
+    await userEvent.type(fee, 'abc');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+    expect(
+      await within(form).findByText('Enter the fee as an amount, e.g. 5000'),
+    ).toBeInTheDocument();
+    expect(saved).toBeNull();
+
+    await userEvent.clear(fee);
+    await userEvent.type(fee, '5,000');
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Late check-out' }));
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+    await waitFor(() =>
+      expect(saved).toEqual({
+        stayAlerts: {
+          dueOutMinutes: 90,
+          holdWarningMinutes: 120,
+          lateCheckOutFeeMinor: '500000',
+          whatsapp: ['LATE_CHECK_OUT'],
+        },
+      }),
+    );
   });
 });

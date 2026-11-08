@@ -1,5 +1,6 @@
 import {
   DEFAULT_REGISTRATION,
+  DEFAULT_STAY_ALERT_SETTINGS,
   localDate,
   LOCKED_WHEN_LIVE,
   SETUP_STEPS,
@@ -12,6 +13,7 @@ import {
   type RegistrationSettings,
   type SetupChecklist,
   type SetupStepId,
+  type StayAlertSettings,
 } from '@hotel/shared';
 import type { z } from 'zod';
 import type { Prisma, Property } from '../../generated/prisma/client.ts';
@@ -41,6 +43,7 @@ type Checklist = z.input<typeof SetupChecklist>;
 interface Settings {
   paymentMethods?: ManualPayMethod[];
   registration?: z.output<typeof RegistrationSettings>;
+  stayAlerts?: z.output<typeof StayAlertSettings>;
 }
 
 const settingsOf = (p: Property): Settings => (p.settings ?? {}) as Settings;
@@ -48,6 +51,14 @@ const settingsOf = (p: Property): Settings => (p.settings ?? {}) as Settings;
 /** What the desk collects at check-in (T-051); the defaults until the property chooses. */
 export const registrationOf = (p: Pick<Property, 'settings'>) =>
   ((p.settings ?? {}) as Settings).registration ?? DEFAULT_REGISTRATION;
+
+/** Front desk alert settings (T-055); the defaults until the property chooses. */
+export const stayAlertsOf = (
+  p: Pick<Property, 'settings'>,
+): z.output<typeof StayAlertSettings> => ({
+  ...DEFAULT_STAY_ALERT_SETTINGS,
+  ...((p.settings ?? {}) as Settings).stayAlerts,
+});
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -180,6 +191,7 @@ async function toDetail(db: DbClient, p: Property, now: Date): Promise<Detail> {
     nightAuditTime: p.nightAuditTime,
     paymentMethods: settingsOf(p).paymentMethods ?? [],
     registration: registrationOf(p),
+    stayAlerts: stayAlertsOf(p),
     checklist: await checklistFor(db, p, now),
   };
 }
@@ -357,6 +369,7 @@ function editable(p: Property): Record<string, unknown> {
     nightAuditTime: p.nightAuditTime,
     paymentMethods: settingsOf(p).paymentMethods ?? [],
     registration: registrationOf(p),
+    stayAlerts: stayAlertsOf(p),
   };
 }
 
@@ -386,18 +399,20 @@ export async function updateProperty(
         );
       }
 
-      const { paymentMethods, registration, address, taxRegistration, ...columns } = body;
+      const { paymentMethods, registration, stayAlerts, address, taxRegistration, ...columns } =
+        body;
       const data: Prisma.PropertyUpdateInput = {};
       for (const [key, value] of Object.entries(columns)) {
         if (value !== undefined) (data as Record<string, unknown>)[key] = value;
       }
       if (address) data.address = address;
       if (taxRegistration) data.taxRegistration = taxRegistration;
-      if (paymentMethods || registration) {
+      if (paymentMethods || registration || stayAlerts) {
         data.settings = {
           ...settingsOf(current),
           ...(paymentMethods ? { paymentMethods } : {}),
           ...(registration ? { registration } : {}),
+          ...(stayAlerts ? { stayAlerts } : {}),
         };
       }
       const after = await tx.property.update({ where: { id: current.id }, data });

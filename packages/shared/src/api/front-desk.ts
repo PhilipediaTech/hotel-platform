@@ -5,6 +5,7 @@ import { AmountMinor, Instant, IsoDate, Uuid } from './primitives.ts';
 import { GUARANTEES } from './rates.ts';
 import { DayUseTimes } from './reservations.ts';
 import { HK_STATUSES } from './rooms.ts';
+import { STAY_ALERT_KINDS } from './stay-alerts.ts';
 
 // Front desk lists (PRD M3-06; tab 4 row "Front desk"; S06; T-053): arrivals, departures and
 // in-house guests for the business date, with balances and flags per row. Until business days
@@ -121,4 +122,70 @@ export const listInHouse = defineRoute({
   response: FrontDeskList,
 });
 
-export const FRONT_DESK_ROUTES = { listArrivals, listDepartures, listInHouse } as const;
+// Stay alerts (PRD M14-01; T-055): what is about to go wrong, worked out live each time from
+// the stays, the property's check-out time and its alert settings. The desk sees them on the
+// front desk bell; the kinds the property chooses also go by WhatsApp to holders of
+// `frontdesk.alerts.notify`, once per stay and business date.
+
+export const StayAlert = z
+  .object({
+    kind: z.enum(STAY_ALERT_KINDS),
+    stayId: Uuid,
+    reservationId: Uuid,
+    confirmationNo: z.string(),
+    guestName: z.string(),
+    roomNumber: z.string().nullable(),
+    arrival: IsoDate,
+    departure: IsoDate,
+    /** When it happens: the check-out time, the day-use end or the hold expiry; null for a missing deposit. */
+    at: Instant.nullable(),
+    /** The deposit still to receive (DEPOSIT_MISSING), else 0. */
+    depositDueMinor: AmountMinor,
+    /** LATE_CHECK_OUT: a late check-out fee is already on the stay's folio. */
+    lateFeePosted: z.boolean(),
+    /** The stay's version, for check-out (`If-Match`). */
+    version: z.number().int(),
+  })
+  .meta({ id: 'StayAlert' });
+
+export const listStayAlerts = defineRoute({
+  operationId: 'listStayAlerts',
+  method: 'get',
+  path: '/front-desk/alerts',
+  summary: 'Late check-outs, departures due soon, holds about to expire and missing deposits',
+  description:
+    'Worked out at the time of the call (M14-01): late check-outs first, then due out, expiring holds and the next business date’s arrivals without their deposit. Also gives the property’s late check-out fee, so the desk can offer it.',
+  tags: ['Front desk'],
+  propertyScoped: true,
+  permission: 'frontdesk.read',
+  response: z.object({
+    date: IsoDate,
+    lateCheckOutFeeMinor: AmountMinor.nullable(),
+    data: z.array(StayAlert),
+  }),
+});
+
+export const postLateCheckOutFee = defineRoute({
+  operationId: 'postLateCheckOutFee',
+  method: 'post',
+  path: '/stays/{stayId}/late-check-out-fee',
+  summary: 'Post the property’s late check-out fee to a checked-in stay past its check-out time',
+  description:
+    'Posts once per stay (409 STATE_TRANSITION_INVALID when already posted, when the guest is not past the check-out time, or when the property has no fee set). The fee goes on the guest folio under the LATE system code.',
+  tags: ['Front desk'],
+  propertyScoped: true,
+  permission: 'folio.charge',
+  idempotent: true,
+  params: z.object({ stayId: Uuid }),
+  body: z.object({}),
+  status: 201,
+  response: z.object({ folioId: Uuid, amountMinor: AmountMinor }),
+});
+
+export const FRONT_DESK_ROUTES = {
+  listArrivals,
+  listDepartures,
+  listInHouse,
+  listStayAlerts,
+  postLateCheckOutFee,
+} as const;

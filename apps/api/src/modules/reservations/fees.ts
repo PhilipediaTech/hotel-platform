@@ -9,14 +9,19 @@ import { systemCodeId, type SystemCode } from '../folios/system-codes.ts';
 // opened for it if it has none; opening it moves the booking's advance deposit onto it as at
 // check-in, so a deposit pays the fee and any rest is a credit refunded from the folio
 // (T-072). Fees post to the system codes CANCEL and NOSHOW (group FEE, no tax until Philip
-// sets the tax stack). Reinstating a booking reverses its fees.
+// sets the tax stack). Reinstating a booking reverses its fees. A late check-out fee (LATE,
+// T-055) goes the same way.
 
 type Ctx = ExecuteContext & { now: Date };
 
 const dbDate = (date: string) => new Date(`${date}T00:00:00Z`);
 
 /** The source types of booking fees, on their lines. */
-export const FEE_SOURCES = { CANCEL: 'CANCELLATION', NOSHOW: 'NO_SHOW' } as const;
+export const FEE_SOURCES = {
+  CANCEL: 'CANCELLATION',
+  NOSHOW: 'NO_SHOW',
+  LATE: 'LATE_CHECK_OUT',
+} as const;
 
 /** Posts a fee for a stay; answers the folio it went on. */
 export async function postBookingFee(
@@ -29,7 +34,7 @@ export async function postBookingFee(
       guestId: string;
       folioId: string | null;
     };
-    code: Extract<SystemCode, 'CANCEL' | 'NOSHOW'>;
+    code: Extract<SystemCode, 'CANCEL' | 'NOSHOW' | 'LATE'>;
     amountMinor: bigint;
     description: string;
     businessDate: string;
@@ -69,7 +74,8 @@ export async function reverseBookingFees(
   const fees = await tx.folioLine.findMany({
     where: {
       kind: 'CHARGE',
-      sourceType: { in: Object.values(FEE_SOURCES) },
+      // Booking fees only: a late check-out fee stays when a booking is reinstated.
+      sourceType: { in: [FEE_SOURCES.CANCEL, FEE_SOURCES.NOSHOW] },
       sourceId: { in: args.stayIds },
       reversedBy: { is: null },
     },

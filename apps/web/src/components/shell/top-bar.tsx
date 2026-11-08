@@ -1,4 +1,12 @@
-import { Bell, Building2, CalendarDays, CircleUser, Search, ShieldCheck } from 'lucide-react';
+import {
+  AlarmClock,
+  Bell,
+  Building2,
+  CalendarDays,
+  CircleUser,
+  Search,
+  ShieldCheck,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { useSession, useSessionActions, type ShellProperty } from '../../app/session.ts';
@@ -137,6 +145,16 @@ export function TopBar() {
       </div>
 
       <div className="ml-auto flex items-center gap-1">
+        {session.permissions.includes('frontdesk.read') && (
+          <Link
+            to="/front-desk?tab=alerts"
+            className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'relative')}
+            aria-label={t('shell.stayAlertsCount', { count: session.stayAlerts })}
+          >
+            <AlarmClock aria-hidden className="size-5" />
+            <CountBadge count={session.stayAlerts} />
+          </Link>
+        )}
         <Link
           to="/approvals"
           className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'relative')}

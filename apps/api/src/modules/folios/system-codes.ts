@@ -16,6 +16,8 @@ export const SYSTEM_CODES = {
   NOSHOW: { name: 'No-show fee', group: 'FEE' },
   /** A cancellation fee per the plan's policy (T-074). */
   CANCEL: { name: 'Cancellation fee', group: 'FEE' },
+  /** A guest who stayed past the check-out time (T-055). */
+  LATE: { name: 'Late check-out fee', group: 'FEE' },
 } as const satisfies Record<string, { name: string; group: RevenueGroup }>;
 
 export type SystemCode = keyof typeof SYSTEM_CODES;

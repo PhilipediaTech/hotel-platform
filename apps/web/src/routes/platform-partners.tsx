@@ -8,11 +8,13 @@ import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import partnerStrings from '../i18n/en/partners.json';
+import platformStrings from '../i18n/en/platform.json';
 import { registerStrings } from '../i18n/index.ts';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 
 registerStrings(partnerStrings);
+registerStrings(platformStrings);
 
 // Referral partners on S31 (PRD M14-06–M14-08; T-110): platform staff add partners, see each
 // one's hotels and ledger, mark payouts paid, and tie a hotel group to a partner.
@@ -214,7 +216,7 @@ function PartnerDetailPanel({ id }: { id: string }) {
       <ul>
         {p.hotelList.map((h) => (
           <li key={h.organisationId}>
-            {h.name} · {h.plan ? `${t(`platform.plans.${h.plan}`)}` : t('partners.noPlan')}
+            {h.name} · {h.plan ? t(`platform.plans.${h.plan}`) : t('partners.noPlan')}
             {h.status ? `, ${t(`platform.statuses.${h.status}`)}` : ''}
           </li>
         ))}

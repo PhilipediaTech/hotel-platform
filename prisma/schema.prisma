@@ -248,6 +248,8 @@ model User {
   roomBlocksCreated  RoomBlock[]
   importJobs         ImportJob[]
   keysIssued         KeyIssue[]
+  occupantsAdded     StayOccupant[]     @relation("OccupantAddedBy")
+  occupantsRemoved   StayOccupant[]     @relation("OccupantRemovedBy")
   cardsSigned        RegistrationCard[]
   daysClosed         BusinessDay[]
   folioLinesPosted   FolioLine[]
@@ -819,6 +821,10 @@ model RatePlan {
   isPublic              Boolean      @default(false) @map("is_public")
   companyId             String?      @map("company_id") @db.Uuid
   dayUseMaxMinutes      Int?         @map("day_use_max_minutes")
+  /// Suggested nightly charge per extra adult or child above the room type's base occupancy
+  /// (T-056); the desk can change it per person. Null = no suggestion.
+  extraAdultMinor       BigInt?      @map("extra_adult_minor")
+  extraChildMinor       BigInt?      @map("extra_child_minor")
   /// Empty = every room type.
   roomTypeIds           String[]     @map("room_type_ids") @db.Uuid
   active                Boolean      @default(true)
@@ -1137,6 +1143,7 @@ model Stay {
   nights      StayNight[]
   allocations RoomAllocation[]
   keys        KeyIssue[]
+  occupants   StayOccupant[]
   roomCharges RoomChargePosting[]
   tasks       Task[]
   card        RegistrationCard?
@@ -1706,6 +1713,44 @@ model DepositLedgerEntry {
   @@index([reservationId])
   @@index([propertyId, businessDate])
   @@map("deposit_ledger_entries")
+}
+
+// ── Occupants (PRD M14-02, M14-03; T-056) ────────────────────────────────────────────────
+
+enum OccupantKind {
+  ADULT
+  CHILD
+
+  @@map("occupant_kind")
+}
+
+/// A person added to a stay after booking (an extra adult or child), counted in the stay's
+/// adults or children while not removed. Night audit posts nightlyChargeMinor for each night
+/// with the room night (same code and taxes). Never deleted: removing sets removedAt.
+model StayOccupant {
+  id                 String       @id @default(uuid()) @db.Uuid
+  propertyId         String       @map("property_id") @db.Uuid
+  stayId             String       @map("stay_id") @db.Uuid
+  firstName          String       @map("first_name")
+  lastName           String       @map("last_name")
+  kind               OccupantKind
+  phone              String?
+  /// What each night costs for this person; 0 = no charge.
+  nightlyChargeMinor BigInt       @default(0) @map("nightly_charge_minor")
+  /// Why the charge differs from the plan's suggestion (required then).
+  chargeNote         String?      @map("charge_note")
+  addedById          String       @map("added_by_id") @db.Uuid
+  addedAt            DateTime     @default(now()) @map("added_at") @db.Timestamptz(6)
+  removedById        String?      @map("removed_by_id") @db.Uuid
+  removedAt          DateTime?    @map("removed_at") @db.Timestamptz(6)
+  version            Int          @default(0)
+
+  stay      Stay  @relation(fields: [propertyId, stayId], references: [propertyId, id], onDelete: Restrict)
+  addedBy   User  @relation("OccupantAddedBy", fields: [addedById], references: [id], onDelete: Restrict)
+  removedBy User? @relation("OccupantRemovedBy", fields: [removedById], references: [id], onDelete: Restrict)
+
+  @@index([stayId])
+  @@map("stay_occupants")
 }
 
 // ── Exchange rates (M4-18, M4 rule 6; tab 3; T-065) ─────────────────────────────────────

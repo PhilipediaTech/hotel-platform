@@ -685,6 +685,9 @@ interface PlanDraft {
   guarantee: (typeof GUARANTEES)[number];
   isPublic: boolean;
   dayUseHours: string;
+  /** Suggested nightly charge per extra adult / child (T-056); empty = none. */
+  extraAdult: string;
+  extraChild: string;
   roomTypeIds: string[];
   active: boolean;
 }
@@ -713,6 +716,8 @@ function PlanForm({ plan, r, onDone }: { plan: Plan | null; r: Rates; onDone: ()
     guarantee: plan?.guarantee ?? 'NONE',
     isPublic: plan?.isPublic ?? false,
     dayUseHours: plan?.dayUseMaxMinutes ? String(plan.dayUseMaxMinutes / 60) : '6',
+    extraAdult: toNaira(plan?.extraAdultMinor ?? null),
+    extraChild: toNaira(plan?.extraChildMinor ?? null),
     roomTypeIds: plan?.roomTypeIds ?? [],
     active: plan?.active ?? true,
   });
@@ -738,6 +743,8 @@ function PlanForm({ plan, r, onDone }: { plan: Plan | null; r: Rates; onDone: ()
     guarantee: d.guarantee,
     isPublic: d.isPublic,
     dayUseMaxMinutes: d.kind === 'DAY_USE' ? Math.round(Number(d.dayUseHours) * 60) : null,
+    extraAdultMinor: d.kind === 'DAY_USE' ? null : toMinor(d.extraAdult),
+    extraChildMinor: d.kind === 'DAY_USE' ? null : toMinor(d.extraChild),
     roomTypeIds: d.roomTypeIds,
   };
   const save = useMutation({
@@ -892,6 +899,26 @@ function PlanForm({ plan, r, onDone }: { plan: Plan | null; r: Rates; onDone: ()
           />
         )}
       </div>
+      {d.kind !== 'DAY_USE' && (
+        <div className="grid gap-x-4 sm:grid-cols-2">
+          <Field
+            label={t('rates.plan.extraAdult', { currency: r.currency })}
+            hint={t('rates.plan.extraHint')}
+            inputMode="decimal"
+            value={d.extraAdult}
+            onChange={(e) => set('extraAdult', e.target.value)}
+            error={errors['extraAdultMinor']}
+          />
+          <Field
+            label={t('rates.plan.extraChild', { currency: r.currency })}
+            hint={t('rates.plan.extraHint')}
+            inputMode="decimal"
+            value={d.extraChild}
+            onChange={(e) => set('extraChild', e.target.value)}
+            error={errors['extraChildMinor']}
+          />
+        </div>
+      )}
       <div className="flex items-end gap-3">
         <div className="flex-1">
           <Select

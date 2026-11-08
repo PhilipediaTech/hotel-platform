@@ -38,6 +38,8 @@ const plan = (planId: string, code: string, name: string, kind: string, extra: o
   currency: 'NGN',
   isPublic: false,
   dayUseMaxMinutes: null,
+  extraAdultMinor: null,
+  extraChildMinor: null,
   roomTypeIds: [],
   active: true,
   version: 2,
@@ -235,9 +237,13 @@ describe('Plans and packages', () => {
     await user.type(within(form).getByLabelText('Code'), 'gov');
     await user.type(within(form).getByLabelText('Name'), 'Government');
     await user.type(within(form).getByLabelText('% off'), '10');
+    // Suggested extra-person charges (T-056): adults set, children left empty.
+    await user.type(within(form).getByLabelText('Extra adult per night (NGN)'), '5,000');
     await user.click(within(form).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(sent('POST /rate-plans')).toHaveLength(1));
     expect(sent('POST /rate-plans')[0]?.body).toMatchObject({
+      extraAdultMinor: '500000',
+      extraChildMinor: null,
       code: 'GOV',
       name: 'Government',
       kind: 'DERIVED',

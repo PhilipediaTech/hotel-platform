@@ -22,6 +22,10 @@ import { DayUseTimes, EndDayUse } from './day-use.tsx';
 
 // Load on first use: the reservation screen is part of the first load (T-070), and these
 // bring the payment screens' code and strings with them.
+// People added to a stay (T-056), loaded with its strings when a stay shows it.
+const StayPeople = lazy(() =>
+  import('./stay-occupants.tsx').then((m) => ({ default: m.StayPeople })),
+);
 const PaymentLinks = lazy(() =>
   import('./payment-links.tsx').then((m) => ({ default: m.PaymentLinks })),
 );
@@ -321,6 +325,11 @@ export function ReservationPage() {
                 onDone={refresh}
                 startOpen={checkInNow === s.id}
               />
+            )}
+            {['TENTATIVE', 'CONFIRMED', 'CHECKED_IN'].includes(s.status) && (
+              <Suspense fallback={null}>
+                <StayPeople stayId={s.id} onChanged={refresh} />
+              </Suspense>
             )}
             {(s.folioId || s.status === 'CHECKED_IN') && <StayFolio stay={s} queryKey={key} />}
             {s.status === 'CHECKED_IN' && <StayKeys stay={s} />}

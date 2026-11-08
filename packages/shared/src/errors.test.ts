@@ -22,7 +22,8 @@ const SPEC_TABLE: Record<number, string[]> = {
     // Added in T-023 (not in tab 4): file not scanned yet, or blocked.
     'FILE_NOT_READY',
   ],
-  422: ['RATE_BELOW_LIMIT', 'RESTRICTION_VIOLATED', 'APPROVAL_EXPIRED'],
+  // OCCUPANCY_EXCEEDED added in T-056 (not in tab 4; PRD M14 AC).
+  422: ['RATE_BELOW_LIMIT', 'RESTRICTION_VIOLATED', 'APPROVAL_EXPIRED', 'OCCUPANCY_EXCEEDED'],
   429: ['RATE_LIMITED'],
   // Added in T-070 (not in tab 4): the payment provider is down or refused the call.
   // T-091b (not in tab 4): WhatsApp could not be reached.

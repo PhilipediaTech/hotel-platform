@@ -1,4 +1,4 @@
-import { FRONT_DESK_ROUTES, RESERVATION_ROUTES } from '@hotel/shared';
+import { FRONT_DESK_ROUTES, OCCUPANT_ROUTES, RESERVATION_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
@@ -8,6 +8,7 @@ import * as dayUse from './day-use.ts';
 import * as checkOuts from './check-out.ts';
 import * as extend from './extend.ts';
 import * as frontDesk from './front-desk.ts';
+import * as occupants from './occupants.ts';
 import * as rooms from './rooms.ts';
 import * as reservations from './service.ts';
 
@@ -140,6 +141,33 @@ export function reservationRoutes(deps: checkIns.CheckInDeps): Router {
   );
   mountRoute(router, fd.postLateCheckOutFee, ({ params }, { tenant }) =>
     alerts.postLateCheckOutFee(deps, tenantFrom(tenant), params.stayId),
+  );
+
+  // Extra people on a stay (T-056).
+  const oc = OCCUPANT_ROUTES;
+  mountRoute(router, oc.listOccupants, ({ params }) =>
+    occupants.listOccupants(deps, params.stayId),
+  );
+  mountRoute(router, oc.addOccupant, ({ params, body }, { tenant }) =>
+    occupants.addOccupant(deps, tenantFrom(tenant), params.stayId, body),
+  );
+  mountRoute(router, oc.changeOccupantCharge, ({ params, body }, { req }) =>
+    occupants.changeOccupantCharge(
+      deps,
+      params.stayId,
+      params.occupantId,
+      req.get('If-Match') ?? '',
+      body,
+    ),
+  );
+  mountRoute(router, oc.removeOccupant, ({ params }, { tenant, req }) =>
+    occupants.removeOccupant(
+      deps,
+      tenantFrom(tenant),
+      params.stayId,
+      params.occupantId,
+      req.get('If-Match') ?? '',
+    ),
   );
 
   return router;

@@ -340,7 +340,14 @@ async function seedRates(db: Db, today: string): Promise<void> {
         ...data,
       },
     });
-  const bar = await plan('BAR', { name: 'Best available', kind: 'BAR', isPublic: true });
+  // Suggested extra-person charges (T-056): ₦5,000 per adult, ₦2,500 per child a night.
+  const bar = await plan('BAR', {
+    name: 'Best available',
+    kind: 'BAR',
+    isPublic: true,
+    extraAdultMinor: 500_000n,
+    extraChildMinor: 250_000n,
+  });
   await plan('CORP', {
     name: 'Corporate',
     kind: 'DERIVED',

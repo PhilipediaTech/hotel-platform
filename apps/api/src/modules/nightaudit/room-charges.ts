@@ -144,7 +144,44 @@ export async function postRoomNight(
     entityId: folio.id,
     after: { lineId, stayId: stay.id, night: args.night, amountMinor: price.roomMinor },
   });
-  return { posted: true, amountMinor: price.roomMinor };
+  // People added to the stay (T-056, M14-03): each one's nightly charge, with the room night
+  // and under its code and taxes, so the night's key posts them once too. A day-use stay is
+  // priced per stay and has none.
+  let extraMinor = 0n;
+  if (!stay.isDayUse) {
+    const people = await tx.stayOccupant.findMany({
+      where: { stayId: stay.id, removedAt: null, nightlyChargeMinor: { gt: 0n } },
+      orderBy: [{ addedAt: 'asc' }, { id: 'asc' }],
+    });
+    for (const person of people) {
+      const extra = await postChargeLines(ctx, {
+        folio,
+        windowId,
+        code,
+        description: `Extra ${person.kind === 'ADULT' ? 'adult' : 'child'}: ${person.firstName} ${person.lastName}, night of ${args.night}`,
+        quantity: 1,
+        unitAmountMinor: person.nightlyChargeMinor,
+        note: null,
+        sourceType: 'OCCUPANT_NIGHT',
+        sourceId: person.id,
+        businessDate: args.businessDate,
+      });
+      extraMinor += person.nightlyChargeMinor;
+      await recordAudit(tx, {
+        action: 'folio.occupant_posted',
+        entityType: 'folio',
+        entityId: folio.id,
+        after: {
+          lineId: extra[0],
+          stayId: stay.id,
+          occupantId: person.id,
+          night: args.night,
+          amountMinor: person.nightlyChargeMinor,
+        },
+      });
+    }
+  }
+  return { posted: true, amountMinor: price.roomMinor + extraMinor };
 }
 
 /**

@@ -124,6 +124,8 @@ function planItem(p: PlanRow): PlanOut {
     currency: p.currency,
     isPublic: p.isPublic,
     dayUseMaxMinutes: p.dayUseMaxMinutes,
+    extraAdultMinor: str(p.extraAdultMinor),
+    extraChildMinor: str(p.extraChildMinor),
     roomTypeIds: p.roomTypeIds,
     active: p.active,
     version: p.version,
@@ -211,6 +213,8 @@ const auditPlan = (p: RatePlan) => ({
   guarantee: p.guarantee,
   isPublic: p.isPublic,
   dayUseMaxMinutes: p.dayUseMaxMinutes,
+  extraAdultMinor: str(p.extraAdultMinor),
+  extraChildMinor: str(p.extraChildMinor),
   roomTypeIds: p.roomTypeIds,
   active: p.active,
 });
@@ -230,6 +234,8 @@ export async function createRatePlan(
           derivationAmountMinor: big(body.derivationAmountMinor),
           roundingMinor: BigInt(body.roundingMinor),
           floorMinor: big(body.floorMinor),
+          extraAdultMinor: big(body.extraAdultMinor),
+          extraChildMinor: big(body.extraChildMinor),
           currency: property.baseCurrency,
         } as Prisma.RatePlanUncheckedCreateInput,
         include: withComponents,
@@ -300,7 +306,14 @@ export async function updateRatePlan(
         );
       }
     }
-    const { derivationAmountMinor, roundingMinor, floorMinor, ...rest } = body;
+    const {
+      derivationAmountMinor,
+      roundingMinor,
+      floorMinor,
+      extraAdultMinor,
+      extraChildMinor,
+      ...rest
+    } = body;
     const claimed = await tx.ratePlan.updateMany({
       where: { id: before.id, version: before.version },
       data: {
@@ -310,6 +323,8 @@ export async function updateRatePlan(
           : {}),
         ...(roundingMinor !== undefined ? { roundingMinor: BigInt(roundingMinor) } : {}),
         ...(floorMinor !== undefined ? { floorMinor: big(floorMinor) } : {}),
+        ...(extraAdultMinor !== undefined ? { extraAdultMinor: big(extraAdultMinor) } : {}),
+        ...(extraChildMinor !== undefined ? { extraChildMinor: big(extraChildMinor) } : {}),
         version: { increment: 1 },
       },
     });

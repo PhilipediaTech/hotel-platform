@@ -44,6 +44,13 @@ export const SignUpBody = z.object({
   organisationName: z.string().trim().min(1).max(120),
   country: z.enum(SIGN_UP_COUNTRY_CODES),
   propertyName: z.string().trim().min(1).max(120),
+  /** A referral partner's code (M14-07; T-110); empty when there is none. */
+  referralCode: z
+    .string()
+    .trim()
+    .transform((v) => v.toUpperCase())
+    .pipe(z.string().regex(/^[A-Z0-9]{4,16}$|^$/, 'Enter the code exactly as you were given it'))
+    .optional(),
 });
 
 export const signUp = defineRoute({
@@ -141,6 +148,8 @@ export const Me = z
     ),
     /** Platform staff (PLATFORM_ADMIN_EMAILS): may open S31 (T-100). */
     platformAdmin: z.boolean(),
+    /** Set when this account belongs to a referral partner (M14-08; T-110). */
+    partner: z.object({ id: Uuid, name: z.string() }).nullable(),
     /** Open support sessions: their groups appear in properties, read-only (T-100). */
     support: z.array(
       z.object({

@@ -58,6 +58,7 @@ export function makeMe(over: Partial<MeResponse> = {}): MeResponse {
     },
     organisations: [{ id: ORG, name: 'Obi Hotels', disabledModules: [] }],
     platformAdmin: false,
+    partner: null,
     support: [],
     properties: [LAGOS_PROPERTY],
     memberships: [membership(LAGOS, ['frontdesk.read', 'folio.read'])],

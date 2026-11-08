@@ -83,6 +83,518 @@
         ],
         "description": "Every error response. Clients branch on `code`, never on `message`."
       },
+      "ReferralPartner": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "contactName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commissionBps": {
+            "type": "integer"
+          },
+          "durationMonths": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string"
+          },
+          "signUpLink": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "hotels": {
+            "type": "integer"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "earnedMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "paidMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "owedMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                }
+              },
+              "required": [
+                "currency",
+                "earnedMinor",
+                "paidMinor",
+                "owedMinor"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "country",
+          "contactName",
+          "email",
+          "phone",
+          "commissionBps",
+          "durationMonths",
+          "code",
+          "signUpLink",
+          "active",
+          "createdAt",
+          "hotels",
+          "totals"
+        ]
+      },
+      "Uuid": {
+        "type": "string",
+        "format": "uuid",
+        "example": "0d0d0d0d-0000-4000-8000-000000000002"
+      },
+      "Instant": {
+        "type": "string",
+        "format": "date-time",
+        "example": "2026-11-12T09:30:00Z"
+      },
+      "AmountMinor": {
+        "type": "string",
+        "pattern": "^-?(0|[1-9]\\d{0,17})$",
+        "example": "4500000"
+      },
+      "ReferralPartnerDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "contactName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commissionBps": {
+            "type": "integer"
+          },
+          "durationMonths": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string"
+          },
+          "signUpLink": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "hotels": {
+            "type": "integer"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "earnedMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "paidMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "owedMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                }
+              },
+              "required": [
+                "currency",
+                "earnedMinor",
+                "paidMinor",
+                "owedMinor"
+              ]
+            }
+          },
+          "payoutDetails": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hotelList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "plan": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "ESSENTIALS",
+                    "PROFESSIONAL",
+                    "GROUP",
+                    null
+                  ]
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "TRIAL",
+                    "ACTIVE",
+                    "PAST_DUE",
+                    "SUSPENDED",
+                    null
+                  ]
+                },
+                "organisationId": {
+                  "$ref": "#/components/schemas/Uuid"
+                }
+              },
+              "required": [
+                "name",
+                "plan",
+                "status",
+                "organisationId"
+              ]
+            }
+          },
+          "commissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "hotel": {
+                  "type": "string"
+                },
+                "periodStart": {
+                  "$ref": "#/components/schemas/IsoDate"
+                },
+                "commissionBps": {
+                  "type": "integer"
+                },
+                "amountMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "earnedAt": {
+                  "$ref": "#/components/schemas/Instant"
+                },
+                "paid": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "hotel",
+                "periodStart",
+                "commissionBps",
+                "amountMinor",
+                "currency",
+                "earnedAt",
+                "paid"
+              ]
+            }
+          },
+          "payouts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "amountMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "paidAt": {
+                  "$ref": "#/components/schemas/Instant"
+                }
+              },
+              "required": [
+                "id",
+                "amountMinor",
+                "currency",
+                "reference",
+                "paidAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "country",
+          "contactName",
+          "email",
+          "phone",
+          "commissionBps",
+          "durationMonths",
+          "code",
+          "signUpLink",
+          "active",
+          "createdAt",
+          "hotels",
+          "totals",
+          "payoutDetails",
+          "hotelList",
+          "commissions",
+          "payouts"
+        ]
+      },
+      "IsoDate": {
+        "type": "string",
+        "format": "date",
+        "example": "2026-11-12"
+      },
+      "PartnerHome": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "signUpLink": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "commissionBps": {
+            "type": "integer"
+          },
+          "durationMonths": {
+            "type": "integer"
+          },
+          "hotels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "plan": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "ESSENTIALS",
+                    "PROFESSIONAL",
+                    "GROUP",
+                    null
+                  ]
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "TRIAL",
+                    "ACTIVE",
+                    "PAST_DUE",
+                    "SUSPENDED",
+                    null
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "plan",
+                "status"
+              ]
+            }
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "earnedMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "paidMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "owedMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                }
+              },
+              "required": [
+                "currency",
+                "earnedMinor",
+                "paidMinor",
+                "owedMinor"
+              ]
+            }
+          },
+          "commissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "hotel": {
+                  "type": "string"
+                },
+                "periodStart": {
+                  "$ref": "#/components/schemas/IsoDate"
+                },
+                "commissionBps": {
+                  "type": "integer"
+                },
+                "amountMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "earnedAt": {
+                  "$ref": "#/components/schemas/Instant"
+                },
+                "paid": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "hotel",
+                "periodStart",
+                "commissionBps",
+                "amountMinor",
+                "currency",
+                "earnedAt",
+                "paid"
+              ]
+            }
+          },
+          "payouts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "amountMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "paidAt": {
+                  "$ref": "#/components/schemas/Instant"
+                }
+              },
+              "required": [
+                "id",
+                "amountMinor",
+                "currency",
+                "reference",
+                "paidAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "code",
+          "signUpLink",
+          "active",
+          "commissionBps",
+          "durationMonths",
+          "hotels",
+          "totals",
+          "commissions",
+          "payouts"
+        ]
+      },
       "Accepted": {
         "type": "object",
         "properties": {
@@ -189,6 +701,24 @@
           "platformAdmin": {
             "type": "boolean"
           },
+          "partner": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
           "support": {
             "type": "array",
             "items": {
@@ -265,7 +795,17 @@
                   }
                 },
                 "businessDate": {
-                  "$ref": "#/components/schemas/IsoDate"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  ]
                 }
               },
               "required": [
@@ -343,29 +883,12 @@
           "session",
           "organisations",
           "platformAdmin",
+          "partner",
           "support",
           "properties",
           "memberships"
         ],
         "description": "The signed-in user, their session and what they can access."
-      },
-      "Uuid": {
-        "type": "string",
-        "format": "uuid",
-        "example": "0d0d0d0d-0000-4000-8000-000000000002"
-      },
-      "Instant": {
-        "type": "string",
-        "format": "date-time",
-        "example": "2026-11-12T09:30:00Z"
-      },
-      "IsoDate": {
-        "type": [
-          "string",
-          "null"
-        ],
-        "format": "date",
-        "example": "2026-11-12"
       },
       "PermissionInfo": {
         "type": "object",
@@ -744,7 +1267,17 @@
             "additionalProperties": {}
           },
           "amountMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "reason": {
             "type": "string"
@@ -857,14 +1390,6 @@
           "FAILED"
         ]
       },
-      "AmountMinor": {
-        "type": [
-          "string",
-          "null"
-        ],
-        "pattern": "^-?(0|[1-9]\\d{0,17})$",
-        "example": "4500000"
-      },
       "ApprovalPolicy": {
         "type": "object",
         "properties": {
@@ -889,7 +1414,17 @@
             "type": "boolean"
           },
           "thresholdMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "thresholdBps": {
             "type": [
@@ -1192,7 +1727,17 @@
             "maximum": 720
           },
           "lateCheckOutFeeMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "whatsapp": {
             "type": "array",
@@ -1595,7 +2140,17 @@
             "$ref": "#/components/schemas/IsoDate"
           },
           "effectiveTo": {
-            "$ref": "#/components/schemas/IsoDate"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "rateBps": {
             "type": "integer"
@@ -1776,13 +2331,33 @@
             ]
           },
           "derivationAmountMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "roundingMinor": {
             "$ref": "#/components/schemas/AmountMinor"
           },
           "floorMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "mealPlan": {
             "type": "string",
@@ -1818,10 +2393,30 @@
             ]
           },
           "extraAdultMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "extraChildMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "roomTypeIds": {
             "type": "array",
@@ -1903,10 +2498,30 @@
             "$ref": "#/components/schemas/IsoDate"
           },
           "amountMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "ownAmountMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "minStay": {
             "type": [
@@ -2212,10 +2827,30 @@
             ]
           },
           "roomMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "totalMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "sellable": {
             "type": "boolean"
@@ -4419,7 +5054,17 @@
             ]
           },
           "idExpiry": {
-            "$ref": "#/components/schemas/IsoDate"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "signature": {
             "type": "string",
@@ -4546,7 +5191,17 @@
                   "type": "integer"
                 },
                 "totalMinor": {
-                  "$ref": "#/components/schemas/AmountMinor"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  ]
                 },
                 "sellable": {
                   "type": "boolean"
@@ -5174,7 +5829,17 @@
             "$ref": "#/components/schemas/AmountMinor"
           },
           "balanceMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "flags": {
             "type": "array",
@@ -6422,10 +7087,30 @@
             "$ref": "#/components/schemas/AmountMinor"
           },
           "countedMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "varianceMinor": {
-            "$ref": "#/components/schemas/AmountMinor"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           }
         },
         "required": [
@@ -7991,7 +8676,17 @@
                       "type": "string"
                     },
                     "amountMinor": {
-                      "$ref": "#/components/schemas/AmountMinor"
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/AmountMinor"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      ]
                     },
                     "createdAt": {
                       "$ref": "#/components/schemas/Instant"
@@ -8348,7 +9043,17 @@
                   ]
                 },
                 "recoveredMinor": {
-                  "$ref": "#/components/schemas/AmountMinor"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  ]
                 },
                 "linkedLine": {
                   "type": [
@@ -9211,7 +9916,17 @@
                 "$ref": "#/components/schemas/IsoDate"
               },
               "through": {
-                "$ref": "#/components/schemas/IsoDate"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                ]
               },
               "days": {
                 "type": "integer"
@@ -9645,7 +10360,17 @@
             "$ref": "#/components/schemas/IsoDate"
           },
           "through": {
-            "$ref": "#/components/schemas/IsoDate"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
           },
           "currency": {
             "type": "string"
@@ -9838,6 +10563,927 @@
         }
       }
     },
+    "/platform/partners": {
+      "get": {
+        "operationId": "listPartners",
+        "summary": "Referral partners with hotels and earnings (M14-06)",
+        "tags": [
+          "Partners"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReferralPartner"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPartner",
+        "summary": "Create a referral partner: code, sign-up link and sign-in (M14-06)",
+        "tags": [
+          "Partners"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Emails the partner a link to choose a password.",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "country": {
+                    "type": "string",
+                    "enum": [
+                      "NG",
+                      "GH",
+                      "KE",
+                      "ZA"
+                    ]
+                  },
+                  "contactName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120,
+                    "default": null
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  },
+                  "phone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^\\+[1-9]\\d{6,14}$",
+                    "default": null
+                  },
+                  "payoutDetails": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "default": null
+                  },
+                  "commissionBps": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "durationMonths": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120
+                  }
+                },
+                "required": [
+                  "name",
+                  "country",
+                  "email",
+                  "commissionBps",
+                  "durationMonths"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferralPartnerDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/partners/{partnerId}": {
+      "get": {
+        "operationId": "getPartner",
+        "summary": "A referral partner: hotels, ledger and payouts",
+        "tags": [
+          "Partners"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "partnerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferralPartnerDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updatePartner",
+        "summary": "Change a partner’s details, rate or term, or retire their code",
+        "tags": [
+          "Partners"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "A new rate applies to invoices paid from now on; earned lines keep theirs.",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "partnerId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "contactName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120
+                  },
+                  "phone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^\\+[1-9]\\d{6,14}$"
+                  },
+                  "payoutDetails": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500
+                  },
+                  "commissionBps": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "durationMonths": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferralPartnerDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/partners/{partnerId}/payouts": {
+      "post": {
+        "operationId": "recordPartnerPayout",
+        "summary": "Mark everything owed in a currency as paid outside the app (M14-08)",
+        "tags": [
+          "Partners"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "409 STATE_TRANSITION_INVALID when nothing is owed in that currency.",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "partnerId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "reference": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  }
+                },
+                "required": [
+                  "currency",
+                  "reference"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferralPartnerDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/tenants/{organisationId}/partner": {
+      "get": {
+        "operationId": "getTenantPartner",
+        "summary": "The partner a hotel group is tied to",
+        "tags": [
+          "Partners"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "organisationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "partner": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ]
+                    },
+                    "firstPaidAt": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Instant"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "partner",
+                    "firstPaidAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "setTenantPartner",
+        "summary": "Tie a hotel group to a partner, change it or remove it (M14-07)",
+        "tags": [
+          "Partners"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "After the first paid invoice a reason is required.",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "organisationId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "partnerId": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Uuid"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 5,
+                    "maxLength": 500,
+                    "default": null
+                  }
+                },
+                "required": [
+                  "partnerId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "partner": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ]
+                    },
+                    "firstPaidAt": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Instant"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "partner",
+                    "firstPaidAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partner/home": {
+      "get": {
+        "operationId": "getPartnerHome",
+        "summary": "My hotels (name, plan, status) and earnings, for a signed-in partner (M14-08)",
+        "tags": [
+          "Partners"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerHome"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/sign-up": {
       "post": {
         "operationId": "signUp",
@@ -9886,6 +11532,9 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 120
+                  },
+                  "referralCode": {
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -17486,7 +19135,17 @@
                     "default": null
                   },
                   "derivationAmountMinor": {
-                    "$ref": "#/components/schemas/AmountMinor"
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/AmountMinor"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
                   },
                   "roundingMinor": {
                     "type": "string",
@@ -17732,7 +19391,17 @@
                     "maximum": 10000
                   },
                   "derivationAmountMinor": {
-                    "$ref": "#/components/schemas/AmountMinor"
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/AmountMinor"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
                   },
                   "roundingMinor": {
                     "type": "string",
@@ -25627,7 +27296,17 @@
                       "$ref": "#/components/schemas/IsoDate"
                     },
                     "lateCheckOutFeeMinor": {
-                      "$ref": "#/components/schemas/AmountMinor"
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/AmountMinor"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      ]
                     },
                     "data": {
                       "type": "array",
@@ -35122,7 +36801,17 @@
                     ]
                   },
                   "recoveredMinor": {
-                    "$ref": "#/components/schemas/AmountMinor"
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/AmountMinor"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
                   },
                   "linkedLineId": {
                     "allOf": [
@@ -37733,7 +39422,17 @@
                           "type": "integer"
                         },
                         "estimateMinor": {
-                          "$ref": "#/components/schemas/AmountMinor"
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/AmountMinor"
+                            },
+                            {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          ]
                         }
                       },
                       "required": [

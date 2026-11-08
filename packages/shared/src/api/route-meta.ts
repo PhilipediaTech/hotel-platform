@@ -3,6 +3,14 @@ import type { RouteMeta } from './route-meta-source.ts';
 
 export const ROUTE_META: Record<string, RouteMeta> = {
   getOpenApiDocument: {"operationId":"getOpenApiDocument","method":"get","path":"/openapi.json"},
+  listPartners: {"operationId":"listPartners","method":"get","path":"/platform/partners"},
+  createPartner: {"operationId":"createPartner","method":"post","path":"/platform/partners","body":true,"idempotent":true},
+  getPartner: {"operationId":"getPartner","method":"get","path":"/platform/partners/{partnerId}"},
+  updatePartner: {"operationId":"updatePartner","method":"patch","path":"/platform/partners/{partnerId}","body":true},
+  recordPartnerPayout: {"operationId":"recordPartnerPayout","method":"post","path":"/platform/partners/{partnerId}/payouts","body":true,"idempotent":true},
+  getTenantPartner: {"operationId":"getTenantPartner","method":"get","path":"/platform/tenants/{organisationId}/partner"},
+  setTenantPartner: {"operationId":"setTenantPartner","method":"put","path":"/platform/tenants/{organisationId}/partner","body":true},
+  getPartnerHome: {"operationId":"getPartnerHome","method":"get","path":"/partner/home"},
   signUp: {"operationId":"signUp","method":"post","path":"/auth/sign-up","body":true},
   verifyEmail: {"operationId":"verifyEmail","method":"post","path":"/auth/email/verify","body":true},
   resendVerification: {"operationId":"resendVerification","method":"post","path":"/auth/email/resend","body":true},

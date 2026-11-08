@@ -1,0 +1,25 @@
+{
+  "$comment": "Public URLs per environment (runbook tab 9 'Public URLs file'; T-005). Scripts read these instead of hand-typed URLs. null until the domain is registered and the hosting exists. Staging uses the same registrable domain as production so the SameSite=Lax session cookie reaches the API.",
+  "staging": {
+    "app": null,
+    "api": null,
+    "site": null,
+    "render": {
+      "blueprint": "render.staging.yaml",
+      "api": "hotel-api-staging",
+      "worker": "hotel-worker-staging",
+      "database": "hotel-db-staging"
+    }
+  },
+  "production": {
+    "app": null,
+    "api": null,
+    "site": null,
+    "render": {
+      "blueprint": "render.yaml",
+      "api": "hotel-api",
+      "worker": "hotel-worker",
+      "database": "hotel-db"
+    }
+  }
+}

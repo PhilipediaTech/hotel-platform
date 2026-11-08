@@ -1,0 +1,104 @@
+# Production on Render (runbook tab 9 "Render blueprint"; Architecture tab hosting: Frankfurt;
+# T-005 prepared, T-103 creates it). New → Blueprint → this repo → render.yaml.
+#
+# Nothing here is live until Philip creates the Blueprint in his Render account (paid plans:
+# check plan names and prices against Render's current blueprint reference first). Values
+# marked `sync: false` are secrets or per-environment settings typed once in the Render
+# dashboard; they never go in git. Staging is render.staging.yaml.
+#
+# Before the first deploy the API also needs its production adapters (they arrive with the
+# accounts): SES email, R2 file store and the scan engine. Until then server.ts and
+# worker.ts refuse to start in production, on purpose.
+
+envVarGroups:
+  - name: hotel-production
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Keep equal to .nvmrc (deploy-config.test.ts checks).
+      - key: NODE_VERSION
+        value: 24.22.1
+      - key: LOG_LEVEL
+        value: info
+      # https://app.<domain> and https://www.<domain> (the booking site).
+      - key: APP_ORIGIN
+        sync: false
+      - key: SITE_ORIGIN
+        sync: false
+      # 32+ random bytes each: node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+      - key: SESSION_SECRET
+        sync: false
+      - key: MFA_ENCRYPTION_KEY
+        sync: false
+      - key: ID_ENCRYPTION_KEY
+        sync: false
+      - key: PAYMENT_PROVIDER
+        value: paystack
+      # sk_live_… from the Paystack dashboard (Settings → API keys).
+      - key: PAYMENT_SECRET_KEY
+        sync: false
+      - key: PASSWORD_BREACH_CHECK
+        value: hibp
+      - key: WHATSAPP_PROVIDER
+        value: meta
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_BUSINESS_ACCOUNT_ID
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      # Platform staff (T-100): comma-separated emails, MFA required.
+      - key: PLATFORM_ADMIN_EMAILS
+        sync: false
+
+services:
+  - type: web
+    name: hotel-api
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: main
+    # Production deploys only from a v* tag (.github/workflows/deploy-production.yml).
+    autoDeploy: false
+    buildCommand: npm ci && npm run build -w apps/api
+    # A failed migration stops the deploy; the running version keeps serving.
+    preDeployCommand: npx --no-install prisma migrate deploy
+    startCommand: npm run start -w apps/api
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: hotel-production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hotel-db
+          property: connectionString
+
+  - type: worker
+    name: hotel-worker
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: main
+    autoDeploy: false
+    buildCommand: npm ci && npm run build -w apps/api
+    startCommand: npm run start:worker -w apps/api
+    envVars:
+      - fromGroup: hotel-production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hotel-db
+          property: connectionString
+
+databases:
+  - name: hotel-db
+    region: frankfurt
+    plan: basic-256mb
+    databaseName: hotel
+    # Same major version as local development and CI.
+    postgresMajorVersion: '18'
+    # Point-in-time recovery: check it is on for this plan (runbook "Backups").
+    # Reachable only from Render services in the same region, never from the internet.
+    ipAllowList: []

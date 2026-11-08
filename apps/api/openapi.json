@@ -595,6 +595,435 @@
           "payouts"
         ]
       },
+      "BookingEngineSettings": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "headline": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 120
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "policies": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "photoFileIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "maxItems": 12
+          },
+          "allowPayFull": {
+            "type": "boolean"
+          },
+          "allowDeposit": {
+            "type": "boolean"
+          },
+          "depositBps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "allowPayAtHotel": {
+            "type": "boolean"
+          },
+          "pageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "embedSnippet": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "slug",
+          "enabled",
+          "headline",
+          "description",
+          "policies",
+          "photoFileIds",
+          "allowPayFull",
+          "allowDeposit",
+          "depositBps",
+          "allowPayAtHotel",
+          "pageUrl",
+          "embedSnippet"
+        ]
+      },
+      "PromoCode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "discountBps": {
+            "type": "integer"
+          },
+          "validFrom": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "validTo": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "maxUses": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "usedCount": {
+            "type": "integer"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "discountBps",
+          "validFrom",
+          "validTo",
+          "maxUses",
+          "usedCount",
+          "active"
+        ]
+      },
+      "PublicProperty": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "headline": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "policies": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "currency": {
+            "type": "string"
+          },
+          "checkInTime": {
+            "type": "string"
+          },
+          "checkOutTime": {
+            "type": "string"
+          },
+          "photoUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "payment": {
+            "type": "object",
+            "properties": {
+              "full": {
+                "type": "boolean"
+              },
+              "deposit": {
+                "type": "boolean"
+              },
+              "depositBps": {
+                "type": "integer"
+              },
+              "atHotel": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "full",
+              "deposit",
+              "depositBps",
+              "atHotel"
+            ]
+          },
+          "roomTypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "maxOccupancy": {
+                  "type": "integer"
+                },
+                "amenities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "photoUrls": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "description",
+                "maxOccupancy",
+                "amenities",
+                "photoUrls"
+              ]
+            }
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "headline",
+          "description",
+          "policies",
+          "phone",
+          "email",
+          "address",
+          "currency",
+          "checkInTime",
+          "checkOutTime",
+          "photoUrls",
+          "payment",
+          "roomTypes"
+        ]
+      },
+      "PublicBookingCreated": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "confirmationNo": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "TENTATIVE",
+              "CONFIRMED"
+            ]
+          },
+          "paymentUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "amountDueNowMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "totalMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "currency": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "confirmationNo",
+          "status",
+          "paymentUrl",
+          "amountDueNowMinor",
+          "totalMinor",
+          "currency"
+        ]
+      },
+      "PublicBooking": {
+        "type": "object",
+        "properties": {
+          "confirmationNo": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "hotel": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "slug",
+              "phone",
+              "email"
+            ]
+          },
+          "guestName": {
+            "type": "string"
+          },
+          "arrival": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "departure": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "roomType": {
+            "type": "string"
+          },
+          "ratePlan": {
+            "type": "string"
+          },
+          "adults": {
+            "type": "integer"
+          },
+          "children": {
+            "type": "integer"
+          },
+          "totalMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "paidMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "cancellation": {
+            "type": "object",
+            "properties": {
+              "allowed": {
+                "type": "boolean"
+              },
+              "feeMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              }
+            },
+            "required": [
+              "allowed",
+              "feeMinor"
+            ]
+          }
+        },
+        "required": [
+          "confirmationNo",
+          "status",
+          "hotel",
+          "guestName",
+          "arrival",
+          "departure",
+          "roomType",
+          "ratePlan",
+          "adults",
+          "children",
+          "totalMinor",
+          "paidMinor",
+          "currency",
+          "cancellation"
+        ]
+      },
       "Accepted": {
         "type": "object",
         "properties": {
@@ -9203,6 +9632,7 @@
             "type": "string",
             "enum": [
               "BOOKING_CONFIRMED",
+              "BOOKING_REFUNDED",
               "PRE_ARRIVAL",
               "PAYMENT_REQUEST",
               "FOLIO",
@@ -11482,6 +11912,1246 @@
           },
           "401": {
             "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/booking-engine/settings": {
+      "get": {
+        "operationId": "getBookingEngineSettings",
+        "summary": "The booking page’s settings and embed snippet (M11-03)",
+        "tags": [
+          "Booking engine"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "bookingengine.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingEngineSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveBookingEngineSettings",
+        "summary": "Save the booking page’s settings (M11-03)",
+        "tags": [
+          "Booking engine"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "bookingengine.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])$"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "headline": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 2000
+                  },
+                  "policies": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 4000
+                  },
+                  "photoFileIds": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "maxItems": 12
+                  },
+                  "allowPayFull": {
+                    "type": "boolean"
+                  },
+                  "allowDeposit": {
+                    "type": "boolean"
+                  },
+                  "depositBps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "allowPayAtHotel": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "slug",
+                  "enabled",
+                  "headline",
+                  "description",
+                  "policies",
+                  "photoFileIds",
+                  "allowPayFull",
+                  "allowDeposit",
+                  "depositBps",
+                  "allowPayAtHotel"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingEngineSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/booking-engine/promo-codes": {
+      "get": {
+        "operationId": "listPromoCodes",
+        "summary": "Promo codes of the booking page",
+        "tags": [
+          "Booking engine"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "bookingengine.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PromoCode"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPromoCode",
+        "summary": "Add a promo code",
+        "tags": [
+          "Booking engine"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "bookingengine.manage",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9-]{3,30}$"
+                  },
+                  "discountBps": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "validFrom": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/IsoDate"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "validTo": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/IsoDate"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "maxUses": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 100000,
+                    "default": null
+                  }
+                },
+                "required": [
+                  "code",
+                  "discountBps"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromoCode"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/booking-engine/promo-codes/{promoId}": {
+      "patch": {
+        "operationId": "updatePromoCode",
+        "summary": "Switch a promo code on or off",
+        "tags": [
+          "Booking engine"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "bookingengine.manage",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "promoId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "active"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromoCode"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/properties/{slug}": {
+      "get": {
+        "operationId": "getPublicProperty",
+        "summary": "A hotel’s booking page (M11-01)",
+        "tags": [
+          "Public booking"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProperty"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/availability": {
+      "get": {
+        "operationId": "getPublicAvailability",
+        "summary": "Rooms and public plans for the dates (M11-01)",
+        "tags": [
+          "Public booking"
+        ],
+        "security": [],
+        "description": "The front desk’s availability, narrowed to public plans that can be sold.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "required": true,
+            "name": "slug",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": true,
+            "name": "arrival",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": true,
+            "name": "departure",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "required": true,
+            "name": "adults",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 20,
+              "default": 0
+            },
+            "required": false,
+            "name": "children",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z0-9-]{3,30}$"
+            },
+            "required": false,
+            "name": "promo",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "arrival": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "departure": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "nights": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "promoApplied": {
+                      "type": "boolean"
+                    },
+                    "roomTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "roomTypeId": {
+                            "$ref": "#/components/schemas/Uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "maxOccupancy": {
+                            "type": "integer"
+                          },
+                          "available": {
+                            "type": "integer"
+                          },
+                          "plans": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "ratePlanId": {
+                                  "$ref": "#/components/schemas/Uuid"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "mealPlan": {
+                                  "type": "string",
+                                  "enum": [
+                                    "ROOM_ONLY",
+                                    "BREAKFAST",
+                                    "HALF_BOARD",
+                                    "FULL_BOARD"
+                                  ]
+                                },
+                                "totalMinor": {
+                                  "$ref": "#/components/schemas/AmountMinor"
+                                }
+                              },
+                              "required": [
+                                "ratePlanId",
+                                "name",
+                                "mealPlan",
+                                "totalMinor"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "roomTypeId",
+                          "name",
+                          "maxOccupancy",
+                          "available",
+                          "plans"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "arrival",
+                    "departure",
+                    "nights",
+                    "currency",
+                    "promoApplied",
+                    "roomTypes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/bookings": {
+      "post": {
+        "operationId": "createPublicBooking",
+        "summary": "Book a room from the booking page (M11-01)",
+        "tags": [
+          "Public booking"
+        ],
+        "security": [],
+        "description": "Paying online holds the room for 30 minutes and confirms when the payment arrives; paying at the hotel confirms at once. Sending the same `bookingKey` again returns the same booking.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "bookingKey": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "roomTypeId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "ratePlanId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "arrival": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "departure": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "adults": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "children": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 20,
+                    "default": 0
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  },
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^\\+[1-9]\\d{6,14}$"
+                  },
+                  "payment": {
+                    "type": "string",
+                    "enum": [
+                      "FULL",
+                      "DEPOSIT",
+                      "AT_HOTEL"
+                    ]
+                  },
+                  "promo": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9-]{3,30}$"
+                  },
+                  "marketingConsent": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "returnUrl": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "slug",
+                  "bookingKey",
+                  "roomTypeId",
+                  "ratePlanId",
+                  "arrival",
+                  "departure",
+                  "adults",
+                  "firstName",
+                  "lastName",
+                  "email",
+                  "phone",
+                  "payment"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `BOOKING_CONFLICT`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule violated: `RESTRICTION_VIOLATED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/bookings/{token}": {
+      "get": {
+        "operationId": "getPublicBooking",
+        "summary": "A guest’s booking, from their secure link (M11-02)",
+        "tags": [
+          "Public booking"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 100
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBooking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/bookings/{token}/cancel": {
+      "post": {
+        "operationId": "cancelPublicBooking",
+        "summary": "Cancel a booking within its policy, from the secure link (M11-02)",
+        "tags": [
+          "Public booking"
+        ],
+        "security": [],
+        "description": "`acceptedFeeMinor` is the fee the guest was shown: if the fee is now higher, 409 and nothing changes.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 100
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "acceptedFeeMinor": {
+                    "$ref": "#/components/schemas/AmountMinor"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBooking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
             "content": {
               "application/json": {
                 "schema": {
@@ -15499,6 +17169,7 @@
                     "type": "string",
                     "enum": [
                       "ImportJob",
+                      "BookingEngine",
                       "RoomType",
                       "IdDocument",
                       "RegistrationCard",
@@ -37633,6 +39304,7 @@
                     "type": "string",
                     "enum": [
                       "BOOKING_CONFIRMED",
+                      "BOOKING_REFUNDED",
                       "PRE_ARRIVAL",
                       "PAYMENT_REQUEST",
                       "FOLIO",
@@ -37769,6 +39441,7 @@
               "type": "string",
               "enum": [
                 "BOOKING_CONFIRMED",
+                "BOOKING_REFUNDED",
                 "PRE_ARRIVAL",
                 "PAYMENT_REQUEST",
                 "FOLIO",
@@ -37940,6 +39613,7 @@
                     "type": "string",
                     "enum": [
                       "BOOKING_CONFIRMED",
+                      "BOOKING_REFUNDED",
                       "PRE_ARRIVAL",
                       "PAYMENT_REQUEST",
                       "FOLIO",

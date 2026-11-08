@@ -66,6 +66,7 @@
     "settings-billing": "Billing",
     "audit-log": "Audit log",
     "platform": "Platform admin",
+    "settings-booking-engine": "Booking page",
     "partner": "Partner account",
     "unmatched-transfers": "Unmatched transfers"
   },

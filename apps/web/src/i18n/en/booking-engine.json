@@ -1,0 +1,32 @@
+{
+  "bookingEngine": {
+    "title": "Booking page",
+    "enabled": "Booking page is open to guests",
+    "slug": "Page address",
+    "slugHint": "Lowercase letters, numbers and hyphens, for example demo-lagos.",
+    "headline": "Headline",
+    "description": "About the hotel",
+    "policies": "Policies guests should read",
+    "photos": "Add a photo",
+    "photoCount_one": "{{count}} photo. Save to keep changes.",
+    "photoCount_other": "{{count}} photos. Save to keep changes.",
+    "payment": "Ways to pay",
+    "payFull": "Pay in full online",
+    "payDeposit": "Pay a deposit online",
+    "depositPercent": "Deposit (%)",
+    "payAtHotel": "Pay at the hotel",
+    "plansHint": "Guests see the rate plans marked public under Rates.",
+    "save": "Save",
+    "saved": "Saved.",
+    "promos": "Promo codes",
+    "noPromos": "No promo codes yet.",
+    "promoLine": "{{percent}}% off, used {{used}} times",
+    "turnOff": "Turn off",
+    "turnOn": "Turn on",
+    "code": "Code",
+    "percentOff": "% off",
+    "addPromo": "Add code",
+    "embed": "Put it on your website",
+    "embedHint": "Paste this into your website where the booking page should appear."
+  }
+}

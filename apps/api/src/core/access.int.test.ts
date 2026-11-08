@@ -39,6 +39,12 @@ const PUBLIC_ROUTES = [
   'paymentWebhook',
   'whatsappWebhookVerify',
   'whatsappWebhook',
+  // Reviewed in T-112: the booking page. Only switched-on, live hotels; a link is a secret.
+  'getPublicProperty',
+  'getPublicAvailability',
+  'createPublicBooking',
+  'getPublicBooking',
+  'cancelPublicBooking',
 ];
 
 /** Reviewed in T-102: reachable after the password, before MFA (to get through MFA). */

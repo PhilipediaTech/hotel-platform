@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-Philip asked (2026-11-08) to build the V1.2 features and finish every ticket that is pure building. V1.2 tickets are stacked: each branch starts from the previous one, merge them in number order. Done: T-110 referral partners, T-111 country packs. Next: T-112 booking engine (API and settings, then the Astro site in apps/site). AI features use Claude behind one interface with a fake locally. Before the pilot, T-005 staging, T-103 and T-104 still wait for paid accounts.
+Philip asked (2026-11-08) to build the V1.2 features and finish every ticket that is pure building, one ticket at a time. Done: T-110 referral partners, T-111 country packs, T-112 booking engine API and settings. Next: T-113 the Astro guest site in apps/site (Astro approved, not yet installed; check the lockfile keeps its Linux bindings). AI features use Claude behind one interface with a fake locally. Clear node_modules/.vitest-cache before full test runs. Before the pilot, T-005 staging, T-103 and T-104 still wait for paid accounts.

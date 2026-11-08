@@ -6,7 +6,7 @@ import type { Prisma } from '../../generated/prisma/client.ts';
 import { recordAudit } from '../../core/audit.ts';
 import { postingDate } from '../../core/business-day.ts';
 import type { Clock } from '../../core/clock.ts';
-import { raisedBy, type Db } from '../../core/db.ts';
+import { pgErrorInfo, raisedBy, type Db } from '../../core/db.ts';
 import type { EmailProvider } from '../../core/email.ts';
 import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
@@ -19,6 +19,7 @@ import {
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { houseRights } from '../folios/service.ts';
+import { afterOnlinePayment } from '../bookingengine/after-payment.ts';
 import { money } from './documents.ts';
 
 // Payment links (PRD M4-07 online card, M4-08; tab 4 POST /payment-intents ●; ADR-021; T-070).
@@ -92,6 +93,7 @@ export async function createPaymentIntent(
   deps: IntentDeps,
   tenant: TenantContext,
   body: z.output<typeof PaymentIntentBody>,
+  options: { callbackUrl: string | null } = { callbackUrl: null },
 ) {
   const property = await deps.tenantDb.property.findUniqueOrThrow({
     where: { id: tenant.propertyId },
@@ -137,7 +139,7 @@ export async function createPaymentIntent(
       amountMinor: amount,
       currency: property.baseCurrency,
       email: body.email,
-      callbackUrl: null,
+      callbackUrl: options.callbackUrl,
       metadata: { hotel: property.name, for: purpose },
     })
     .catch(unavailable);
@@ -245,7 +247,7 @@ export async function systemShift(
  * webhook); the request path checks the tenant first. Answers the link's status.
  */
 export async function settleIntent(
-  deps: Pick<IntentDeps, 'db' | 'clock' | 'provider'>,
+  deps: Pick<IntentDeps, 'db' | 'clock' | 'provider' | 'logger'>,
   intentId: string,
   /** The charge as a signed webhook told it (T-071): no need to ask the provider again. */
   known?: Charge,
@@ -380,6 +382,14 @@ export async function settleIntent(
     }
     throw err;
   }
+  // A booking-page payment confirms its booking (T-112). The money is safely recorded by now;
+  // a problem here is for the logs and must not make the provider send the payment again.
+  await afterOnlinePayment(deps, intent.id).catch((err: unknown) => {
+    deps.logger?.error(
+      { err: pgErrorInfo(err) ?? String(err), intentId: intent.id },
+      'After-payment step failed',
+    );
+  });
   return 'SUCCEEDED';
 }
 

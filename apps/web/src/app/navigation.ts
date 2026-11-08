@@ -248,6 +248,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-024',
   },
   {
+    id: 'settings-booking-engine',
+    path: '/settings/booking-engine',
+    anyOf: ['bookingengine.manage'],
+    group: 'admin',
+    screen: 'S40',
+    ticket: 'T-112',
+  },
+  {
     id: 'settings-rooms',
     path: '/settings/rooms',
     anyOf: ['room.manage', 'roomtype.manage'],

@@ -183,6 +183,7 @@ function price(
   roomTypeId: string,
   stay: { arrival: string; departure: string },
   guests: number,
+  discountBps = 0,
 ): Pricing {
   const dates = stayDates(stay.arrival, stay.departure);
   const own = (date: string) => ctx.days.get(key(plan.id, roomTypeId, date));
@@ -215,7 +216,9 @@ function price(
     const parent = plan.parentRatePlanId
       ? ctx.days.get(key(plan.parentRatePlanId, roomTypeId, date))
       : undefined;
-    const amount = sellingPrice(plan, mine, parent);
+    const listed = sellingPrice(plan, mine, parent);
+    // A booking-page promo code comes off each night before tax (T-112).
+    const amount = listed === null ? null : listed - (listed * BigInt(discountBps)) / 10_000n;
     if (amount === null) {
       violations.push({ rule: 'NO_PRICE', date });
       continue;
@@ -314,6 +317,7 @@ export async function getAvailability(
   deps: QuoteDeps,
   tenant: TenantContext,
   query: z.output<typeof AvailabilityQuery>,
+  discountBps = 0,
 ) {
   const { currency, nights } = await checkStay(deps, tenant, query, 'query');
   const ctx = await load(deps.tenantDb, query);
@@ -326,7 +330,7 @@ export async function getAvailability(
       const plans = [...ctx.plans.values()]
         .filter((p) => sells(p, type.id))
         .map((plan) => {
-          const p = price(ctx, plan, type.id, query, guests);
+          const p = price(ctx, plan, type.id, query, guests, discountBps);
           return {
             ratePlanId: plan.id,
             code: plan.code,
@@ -360,6 +364,7 @@ export async function createQuote(
   deps: QuoteDeps,
   tenant: TenantContext,
   body: z.output<typeof QuoteBody>,
+  discountBps = 0,
 ): Promise<z.input<typeof QuoteItem>> {
   const { currency } = await checkStay(deps, tenant, body, 'body');
   const ctx = await load(deps.tenantDb, body);
@@ -382,7 +387,7 @@ export async function createQuote(
       'Add a room revenue code (Tax and FX) before selling rooms',
     );
   }
-  const p = price(ctx, plan, type.id, body, guests);
+  const p = price(ctx, plan, type.id, body, guests, discountBps);
   if (p.violations.length > 0 || !p.nights) {
     throw new AppError('RESTRICTION_VIOLATED', 'This stay cannot be sold on this rate plan', {
       violations: p.violations,

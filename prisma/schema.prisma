@@ -144,6 +144,10 @@ model Property {
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
 
+  bookingEngineSettings BookingEngineSettings?
+  promoCodes            PromoCode[]
+  guestLinks            GuestLink[]
+
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
   @@unique([organisationId, id])
@@ -1108,6 +1112,8 @@ model Reservation {
   payments       Payment[]
   depositEntries DepositLedgerEntry[]
   paymentIntents PaymentIntent[]
+
+  guestLinks GuestLink[]
 
   @@unique([propertyId, confirmationNo])
   @@unique([propertyId, source, channelRef])
@@ -2387,4 +2393,63 @@ model PartnerChange {
 
   @@index([partnerId, at])
   @@map("partner_changes")
+}
+
+// The booking engine (PRD M11-01–M11-03; tab 3 booking_engine_settings, promo_codes; T-112).
+model BookingEngineSettings {
+  propertyId      String   @id @map("property_id") @db.Uuid
+  organisationId  String   @map("organisation_id") @db.Uuid
+  slug            String   @unique
+  enabled         Boolean  @default(false)
+  headline        String?
+  description     String?
+  policies        String?
+  photoFileIds    String[] @map("photo_file_ids") @db.Uuid
+  allowPayFull    Boolean  @default(true) @map("allow_pay_full")
+  allowDeposit    Boolean  @default(true) @map("allow_deposit")
+  depositBps      Int      @default(3000) @map("deposit_bps")
+  allowPayAtHotel Boolean  @default(true) @map("allow_pay_at_hotel")
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@map("booking_engine_settings")
+}
+
+model PromoCode {
+  id             String    @id @default(uuid()) @db.Uuid
+  organisationId String    @map("organisation_id") @db.Uuid
+  propertyId     String    @map("property_id") @db.Uuid
+  code           String
+  discountBps    Int       @map("discount_bps")
+  validFrom      DateTime? @map("valid_from") @db.Date
+  validTo        DateTime? @map("valid_to") @db.Date
+  maxUses        Int?      @map("max_uses")
+  usedCount      Int       @default(0) @map("used_count")
+  active         Boolean   @default(true)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, code])
+  @@map("promo_codes")
+}
+
+/// A guest's secure link to a booking (M11-02); online check-in uses the same link.
+model GuestLink {
+  id             String   @id @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  propertyId     String   @map("property_id") @db.Uuid
+  reservationId  String   @map("reservation_id") @db.Uuid
+  tokenHash      String   @unique @map("token_hash")
+  /// The booking page's own key for this booking: a repeat returns the same one.
+  clientKey      String?  @map("client_key") @db.Uuid
+  promoCodeId    String?  @map("promo_code_id") @db.Uuid
+  createdAt      DateTime @map("created_at") @db.Timestamptz(6)
+
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation Reservation @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+
+  @@unique([propertyId, clientKey])
+  @@index([reservationId])
+  @@map("guest_links")
 }

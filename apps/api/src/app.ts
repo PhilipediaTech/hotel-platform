@@ -47,6 +47,7 @@ import { leakageRoutes } from './modules/leakage/routes.ts';
 import { messagingRoutes } from './modules/notifications/routes.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
+import { bookingEngineRoutes } from './modules/bookingengine/routes.ts';
 import { partnerRoutes } from './modules/partners/routes.ts';
 import { platformRoutes } from './modules/platform/routes.ts';
 import type { MessageProvider } from './core/messaging.ts';
@@ -99,6 +100,11 @@ export function createApp({
   // Render terminates TLS one proxy hop in front of us; needed for real client IPs.
   if (config.nodeEnv === 'production') app.set('trust proxy', 1);
 
+  // The public booking API answers at /public/v1 (tab 4); it is the same router.
+  app.use((req, _res, next) => {
+    if (req.url.startsWith('/public/v1/')) req.url = `/api/v1/public/${req.url.slice(11)}`;
+    next();
+  });
   // 1. Request ID
   app.use(requestId());
   // 2. Logger
@@ -187,6 +193,9 @@ export function createApp({
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config }));
   api.use(partnerRoutes({ db, clock, config, email }));
+  api.use(
+    bookingEngineRoutes({ db, tenantDb, clock, config, provider: payments, email, store: files }),
+  );
   api.use(
     paymentIntentRoutes({
       db,

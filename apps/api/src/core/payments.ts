@@ -82,6 +82,8 @@ export interface PaymentProvider {
   /** Stored on payments and intents: `PAYSTACK`, `FAKE`. */
   readonly name: string;
   createCheckout(request: CheckoutRequest): Promise<CheckoutSession>;
+  /** Sends a charge back in full or in part (T-112). */
+  refund(reference: string, amountMinor: bigint): Promise<void>;
   /** The charge for a reference; PENDING while the guest has not paid. */
   verify(reference: string): Promise<Charge>;
   /** Checks a webhook's signature on its raw body and reads it (T-071). */
@@ -111,6 +113,7 @@ export const FAKE_WEBHOOK_KEY = 'fake-provider-webhook-key';
 
 export interface FakePaymentProvider extends PaymentProvider {
   readonly sessions: Map<string, CheckoutRequest & { status: ChargeStatus; paidAt: Date | null }>;
+  readonly refunds: { reference: string; amountMinor: bigint }[];
   /** The guest pays (or fails) on the fake checkout page. */
   complete(reference: string, outcome?: 'SUCCEEDED' | 'FAILED', paidAt?: Date): void;
 }
@@ -124,10 +127,12 @@ export function createFakePaymentProvider(options: {
   logger?: Logger;
 }): FakePaymentProvider {
   const sessions: FakePaymentProvider['sessions'] = new Map();
+  const refunds: FakePaymentProvider['refunds'] = [];
 
   return {
     name: 'FAKE',
     sessions,
+    refunds,
     createCheckout(request) {
       sessions.set(request.reference, { ...request, status: 'PENDING', paidAt: null });
       const checkoutUrl = `${options.checkoutBase}/${encodeURIComponent(request.reference)}`;
@@ -136,6 +141,10 @@ export function createFakePaymentProvider(options: {
         'Payment link (fake provider): open it to pay',
       );
       return Promise.resolve({ reference: request.reference, checkoutUrl });
+    },
+    refund(reference, amountMinor) {
+      refunds.push({ reference, amountMinor });
+      return Promise.resolve();
     },
     verify(reference) {
       const s = sessions.get(reference);

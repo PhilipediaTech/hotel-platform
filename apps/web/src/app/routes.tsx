@@ -81,6 +81,11 @@ const ReportsPage = lazy(() =>
 const DashboardPage = lazy(() =>
   import('../routes/reports.tsx').then((m) => ({ default: m.DashboardPage })),
 );
+const BookingEngineSettingsPage = lazy(() =>
+  import('../routes/booking-engine-settings.tsx').then((m) => ({
+    default: m.BookingEngineSettingsPage,
+  })),
+);
 const BillingPage = lazy(() =>
   import('../routes/billing.tsx').then((m) => ({ default: m.BillingPage })),
 );
@@ -124,6 +129,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/messages': <MessagesPage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
+  '/settings/booking-engine': <BookingEngineSettingsPage />,
   '/platform': <PlatformPage />,
   '/partner': <PartnerPage />,
   '/reports': <ReportsPage />,

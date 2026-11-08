@@ -394,6 +394,25 @@ async function bVisitor(db: Db, world: TenantWorld, propertyId: string) {
   return { ...theirs, visitorId: visitor.id };
 }
 
+/** B's booking page and a promo code (T-112). */
+async function bBookingPage(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  await db.bookingEngineSettings.create({
+    data: { propertyId, organisationId, slug: 'theirs-page', enabled: true },
+  });
+  const promo = await db.promoCode.create({
+    data: { propertyId, organisationId, code: 'THEIRS', discountBps: 1000 },
+  });
+  return { promoId: promo.id, slug: 'theirs-page' };
+}
+
+async function bBookingPageUnchanged(db: Db) {
+  expect((await db.bookingEngineSettings.findMany()).map((s) => s.slug)).toEqual(['theirs-page']);
+  expect((await db.promoCode.findMany()).map((p) => [p.code, p.active])).toEqual([
+    ['THEIRS', true],
+  ]);
+}
+
 /** A person added to B's checked-in stay (T-056). */
 async function bOccupant(db: Db, world: TenantWorld, propertyId: string) {
   const theirs = await bInHouse(db, world, propertyId);
@@ -1441,6 +1460,46 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     listIds: frontDeskIds,
   },
   // Visitor register (T-057).
+  getBookingEngineSettings: {
+    seed: bBookingPage,
+    listIds: (body) => [(body as { slug: string | null }).slug ?? 'none'],
+  },
+  saveBookingEngineSettings: {
+    seed: bBookingPage,
+    creates: true,
+    body: () => ({
+      slug: 'a-page',
+      enabled: false,
+      headline: null,
+      description: null,
+      policies: null,
+      photoFileIds: [],
+      allowPayFull: true,
+      allowDeposit: true,
+      depositBps: 3000,
+      allowPayAtHotel: true,
+    }),
+    untouched: async (db) => {
+      expect(await db.bookingEngineSettings.count({ where: { slug: 'theirs-page' } })).toBe(1);
+    },
+  },
+  listPromoCodes: {
+    seed: bBookingPage,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((p) => p.id),
+  },
+  createPromoCode: {
+    seed: bBookingPage,
+    creates: true,
+    body: () => ({ code: 'MINE', discountBps: 500 }),
+    untouched: async (db) => {
+      expect(await db.promoCode.count({ where: { code: 'THEIRS' } })).toBe(1);
+    },
+  },
+  updatePromoCode: {
+    seed: bBookingPage,
+    body: () => ({ active: false }),
+    untouched: bBookingPageUnchanged,
+  },
   listVisitors: {
     seed: bVisitor,
     listIds: (body) => (body as { data: { id: string }[] }).data.map((v) => v.id),

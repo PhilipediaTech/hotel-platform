@@ -102,6 +102,24 @@ export const LEAKAGE_RULES = [
       { key: 'hours', label: 'After (hours)', kind: 'hours', default: 24, min: 1, max: 720 },
     ],
   },
+  {
+    // M14-05 (T-057): a visitor who stays the night is a guest nobody charged.
+    code: 'VISITOR_OVERSTAY',
+    label: 'Visitor past cut-off',
+    trigger: 'A visitor is still signed in after the cut-off and no extra person was added',
+    alertCodes: ['VISITOR_OVERSTAY'],
+    canDisable: true,
+    params: [
+      {
+        key: 'cutoffHour',
+        label: 'Cut-off hour (18–23, 24-hour clock)',
+        kind: 'hours',
+        default: 23,
+        min: 18,
+        max: 23,
+      },
+    ],
+  },
 ] as const satisfies readonly LeakageRuleDef[];
 
 export type LeakageRuleCode = (typeof LEAKAGE_RULES)[number]['code'];
@@ -128,6 +146,7 @@ export const LEAKAGE_ALERT_LABELS: Record<string, string> = {
   REVERSAL_PATTERN: 'Reversal pattern',
   SHIFT_VARIANCE: 'Cash variance',
   UNMATCHED_TRANSFER: 'Unmatched transfer',
+  VISITOR_OVERSTAY: 'Visitor past cut-off',
 };
 
 export const ALERT_OUTCOMES = ['EXPLAINED', 'RECOVERED', 'ACTION_TAKEN', 'FALSE_POSITIVE'] as const;

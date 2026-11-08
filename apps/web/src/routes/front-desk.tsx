@@ -24,13 +24,17 @@ import { useOfflineKey } from '../offline/use-offline-key.ts';
 // (T-060), and overnight check-out comes with them (T-064).
 
 type Row = z.output<typeof FrontDeskRow>;
-type Tab = 'arrivals' | 'departures' | 'in-house' | 'alerts';
-type ListTab = Exclude<Tab, 'alerts'>;
+type Tab = 'arrivals' | 'departures' | 'in-house' | 'alerts' | 'visitors';
+type ListTab = Exclude<Tab, 'alerts' | 'visitors'>;
 
-const TABS: Tab[] = ['arrivals', 'departures', 'in-house', 'alerts'];
+const TABS: Tab[] = ['arrivals', 'departures', 'in-house', 'alerts', 'visitors'];
 // The Alerts tab (T-055) loads with its strings only when opened.
 const StayAlertsPanel = lazy(() =>
   import('./front-desk-alerts.tsx').then((m) => ({ default: m.StayAlertsPanel })),
+);
+// The Visitors tab (T-057), for those who can sign visitors in.
+const VisitorsPanel = lazy(() =>
+  import('./front-desk-visitors.tsx').then((m) => ({ default: m.VisitorsPanel })),
 );
 const OPERATION = {
   arrivals: 'listArrivals',
@@ -82,7 +86,8 @@ export function FrontDeskPage() {
   const today =
     property?.businessDate ?? localDate(new Date(), property?.timeZone ?? 'Africa/Lagos');
   const [params, setParams] = useSearchParams();
-  const tab: Tab = TABS.find((x) => x === params.get('tab')) ?? 'arrivals';
+  const tabs = TABS.filter((x) => x !== 'visitors' || session.permissions.includes('visitor.log'));
+  const tab: Tab = tabs.find((x) => x === params.get('tab')) ?? 'arrivals';
   const [dateInput, setDate] = useState(today);
   // While the field is being typed in (empty), the list stays on today.
   const date = dateInput || today;
@@ -98,8 +103,9 @@ export function FrontDeskPage() {
     departures: lists.departures.data?.data.length,
     'in-house': lists['in-house'].data?.data.length,
     alerts: alerts.data?.data.length,
+    visitors: undefined,
   };
-  const listTab: ListTab | null = tab === 'alerts' ? null : tab;
+  const listTab: ListTab | null = tab === 'alerts' || tab === 'visitors' ? null : tab;
   const current = lists[listTab ?? 'arrivals'];
   const q = text.trim().toLowerCase();
   const rows = (current.data?.data ?? []).filter(
@@ -115,7 +121,7 @@ export function FrontDeskPage() {
       <h1 className="text-xl font-semibold">{t('nav.front-desk')}</h1>
 
       <div role="tablist" aria-label={t('frontDesk.lists')} className="mt-4 flex flex-wrap gap-2">
-        {TABS.map((x) => (
+        {tabs.map((x) => (
           <Button
             key={x}
             role="tab"
@@ -206,7 +212,7 @@ export function FrontDeskPage() {
         </>
       ) : (
         <Suspense fallback={null}>
-          <StayAlertsPanel />
+          {tab === 'visitors' ? <VisitorsPanel /> : <StayAlertsPanel />}
         </Suspense>
       )}
     </section>

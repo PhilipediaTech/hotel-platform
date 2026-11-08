@@ -54,6 +54,9 @@
     },
     "evidence": {
       "roomNumber": "Room",
+      "visitor": "Visitor",
+      "signedInAt": "Signed in",
+      "cutoffHour": "Cut-off hour",
       "room": "Room",
       "observed": "Housekeeping saw",
       "frontOffice": "Front office shows",

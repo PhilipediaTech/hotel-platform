@@ -97,6 +97,8 @@ export function alertDetail(
     case 'OCCUPIED_NO_FOLIO':
     case 'VACANT_IN_HOUSE':
       return `Room ${str(e['roomNumber']) || '?'}: housekeeping saw ${str(e['observed']).toLowerCase().replaceAll('_', ' ')}, the front office shows ${str(e['frontOffice']).toLowerCase()}.`;
+    case 'VISITOR_OVERSTAY':
+      return `${str(e['visitor']) || 'A visitor'} is still signed in with ${str(e['guest']) || 'a guest'} in room ${str(e['room']) || '?'} after the ${str(e['cutoffHour'])}:00 cut-off.`;
     case 'UNMATCHED_TRANSFER':
       return `A transfer of ${money(minor(e['amountMinor']), str(e['currency']) || currency)}${
         str(e['reference']) ? ` (reference ${str(e['reference'])})` : ''

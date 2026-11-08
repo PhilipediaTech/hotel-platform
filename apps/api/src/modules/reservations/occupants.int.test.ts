@@ -117,7 +117,10 @@ describe('extra people on a stay (M14-02, M14-03)', () => {
     await h.ok(h.add({ firstName: 'Bola', lastName: 'Obi', kind: 'ADULT' }));
     // Third adult: the suggestion when no amount is given.
     const chi = await h.ok<Occupants>(h.add({ firstName: 'Chi', lastName: 'Obi', kind: 'ADULT' }));
-    expect(chi.data[0]).toMatchObject({ firstName: 'Chi', nightlyChargeMinor: '500000' });
+    expect(chi.data.find((o) => o.firstName === 'Chi')).toMatchObject({
+      firstName: 'Chi',
+      nightlyChargeMinor: '500000',
+    });
 
     // Free for a small child, but only with a reason.
     const bare = await h.add({
@@ -140,14 +143,17 @@ describe('extra people on a stay (M14-02, M14-03)', () => {
       }),
     );
     expect(dayo).toMatchObject({ adults: 3, children: 1 });
-    expect(dayo.data[0]).toMatchObject({ nightlyChargeMinor: '0', chargeNote: 'Under five: free' });
+    expect(dayo.data.find((o) => o.firstName === 'Dayo')).toMatchObject({
+      nightlyChargeMinor: '0',
+      chargeNote: 'Under five: free',
+    });
     const added = await db.auditEvent.findFirstOrThrow({
       where: { action: 'stay.occupant_added', reason: 'Under five: free' },
     });
     expect(added.after).toMatchObject({ nightlyChargeMinor: '0', suggestedMinor: '200000' });
 
     // A negotiated amount for Chi from the next night, with its reason; the old version is refused.
-    const chiRow = chi.data[0] as Occupants['data'][number];
+    const chiRow = chi.data.find((o) => o.firstName === 'Chi') as Occupants['data'][number];
     const path = `/stays/${h.stayId}/occupants/${chiRow.id}`;
     const changed = await h.ok<Occupants>(
       h.fd
@@ -198,7 +204,7 @@ describe('extra people on a stay (M14-02, M14-03)', () => {
     await h.ok(h.add({ firstName: 'Bola', lastName: 'Obi', kind: 'ADULT' }));
     const chi = await h.ok<Occupants>(h.add({ firstName: 'Chi', lastName: 'Obi', kind: 'ADULT' }));
     await h.postNight(TODAY);
-    const row = chi.data[0] as Occupants['data'][number];
+    const row = chi.data.find((o) => o.firstName === 'Chi') as Occupants['data'][number];
     const removed = await h.ok<Occupants>(
       h.fd
         .send(`/stays/${h.stayId}/occupants/${row.id}/remove`, {})

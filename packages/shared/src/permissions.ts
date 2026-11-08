@@ -63,6 +63,7 @@ export const PERMISSIONS: readonly PermissionDef[] = [
   // Reservations and front desk (M3)
   p('frontdesk', 'frontdesk.read', 'View the front desk: arrivals, in-house, departures'),
   p('frontdesk', 'frontdesk.alerts.notify', 'Receive front desk alerts by WhatsApp'),
+  p('frontdesk', 'visitor.log', 'Sign visitors in and out'),
   p('frontdesk', 'reservation.create', 'Create reservations'),
   p('frontdesk', 'reservation.modify', 'Change reservations'),
   p('frontdesk', 'reservation.cancel', 'Cancel reservations'),

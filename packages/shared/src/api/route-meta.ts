@@ -115,6 +115,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   listArrivals: {"operationId":"listArrivals","method":"get","path":"/front-desk/arrivals","propertyScoped":true},
   listDepartures: {"operationId":"listDepartures","method":"get","path":"/front-desk/departures","propertyScoped":true},
   listInHouse: {"operationId":"listInHouse","method":"get","path":"/front-desk/in-house","propertyScoped":true},
+  listStayAlerts: {"operationId":"listStayAlerts","method":"get","path":"/front-desk/alerts","propertyScoped":true},
+  postLateCheckOutFee: {"operationId":"postLateCheckOutFee","method":"post","path":"/stays/{stayId}/late-check-out-fee","body":true,"propertyScoped":true,"idempotent":true},
   getBusinessDay: {"operationId":"getBusinessDay","method":"get","path":"/business-day","propertyScoped":true},
   startNightAudit: {"operationId":"startNightAudit","method":"post","path":"/night-audits","body":true,"propertyScoped":true,"idempotent":true},
   getNightAudit: {"operationId":"getNightAudit","method":"get","path":"/night-audits/{nightAuditId}","propertyScoped":true},

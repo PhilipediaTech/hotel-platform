@@ -16,6 +16,7 @@ import { flashReportHandler, instantAlertHandler } from './modules/owner/notify.
 import { fileScanJob } from './modules/files/jobs.ts';
 import { inventoryJob } from './modules/availability/inventory.ts';
 import { idPurgeJob } from './modules/reservations/check-in.ts';
+import { stayAlertJob } from './modules/reservations/alert-jobs.ts';
 import { holdExpiryJob } from './modules/reservations/jobs.ts';
 import {
   paymentLinkCheckJob,
@@ -39,6 +40,7 @@ export function workerJobs(deps: {
     roomBlockStatusJob,
     inventoryJob,
     holdExpiryJob,
+    stayAlertJob,
     idPurgeJob({ store: deps.files }),
     // The fake keeps its links in the API process: nothing for the worker to ask.
     ...(deps.payments.name === 'FAKE' ? [] : [paymentLinkCheckJob({ provider: deps.payments })]),

@@ -1043,6 +1043,9 @@
           "registration": {
             "$ref": "#/components/schemas/RegistrationSettings"
           },
+          "stayAlerts": {
+            "$ref": "#/components/schemas/StayAlertSettings"
+          },
           "checklist": {
             "$ref": "#/components/schemas/SetupChecklist"
           }
@@ -1065,6 +1068,7 @@
           "nightAuditTime",
           "paymentMethods",
           "registration",
+          "stayAlerts",
           "checklist"
         ]
       },
@@ -1171,6 +1175,42 @@
         "required": [
           "requiredFields",
           "idRetentionMonths"
+        ]
+      },
+      "StayAlertSettings": {
+        "type": "object",
+        "properties": {
+          "dueOutMinutes": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 240
+          },
+          "holdWarningMinutes": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 720
+          },
+          "lateCheckOutFeeMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "whatsapp": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "LATE_CHECK_OUT",
+                "DUE_OUT_SOON",
+                "HOLD_EXPIRING",
+                "DEPOSIT_MISSING"
+              ]
+            }
+          }
+        },
+        "required": [
+          "dueOutMinutes",
+          "holdWarningMinutes",
+          "lateCheckOutFeeMinor",
+          "whatsapp"
         ]
       },
       "SetupChecklist": {
@@ -4959,6 +4999,80 @@
           "version"
         ]
       },
+      "StayAlert": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "LATE_CHECK_OUT",
+              "DUE_OUT_SOON",
+              "HOLD_EXPIRING",
+              "DEPOSIT_MISSING"
+            ]
+          },
+          "stayId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "reservationId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "confirmationNo": {
+            "type": "string"
+          },
+          "guestName": {
+            "type": "string"
+          },
+          "roomNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arrival": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "departure": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "at": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "depositDueMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "lateFeePosted": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "stayId",
+          "reservationId",
+          "confirmationNo",
+          "guestName",
+          "roomNumber",
+          "arrival",
+          "departure",
+          "at",
+          "depositDueMinor",
+          "lateFeePosted",
+          "version"
+        ]
+      },
       "BusinessDay": {
         "type": "object",
         "properties": {
@@ -8134,7 +8248,8 @@
               "FEEDBACK",
               "APPROVAL_OTP",
               "LEAKAGE_ALERT",
-              "FLASH_REPORT"
+              "FLASH_REPORT",
+              "STAY_ALERT"
             ]
           },
           "label": {
@@ -14418,6 +14533,9 @@
                   },
                   "registration": {
                     "$ref": "#/components/schemas/RegistrationSettings"
+                  },
+                  "stayAlerts": {
+                    "$ref": "#/components/schemas/StayAlertSettings"
                   }
                 }
               }
@@ -24125,6 +24243,260 @@
           },
           "403": {
             "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/front-desk/alerts": {
+      "get": {
+        "operationId": "listStayAlerts",
+        "summary": "Late check-outs, departures due soon, holds about to expire and missing deposits",
+        "tags": [
+          "Front desk"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Worked out at the time of the call (M14-01): late check-outs first, then due out, expiring holds and the next business date’s arrivals without their deposit. Also gives the property’s late check-out fee, so the desk can offer it.",
+        "x-permission": "frontdesk.read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "lateCheckOutFeeMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StayAlert"
+                      }
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "lateCheckOutFeeMinor",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stays/{stayId}/late-check-out-fee": {
+      "post": {
+        "operationId": "postLateCheckOutFee",
+        "summary": "Post the property’s late check-out fee to a checked-in stay past its check-out time",
+        "tags": [
+          "Front desk"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Posts once per stay (409 STATE_TRANSITION_INVALID when already posted, when the guest is not past the check-out time, or when the property has no fee set). The fee goes on the guest folio under the LATE system code.",
+        "x-permission": "folio.charge",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "folioId": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "amountMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    }
+                  },
+                  "required": [
+                    "folioId",
+                    "amountMinor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`",
             "content": {
               "application/json": {
                 "schema": {
@@ -34231,7 +34603,8 @@
                       "FEEDBACK",
                       "APPROVAL_OTP",
                       "LEAKAGE_ALERT",
-                      "FLASH_REPORT"
+                      "FLASH_REPORT",
+                      "STAY_ALERT"
                     ]
                   },
                   "channel": {
@@ -34366,7 +34739,8 @@
                 "FEEDBACK",
                 "APPROVAL_OTP",
                 "LEAKAGE_ALERT",
-                "FLASH_REPORT"
+                "FLASH_REPORT",
+                "STAY_ALERT"
               ]
             },
             "required": true,
@@ -34536,7 +34910,8 @@
                       "FEEDBACK",
                       "APPROVAL_OTP",
                       "LEAKAGE_ALERT",
-                      "FLASH_REPORT"
+                      "FLASH_REPORT",
+                      "STAY_ALERT"
                     ]
                   },
                   "channel": {

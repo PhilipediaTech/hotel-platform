@@ -1,10 +1,11 @@
 import { localDate, type FrontDeskRow } from '@hotel/shared';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import type { z } from 'zod';
 import { useSession } from '../app/session.ts';
+import { useStayAlerts } from '../app/stay-alerts.ts';
 import { Alert } from '../components/ui/alert.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
@@ -23,9 +24,14 @@ import { useOfflineKey } from '../offline/use-offline-key.ts';
 // (T-060), and overnight check-out comes with them (T-064).
 
 type Row = z.output<typeof FrontDeskRow>;
-type Tab = 'arrivals' | 'departures' | 'in-house';
+type Tab = 'arrivals' | 'departures' | 'in-house' | 'alerts';
+type ListTab = Exclude<Tab, 'alerts'>;
 
-const TABS: Tab[] = ['arrivals', 'departures', 'in-house'];
+const TABS: Tab[] = ['arrivals', 'departures', 'in-house', 'alerts'];
+// The Alerts tab (T-055) loads with its strings only when opened.
+const StayAlertsPanel = lazy(() =>
+  import('./front-desk-alerts.tsx').then((m) => ({ default: m.StayAlertsPanel })),
+);
 const OPERATION = {
   arrivals: 'listArrivals',
   departures: 'listDepartures',
@@ -42,7 +48,7 @@ const FLAG_TONE: Record<string, string> = {
 
 const frontDeskKey = (propertyId: string | null) => ['front-desk', propertyId ?? ''];
 
-function useList(tab: Tab, date: string) {
+function useList(tab: ListTab, date: string) {
   const { currentPropertyId } = useSession();
   // Kept on the device for offline use and refreshed every minute (T-093).
   const savedAs = useOfflineKey(`front-desk:${tab}:${tab === 'in-house' ? '' : date}`);
@@ -86,7 +92,15 @@ export function FrontDeskPage() {
     departures: useList('departures', date),
     'in-house': useList('in-house', date),
   };
-  const current = lists[tab];
+  const alerts = useStayAlerts(session.currentPropertyId, true);
+  const counts: Record<Tab, number | undefined> = {
+    arrivals: lists.arrivals.data?.data.length,
+    departures: lists.departures.data?.data.length,
+    'in-house': lists['in-house'].data?.data.length,
+    alerts: alerts.data?.data.length,
+  };
+  const listTab: ListTab | null = tab === 'alerts' ? null : tab;
+  const current = lists[listTab ?? 'arrivals'];
   const q = text.trim().toLowerCase();
   const rows = (current.data?.data ?? []).filter(
     (r) =>
@@ -111,74 +125,89 @@ export function FrontDeskPage() {
             onClick={() => setParams({ tab: x }, { replace: true })}
           >
             {t(`frontDesk.tabs.${x}`)}
-            {lists[x].data ? ` (${lists[x].data.data.length})` : ''}
+            {counts[x] !== undefined ? ` (${counts[x]})` : ''}
           </Button>
         ))}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        {tab !== 'in-house' && (
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="fd-date">{t('frontDesk.date')}</Label>
-            <div className="flex gap-2">
+      {listTab ? (
+        <>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            {listTab !== 'in-house' && (
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="fd-date">{t('frontDesk.date')}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="fd-date"
+                    type="date"
+                    className="w-44"
+                    value={dateInput}
+                    onChange={(e) => setDate(e.target.value)}
+                  />
+                  {date !== today && (
+                    <Button size="sm" variant="ghost" onClick={() => setDate(today)}>
+                      {t('frontDesk.today')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="fd-find">{t('frontDesk.find')}</Label>
               <Input
-                id="fd-date"
-                type="date"
-                className="w-44"
-                value={dateInput}
-                onChange={(e) => setDate(e.target.value)}
+                id="fd-find"
+                className="w-64"
+                placeholder={t('frontDesk.findHint')}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
               />
-              {date !== today && (
-                <Button size="sm" variant="ghost" onClick={() => setDate(today)}>
-                  {t('frontDesk.today')}
-                </Button>
-              )}
             </div>
           </div>
-        )}
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="fd-find">{t('frontDesk.find')}</Label>
-          <Input
-            id="fd-find"
-            className="w-64"
-            placeholder={t('frontDesk.findHint')}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-        </div>
-      </div>
 
-      <SavedCopyNote savedAs={current.savedAs} />
-      {current.error && (
-        <Alert tone="critical" className="mt-3">
-          {errorMessage(current.error)}
-        </Alert>
-      )}
-      {current.data && rows.length === 0 && (
-        <p className="mt-4 text-sm text-text-muted">{t(`frontDesk.empty.${tab}`)}</p>
-      )}
-      {rows.length > 0 && (
-        <div className="mt-4 overflow-x-auto">
-          <table aria-label={t(`frontDesk.tabs.${tab}`)} className="w-full text-left text-sm">
-            <thead className="text-text-muted">
-              <tr>
-                <th className="py-2 pr-3 font-medium">{t('frontDesk.cols.guest')}</th>
-                <th className="py-2 pr-3 font-medium">{t('frontDesk.cols.room')}</th>
-                <th className="py-2 pr-3 font-medium">{t('frontDesk.cols.stay')}</th>
-                <th className="py-2 pr-3 text-right font-medium">{t('frontDesk.cols.total')}</th>
-                <th className="py-2 pr-3 text-right font-medium">{t('frontDesk.cols.balance')}</th>
-                <th className="py-2 font-medium">
-                  <span className="sr-only">{t('frontDesk.cols.action')}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <RowView key={row.stayId} row={row} tab={tab} today={today} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+          <SavedCopyNote savedAs={current.savedAs} />
+          {current.error && (
+            <Alert tone="critical" className="mt-3">
+              {errorMessage(current.error)}
+            </Alert>
+          )}
+          {current.data && rows.length === 0 && (
+            <p className="mt-4 text-sm text-text-muted">{t(`frontDesk.empty.${listTab}`)}</p>
+          )}
+          {rows.length > 0 && (
+            <div className="mt-4 overflow-x-auto">
+              <table
+                aria-label={t(`frontDesk.tabs.${listTab}`)}
+                className="w-full text-left text-sm"
+              >
+                <thead className="text-text-muted">
+                  <tr>
+                    <th className="py-2 pr-3 font-medium">{t('frontDesk.cols.guest')}</th>
+                    <th className="py-2 pr-3 font-medium">{t('frontDesk.cols.room')}</th>
+                    <th className="py-2 pr-3 font-medium">{t('frontDesk.cols.stay')}</th>
+                    <th className="py-2 pr-3 text-right font-medium">
+                      {t('frontDesk.cols.total')}
+                    </th>
+                    <th className="py-2 pr-3 text-right font-medium">
+                      {t('frontDesk.cols.balance')}
+                    </th>
+                    <th className="py-2 font-medium">
+                      <span className="sr-only">{t('frontDesk.cols.action')}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <RowView key={row.stayId} row={row} tab={listTab} today={today} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      ) : (
+        <Suspense fallback={null}>
+          <StayAlertsPanel />
+        </Suspense>
       )}
     </section>
   );

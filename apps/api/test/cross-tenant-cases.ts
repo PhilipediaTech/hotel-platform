@@ -1405,6 +1405,18 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bInHouse,
     listIds: frontDeskIds,
   },
+  listStayAlerts: {
+    // T-055: B's checked-in guest never shows among A1's alerts.
+    seed: bInHouse,
+    listIds: frontDeskIds,
+  },
+  postLateCheckOutFee: {
+    seed: bInHouse,
+    body: () => ({}),
+    untouched: async (db, _world, theirs) => {
+      expect(await db.folioLine.count({ where: { sourceId: theirs['stayId'] } })).toBe(0);
+    },
+  },
   getBusinessDay: {
     // No record in the path: A1 gets its own day; asking for B1 is refused like any route.
     seed: bProperty,

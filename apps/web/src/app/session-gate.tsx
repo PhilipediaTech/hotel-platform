@@ -15,6 +15,7 @@ import {
   toShellSession,
   type SessionActions,
 } from './session.ts';
+import { useStayAlerts } from './stay-alerts.ts';
 import { clearSnapshots, withSnapshot } from '../offline/snapshots.ts';
 
 const propertyKey = (userId: string) => `hotel.currentProperty.${userId}`;
@@ -91,13 +92,20 @@ export function SessionGate({ children }: { children: ReactNode }) {
     enabled: isApprover && !!base?.currentPropertyId && (me.data?.session.mfaPassed ?? false),
     refetchInterval: 60_000,
   });
+  // Front desk alerts (T-055): counted on the top bar for anyone who sees the front desk.
+  const deskAlerts = useStayAlerts(
+    base?.currentPropertyId ?? null,
+    (base?.permissions.includes('frontdesk.read') ?? false) &&
+      (me.data?.session.mfaPassed ?? false),
+  );
   const session = useMemo(
     () =>
       base && {
         ...base,
         pendingApprovals: pending.data?.data.filter((r) => r.canDecide).length ?? 0,
+        stayAlerts: deskAlerts.data?.data.length ?? 0,
       },
-    [base, pending.data],
+    [base, pending.data, deskAlerts.data],
   );
 
   const actions = useMemo<SessionActions>(

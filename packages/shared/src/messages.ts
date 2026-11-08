@@ -248,6 +248,23 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplateDef[] = [
         'report in the app.',
     },
   },
+  {
+    // T-055 (PRD M14-01): a late check-out, a departure due soon, an expiring hold or a
+    // missing deposit, to holders of frontdesk.alerts.notify for the kinds the hotel chose.
+    code: 'STAY_ALERT',
+    label: 'Front desk alert',
+    audience: 'STAFF',
+    variables: [
+      PROPERTY,
+      v('alert', 'Alert', 'Late check-out'),
+      v('detail', 'Details', 'Room 204, Ada Obi (LAG-000123): check-out was due at 12:00.'),
+    ],
+    whatsapp: {
+      name: 'stay_alert',
+      category: 'UTILITY',
+      body: 'Front desk alert at {{property_name}}: {{alert}}. {{detail}} Open the app to act on it.',
+    },
+  },
 ];
 
 /**
@@ -263,6 +280,7 @@ export const MESSAGE_TEMPLATE_CODES = [
   'APPROVAL_OTP',
   'LEAKAGE_ALERT',
   'FLASH_REPORT',
+  'STAY_ALERT',
 ] as const;
 export type MessageTemplateCode = (typeof MESSAGE_TEMPLATE_CODES)[number];
 

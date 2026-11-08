@@ -7,6 +7,7 @@ export * from './files.ts';
 export * from './folios.ts';
 export * from './fx.ts';
 export * from './front-desk.ts';
+export * from './stay-alerts.ts';
 export * from './guests.ts';
 export * from './imports.ts';
 export * from './inventory.ts';

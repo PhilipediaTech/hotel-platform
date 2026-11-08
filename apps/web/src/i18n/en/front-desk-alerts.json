@@ -1,0 +1,39 @@
+{
+  "stayAlerts": {
+    "list": "Front desk alerts",
+    "none": "Nothing needs attention right now.",
+    "kinds": {
+      "LATE_CHECK_OUT": "Late check-out",
+      "DUE_OUT_SOON": "Due out soon",
+      "HOLD_EXPIRING": "Hold expiring",
+      "DEPOSIT_MISSING": "Deposit not received"
+    },
+    "what": {
+      "LATE_CHECK_OUT": "Check-out was due at {{time}}",
+      "DUE_OUT_SOON": "Checks out at {{time}}",
+      "HOLD_EXPIRING": "Hold ends at {{time}}; the rooms then go back on sale",
+      "DEPOSIT_MISSING": "Arrives {{date}}; deposit {{amount}} not received"
+    },
+    "feePosted": "Late check-out fee posted",
+    "postFee": "Post late fee {{amount}}",
+    "postFeeNamed": "Post the late check-out fee of {{amount}} for {{name}}",
+    "feeDone": "Late check-out fee of {{amount}} posted to {{name}}’s folio.",
+    "open": "Open booking",
+    "openNamed": "Open the booking for {{name}}",
+    "checkOut": "Check out",
+    "settings": {
+      "open": "Alert settings",
+      "close": "Close settings",
+      "title": "Alert settings",
+      "dueOut": "Show departures due out (minutes before check-out)",
+      "hold": "Show tentative holds (minutes before they expire)",
+      "fee": "Late check-out fee",
+      "feeHint": "Leave empty for no fee",
+      "whatsapp": "Also send by WhatsApp",
+      "whatsappHint": "Sent once per guest and day to staff whose role can receive front desk alerts by WhatsApp, if they have a phone.",
+      "save": "Save settings",
+      "saved": "Alert settings saved.",
+      "badFee": "Enter the fee as an amount, e.g. 5000"
+    }
+  }
+}

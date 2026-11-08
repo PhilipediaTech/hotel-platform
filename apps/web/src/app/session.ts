@@ -29,6 +29,8 @@ export interface ShellSession {
   businessDate: string | null;
   pendingApprovals: number;
   openAlerts: number;
+  /** Front desk alerts now (T-055): late check-outs, due out, expiring holds, missing deposits. */
+  stayAlerts: number;
   /** True while showing PREVIEW_SESSION instead of a real signed-in user. */
   preview: boolean;
   /** A manager-opened shared device: offer "Switch user" (PIN, M1-07). */
@@ -101,6 +103,7 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
     businessDate: property?.businessDate ?? null,
     pendingApprovals: 0, // filled in by SessionGate from GET /approvals (T-022)
     openAlerts: 0, // T-090
+    stayAlerts: 0, // filled in by SessionGate from GET /front-desk/alerts (T-055)
     preview: false,
     pinSwitchAvailable: me.session.pinSwitchAvailable,
     support: support
@@ -176,6 +179,7 @@ export const PREVIEW_SESSION: ShellSession = {
   businessDate: null,
   pendingApprovals: 0,
   openAlerts: 0,
+  stayAlerts: 0,
   preview: true,
   support: null,
   pinSwitchAvailable: false,

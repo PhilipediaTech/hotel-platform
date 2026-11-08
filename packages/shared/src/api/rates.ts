@@ -124,6 +124,10 @@ export const RatePlanItem = z
     /** Offered on the booking engine and channels. */
     isPublic: z.boolean(),
     dayUseMaxMinutes: z.number().int().nullable(),
+    /** Suggested nightly charge per extra adult / child above the room type's base occupancy
+     * (T-056); the desk can change it per person. Null = no suggestion. */
+    extraAdultMinor: AmountMinor.nullable(),
+    extraChildMinor: AmountMinor.nullable(),
     /** Empty = every room type. */
     roomTypeIds: z.array(Uuid),
     active: z.boolean(),
@@ -144,6 +148,8 @@ const PlanFields = z.object({
   guarantee: z.enum(GUARANTEES),
   isPublic: z.boolean(),
   dayUseMaxMinutes: z.number().int().min(30).max(1440).nullable(),
+  extraAdultMinor: NonNegative.nullable(),
+  extraChildMinor: NonNegative.nullable(),
   roomTypeIds: UniqueIds,
 });
 
@@ -163,6 +169,8 @@ export const RatePlanBody = PlanFields.extend({
   guarantee: z.enum(GUARANTEES).default('NONE'),
   isPublic: z.boolean().default(false),
   dayUseMaxMinutes: PlanFields.shape.dayUseMaxMinutes.default(null),
+  extraAdultMinor: NonNegative.nullable().default(null),
+  extraChildMinor: NonNegative.nullable().default(null),
   roomTypeIds: UniqueIds.default([]),
 });
 

@@ -33,6 +33,8 @@ export const ERROR_HTTP_STATUS = {
   RATE_BELOW_LIMIT: 422,
   RESTRICTION_VIOLATED: 422,
   APPROVAL_EXPIRED: 422,
+  // Not in tab 4 (T-056, PRD M14 AC): more people than the room type holds.
+  OCCUPANCY_EXCEEDED: 422,
 
   RATE_LIMITED: 429,
 

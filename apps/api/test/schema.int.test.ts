@@ -82,6 +82,7 @@ describe('migrations', () => {
       'routing_rules',
       'sessions',
       'stay_nights',
+      'stay_occupants',
       'stays',
       'subscriptions',
       'support_sessions',

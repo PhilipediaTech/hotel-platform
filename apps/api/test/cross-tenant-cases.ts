@@ -384,6 +384,31 @@ async function bReservationUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** A person added to B's checked-in stay (T-056). */
+async function bOccupant(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bInHouse(db, world, propertyId);
+  const user = await makeUser(db);
+  const occupant = await db.stayOccupant.create({
+    data: {
+      propertyId,
+      stayId: theirs.stayId,
+      firstName: 'Bola',
+      lastName: 'B',
+      kind: 'ADULT',
+      nightlyChargeMinor: 500000n,
+      addedById: user.id,
+    },
+  });
+  return { ...theirs, occupantId: occupant.id };
+}
+
+async function bOccupantUnchanged(db: Db) {
+  const rows = await db.stayOccupant.findMany();
+  expect(rows.map((o) => [o.nightlyChargeMinor, o.removedAt, o.version])).toEqual([
+    [500000n, null, 0],
+  ]);
+}
+
 /** B's guest checked in to a room of their type (T-053). */
 async function bInHouse(db: Db, world: TenantWorld, propertyId: string) {
   const theirs = await bReservation(db, world, propertyId);
@@ -1404,6 +1429,25 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   listInHouse: {
     seed: bInHouse,
     listIds: frontDeskIds,
+  },
+  // Extra people on a stay (T-056).
+  listOccupants: { seed: bInHouse },
+  addOccupant: {
+    seed: bInHouse,
+    body: () => ({ firstName: 'Leak', lastName: 'Test', kind: 'ADULT' }),
+    untouched: async (db) => {
+      expect(await db.stayOccupant.count()).toBe(0);
+    },
+  },
+  changeOccupantCharge: {
+    seed: bOccupant,
+    body: () => ({ nightlyChargeMinor: '1', chargeNote: 'Leak' }),
+    untouched: bOccupantUnchanged,
+  },
+  removeOccupant: {
+    seed: bOccupant,
+    body: () => ({}),
+    untouched: bOccupantUnchanged,
   },
   listStayAlerts: {
     // T-055: B's checked-in guest never shows among A1's alerts.

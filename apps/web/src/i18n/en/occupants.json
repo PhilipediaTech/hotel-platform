@@ -1,0 +1,33 @@
+{
+  "occupants": {
+    "title": "People added",
+    "limits": "{{guests}} of {{max}} guests · {{base}} included in the price",
+    "none": "Nobody added.",
+    "add": "Add a person",
+    "cancel": "Cancel",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "kind": "Adult or child",
+    "kinds": { "ADULT": "Adult", "CHILD": "Child" },
+    "phone": "Phone (optional)",
+    "charge": "Charge per night",
+    "chargeHint_suggested": "The plan suggests {{amount}}. Change it if needed; 0 = free.",
+    "chargeHint_none": "Within the guests the price includes: no suggested charge. Enter one if needed.",
+    "dayUse": "Day-use stays are priced per stay: no nightly charge.",
+    "note": "Why this charge?",
+    "noteHint": "Needed when the charge differs from the plan’s suggestion.",
+    "save": "Add {{name}}",
+    "full": "The room holds {{max}} guests at most.",
+    "perNight": "{{amount}} per night",
+    "free": "No charge",
+    "removed": "Removed",
+    "changeCharge": "Change charge",
+    "changeChargeNamed": "Change the charge for {{name}}",
+    "newCharge": "New charge per night",
+    "saveCharge": "Save charge",
+    "remove": "Remove",
+    "removeNamed": "Remove {{name}} from the stay",
+    "badAmount": "Enter an amount, e.g. 5000, or 0 for free",
+    "fromNext": "Charges post at night audit, from the next night."
+  }
+}

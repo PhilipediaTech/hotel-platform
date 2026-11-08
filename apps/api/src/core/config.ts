@@ -72,6 +72,9 @@ const envSchema = z.object({
 
 const PLACEHOLDER_SECRET = /^dev-only-/;
 
+/** Every environment variable the API reads (deploy blueprints are checked against it). */
+export const ENV_VARIABLES = Object.keys(envSchema.shape);
+
 export interface Config {
   nodeEnv: 'development' | 'test' | 'production';
   port: number;

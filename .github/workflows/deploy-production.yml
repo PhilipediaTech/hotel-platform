@@ -1,0 +1,65 @@
+# Production deploy (runbook tab 9 "Deploy workflow"; T-005 prepared, T-103 switches it on).
+# Push a tag v* on the head of main → a person approves the `production` environment in
+# GitHub → Render deploys the API and worker (migrations first) and Cloudflare Pages
+# rebuilds the staff app.
+#
+# Inert until Philip sets it up: the `production` environment with required reviewers
+# (GitHub → Settings → Environments), and the three deploy-hook URLs as environment secrets.
+# Without them the job stops at the check below and nothing is called.
+name: deploy-production
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  # Reads the CI run of the tagged commit.
+  actions: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Requires manual approval (required reviewers on the environment).
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      # Deploy hooks deploy the head of main, so the tag must point at it (runbook).
+      - name: Tag is the head of main
+        run: |
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || {
+            echo "::error::Tag ${GITHUB_REF_NAME} is not the head of main; tag main's head instead."
+            exit 1
+          }
+      - name: CI passed on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&status=completed" --jq '.workflow_runs[0].conclusion')
+          test "$conclusion" = "success" || {
+            echo "::error::CI has not passed on ${GITHUB_SHA} (got: ${conclusion:-no run})."
+            exit 1
+          }
+      - name: Deploy hooks are configured
+        env:
+          API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+          WORKER: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}
+          WEB: ${{ secrets.CF_PAGES_DEPLOY_HOOK_WEB }}
+        run: |
+          for name in API WORKER WEB; do
+            test -n "${!name}" || { echo "::error::Deploy hook secret for ${name} is missing."; exit 1; }
+          done
+      - name: Deploy API (migrations run first on Render)
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_API }}"
+      - name: Deploy worker
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}"
+      - name: Deploy staff app
+        run: curl -fsS -X POST "${{ secrets.CF_PAGES_DEPLOY_HOOK_WEB }}"

@@ -2,12 +2,25 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { pagesHeadersFile, securityHeaders } from './src/security-headers.ts';
 
 // Brand accent is a placeholder until the product name and brand are chosen.
 const THEME_COLOR = '#0f766e';
 
 export default defineConfig({
   plugins: [
+    // dist/_headers for Cloudflare Pages: CSP, HSTS and friends (src/security-headers.ts).
+    {
+      name: 'pages-security-headers',
+      apply: 'build',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: '_headers',
+          source: pagesHeadersFile({ apiBaseUrl: process.env['VITE_API_BASE_URL'] }),
+        });
+      },
+    },
     react(),
     tailwindcss(),
     VitePWA({
@@ -49,6 +62,13 @@ export default defineConfig({
     // Same-origin API in development, so the `sid` cookie needs no cross-site rules.
     proxy: { '/api': 'http://localhost:4000' },
   },
-  preview: { port: 4173, strictPort: true },
+  // The production build with the headers Cloudflare Pages will send (T-005), against the
+  // local API, so the CSP is tried before it ships.
+  preview: {
+    port: 4173,
+    strictPort: true,
+    proxy: { '/api': 'http://localhost:4000' },
+    headers: securityHeaders({ apiBaseUrl: process.env['VITE_API_BASE_URL'], local: true }),
+  },
   build: { target: 'es2022', sourcemap: true },
 });

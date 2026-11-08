@@ -1,0 +1,100 @@
+# Staging on Render (T-005; runbook tab 9 "Staging: Render (Starter instances, suspended when
+# idle) + Cloudflare Pages preview"). New → Blueprint → this repo → Blueprint path
+# render.staging.yaml. Same as production (render.yaml) except: deploys every push to main,
+# test keys only, and its own database.
+#
+# Nothing here is live until Philip creates the Blueprint in his Render account (paid plans:
+# check plan names and prices first). `sync: false` values are typed once in the dashboard.
+# Like production, the API starts only once the SES, R2 and scan adapters exist.
+
+envVarGroups:
+  - name: hotel-staging
+    envVars:
+      # Production mode on purpose: staging must refuse what production refuses.
+      - key: NODE_ENV
+        value: production
+      # Keep equal to .nvmrc (deploy-config.test.ts checks).
+      - key: NODE_VERSION
+        value: 24.22.1
+      - key: LOG_LEVEL
+        value: info
+      # https://staging-app.<domain> and https://staging-www.<domain>. Same registrable
+      # domain as the API, so the SameSite=Lax session cookie reaches it (*.onrender.com and
+      # *.pages.dev are different sites and would not).
+      - key: APP_ORIGIN
+        sync: false
+      - key: SITE_ORIGIN
+        sync: false
+      # Different values from production, never copied from it.
+      - key: SESSION_SECRET
+        sync: false
+      - key: MFA_ENCRYPTION_KEY
+        sync: false
+      - key: ID_ENCRYPTION_KEY
+        sync: false
+      - key: PAYMENT_PROVIDER
+        value: paystack
+      # sk_test_… only (Paystack test mode).
+      - key: PAYMENT_SECRET_KEY
+        sync: false
+      - key: PASSWORD_BREACH_CHECK
+        value: hibp
+      - key: WHATSAPP_PROVIDER
+        value: meta
+      # Meta's test number and its temporary or system-user token.
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_BUSINESS_ACCOUNT_ID
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: PLATFORM_ADMIN_EMAILS
+        sync: false
+
+services:
+  - type: web
+    name: hotel-api-staging
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci && npm run build -w apps/api
+    preDeployCommand: npx --no-install prisma migrate deploy
+    startCommand: npm run start -w apps/api
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: hotel-staging
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hotel-db-staging
+          property: connectionString
+
+  - type: worker
+    name: hotel-worker-staging
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci && npm run build -w apps/api
+    startCommand: npm run start:worker -w apps/api
+    envVars:
+      - fromGroup: hotel-staging
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hotel-db-staging
+          property: connectionString
+
+databases:
+  - name: hotel-db-staging
+    region: frankfurt
+    plan: basic-256mb
+    databaseName: hotel_staging
+    postgresMajorVersion: '18'
+    # Reachable only from Render services in the same region, never from the internet.
+    ipAllowList: []

@@ -1,11 +1,11 @@
 // `npm run dev`: runs every app's dev server side by side with prefixed output (runbook §1).
-// Add the site (V1.2) here when it exists.
 import { spawn } from 'node:child_process';
 
 const APPS = [
   { name: 'api', workspace: 'apps/api', colour: 36 }, // cyan, :4000
   { name: 'worker', workspace: 'apps/api', script: 'worker', colour: 33 }, // yellow, jobs (T-021)
   { name: 'web', workspace: 'apps/web', colour: 35 }, // magenta, :5173
+  { name: 'site', workspace: 'apps/site', colour: 32 }, // green, :4321
 ];
 
 const npmCli = process.env.npm_execpath;

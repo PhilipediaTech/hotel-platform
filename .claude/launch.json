@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "site-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "-w", "apps/site"],
+      "port": 4321
+    },
+    {
       "name": "web-preview",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "preview", "-w", "apps/web"],

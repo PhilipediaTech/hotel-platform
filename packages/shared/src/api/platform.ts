@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { COUNTRY_PACK_CODES } from '../country-packs.ts';
 import {
   MODULE_CODES,
   PLANS,
@@ -75,6 +76,8 @@ export const PlatformTenantItem = z
     name: z.string(),
     legalName: z.string().nullable(),
     country: z.string(),
+    /** The pack in force: given by staff, or the sign-up country's. */
+    countryPack: z.string(),
     createdAt: Instant,
     properties: z.number().int(),
     subscription: SubscriptionItem.nullable(),
@@ -269,7 +272,27 @@ export const getPlatformInvoicePdf = defineRoute({
   response: PdfDocument,
 });
 
+export const setTenantCountryPack = defineRoute({
+  ...PLATFORM,
+  operationId: 'setTenantCountryPack',
+  method: 'put',
+  path: '/platform/tenants/{organisationId}/country-pack',
+  summary: 'Give a hotel group a country pack (M14-09)',
+  description:
+    'Sets the ID documents offered, the data-protection notice and the defaults. Properties still in setup take its currency, time zone, locale and ID retention; live properties keep theirs, because their books are in their currency.',
+  params: z.object({ organisationId: Uuid }),
+  body: z.object({ pack: z.enum(COUNTRY_PACK_CODES) }),
+  response: z.object({
+    pack: z.enum(COUNTRY_PACK_CODES),
+    /** Properties in setup that took the defaults. */
+    applied: z.array(z.string()),
+    /** Live properties left as they are. */
+    keptAsTheyAre: z.array(z.string()),
+  }),
+});
+
 export const PLATFORM_ROUTES = {
+  setTenantCountryPack,
   listPlatformTenants,
   getPlatformTenant,
   setTenantSubscription,

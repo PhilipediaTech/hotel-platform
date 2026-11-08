@@ -1,3 +1,4 @@
+import { ID_TYPES } from '@hotel/shared';
 import type { MeResponse } from '../app/session.ts';
 
 export const ORG = '0d0d0d0d-0000-4000-8000-000000000001';
@@ -13,6 +14,8 @@ const property = (id: string, name: string, code: string) => ({
   timeZone: 'Africa/Lagos',
   baseCurrency: 'NGN',
   locale: 'en-NG',
+  idTypes: [...ID_TYPES],
+  dataProtectionNotice: null,
   registrationFields: [
     'nationality',
     'purpose',

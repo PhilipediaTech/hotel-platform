@@ -140,6 +140,8 @@ describe('top bar', () => {
           baseCurrency: 'NGN',
           locale: 'en-NG',
           registrationFields: [],
+          idTypes: [],
+          dataProtectionNotice: null,
           businessDate: null,
         },
         {
@@ -151,6 +153,8 @@ describe('top bar', () => {
           baseCurrency: 'NGN',
           locale: 'en-NG',
           registrationFields: [],
+          idTypes: [],
+          dataProtectionNotice: null,
           businessDate: null,
         },
       ],

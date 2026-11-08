@@ -1,5 +1,5 @@
 import { MODULE_PERMISSIONS, PLATFORM_PERMISSION_CODES, type ModuleCode } from '@hotel/shared';
-import type { Me, RegistrationField } from '@hotel/shared';
+import type { ID_TYPES, Me, RegistrationField } from '@hotel/shared';
 import { createContext, useContext } from 'react';
 import type { z } from 'zod';
 
@@ -15,6 +15,8 @@ export interface ShellProperty {
   locale: string;
   /** What the desk must collect at check-in (T-051). */
   registrationFields: readonly RegistrationField[];
+  idTypes: readonly (typeof ID_TYPES)[number][];
+  dataProtectionNotice: string | null;
   /** The business date it trades on (T-054); null until it goes live. */
   businessDate: string | null;
 }
@@ -88,6 +90,8 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
         baseCurrency,
         locale,
         registrationFields,
+        idTypes,
+        dataProtectionNotice,
         businessDate,
       }) => ({
         id,
@@ -98,6 +102,8 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
         baseCurrency,
         locale,
         registrationFields,
+        idTypes,
+        dataProtectionNotice,
         businessDate,
       }),
     ),
@@ -174,6 +180,8 @@ export const PREVIEW_SESSION: ShellSession = {
       baseCurrency: 'NGN',
       locale: 'en-NG',
       registrationFields: [],
+      idTypes: [],
+      dataProtectionNotice: null,
       businessDate: null,
     },
   ],

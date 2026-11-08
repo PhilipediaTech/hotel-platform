@@ -87,6 +87,9 @@ const BillingPage = lazy(() =>
 const PlatformPage = lazy(() =>
   import('../routes/platform.tsx').then((m) => ({ default: m.PlatformPage })),
 );
+const PartnerPage = lazy(() =>
+  import('../routes/partner.tsx').then((m) => ({ default: m.PartnerPage })),
+);
 const OwnerHomePage = lazy(() =>
   import('../routes/owner.tsx').then((m) => ({ default: m.OwnerHomePage })),
 );
@@ -122,6 +125,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/platform': <PlatformPage />,
+  '/partner': <PartnerPage />,
   '/reports': <ReportsPage />,
   '/dashboard': <DashboardPage />,
   '/reservations': <ReservationsPage />,

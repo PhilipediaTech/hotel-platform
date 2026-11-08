@@ -13,6 +13,7 @@ import { AppError } from '../../core/errors.ts';
 import { burnPasswordCheck, hashPassword, verifyPassword } from '../../core/passwords.ts';
 import { hashToken, newToken } from '../../core/tokens.ts';
 import { isPlatformAdmin } from '../../core/platform-admin.ts';
+import { partnerForCode } from '../partners/service.ts';
 import { openSupportSessions, SUPPORT_PERMISSIONS, SUPPORT_ROLE_NAME } from '../../core/support.ts';
 import { accountExistsMessage, passwordResetMessage, verifyEmailMessage } from './emails.ts';
 import { createDefaultApprovalPolicies } from '../approvals/defaults.ts';
@@ -121,6 +122,7 @@ export interface SignUpInput {
   organisationName: string;
   country: SignUpCountry;
   propertyName: string;
+  referralCode?: string | undefined;
 }
 
 /** "Demo Lagos Hotel" → "DLH", "Sheraton" → "SHE". Unique per organisation; editable later. */
@@ -147,6 +149,8 @@ export function propertyCodeFor(name: string): string {
 export async function signUp(deps: IdentityDeps, input: SignUpInput): Promise<void> {
   // Before the account lookup, so the answer is the same whether the email has one or not.
   await assertNotBreached(deps.breachedPasswords, input.password);
+  // Also before the lookup: a wrong code answers the same for any email.
+  const partner = input.referralCode ? await partnerForCode(deps.db, input.referralCode) : null;
   const existing = await deps.db.user.findUnique({ where: { email: input.email } });
   if (existing) {
     await notifyExistingAccount(deps, existing);
@@ -208,6 +212,16 @@ export async function signUp(deps: IdentityDeps, input: SignUpInput): Promise<vo
           roleId: ownerRole.id,
         },
       });
+      if (partner) {
+        await tx.partnerReferral.create({
+          data: {
+            organisationId: organisation.id,
+            partnerId: partner.id,
+            source: 'SIGN_UP',
+            tiedAt: deps.clock(),
+          },
+        });
+      }
       await createDefaultApprovalPolicies(tx, organisation.id, property.id);
       await createDefaultTaxes(
         tx,
@@ -533,6 +547,10 @@ export async function buildMe(
       disabledModules: switchedOff.filter((f) => f.organisationId === o.id).map((f) => f.module),
     })),
     platformAdmin,
+    partner: await db.referralPartner.findUnique({
+      where: { userId: user.id },
+      select: { id: true, name: true },
+    }),
     support: support.map((s) => ({
       sessionId: s.id,
       organisationId: s.organisationId,

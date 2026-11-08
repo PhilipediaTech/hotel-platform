@@ -311,6 +311,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     screen: 'S31',
     ticket: 'T-100',
   },
+  {
+    id: 'partner',
+    path: '/partner',
+    anyOf: ['partner.read'],
+    group: 'admin',
+    screen: 'S47',
+    ticket: 'T-110',
+  },
 ];
 
 export type HomeKey =

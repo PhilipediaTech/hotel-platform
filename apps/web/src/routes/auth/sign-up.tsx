@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Alert } from '../../components/ui/alert.tsx';
 import { Button } from '../../components/ui/button.tsx';
 import { Label } from '../../components/ui/label.tsx';
@@ -16,12 +16,14 @@ type Body = z.output<typeof SignUpBody>;
 /** S02 sign-up (M1-01): owner, organisation and first property in one step. */
 export function SignUpPage() {
   const { t } = useTranslation();
+  const [params] = useSearchParams();
   const form = useForm({
     resolver: zodResolver(SignUpBody),
-    defaultValues: { country: 'NG' as const },
+    defaultValues: { country: 'NG' as const, referralCode: params.get('ref') ?? '' },
   });
   const submit = useMutation({
-    mutationFn: (body: Body) => api.call('signUp', { body }),
+    mutationFn: ({ referralCode, ...rest }: Body) =>
+      api.call('signUp', { body: referralCode ? { ...rest, referralCode } : rest }),
     onError: (error) => {
       for (const { field, message } of apiFieldErrors(error)) {
         form.setError(field as keyof Body, { message });
@@ -98,6 +100,11 @@ export function SignUpPage() {
           label={t('auth.fields.propertyName')}
           error={errors.propertyName?.message}
           {...form.register('propertyName')}
+        />
+        <Field
+          label={t('auth.fields.referralCode')}
+          error={errors.referralCode?.message}
+          {...form.register('referralCode')}
         />
 
         {submit.error && apiFieldErrors(submit.error).length === 0 && (

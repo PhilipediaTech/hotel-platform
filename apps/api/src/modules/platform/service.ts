@@ -14,6 +14,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import { addCommission } from '../partners/service.ts';
 import { facts, footer, money, render, table, totals } from '../payments/documents.ts';
 
 // Platform administration (PRD M13-01–M13-05, M13 rules and AC; tab 3 subscriptions,
@@ -370,6 +371,7 @@ export async function updateInvoice(
       );
     }
     const updated = await tx.platformInvoice.update({ where: { id: row.id }, data: { status } });
+    if (status === 'PAID') await addCommission(tx, row, deps.clock());
     await audit(tx as unknown as Db, auth, row.organisationId, {
       action: status === 'PAID' ? 'platform.invoice_paid' : 'platform.invoice_voided',
       entityType: 'platform_invoice',

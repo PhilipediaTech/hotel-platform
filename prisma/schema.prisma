@@ -50,28 +50,30 @@ model Organisation {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  properties       Property[]
-  tasks            Task[]
-  roles            Role[]
-  memberships      Membership[]
-  departments      Department[]
-  invitations      Invitation[]
-  featureFlags     FeatureFlag[]
-  auditEvents      AuditEvent[]
-  domainEvents     DomainEvent[]
-  approvalPolicies ApprovalPolicy[]
-  approvalRequests ApprovalRequest[]
-  files            FileObject[]
-  roomTypes        RoomType[]
-  rooms            Room[]
-  ratePlans        RatePlan[]
-  guests           Guest[]
-  companies        Company[]
-  reservations     Reservation[]
-  messageTemplates MessageTemplate[]
-  subscription     Subscription?
-  platformInvoices PlatformInvoice[]
-  supportSessions  SupportSession[]
+  properties         Property[]
+  tasks              Task[]
+  roles              Role[]
+  memberships        Membership[]
+  departments        Department[]
+  invitations        Invitation[]
+  featureFlags       FeatureFlag[]
+  auditEvents        AuditEvent[]
+  domainEvents       DomainEvent[]
+  approvalPolicies   ApprovalPolicy[]
+  approvalRequests   ApprovalRequest[]
+  files              FileObject[]
+  roomTypes          RoomType[]
+  rooms              Room[]
+  ratePlans          RatePlan[]
+  guests             Guest[]
+  companies          Company[]
+  reservations       Reservation[]
+  messageTemplates   MessageTemplate[]
+  subscription       Subscription?
+  platformInvoices   PlatformInvoice[]
+  supportSessions    SupportSession[]
+  partnerReferral    PartnerReferral?
+  partnerCommissions PartnerCommission[]
 
   @@map("organisations")
 }
@@ -274,6 +276,9 @@ model User {
   handoversAcked     HandoverNote[]     @relation("HandoverAcknowledger")
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
   supportSessions    SupportSession[]
+  referralPartner    ReferralPartner?
+  partnerPayouts     PartnerPayout[]    @relation("PartnerPayoutBy")
+  partnerChanges     PartnerChange[]    @relation("PartnerChangeBy")
 
   @@map("users")
 }
@@ -2254,7 +2259,8 @@ model PlatformInvoice {
   status         String
   issuedAt       DateTime @map("issued_at") @db.Timestamptz(6)
 
-  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  organisation      Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  partnerCommission PartnerCommission?
 
   @@index([organisationId, periodStart])
   @@map("platform_invoices")
@@ -2277,4 +2283,106 @@ model SupportSession {
   @@index([organisationId, startedAt])
   @@index([adminUserId, expiresAt])
   @@map("support_sessions")
+}
+
+// Referral partners (PRD M14-06–M14-08; T-110). Platform-level, like subscriptions: partners
+// sit above the hotel groups and never see guest, folio or staff data.
+model ReferralPartner {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String
+  country          String   @db.Char(2)
+  contactName      String?  @map("contact_name")
+  email            String   @unique
+  phone            String?
+  /// AES-256-GCM (config.idKey); only platform staff read it.
+  payoutDetailsEnc Bytes?   @map("payout_details_enc")
+  /// Basis points of each paid invoice: 2000 = 20%.
+  commissionBps    Int      @map("commission_bps")
+  /// How long a hotel earns commission, counted from its first paid invoice.
+  durationMonths   Int      @map("duration_months")
+  code             String   @unique
+  active           Boolean  @default(true)
+  /// The account the partner signs in with.
+  userId           String   @unique @map("user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  referrals   PartnerReferral[]
+  commissions PartnerCommission[]
+  payouts     PartnerPayout[]
+  changes     PartnerChange[]
+
+  @@map("referral_partners")
+}
+
+/// The tie between a hotel group and the partner who brought it (M14-07).
+model PartnerReferral {
+  organisationId String    @id @map("organisation_id") @db.Uuid
+  partnerId      String    @map("partner_id") @db.Uuid
+  /// SIGN_UP | ADMIN
+  source         String
+  tiedAt         DateTime  @map("tied_at") @db.Timestamptz(6)
+  firstPaidAt    DateTime? @map("first_paid_at") @db.Timestamptz(6)
+
+  organisation Organisation    @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  partner      ReferralPartner @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+
+  @@index([partnerId])
+  @@map("partner_referrals")
+}
+
+/// The commission ledger (M14-08): one line per paid invoice, ever.
+model PartnerCommission {
+  id             String   @id @default(uuid()) @db.Uuid
+  partnerId      String   @map("partner_id") @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  invoiceId      String   @unique @map("invoice_id") @db.Uuid
+  commissionBps  Int      @map("commission_bps")
+  amountMinor    BigInt   @map("amount_minor")
+  currency       String   @db.Char(3)
+  earnedAt       DateTime @map("earned_at") @db.Timestamptz(6)
+  payoutId       String?  @map("payout_id") @db.Uuid
+
+  partner      ReferralPartner @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  organisation Organisation    @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  invoice      PlatformInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  payout       PartnerPayout?  @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+
+  @@index([partnerId, earnedAt])
+  @@map("partner_commissions")
+}
+
+/// Money paid to a partner outside the app and marked here.
+model PartnerPayout {
+  id          String   @id @default(uuid()) @db.Uuid
+  partnerId   String   @map("partner_id") @db.Uuid
+  amountMinor BigInt   @map("amount_minor")
+  currency    String   @db.Char(3)
+  reference   String
+  paidById    String   @map("paid_by_id") @db.Uuid
+  paidAt      DateTime @map("paid_at") @db.Timestamptz(6)
+
+  partner     ReferralPartner     @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  paidBy      User                @relation("PartnerPayoutBy", fields: [paidById], references: [id], onDelete: Restrict)
+  commissions PartnerCommission[]
+
+  @@index([partnerId, paidAt])
+  @@map("partner_payouts")
+}
+
+/// Who changed a partner and how: audit_events needs a hotel group, partners have none.
+model PartnerChange {
+  id          BigInt   @id @default(autoincrement())
+  partnerId   String   @map("partner_id") @db.Uuid
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  action      String
+  before      Json?
+  after       Json?
+  at          DateTime @db.Timestamptz(6)
+
+  partner ReferralPartner @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  actor   User            @relation("PartnerChangeBy", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([partnerId, at])
+  @@map("partner_changes")
 }

@@ -13,6 +13,7 @@ import { HANDOVER_ROUTES } from './handovers.ts';
 import { LEAKAGE_ROUTES } from './leakage.ts';
 import { MESSAGE_ROUTES } from './messages.ts';
 import { OWNER_ROUTES } from './owner.ts';
+import { PARTNER_ROUTES } from './partners.ts';
 import { PLATFORM_ROUTES } from './platform.ts';
 import { REPORT_ROUTES } from './reports.ts';
 import { HOUSEKEEPING_ROUTES } from './housekeeping.ts';
@@ -48,6 +49,7 @@ export const getOpenApiDocument = defineRoute({
 
 export const API_ROUTES = {
   getOpenApiDocument,
+  ...PARTNER_ROUTES,
   ...AUTH_ROUTES,
   ...ACCESS_ROUTES,
   ...AUDIT_ROUTES,

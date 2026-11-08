@@ -70,6 +70,8 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
   }
   // Platform staff reach S31 (T-100).
   if (me.platformAdmin) for (const code of PLATFORM_PERMISSION_CODES) permissions.add(code);
+  // A referral partner reaches their own page (T-110).
+  if (me.partner) permissions.add('partner.read');
   const support = property
     ? me.support.find((s) => s.organisationId === property.organisationId)
     : undefined;

@@ -94,6 +94,7 @@ describe('migrations', () => {
       'unmatched_transfers',
       'users',
       'virtual_accounts',
+      'visitors',
       'webhook_events',
     ]);
   });

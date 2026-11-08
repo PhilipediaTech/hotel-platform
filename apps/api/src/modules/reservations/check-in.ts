@@ -460,7 +460,19 @@ export function idPurgeJob(deps: { store: FileStore }) {
         });
         if (doc.file) await deps.store.delete(doc.file.storageKey);
       }
-      logger.info({ purged: due.length }, 'ID documents purged');
+      // Visitors' ID photos go on the same retention period (T-057); the row stays.
+      const photos = await db.visitor.findMany({
+        where: { purgeAfter: { lte: dbDate(today) }, idFileId: { not: null } },
+        include: { idFile: true },
+        take: 500,
+      });
+      for (const visitor of photos) {
+        if (!visitor.idFile) continue;
+        // Deleting the file clears visitors.id_file_id (ON DELETE SET NULL).
+        await db.fileObject.delete({ where: { id: visitor.idFile.id } });
+        await deps.store.delete(visitor.idFile.storageKey);
+      }
+      logger.info({ purged: due.length, visitorPhotos: photos.length }, 'ID documents purged');
     },
   });
 }

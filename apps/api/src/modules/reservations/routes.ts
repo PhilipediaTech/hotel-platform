@@ -1,4 +1,9 @@
-import { FRONT_DESK_ROUTES, OCCUPANT_ROUTES, RESERVATION_ROUTES } from '@hotel/shared';
+import {
+  FRONT_DESK_ROUTES,
+  OCCUPANT_ROUTES,
+  RESERVATION_ROUTES,
+  VISITOR_ROUTES,
+} from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
@@ -11,6 +16,7 @@ import * as frontDesk from './front-desk.ts';
 import * as occupants from './occupants.ts';
 import * as rooms from './rooms.ts';
 import * as reservations from './service.ts';
+import * as visitors from './visitors.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
 function tenantFrom(tenant: TenantContext | null): TenantContext {
@@ -168,6 +174,18 @@ export function reservationRoutes(deps: checkIns.CheckInDeps): Router {
       params.occupantId,
       req.get('If-Match') ?? '',
     ),
+  );
+
+  // Visitor register (T-057).
+  const vs = VISITOR_ROUTES;
+  mountRoute(router, vs.listVisitors, ({ query }, { tenant }) =>
+    visitors.listVisitors(deps, tenantFrom(tenant), query),
+  );
+  mountRoute(router, vs.signInVisitor, ({ body }, { tenant }) =>
+    visitors.signInVisitor(deps, tenantFrom(tenant), body),
+  );
+  mountRoute(router, vs.signOutVisitor, ({ params }, { tenant }) =>
+    visitors.signOutVisitor(deps, tenantFrom(tenant), params.visitorId),
   );
 
   return router;

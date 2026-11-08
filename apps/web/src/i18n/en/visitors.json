@@ -1,0 +1,29 @@
+{
+  "visitors": {
+    "signIn": "Sign a visitor in",
+    "guest": "Visiting",
+    "chooseGuest": "Choose the guest",
+    "noGuests": "No guests are checked in.",
+    "name": "Visitor’s name",
+    "phone": "Phone (optional)",
+    "note": "Note (optional)",
+    "photo": "ID photo (optional)",
+    "submit": "Sign in",
+    "date": "Day",
+    "stillIn": "Still in",
+    "left": "Left",
+    "noneIn": "No visitors are signed in.",
+    "noneLeft": "Nobody left on this day.",
+    "visiting": "Visiting {{guest}}, room {{room}}",
+    "visitingNoRoom": "Visiting {{guest}}",
+    "cameAt": "In at {{time}}",
+    "stayed": "In at {{from}}, out at {{to}}",
+    "signOut": "Sign out",
+    "signOutNamed": "Sign out {{name}}",
+    "viewPhoto": "View ID photo",
+    "viewPhotoNamed": "View the ID photo of {{name}}",
+    "stayingOver": "Staying the night? Add them to the booking",
+    "stayingOverNamed": "Add {{name}} to the booking of {{guest}}",
+    "stayingOverHint": "A visitor still signed in after the cut-off raises a leakage alert, unless they were added to the booking."
+  }
+}

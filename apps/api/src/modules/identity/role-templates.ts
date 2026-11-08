@@ -103,6 +103,7 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
       'room.move',
       'guest.manage',
       'key.issue',
+      'visitor.log',
       'folio.read',
       'folio.charge',
       'folio.discount',

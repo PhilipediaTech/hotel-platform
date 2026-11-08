@@ -25,6 +25,7 @@ import { QUOTE_ROUTES } from './quotes.ts';
 import { PROPERTY_ROUTES } from './properties.ts';
 import { RATE_ROUTES } from './rates.ts';
 import { OCCUPANT_ROUTES } from './occupants.ts';
+import { VISITOR_ROUTES } from './visitors.ts';
 import { RESERVATION_ROUTES } from './reservations.ts';
 import { ROOM_ROUTES } from './rooms.ts';
 import { SHIFT_ROUTES } from './shifts.ts';
@@ -62,6 +63,7 @@ export const API_ROUTES = {
   ...GUEST_ROUTES,
   ...RESERVATION_ROUTES,
   ...OCCUPANT_ROUTES,
+  ...VISITOR_ROUTES,
   ...FRONT_DESK_ROUTES,
   ...NIGHT_AUDIT_ROUTES,
   ...FOLIO_ROUTES,

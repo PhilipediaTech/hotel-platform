@@ -514,7 +514,7 @@ describe('reviewing alerts (M6-08, M6 rule 3)', () => {
 });
 
 describe('rule settings (M6-07, M6-09)', () => {
-  it('lists the five rules with their defaults', async () => {
+  it('lists the rules with their defaults', async () => {
     const h = await hotel();
     const { rules } = await h.rules();
     expect(rules.map((r) => [r.code, r.enabled, r.canDisable, r.notifyInstant])).toEqual([
@@ -523,6 +523,10 @@ describe('rule settings (M6-07, M6-09)', () => {
       ['REVERSAL_PATTERN', true, true, false],
       ['SHIFT_VARIANCE', true, false, false],
       ['UNMATCHED_TRANSFER', true, true, false],
+      ['VISITOR_OVERSTAY', true, true, false],
+    ]);
+    expect(rules.find((r) => r.code === 'VISITOR_OVERSTAY')?.params).toEqual([
+      expect.objectContaining({ key: 'cutoffHour', value: 23, default: 23 }),
     ]);
     expect(rules.find((r) => r.code === 'REVERSAL_PATTERN')?.params).toEqual([
       expect.objectContaining({ key: 'maxCount', value: 3, default: 3 }),

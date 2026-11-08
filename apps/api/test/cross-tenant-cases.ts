@@ -384,6 +384,16 @@ async function bReservationUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** A visitor signed in to B's checked-in stay (T-057). */
+async function bVisitor(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bInHouse(db, world, propertyId);
+  const user = await makeUser(db);
+  const visitor = await db.visitor.create({
+    data: { propertyId, stayId: theirs.stayId, name: 'Bola B', signedInById: user.id },
+  });
+  return { ...theirs, visitorId: visitor.id };
+}
+
 /** A person added to B's checked-in stay (T-056). */
 async function bOccupant(db: Db, world: TenantWorld, propertyId: string) {
   const theirs = await bInHouse(db, world, propertyId);
@@ -1429,6 +1439,25 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   listInHouse: {
     seed: bInHouse,
     listIds: frontDeskIds,
+  },
+  // Visitor register (T-057).
+  listVisitors: {
+    seed: bVisitor,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((v) => v.id),
+  },
+  signInVisitor: {
+    seed: bInHouse,
+    body: (theirs) => ({ stayId: theirs['stayId'], name: 'Leak' }),
+    untouched: async (db) => {
+      expect(await db.visitor.count()).toBe(0);
+    },
+  },
+  signOutVisitor: {
+    seed: bVisitor,
+    body: () => ({}),
+    untouched: async (db) => {
+      expect((await db.visitor.findMany()).map((v) => v.signedOutAt)).toEqual([null]);
+    },
   },
   // Extra people on a stay (T-056).
   listOccupants: { seed: bInHouse },

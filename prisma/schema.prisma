@@ -250,6 +250,8 @@ model User {
   keysIssued         KeyIssue[]
   occupantsAdded     StayOccupant[]     @relation("OccupantAddedBy")
   occupantsRemoved   StayOccupant[]     @relation("OccupantRemovedBy")
+  visitorsSignedIn   Visitor[]          @relation("VisitorSignedInBy")
+  visitorsSignedOut  Visitor[]          @relation("VisitorSignedOutBy")
   cardsSigned        RegistrationCard[]
   daysClosed         BusinessDay[]
   folioLinesPosted   FolioLine[]
@@ -561,6 +563,7 @@ model FileObject {
   uploadedBy     User               @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
   importJobs     ImportJob[]
   idDocuments    IdDocument[]
+  visitors       Visitor[]
   cards          RegistrationCard[]
 
   @@index([propertyId, entityType, entityId])
@@ -1144,6 +1147,7 @@ model Stay {
   allocations RoomAllocation[]
   keys        KeyIssue[]
   occupants   StayOccupant[]
+  visitors    Visitor[]
   roomCharges RoomChargePosting[]
   tasks       Task[]
   card        RegistrationCard?
@@ -1751,6 +1755,36 @@ model StayOccupant {
 
   @@index([stayId])
   @@map("stay_occupants")
+}
+
+// ── Visitor register (PRD M14-04, M14-05; T-057) ─────────────────────────────────────────
+
+/// Someone visiting an in-house guest: signed in and out at the desk. Never deleted. The ID
+/// photo, when taken, goes on the property's ID retention period (purgeAfter).
+model Visitor {
+  id            String    @id @default(uuid()) @db.Uuid
+  propertyId    String    @map("property_id") @db.Uuid
+  stayId        String    @map("stay_id") @db.Uuid
+  name          String
+  phone         String?
+  note          String?
+  idFileId      String?   @map("id_file_id") @db.Uuid
+  purgeAfter    DateTime? @map("purge_after") @db.Date
+  signedInById  String    @map("signed_in_by_id") @db.Uuid
+  signedInAt    DateTime  @default(now()) @map("signed_in_at") @db.Timestamptz(6)
+  signedOutById String?   @map("signed_out_by_id") @db.Uuid
+  signedOutAt   DateTime? @map("signed_out_at") @db.Timestamptz(6)
+
+  stay        Stay        @relation(fields: [propertyId, stayId], references: [propertyId, id], onDelete: Restrict)
+  idFile      FileObject? @relation(fields: [idFileId], references: [id], onDelete: SetNull)
+  signedInBy  User        @relation("VisitorSignedInBy", fields: [signedInById], references: [id], onDelete: Restrict)
+  signedOutBy User?       @relation("VisitorSignedOutBy", fields: [signedOutById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, signedOutAt])
+  @@index([propertyId, signedInAt])
+  @@index([stayId])
+  @@index([purgeAfter])
+  @@map("visitors")
 }
 
 // ── Exchange rates (M4-18, M4 rule 6; tab 3; T-065) ─────────────────────────────────────

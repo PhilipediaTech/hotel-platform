@@ -166,6 +166,7 @@ export function addOccupant(
         nightlyChargeMinor: charge,
         chargeNote: charge === suggested ? null : body.chargeNote,
         addedById: tenant.userId,
+        addedAt: deps.clock(),
       },
     });
     await tx.stay.update({

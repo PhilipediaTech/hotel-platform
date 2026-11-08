@@ -4911,6 +4911,90 @@
           "version"
         ]
       },
+      "Visitor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "stayId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "reservationId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "guestName": {
+            "type": "string"
+          },
+          "roomNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idFileId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "signedInAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "signedInBy": {
+            "type": "string"
+          },
+          "signedOutAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "stayId",
+          "reservationId",
+          "guestName",
+          "roomNumber",
+          "name",
+          "phone",
+          "note",
+          "idFileId",
+          "signedInAt",
+          "signedInBy",
+          "signedOutAt"
+        ]
+      },
       "FrontDeskRow": {
         "type": "object",
         "properties": {
@@ -8082,6 +8166,7 @@
               "REVERSAL_PATTERN",
               "SHIFT_VARIANCE",
               "UNMATCHED_TRANSFER",
+              "VISITOR_OVERSTAY",
               null
             ]
           },
@@ -8182,6 +8267,7 @@
               "REVERSAL_PATTERN",
               "SHIFT_VARIANCE",
               "UNMATCHED_TRANSFER",
+              "VISITOR_OVERSTAY",
               null
             ]
           },
@@ -13738,6 +13824,7 @@
                       "RoomType",
                       "IdDocument",
                       "RegistrationCard",
+                      "Visitor",
                       "Task"
                     ]
                   },
@@ -24759,6 +24846,425 @@
         }
       }
     },
+    "/visitors": {
+      "get": {
+        "operationId": "listVisitors",
+        "summary": "Visitors still signed in, then those who came on the date",
+        "tags": [
+          "Front desk"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "visitor.log",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Visitor"
+                      }
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "signInVisitor",
+        "summary": "Sign a visitor in to a checked-in guest",
+        "tags": [
+          "Front desk"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "409 STATE_TRANSITION_INVALID when the stay is not checked in.",
+        "x-permission": "visitor.log",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "stayId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "phone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^\\+[1-9]\\d{6,14}$",
+                    "default": null
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "default": null
+                  },
+                  "idFileId": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Uuid"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "stayId",
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Visitor"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/visitors/{visitorId}/sign-out": {
+      "post": {
+        "operationId": "signOutVisitor",
+        "summary": "Sign a visitor out",
+        "tags": [
+          "Front desk"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "409 STATE_TRANSITION_INVALID when they have already left.",
+        "x-permission": "visitor.log",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "visitorId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Visitor"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/front-desk/arrivals": {
       "get": {
         "operationId": "listArrivals",
@@ -34326,7 +34832,8 @@
                 "RATE_OVERRIDE",
                 "REVERSAL_PATTERN",
                 "SHIFT_VARIANCE",
-                "UNMATCHED_TRANSFER"
+                "UNMATCHED_TRANSFER",
+                "VISITOR_OVERSTAY"
               ]
             },
             "required": false,
@@ -34810,7 +35317,8 @@
                               "RATE_OVERRIDE",
                               "REVERSAL_PATTERN",
                               "SHIFT_VARIANCE",
-                              "UNMATCHED_TRANSFER"
+                              "UNMATCHED_TRANSFER",
+                              "VISITOR_OVERSTAY"
                             ]
                           },
                           "label": {
@@ -35017,7 +35525,8 @@
                             "RATE_OVERRIDE",
                             "REVERSAL_PATTERN",
                             "SHIFT_VARIANCE",
-                            "UNMATCHED_TRANSFER"
+                            "UNMATCHED_TRANSFER",
+                            "VISITOR_OVERSTAY"
                           ]
                         },
                         "enabled": {
@@ -35045,7 +35554,7 @@
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 5
+                    "maxItems": 6
                   }
                 },
                 "required": [
@@ -35078,7 +35587,8 @@
                               "RATE_OVERRIDE",
                               "REVERSAL_PATTERN",
                               "SHIFT_VARIANCE",
-                              "UNMATCHED_TRANSFER"
+                              "UNMATCHED_TRANSFER",
+                              "VISITOR_OVERSTAY"
                             ]
                           },
                           "label": {

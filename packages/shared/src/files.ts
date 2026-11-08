@@ -65,6 +65,14 @@ export const FILE_KINDS = [
     maxBytes: 1 * MB,
     retentionClass: 'STANDARD',
   }),
+  // A visitor's ID photo (M14-04; T-057): purged on the property's ID retention period.
+  k({
+    entityType: 'Visitor',
+    permission: 'visitor.log',
+    contentTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    maxBytes: 5 * MB,
+    retentionClass: 'STANDARD',
+  }),
   // Task photos: the fault, the work, the fix (M5-07, M6-03; T-082). Every member who
   // reports or works tasks holds task.report.
   k({

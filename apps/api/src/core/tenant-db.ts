@@ -59,6 +59,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   IdDocument: { kind: 'property' },
   KeyIssue: { kind: 'property' },
   StayOccupant: { kind: 'property' },
+  Visitor: { kind: 'property' },
   BusinessDay: { kind: 'property' },
   Folio: { kind: 'property', organisationField: 'organisationId' },
   FolioLine: { kind: 'property' },

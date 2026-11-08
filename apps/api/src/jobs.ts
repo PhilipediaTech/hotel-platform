@@ -18,6 +18,7 @@ import { inventoryJob } from './modules/availability/inventory.ts';
 import { idPurgeJob } from './modules/reservations/check-in.ts';
 import { stayAlertJob } from './modules/reservations/alert-jobs.ts';
 import { holdExpiryJob } from './modules/reservations/jobs.ts';
+import { visitorCutoffJob } from './modules/reservations/visitors.ts';
 import {
   paymentLinkCheckJob,
   paymentWebhookJob,
@@ -41,6 +42,7 @@ export function workerJobs(deps: {
     inventoryJob,
     holdExpiryJob,
     stayAlertJob,
+    visitorCutoffJob,
     idPurgeJob({ store: deps.files }),
     // The fake keeps its links in the API process: nothing for the worker to ask.
     ...(deps.payments.name === 'FAKE' ? [] : [paymentLinkCheckJob({ provider: deps.payments })]),

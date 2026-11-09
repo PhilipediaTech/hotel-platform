@@ -55,6 +55,7 @@
                   "OCCUPANCY_EXCEEDED",
                   "RATE_LIMITED",
                   "PAYMENT_PROVIDER_UNAVAILABLE",
+                  "AI_UNAVAILABLE",
                   "MESSAGE_PROVIDER_UNAVAILABLE",
                   "INTERNAL"
                 ]
@@ -9948,6 +9949,7 @@
               "BOOKING_CONFIRMED",
               "BOOKING_REFUNDED",
               "GUEST_FOLLOW_UP",
+              "OWNER_SUMMARY",
               "PRE_ARRIVAL",
               "PAYMENT_REQUEST",
               "FOLIO",
@@ -10607,6 +10609,43 @@
           "currency",
           "status",
           "issuedAt"
+        ]
+      },
+      "AskFiguresResponse": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "report": {
+                  "type": "string"
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "report",
+                "detail"
+              ]
+            }
+          },
+          "grounded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "answer",
+          "sources",
+          "grounded"
         ]
       },
       "DashboardReport": {
@@ -41079,6 +41118,7 @@
                       "BOOKING_CONFIRMED",
                       "BOOKING_REFUNDED",
                       "GUEST_FOLLOW_UP",
+                      "OWNER_SUMMARY",
                       "PRE_ARRIVAL",
                       "PAYMENT_REQUEST",
                       "FOLIO",
@@ -41217,6 +41257,7 @@
                 "BOOKING_CONFIRMED",
                 "BOOKING_REFUNDED",
                 "GUEST_FOLLOW_UP",
+                "OWNER_SUMMARY",
                 "PRE_ARRIVAL",
                 "PAYMENT_REQUEST",
                 "FOLIO",
@@ -41390,6 +41431,7 @@
                       "BOOKING_CONFIRMED",
                       "BOOKING_REFUNDED",
                       "GUEST_FOLLOW_UP",
+                      "OWNER_SUMMARY",
                       "PRE_ARRIVAL",
                       "PAYMENT_REQUEST",
                       "FOLIO",
@@ -43343,6 +43385,127 @@
           },
           "500": {
             "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/ask": {
+      "post": {
+        "operationId": "askFigures",
+        "summary": "Ask about the hotel’s figures in your own words (M14-12)",
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Answered only from the reports the caller may open, naming them. Reads only. 503 AI_UNAVAILABLE when the AI is switched off or unreachable.",
+        "x-permission": "report.dashboard",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "question"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskFiguresResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error: `AI_UNAVAILABLE`",
             "content": {
               "application/json": {
                 "schema": {

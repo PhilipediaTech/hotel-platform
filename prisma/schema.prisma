@@ -75,6 +75,7 @@ model Organisation {
   platformInvoices   PlatformInvoice[]
   supportSessions    SupportSession[]
   partnerReferral    PartnerReferral?
+  usageCounters      UsageCounter[]
   partnerCommissions PartnerCommission[]
 
   @@map("organisations")
@@ -2534,4 +2535,21 @@ model Message {
 
   @@index([threadId, createdAt])
   @@map("messages")
+}
+
+/// AI and WhatsApp use per hotel group and month (M14 rules; T-116), for the plan's allowance.
+model UsageCounter {
+  organisationId String @map("organisation_id") @db.Uuid
+  /// YYYY-MM
+  month          String @db.Char(7)
+  /// AI_SUMMARY | AI_QUESTION
+  metric         String
+  count          Int    @default(0)
+  inputTokens    Int    @default(0) @map("input_tokens")
+  outputTokens   Int    @default(0) @map("output_tokens")
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  @@id([organisationId, month, metric])
+  @@map("usage_counters")
 }

@@ -35,6 +35,7 @@ describe('loadConfig', () => {
       cookieSecure: false,
       localFilesDir: path.resolve(import.meta.dirname, '../../../../.data/files'),
       payments: { provider: 'fake', secretKey: null, webhookSecret: null },
+      ai: { provider: 'fake', apiKey: null, model: 'claude-opus-5-5' },
       platformAdminEmails: [],
       passwordBreachCheck: 'hibp',
       whatsapp: {

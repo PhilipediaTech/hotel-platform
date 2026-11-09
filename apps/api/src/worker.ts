@@ -1,4 +1,5 @@
 import { loadConfig } from './core/config.ts';
+import { createAiProvider } from './core/ai.ts';
 import { systemClock } from './core/clock.ts';
 import { createDb } from './core/db.ts';
 import { startWorker } from './core/jobs.ts';
@@ -46,6 +47,7 @@ try {
       files,
       scanner: createFakeFileScanner(),
       payments: createPaymentProvider(config, logger),
+      ai: createAiProvider(config, logger),
     }),
     // Email: the fake logs messages until the SES adapter (AWS account; production stops above).
     handlers: eventHandlers({

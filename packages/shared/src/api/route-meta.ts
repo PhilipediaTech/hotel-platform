@@ -11,6 +11,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   getTenantPartner: {"operationId":"getTenantPartner","method":"get","path":"/platform/tenants/{organisationId}/partner"},
   setTenantPartner: {"operationId":"setTenantPartner","method":"put","path":"/platform/tenants/{organisationId}/partner","body":true},
   getPartnerHome: {"operationId":"getPartnerHome","method":"get","path":"/partner/home"},
+  setThreadAssistant: {"operationId":"setThreadAssistant","method":"post","path":"/message-threads/{threadId}/assistant","body":true,"propertyScoped":true},
   listMessageThreads: {"operationId":"listMessageThreads","method":"get","path":"/message-threads","propertyScoped":true},
   getMessageThread: {"operationId":"getMessageThread","method":"get","path":"/message-threads/{threadId}","propertyScoped":true},
   sendThreadMessage: {"operationId":"sendThreadMessage","method":"post","path":"/message-threads/{threadId}/messages","body":true,"propertyScoped":true,"idempotent":true},

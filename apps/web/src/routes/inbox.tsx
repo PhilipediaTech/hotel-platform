@@ -47,7 +47,12 @@ function Bubble({ m }: { m: Message }) {
       >
         <p className="whitespace-pre-line break-words">{m.body}</p>
         <p className="mt-1 text-xs text-text-muted">
-          {out ? (m.sentBy ?? t('inbox.you')) : t('inbox.guest')} · {when(m.createdAt)}
+          {m.kind === 'ASSISTANT'
+            ? t('inbox.assistant')
+            : out
+              ? (m.sentBy ?? t('inbox.you'))
+              : t('inbox.guest')}{' '}
+          · {when(m.createdAt)}
         </p>
         {m.kind === 'TEMPLATE' && <p className="text-xs text-text-muted">{t('inbox.template')}</p>}
         {m.status === 'FAILED' && <p className="text-xs text-critical">{t('inbox.failed')}</p>}
@@ -88,6 +93,11 @@ function Conversation({ id, keyBase }: { id: string; keyBase: unknown[] }) {
     mutationFn: () => api.call('sendThreadFollowUp', { params: { threadId: id }, body: {} }),
     onSuccess: refresh,
   });
+  const assistant = useMutation({
+    mutationFn: (active: boolean) =>
+      api.call('setThreadAssistant', { params: { threadId: id }, body: { active } }),
+    onSuccess: refresh,
+  });
   if (q.error) return <Alert tone="critical">{errorMessage(q.error)}</Alert>;
   if (!q.data) return null;
   const th = q.data;
@@ -106,6 +116,16 @@ function Conversation({ id, keyBase }: { id: string; keyBase: unknown[] }) {
           </Link>
         )}
       </header>
+      <div>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={assistant.isPending}
+          onClick={() => assistant.mutate(th.assistantPaused)}
+        >
+          {th.assistantPaused ? t('inbox.handBack') : t('inbox.takeOver')}
+        </Button>
+      </div>
       <ul className="flex max-h-[28rem] flex-col gap-2 overflow-y-auto">
         {th.messages.map((m) => (
           <Bubble key={m.id} m={m} />
@@ -195,6 +215,9 @@ export function InboxPage() {
                 >
                   <span className="block font-semibold">{th.guest?.name ?? th.phone}</span>
                   <span className="block truncate text-text-muted">{th.lastPreview}</span>
+                  {th.needsStaff && (
+                    <span className="block font-medium text-critical">{t('inbox.needsStaff')}</span>
+                  )}
                   {th.unreadCount > 0 && (
                     <span className="block font-medium text-brand">
                       {t('inbox.unread', { count: th.unreadCount })}

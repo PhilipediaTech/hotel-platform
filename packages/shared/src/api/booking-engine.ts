@@ -38,6 +38,10 @@ export const BookingEngineSettingsBody = z.object({
   /** Share of the total taken as a deposit: 3000 = 30%. */
   depositBps: Bps,
   allowPayAtHotel: z.boolean(),
+  /** The WhatsApp booking assistant answers guests (M14-10; T-117). */
+  assistantEnabled: z.boolean().default(false),
+  /** Anything else it may tell guests: parking, airport pickup and so on. */
+  assistantNotes: z.string().trim().max(4000).nullable().default(null),
 });
 
 export const BookingEngineSettingsItem = BookingEngineSettingsBody.extend({

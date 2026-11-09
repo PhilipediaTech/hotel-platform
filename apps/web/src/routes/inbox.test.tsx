@@ -31,6 +31,8 @@ const THREAD = {
   lastPreview: 'Can I check out late?',
   unreadCount: 1,
   windowOpen: true,
+  needsStaff: false,
+  assistantPaused: false,
 };
 const MESSAGE = {
   id: '99999999-0000-4000-8000-000000000004',

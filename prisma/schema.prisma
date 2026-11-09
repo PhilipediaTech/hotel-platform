@@ -2410,19 +2410,23 @@ model PartnerChange {
 
 // The booking engine (PRD M11-01–M11-03; tab 3 booking_engine_settings, promo_codes; T-112).
 model BookingEngineSettings {
-  propertyId      String   @id @map("property_id") @db.Uuid
-  organisationId  String   @map("organisation_id") @db.Uuid
-  slug            String   @unique
-  enabled         Boolean  @default(false)
-  headline        String?
-  description     String?
-  policies        String?
-  photoFileIds    String[] @map("photo_file_ids") @db.Uuid
-  allowPayFull    Boolean  @default(true) @map("allow_pay_full")
-  allowDeposit    Boolean  @default(true) @map("allow_deposit")
-  depositBps      Int      @default(3000) @map("deposit_bps")
-  allowPayAtHotel Boolean  @default(true) @map("allow_pay_at_hotel")
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  propertyId       String   @id @map("property_id") @db.Uuid
+  organisationId   String   @map("organisation_id") @db.Uuid
+  slug             String   @unique
+  enabled          Boolean  @default(false)
+  headline         String?
+  description      String?
+  policies         String?
+  photoFileIds     String[] @map("photo_file_ids") @db.Uuid
+  allowPayFull     Boolean  @default(true) @map("allow_pay_full")
+  allowDeposit     Boolean  @default(true) @map("allow_deposit")
+  depositBps       Int      @default(3000) @map("deposit_bps")
+  allowPayAtHotel  Boolean  @default(true) @map("allow_pay_at_hotel")
+  /// The WhatsApp booking assistant (M14-10; T-117).
+  assistantEnabled Boolean  @default(false) @map("assistant_enabled")
+  /// What else the assistant may tell guests: parking, airport pickup and so on.
+  assistantNotes   String?  @map("assistant_notes")
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
 
@@ -2491,17 +2495,23 @@ model OnlineCheckIn {
 
 // The two-way WhatsApp inbox (PRD M11-04; tab 3 message_threads, messages; T-115).
 model MessageThread {
-  id             String    @id @default(uuid()) @db.Uuid
-  organisationId String    @map("organisation_id") @db.Uuid
-  propertyId     String    @map("property_id") @db.Uuid
-  phone          String
-  guestId        String?   @map("guest_id") @db.Uuid
-  reservationId  String?   @map("reservation_id") @db.Uuid
+  id                   String    @id @default(uuid()) @db.Uuid
+  organisationId       String    @map("organisation_id") @db.Uuid
+  propertyId           String    @map("property_id") @db.Uuid
+  phone                String
+  guestId              String?   @map("guest_id") @db.Uuid
+  reservationId        String?   @map("reservation_id") @db.Uuid
   /// Free text is allowed for 24 hours after this (M11 rule).
-  lastInboundAt  DateTime? @map("last_inbound_at") @db.Timestamptz(6)
-  lastMessageAt  DateTime  @map("last_message_at") @db.Timestamptz(6)
-  lastPreview    String    @map("last_preview")
-  unreadCount    Int       @default(0) @map("unread_count")
+  lastInboundAt        DateTime? @map("last_inbound_at") @db.Timestamptz(6)
+  lastMessageAt        DateTime  @map("last_message_at") @db.Timestamptz(6)
+  lastPreview          String    @map("last_preview")
+  unreadCount          Int       @default(0) @map("unread_count")
+  /// The assistant asked for a person, or could not answer (T-117).
+  needsStaff           Boolean   @default(false) @map("needs_staff")
+  /// The assistant stays quiet until then: staff have taken over.
+  assistantPausedUntil DateTime? @map("assistant_paused_until") @db.Timestamptz(6)
+  /// While a reply is being written, so two runs never answer at once.
+  assistantRunAt       DateTime? @map("assistant_run_at") @db.Timestamptz(6)
 
   property    Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   guest       Guest?       @relation(fields: [guestId], references: [id], onDelete: SetNull)
@@ -2520,7 +2530,7 @@ model Message {
   threadId    String   @map("thread_id") @db.Uuid
   /// IN | OUT
   direction   String
-  /// TEXT | TEMPLATE | OTHER (a photo or the like: not stored)
+  /// TEXT | TEMPLATE | ASSISTANT | OTHER (a photo or the like: not stored)
   kind        String
   body        String
   /// RECEIVED | QUEUED | SENT | DELIVERED | READ | FAILED
@@ -2542,7 +2552,7 @@ model UsageCounter {
   organisationId String @map("organisation_id") @db.Uuid
   /// YYYY-MM
   month          String @db.Char(7)
-  /// AI_SUMMARY | AI_QUESTION
+  /// AI_SUMMARY | AI_QUESTION | AI_ASSISTANT
   metric         String
   count          Int    @default(0)
   inputTokens    Int    @default(0) @map("input_tokens")

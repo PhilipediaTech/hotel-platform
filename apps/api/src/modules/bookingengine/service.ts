@@ -83,6 +83,8 @@ function settingsOf(deps: BookingEngineDeps, s: Settings | null): SettingsOut {
     allowDeposit: s?.allowDeposit ?? true,
     depositBps: s?.depositBps ?? 3000,
     allowPayAtHotel: s?.allowPayAtHotel ?? true,
+    assistantEnabled: s?.assistantEnabled ?? false,
+    assistantNotes: s?.assistantNotes ?? null,
     pageUrl,
     embedSnippet: pageUrl
       ? `<iframe src="${pageUrl}" title="Book a room" style="width:100%;height:800px;border:0"></iframe>`
@@ -413,6 +415,7 @@ async function sendLinkEmail(
 export async function createPublicBooking(
   deps: BookingEngineDeps,
   body: z.output<typeof PublicBookingBody>,
+  options: { source: 'DIRECT' | 'WHATSAPP' } = { source: 'DIRECT' },
 ): Promise<z.input<typeof PublicBookingCreated>> {
   const page = await pageOf(deps.db, body.slug);
   const repeat = await alreadyBooked(deps, page, body.bookingKey);
@@ -469,7 +472,7 @@ export async function createPublicBooking(
         deps,
         tenant,
         ReservationBody.parse({
-          source: 'DIRECT',
+          source: options.source,
           guarantee: online ? 'DEPOSIT' : 'NONE',
           holdUntil: online
             ? new Date(now.getTime() + ONLINE_HOLD_MINUTES * 60_000).toISOString()
@@ -489,7 +492,12 @@ export async function createPublicBooking(
               roomId: null,
             },
           ],
-          notes: promo ? `Booking page, promo ${promo.code}` : 'Booking page',
+          notes:
+            options.source === 'WHATSAPP'
+              ? 'WhatsApp assistant'
+              : promo
+                ? `Booking page, promo ${promo.code}`
+                : 'Booking page',
         }),
       );
       if (!('id' in reservation)) throw new Error('A booking-page booking needs no approval');

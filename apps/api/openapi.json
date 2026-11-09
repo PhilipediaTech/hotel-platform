@@ -656,6 +656,12 @@
           },
           "windowOpen": {
             "type": "boolean"
+          },
+          "needsStaff": {
+            "type": "boolean"
+          },
+          "assistantPaused": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -666,7 +672,9 @@
           "lastMessageAt",
           "lastPreview",
           "unreadCount",
-          "windowOpen"
+          "windowOpen",
+          "needsStaff",
+          "assistantPaused"
         ]
       },
       "ThreadMessage": {
@@ -687,6 +695,7 @@
             "enum": [
               "TEXT",
               "TEMPLATE",
+              "ASSISTANT",
               "OTHER"
             ]
           },
@@ -963,6 +972,18 @@
           },
           "allowPayAtHotel": {
             "type": "boolean"
+          },
+          "assistantEnabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "assistantNotes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000,
+            "default": null
           },
           "pageUrl": {
             "type": [
@@ -12297,6 +12318,132 @@
         }
       }
     },
+    "/message-threads/{threadId}/assistant": {
+      "post": {
+        "operationId": "setThreadAssistant",
+        "summary": "Take a conversation over from the assistant, or hand it back (T-117)",
+        "tags": [
+          "Messaging"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "message.send",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "threadId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "active"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageThread"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/message-threads": {
       "get": {
         "operationId": "listMessageThreads",
@@ -12506,6 +12653,12 @@
                     "windowOpen": {
                       "type": "boolean"
                     },
+                    "needsStaff": {
+                      "type": "boolean"
+                    },
+                    "assistantPaused": {
+                      "type": "boolean"
+                    },
                     "messages": {
                       "type": "array",
                       "items": {
@@ -12522,6 +12675,8 @@
                     "lastPreview",
                     "unreadCount",
                     "windowOpen",
+                    "needsStaff",
+                    "assistantPaused",
                     "messages"
                   ]
                 }
@@ -13910,6 +14065,18 @@
                   },
                   "allowPayAtHotel": {
                     "type": "boolean"
+                  },
+                  "assistantEnabled": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "assistantNotes": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 4000,
+                    "default": null
                   }
                 },
                 "required": [

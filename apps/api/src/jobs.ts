@@ -8,6 +8,8 @@ import type { JobDefinition } from './core/jobs.ts';
 import type { EventHandler } from './core/outbox.ts';
 import type { AiProvider } from './core/ai.ts';
 import type { PaymentProvider } from './core/payments.ts';
+import { assistantHandler } from './modules/bookingengine/assistant.ts';
+import { createTenantDb } from './core/tenant-db.ts';
 import { ownerSummaryJob } from './modules/owner/ai.ts';
 import type { Clock } from './core/clock.ts';
 import type { EmailProvider } from './core/email.ts';
@@ -63,6 +65,10 @@ export function eventHandlers(deps: {
   clock: Clock;
   messages: MessageProvider;
   email: EmailProvider;
+  /** For the WhatsApp assistant (T-117). */
+  ai: AiProvider;
+  payments: PaymentProvider;
+  files: FileStore;
 }): EventHandler[] {
   const send = {
     db: deps.db,
@@ -82,5 +88,18 @@ export function eventHandlers(deps: {
     // To the owner (T-091): instant leakage alerts and the flash report at day close.
     instantAlertHandler({ db: deps.db, logger: deps.logger }),
     flashReportHandler({ db: deps.db, logger: deps.logger }),
+    // Guests' WhatsApp messages (T-117).
+    assistantHandler({
+      db: deps.db,
+      tenantDb: createTenantDb(deps.db),
+      clock: deps.clock,
+      config: deps.config,
+      provider: deps.payments,
+      email: deps.email,
+      store: deps.files,
+      ai: deps.ai,
+      messages: deps.messages,
+      logger: deps.logger,
+    }),
   ];
 }

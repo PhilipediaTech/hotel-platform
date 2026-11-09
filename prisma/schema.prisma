@@ -2259,6 +2259,10 @@ model Subscription {
   /// TRIAL | ACTIVE | PAST_DUE | SUSPENDED
   status            String
   currentPeriodEnd  DateTime @map("current_period_end") @db.Date
+  /// AI uses per month (M14 rules; T-118); null = no limit.
+  aiAllowance       Int?     @map("ai_allowance")
+  /// WhatsApp template messages per month; null = no limit.
+  whatsappAllowance Int?     @map("whatsapp_allowance")
 
   organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
 
@@ -2552,7 +2556,7 @@ model UsageCounter {
   organisationId String @map("organisation_id") @db.Uuid
   /// YYYY-MM
   month          String @db.Char(7)
-  /// AI_SUMMARY | AI_QUESTION | AI_ASSISTANT
+  /// AI_SUMMARY | AI_QUESTION | AI_ASSISTANT | WHATSAPP
   metric         String
   count          Int    @default(0)
   inputTokens    Int    @default(0) @map("input_tokens")

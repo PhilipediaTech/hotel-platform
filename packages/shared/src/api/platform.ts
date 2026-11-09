@@ -26,6 +26,10 @@ export const SubscriptionItem = z
     currency: Currency,
     status: z.enum(SUBSCRIPTION_STATUSES),
     currentPeriodEnd: IsoDate,
+    /** AI uses a month; null means no limit (T-118). */
+    aiAllowance: z.number().int().nullable(),
+    /** WhatsApp template messages a month; null means no limit. */
+    whatsappAllowance: z.number().int().nullable(),
   })
   .meta({ id: 'Subscription' });
 
@@ -68,6 +72,7 @@ const Usage = z.object({
   /** Rooms not archived (active), the billing measure (M13 rule). */
   activeRooms: z.number().int(),
   whatsappMessages: z.number().int(),
+  aiUses: z.number().int(),
 });
 
 export const PlatformTenantItem = z
@@ -119,6 +124,8 @@ export const getPlatformTenant = defineRoute({
   response: PlatformTenantDetail,
 });
 
+const Allowance = z.number().int().min(0).max(100_000_000).nullable();
+
 export const SubscriptionBody = z.object({
   plan: z.enum(PLANS),
   pricePerRoomMinor: AmountMinor,
@@ -126,6 +133,8 @@ export const SubscriptionBody = z.object({
   currency: Currency,
   status: z.enum(SUBSCRIPTION_STATUSES),
   currentPeriodEnd: IsoDate,
+  aiAllowance: Allowance,
+  whatsappAllowance: Allowance,
 });
 
 export const setTenantSubscription = defineRoute({

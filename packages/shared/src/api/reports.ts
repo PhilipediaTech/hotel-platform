@@ -250,13 +250,13 @@ export const askFigures = defineRoute({
   path: '/reports/ask',
   summary: 'Ask about the hotel’s figures in your own words (M14-12)',
   description:
-    'Answered only from the reports the caller may open, naming them. Reads only. 503 AI_UNAVAILABLE when the AI is switched off or unreachable.',
+    'Answered only from the reports the caller may open, naming them. Reads only. 503 AI_UNAVAILABLE when the AI is switched off or unreachable; 403 ALLOWANCE_USED_UP when the month’s AI allowance is gone.',
   tags: ['Reports'],
   propertyScoped: true,
   permission: 'report.dashboard',
   body: z.object({ question: z.string().trim().min(3).max(500) }),
   response: AskFiguresResponse,
-  errors: ['AI_UNAVAILABLE'],
+  errors: ['AI_UNAVAILABLE', 'ALLOWANCE_USED_UP'],
 });
 
 export const REPORT_ROUTES = {

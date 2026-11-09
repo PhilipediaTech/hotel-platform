@@ -5,6 +5,7 @@ import { makeRoom, makeRoomType, makeUser } from '../../../test/factories.ts';
 import { APP_ORIGIN, errorOf, TEST_CONFIG } from '../../../test/helpers.ts';
 import { hotelClient, makeHotel } from '../../../test/hotel.ts';
 import { sessionCookie } from '../../../test/tenancy.ts';
+import { countWhatsappSent } from '../../core/usage.ts';
 
 // Platform administration (PRD M13-01–M13-05; M13 rules "active rooms = rooms not archived";
 // M13 AC "a support session expires on time and every record viewed is logged"; tab 4
@@ -60,6 +61,8 @@ async function setup() {
     currency: 'NGN',
     status: 'ACTIVE',
     currentPeriodEnd: '2026-11-30',
+    aiAllowance: null,
+    whatsappAllowance: null,
   };
   return { ...h, c, admin, adminCookie, cookie, send, asAdmin, ownerCookie, owner, subscription };
 }
@@ -67,16 +70,7 @@ async function setup() {
 describe('platform staff only (PLATFORM_ADMIN_EMAILS with MFA on)', () => {
   it('lists hotel groups with plan, status and usage; nobody else gets in', async () => {
     const s = await setup();
-    await db.notificationDelivery.create({
-      data: {
-        propertyId: s.p1.id,
-        channel: 'WHATSAPP',
-        templateCode: 'FLASH_REPORT',
-        recipient: '+2348000000001',
-        payload: {},
-        status: 'SENT',
-      },
-    });
+    await countWhatsappSent(db, s.org.id, now);
     const list = await s.asAdmin('get', '/platform/tenants');
     expect(list.status, JSON.stringify(list.body)).toBe(200);
     const mine = (

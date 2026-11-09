@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-Philip asked (2026-11-08) to build the V1.2 features and finish every ticket that is pure building, one ticket at a time. Done: T-110 to T-117 (referrals, country packs, booking engine, Astro site, online check-in, WhatsApp inbox, AI summary and questions, summary email, WhatsApp assistant). Next: T-118 AI and WhatsApp allowances per plan (sizes are Philip's to set; typed per group), then events and spaces (M9), services, group blocks, automated billing. Clear node_modules/.vitest-cache before full test runs. Disk space on C: is tight. Before the pilot, T-005 staging, T-103 and T-104 still wait for paid accounts.
+T-118 is pushed on `feat/T-118-allowances`, awaiting merge (migration: run `npm run db:deploy`). Next in V1.2: events and spaces (M9-01–M9-08), then services (M9-09), group blocks and allotments (M3-17, M2-12), automated hotel billing and suspension (M13-03, M13-06). Plan allowance sizes are Philip's to type per hotel group; no real AI key for paying hotels until they are set.

@@ -26,6 +26,9 @@ function useMoney() {
     );
 }
 
+const isUsedUp = (used: number, allowance: number | null | undefined) =>
+  allowance !== null && allowance !== undefined && used >= allowance;
+
 export function BillingPage() {
   const { t, i18n } = useTranslation();
   const money = useMoney();
@@ -48,6 +51,10 @@ export function BillingPage() {
   if (!d) return null;
   const s = d.subscription;
   const currency = s?.currency ?? 'NGN';
+  const ofAllowance = (used: number, allowance: number | null | undefined) =>
+    allowance === null || allowance === undefined
+      ? used
+      : t('billing.ofAllowance', { used, allowance });
   return (
     <section className="max-w-3xl">
       <h1 className="text-xl font-semibold">{t('billing.title')}</h1>
@@ -75,14 +82,20 @@ export function BillingPage() {
           <p className="text-sm text-text-muted">{t('billing.noPlan')}</p>
         )}
         <h2 className="mt-4 font-semibold">{t('billing.usage', { month: d.usage.month })}</h2>
-        <dl className="mt-1 grid grid-cols-3 gap-2 text-sm">
+        <dl className="mt-1 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
           <div>
             <dt className="text-text-muted">{t('billing.activeRooms')}</dt>
             <dd className="text-lg font-semibold">{d.usage.activeRooms}</dd>
           </div>
           <div>
             <dt className="text-text-muted">{t('billing.whatsapp')}</dt>
-            <dd className="text-lg font-semibold">{d.usage.whatsappMessages}</dd>
+            <dd className="text-lg font-semibold">
+              {ofAllowance(d.usage.whatsappMessages, s?.whatsappAllowance)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-text-muted">{t('billing.ai')}</dt>
+            <dd className="text-lg font-semibold">{ofAllowance(d.usage.aiUses, s?.aiAllowance)}</dd>
           </div>
           {d.usage.estimateMinor && (
             <div>
@@ -91,6 +104,16 @@ export function BillingPage() {
             </div>
           )}
         </dl>
+        {isUsedUp(d.usage.whatsappMessages, s?.whatsappAllowance) && (
+          <Alert tone="critical" className="mt-3">
+            {t('billing.whatsappUsedUp')}
+          </Alert>
+        )}
+        {isUsedUp(d.usage.aiUses, s?.aiAllowance) && (
+          <Alert tone="critical" className="mt-3">
+            {t('billing.aiUsedUp')}
+          </Alert>
+        )}
       </section>
 
       <section aria-label={t('billing.invoices')} className="mt-6">

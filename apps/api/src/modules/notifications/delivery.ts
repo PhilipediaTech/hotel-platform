@@ -15,6 +15,7 @@ import type { Db } from '../../core/db.ts';
 import type { EmailProvider } from '../../core/email.ts';
 import { MessageSendError, type MessageProvider, type StatusUpdate } from '../../core/messaging.ts';
 import { recordEvent, type EventHandler, type OutboxClient } from '../../core/outbox.ts';
+import { countWhatsappSent, whatsappAllowanceUsedUp } from '../../core/usage.ts';
 
 // Sending (T-024; tab 2 "Integrations", tab 3 `notification_deliveries`). A module that
 // wants a message sent queues it in the transaction of its change: a delivery row and the
@@ -25,6 +26,8 @@ import { recordEvent, type EventHandler, type OutboxClient } from '../../core/ou
 
 /** Sends per message, the first included (pg-boss retries a handler 5 times). */
 export const MAX_SEND_ATTEMPTS = 6;
+
+export const ALLOWANCE_USED_UP_ERROR = 'Not sent: this month’s WhatsApp allowance is used up';
 
 export interface SendDeps {
   db: Db;
@@ -224,6 +227,18 @@ export async function sendDelivery(
     });
     return 'FAILED';
   }
+  // M14 rule: the plan's monthly allowance. One-time codes never come this way.
+  if (
+    d.channel === 'WHATSAPP' &&
+    (await whatsappAllowanceUsedUp(db, organisationId, deps.clock()))
+  ) {
+    await db.notificationDelivery.updateMany({
+      where: { id: d.id, status: 'QUEUED' },
+      data: { status: 'FAILED', lastError: ALLOWANCE_USED_UP_ERROR },
+    });
+    deps.logger.warn({ deliveryId: d.id }, 'Message not sent: WhatsApp allowance used up');
+    return 'FAILED';
+  }
   const claimed = await db.notificationDelivery.updateMany({
     where: { id: d.id, status: 'QUEUED', attempts: d.attempts },
     data: { attempts: { increment: 1 } },
@@ -236,6 +251,7 @@ export async function sendDelivery(
       where: { id: d.id, status: 'QUEUED' },
       data: { status: 'SENT', providerRef, sentAt: deps.clock(), lastError: null },
     });
+    if (d.channel === 'WHATSAPP') await countWhatsappSent(db, organisationId, deps.clock());
     return 'SENT';
   } catch (err) {
     const known = err instanceof MessageSendError;
@@ -394,6 +410,14 @@ export function whatsappOtpChannel(deps: Omit<SendDeps, 'email'>): ApprovalOtpCh
           if (!known || !err.permanent)
             retryable = err instanceof Error ? err : new Error(String(err));
         }
+      }
+      // Counted, but never held back: a hotel at its allowance must still approve things.
+      if (sent > 0) {
+        const { organisationId } = await deps.db.property.findUniqueOrThrow({
+          where: { id: propertyId },
+          select: { organisationId: true },
+        });
+        await countWhatsappSent(deps.db, organisationId, deps.clock(), sent);
       }
       if (sent === 0 && retryable) throw retryable;
     },

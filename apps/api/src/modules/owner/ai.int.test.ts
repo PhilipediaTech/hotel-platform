@@ -61,7 +61,7 @@ describe('the morning summary (M14-11)', () => {
     const ai = createFakeAiProvider();
     ai.respond = () => 'A good night: Occupancy 70% and room revenue ₦315,000.00.';
     expect(await sendMorningSummaries(db, ai, clock, logger)).toBe(1);
-    const [sent] = await h.summaries();
+    const [sent] = (await h.summaries()).filter((d) => d.channel === 'WHATSAPP');
     expect(sent).toMatchObject({ recipient: '+2348030000001', channel: 'WHATSAPP' });
     expect(summaryOf(sent as { payload: unknown })).toContain('A good night');
     expect(ai.requests[0]?.user).toContain('Occupancy 70%');
@@ -70,6 +70,22 @@ describe('the morning summary (M14-11)', () => {
     expect(await sendMorningSummaries(db, ai, clock, logger)).toBe(0);
     expect(ai.requests).toHaveLength(1);
     expect((await h.usage())[0]).toMatchObject({ metric: 'AI_SUMMARY', count: 1 });
+  });
+
+  it('also goes by email to owners and to those who get the flash report', async () => {
+    const h = await hotel();
+    await sendMorningSummaries(db, createFakeAiProvider(), clock, logger);
+    const email = (await h.summaries()).filter((d) => d.channel === 'EMAIL');
+    const gm = await db.user.findUniqueOrThrow({ where: { id: h.gmId } });
+    expect(email.map((d) => d.recipient)).toEqual(
+      expect.arrayContaining([gm.email, h.owner.email]),
+    );
+    const fd = await db.user.findUniqueOrThrow({ where: { id: h.fdId } });
+    expect(email.map((d) => d.recipient)).not.toContain(fd.email);
+    expect(new Set(email.map((d) => d.recipient)).size).toBe(email.length);
+    // Nobody is sent it twice on the next run.
+    await sendMorningSummaries(db, createFakeAiProvider(), clock, logger);
+    expect((await h.summaries()).filter((d) => d.channel === 'EMAIL')).toHaveLength(email.length);
   });
 
   it('waits for 07:00 at the hotel', async () => {

@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { addDays, localDate } from '@hotel/shared';
 import request from 'supertest';
 import { createApp } from '../apps/api/src/app.ts';
+import { createFakeAiProvider } from '../apps/api/src/core/ai.ts';
 import { createSession } from '../apps/api/src/core/auth.ts';
 import { systemClock } from '../apps/api/src/core/clock.ts';
 import { loadConfig } from '../apps/api/src/core/config.ts';
@@ -41,6 +42,7 @@ const app = createApp({
   email: createFakeEmailProvider(),
   payments: createFakePaymentProvider({ checkoutBase: `${config.appOrigin}/api/v1/dev/fake-pay` }),
   messages: createFakeMessageProvider(),
+  ai: createFakeAiProvider(),
   files: createLocalFileStore({
     dir: config.localFilesDir,
     secret: config.sessionSecret,

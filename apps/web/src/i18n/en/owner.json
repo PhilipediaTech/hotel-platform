@@ -1,5 +1,15 @@
 {
   "owner": {
+    "ask": {
+      "title": "Ask about your figures",
+      "hint": "For the hotel you have open. Answers come only from its reports.",
+      "label": "Your question",
+      "example": "For example: how was occupancy last night?",
+      "submit": "Ask",
+      "thinking": "Looking at your reports…",
+      "source": "From: {{sources}}",
+      "noReport": "No report was used for this answer, so don’t rely on it for figures."
+    },
     "title": "Owner home",
     "empty": "No property to show yet.",
     "today": "Business day {{date}}",

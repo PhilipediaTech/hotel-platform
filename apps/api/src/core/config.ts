@@ -35,6 +35,10 @@ const envSchema = z.object({
   LOCAL_FILES_DIR: z.string().min(1).optional(),
   // Payment provider (T-070, ADR-021): `fake` locally and in tests, `paystack` with its secret key.
   PAYMENT_PROVIDER: z.enum(['fake', 'paystack']).default('fake'),
+  // AI (T-116): `off` until a key is set in production; `fake` locally.
+  AI_PROVIDER: z.enum(['off', 'fake', 'anthropic']).optional(),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  AI_MODEL: z.string().min(1).default('claude-opus-5-5'),
   PAYMENT_SECRET_KEY: z
     .string()
     .regex(
@@ -106,6 +110,8 @@ export interface Config {
   platformAdminEmails: readonly string[];
   /** Where new passwords are checked against known breaches (T-102). */
   passwordBreachCheck: 'hibp' | 'fake';
+  /** The AI provider, its key (null unless anthropic) and model (T-116). */
+  ai: { provider: 'off' | 'fake' | 'anthropic'; apiKey: string | null; model: string };
   /** The WhatsApp provider and its Meta settings (null for the fake). */
   whatsapp: {
     provider: 'fake' | 'meta';
@@ -143,6 +149,15 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       'Invalid environment configuration:\n✖ ID_ENCRYPTION_KEY is required in production',
     );
   }
+  const aiProvider = e.AI_PROVIDER ?? (e.NODE_ENV === 'production' ? 'off' : 'fake');
+  if (aiProvider === 'anthropic' && !e.ANTHROPIC_API_KEY) {
+    throw new Error(
+      'Invalid environment configuration:\n✖ ANTHROPIC_API_KEY is required with AI_PROVIDER=anthropic',
+    );
+  }
+  if (e.NODE_ENV === 'production' && aiProvider === 'fake') {
+    throw new Error('Invalid environment configuration:\n✖ AI_PROVIDER=fake in production');
+  }
   if (e.PAYMENT_PROVIDER === 'paystack' && !e.PAYMENT_SECRET_KEY) {
     throw new Error(
       'Invalid environment configuration:\n✖ PAYMENT_SECRET_KEY is required with PAYMENT_PROVIDER=paystack',
@@ -175,6 +190,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     logLevel: e.LOG_LEVEL,
     appOrigin: e.APP_ORIGIN,
     siteOrigin: e.SITE_ORIGIN,
+    ai: { provider: aiProvider, apiKey: e.ANTHROPIC_API_KEY ?? null, model: e.AI_MODEL },
     databaseUrl: e.DATABASE_URL,
     sessionSecret: e.SESSION_SECRET,
     mfaKey,

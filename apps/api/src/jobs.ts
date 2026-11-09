@@ -6,7 +6,9 @@ import type { FileScanner } from './core/file-scan.ts';
 import type { FileStore } from './core/files.ts';
 import type { JobDefinition } from './core/jobs.ts';
 import type { EventHandler } from './core/outbox.ts';
+import type { AiProvider } from './core/ai.ts';
 import type { PaymentProvider } from './core/payments.ts';
+import { ownerSummaryJob } from './modules/owner/ai.ts';
 import type { Clock } from './core/clock.ts';
 import type { EmailProvider } from './core/email.ts';
 import type { MessageProvider } from './core/messaging.ts';
@@ -33,8 +35,10 @@ export function workerJobs(deps: {
   files: FileStore;
   scanner: FileScanner;
   payments: PaymentProvider;
+  ai: AiProvider;
 }): readonly JobDefinition<never>[] {
   return [
+    ownerSummaryJob({ ai: deps.ai }),
     cleanupJob,
     approvalExpiryJob,
     fileScanJob({ store: deps.files, scanner: deps.scanner }),

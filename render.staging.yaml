@@ -37,6 +37,13 @@ envVarGroups:
       # sk_test_… only (Paystack test mode).
       - key: PAYMENT_SECRET_KEY
         sync: false
+      # AI (owner summary, questions): off until you add a key and set this to anthropic.
+      - key: AI_PROVIDER
+        value: 'off'
+      - key: AI_MODEL
+        value: claude-opus-5-5
+      - key: ANTHROPIC_API_KEY
+        sync: false
       - key: PASSWORD_BREACH_CHECK
         value: hibp
       - key: WHATSAPP_PROVIDER

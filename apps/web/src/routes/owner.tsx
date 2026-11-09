@@ -10,6 +10,7 @@ import ownerStrings from '../i18n/en/owner.json';
 import { registerStrings } from '../i18n/index.ts';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
+import { AskFigures } from './ask-figures.tsx';
 
 registerStrings(ownerStrings);
 
@@ -156,6 +157,7 @@ export function OwnerHomePage() {
           <PropertyCard key={c.id} card={c} />
         ))}
       </div>
+      <AskFigures />
     </section>
   );
 }

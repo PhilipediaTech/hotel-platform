@@ -128,6 +128,22 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplateDef[] = [
     },
   },
   {
+    // T-116 (PRD M14-11): the owner's morning summary in plain language.
+    code: 'OWNER_SUMMARY',
+    label: 'Owner morning summary',
+    audience: 'STAFF',
+    variables: [
+      PROPERTY,
+      v('business_date', 'Business day', '10 Nov 2026'),
+      v('summary', 'Summary', 'A busy night: 72% occupancy and ₦1,620,000.00 in room revenue.'),
+    ],
+    whatsapp: {
+      name: 'owner_summary',
+      category: 'UTILITY',
+      body: 'Good morning. {{property_name}}, {{business_date}}: {{summary}} Open the app for details.',
+    },
+  },
+  {
     code: 'PRE_ARRIVAL',
     label: 'Before arrival',
     audience: 'GUEST',
@@ -307,6 +323,7 @@ export const MESSAGE_TEMPLATE_CODES = [
   'BOOKING_CONFIRMED',
   'BOOKING_REFUNDED',
   'GUEST_FOLLOW_UP',
+  'OWNER_SUMMARY',
   'PRE_ARRIVAL',
   'PAYMENT_REQUEST',
   'FOLIO',

@@ -1,4 +1,5 @@
 import { createApp } from './app.ts';
+import { createAiProvider } from './core/ai.ts';
 import { loadConfig } from './core/config.ts';
 import { createDb } from './core/db.ts';
 import { systemClock } from './core/clock.ts';
@@ -37,7 +38,16 @@ const files = createLocalFileStore({
 const payments = createPaymentProvider(config, logger);
 // WhatsApp: Meta with its token, or the fake (the API only checks webhooks; the worker sends).
 const messages = createMessageProvider(config, logger);
-const app = createApp({ config, logger, db, email, payments, messages, files });
+const app = createApp({
+  config,
+  logger,
+  db,
+  email,
+  payments,
+  ai: createAiProvider(config, logger),
+  messages,
+  files,
+});
 
 const server = app.listen(config.port, (err?: Error) => {
   if (err) {

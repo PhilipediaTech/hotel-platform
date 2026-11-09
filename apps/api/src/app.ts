@@ -53,6 +53,7 @@ import { platformRoutes } from './modules/platform/routes.ts';
 import type { MessageProvider } from './core/messaging.ts';
 import { paymentIntentRoutes } from './modules/payments/intent-routes.ts';
 import { RAW_BODY, webhookRoutes } from './modules/payments/webhook-routes.ts';
+import type { AiProvider } from './core/ai.ts';
 import type { PaymentProvider } from './core/payments.ts';
 import { reservationRoutes } from './modules/reservations/routes.ts';
 import { roomRoutes } from './modules/rooms/routes.ts';
@@ -68,6 +69,7 @@ export interface AppOptions {
   email: EmailProvider;
   /** Payment links (ADR-021: Paystack; the fake locally and in tests). */
   payments: PaymentProvider;
+  ai: AiProvider;
   /** WhatsApp (ADR-016: Meta Cloud API; the fake locally and in tests). */
   messages: MessageProvider;
   /** File storage (R2 in production); the local store also serves its signed links. */
@@ -88,6 +90,7 @@ export function createApp({
   db,
   email,
   payments,
+  ai,
   messages,
   files,
   clock = systemClock,
@@ -189,7 +192,7 @@ export function createApp({
   api.use(handoverRoutes({ db, tenantDb, clock }));
   api.use(leakageRoutes({ db, tenantDb, clock }));
   api.use(messagingRoutes({ db, tenantDb, clock, messages }));
-  api.use(ownerRoutes({ db, clock }));
+  api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config }));
   api.use(partnerRoutes({ db, clock, config, email }));

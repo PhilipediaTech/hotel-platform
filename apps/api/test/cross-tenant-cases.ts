@@ -1499,6 +1499,15 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   sendThreadMessage: { seed: bThread, body: () => ({ body: 'Leak' }), untouched: bThreadUnchanged },
   sendThreadFollowUp: { seed: bThread, body: () => ({}), untouched: bThreadUnchanged },
   markThreadRead: { seed: bThread, body: () => ({}), untouched: bThreadUnchanged },
+  // Reads only, from the caller's own hotel: nothing of B's can be named in the request.
+  askFigures: {
+    seed: (_db, _world, propertyId) => Promise.resolve({ propertyId }),
+    creates: true,
+    body: () => ({ question: 'How is business?' }),
+    untouched: async (db) => {
+      expect(await db.message.count()).toBe(0);
+    },
+  },
   getBookingEngineSettings: {
     seed: bBookingPage,
     listIds: (body) => [(body as { slug: string | null }).slug ?? 'none'],

@@ -234,7 +234,33 @@ export const getTaxReport = defineRoute({
   response: TaxReport,
 });
 
+export const AskFiguresResponse = z
+  .object({
+    answer: z.string(),
+    /** The reports the answer came from. */
+    sources: z.array(z.object({ report: z.string(), detail: z.string().nullable() })),
+    /** False when no report was used: the answer is not about the hotel's figures. */
+    grounded: z.boolean(),
+  })
+  .meta({ id: 'AskFiguresResponse' });
+
+export const askFigures = defineRoute({
+  operationId: 'askFigures',
+  method: 'post',
+  path: '/reports/ask',
+  summary: 'Ask about the hotel’s figures in your own words (M14-12)',
+  description:
+    'Answered only from the reports the caller may open, naming them. Reads only. 503 AI_UNAVAILABLE when the AI is switched off or unreachable.',
+  tags: ['Reports'],
+  propertyScoped: true,
+  permission: 'report.dashboard',
+  body: z.object({ question: z.string().trim().min(3).max(500) }),
+  response: AskFiguresResponse,
+  errors: ['AI_UNAVAILABLE'],
+});
+
 export const REPORT_ROUTES = {
+  askFigures,
   getDashboardReport,
   getFlashReport,
   getTrialBalanceReport,

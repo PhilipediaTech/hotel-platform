@@ -241,6 +241,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   getSubscription: {"operationId":"getSubscription","method":"get","path":"/subscription","propertyScoped":true},
   updateBillingDetails: {"operationId":"updateBillingDetails","method":"patch","path":"/subscription/billing","body":true,"propertyScoped":true},
   getPlatformInvoicePdf: {"operationId":"getPlatformInvoicePdf","method":"get","path":"/subscription/invoices/{invoiceId}.pdf","propertyScoped":true,"produces":"application/pdf"},
+  askFigures: {"operationId":"askFigures","method":"post","path":"/reports/ask","body":true,"propertyScoped":true},
   getDashboardReport: {"operationId":"getDashboardReport","method":"get","path":"/reports/dashboard","propertyScoped":true,"exports":true},
   getFlashReport: {"operationId":"getFlashReport","method":"get","path":"/reports/flash","propertyScoped":true,"exports":true},
   getTrialBalanceReport: {"operationId":"getTrialBalanceReport","method":"get","path":"/reports/trial-balance","propertyScoped":true,"exports":true},

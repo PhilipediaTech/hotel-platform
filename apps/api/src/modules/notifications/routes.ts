@@ -1,8 +1,9 @@
-import { MESSAGE_ROUTES } from '@hotel/shared';
+import { INBOX_ROUTES, MESSAGE_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { RAW_BODY } from '../payments/webhook-routes.ts';
+import * as inbox from './inbox.ts';
 import * as messaging from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -42,6 +43,17 @@ export function messagingRoutes(deps: messaging.MessagingDeps): Router {
       req.headers,
       body,
     ),
+  );
+
+  const t = INBOX_ROUTES;
+  mountRoute(router, t.listMessageThreads, ({ query }) => inbox.listThreads(deps, query));
+  mountRoute(router, t.getMessageThread, ({ params }) => inbox.getThread(deps, params.threadId));
+  mountRoute(router, t.markThreadRead, ({ params }) => inbox.markRead(deps, params.threadId));
+  mountRoute(router, t.sendThreadMessage, ({ params, body }, { tenant }) =>
+    inbox.sendText(deps, tenantFrom(tenant), params.threadId, body.body),
+  );
+  mountRoute(router, t.sendThreadFollowUp, ({ params }, { tenant }) =>
+    inbox.sendFollowUp(deps, tenantFrom(tenant), params.threadId),
   );
 
   return router;

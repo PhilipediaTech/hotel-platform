@@ -240,6 +240,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-092',
   },
   {
+    id: 'inbox',
+    path: '/inbox',
+    anyOf: ['message.send'],
+    group: 'admin',
+    screen: 'S29',
+    ticket: 'T-115',
+  },
+  {
     id: 'messages',
     path: '/messages',
     anyOf: ['message.send', 'template.manage'],

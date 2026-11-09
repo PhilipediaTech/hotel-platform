@@ -148,6 +148,8 @@ model Property {
   promoCodes            PromoCode[]
   guestLinks            GuestLink[]
 
+  messageThreads MessageThread[]
+
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
   @@unique([organisationId, id])
@@ -285,6 +287,8 @@ model User {
   referralPartner    ReferralPartner?
   partnerPayouts     PartnerPayout[]    @relation("PartnerPayoutBy")
   partnerChanges     PartnerChange[]    @relation("PartnerChangeBy")
+
+  messagesSent Message[] @relation("MessageSentBy")
 
   @@map("users")
 }
@@ -1021,6 +1025,8 @@ model Guest {
   folioWindows FolioWindow[]
   tasks        Task[]
 
+  messageThreads MessageThread[]
+
   @@index([organisationId, phone])
   @@index([organisationId, email])
   @@index([organisationId, lastName])
@@ -1116,6 +1122,8 @@ model Reservation {
   paymentIntents PaymentIntent[]
 
   guestLinks GuestLink[]
+
+  messageThreads MessageThread[]
 
   @@unique([propertyId, confirmationNo])
   @@unique([propertyId, source, channelRef])
@@ -2478,4 +2486,52 @@ model OnlineCheckIn {
   @@unique([propertyId, stayId])
   @@index([purgeAfter])
   @@map("online_check_ins")
+}
+
+// The two-way WhatsApp inbox (PRD M11-04; tab 3 message_threads, messages; T-115).
+model MessageThread {
+  id             String    @id @default(uuid()) @db.Uuid
+  organisationId String    @map("organisation_id") @db.Uuid
+  propertyId     String    @map("property_id") @db.Uuid
+  phone          String
+  guestId        String?   @map("guest_id") @db.Uuid
+  reservationId  String?   @map("reservation_id") @db.Uuid
+  /// Free text is allowed for 24 hours after this (M11 rule).
+  lastInboundAt  DateTime? @map("last_inbound_at") @db.Timestamptz(6)
+  lastMessageAt  DateTime  @map("last_message_at") @db.Timestamptz(6)
+  lastPreview    String    @map("last_preview")
+  unreadCount    Int       @default(0) @map("unread_count")
+
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  guest       Guest?       @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  messages    Message[]
+
+  @@unique([propertyId, phone])
+  @@index([phone, lastMessageAt])
+  @@index([propertyId, lastMessageAt])
+  @@map("message_threads")
+}
+
+model Message {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  threadId    String   @map("thread_id") @db.Uuid
+  /// IN | OUT
+  direction   String
+  /// TEXT | TEMPLATE | OTHER (a photo or the like: not stored)
+  kind        String
+  body        String
+  /// RECEIVED | QUEUED | SENT | DELIVERED | READ | FAILED
+  status      String
+  providerRef String?  @unique @map("provider_ref")
+  error       String?
+  sentById    String?  @map("sent_by_id") @db.Uuid
+  createdAt   DateTime @map("created_at") @db.Timestamptz(6)
+
+  thread MessageThread @relation(fields: [threadId], references: [id], onDelete: Restrict)
+  sentBy User?         @relation("MessageSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+
+  @@index([threadId, createdAt])
+  @@map("messages")
 }

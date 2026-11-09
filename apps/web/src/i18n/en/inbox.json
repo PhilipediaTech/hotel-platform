@@ -1,0 +1,21 @@
+{
+  "inbox": {
+    "title": "WhatsApp inbox",
+    "unreadOnly": "Unread only",
+    "none": "No conversations yet. Guests’ replies on WhatsApp appear here.",
+    "pick": "Choose a conversation.",
+    "unknown": "Not matched to a guest",
+    "unread_one": "{{count}} unread",
+    "unread_other": "{{count}} unread",
+    "booking": "Booking {{no}}",
+    "you": "Staff",
+    "guest": "Guest",
+    "failed": "Not delivered",
+    "template": "Sent as an approved template",
+    "reply": "Your reply",
+    "send": "Send",
+    "windowClosed": "This guest last wrote more than 24 hours ago, so WhatsApp only allows an approved message.",
+    "followUp": "Send follow-up message",
+    "followUpSent": "Follow-up sent. You can reply freely once the guest answers."
+  }
+}

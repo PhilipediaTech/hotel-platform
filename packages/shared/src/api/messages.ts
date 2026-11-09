@@ -188,12 +188,12 @@ export const whatsappWebhook = defineRoute({
   operationId: 'whatsappWebhook',
   method: 'post',
   path: '/webhooks/whatsapp/{provider}',
-  summary: 'WhatsApp delivery statuses',
+  summary: 'WhatsApp delivery statuses and incoming guest messages',
   description:
     'Signed by the provider (Meta: `x-hub-signature-256`, HMAC-SHA256 of the raw body with ' +
     'the app secret). A bad signature answers 401 and changes nothing. Statuses only move a ' +
     'message forward (sent → delivered → read); failed records the provider’s error. ' +
-    'Incoming guest messages wait for the two-way inbox (V1.2).',
+    'Incoming guest messages go to the two-way inbox (T-115).',
   tags: ['Webhooks'],
   auth: 'none',
   params: Provider,

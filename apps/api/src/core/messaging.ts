@@ -25,6 +25,15 @@ export interface StatusUpdate {
   error: string | null;
 }
 
+/** A message from a guest (T-115). */
+export interface InboundMessage {
+  providerRef: string;
+  /** International format, e.g. +2348012345678. */
+  from: string;
+  kind: 'TEXT' | 'OTHER';
+  body: string;
+}
+
 /** A send that failed. `permanent`: retrying the same message cannot help. */
 export class MessageSendError extends Error {
   readonly permanent: boolean;
@@ -44,6 +53,10 @@ export interface MessageProvider {
   verifyChallenge(query: Record<string, string | undefined>): string | null;
   /** Delivery statuses in a verified webhook body; other content is ignored. */
   parseStatuses(body: unknown): StatusUpdate[];
+  /** Free text, only within 24 hours of the guest's last message (T-115). */
+  sendText(message: { to: string; body: string }): Promise<{ providerRef: string }>;
+  /** Guest messages in a verified webhook body (T-115). */
+  parseInbound(body: unknown): InboundMessage[];
 }
 
 /** HMAC-SHA256 of the raw body, as Meta sends it: `sha256=<hex>`. */
@@ -100,8 +113,46 @@ export function parseMetaStatuses(body: unknown): StatusUpdate[] {
   return out;
 }
 
+const OTHER_KINDS: Record<string, string> = {
+  image: '[Photo]',
+  document: '[Document]',
+  audio: '[Voice note]',
+  video: '[Video]',
+  location: '[Location]',
+  sticker: '[Sticker]',
+  contacts: '[Contact]',
+};
+
+/**
+ * Guest messages in Meta's webhook shape: entry[].changes[].value.messages[] with `id`,
+ * `from` (digits, no plus) and `type`. Only text is kept; the rest shows as a placeholder.
+ */
+export function parseMetaInbound(body: unknown): InboundMessage[] {
+  if (!isObject(body)) return [];
+  const out: InboundMessage[] = [];
+  for (const entry of list(body['entry'])) {
+    if (!isObject(entry)) continue;
+    for (const change of list(entry['changes'])) {
+      if (!isObject(change) || !isObject(change['value'])) continue;
+      for (const m of list(change['value']['messages'])) {
+        if (!isObject(m) || typeof m['id'] !== 'string' || typeof m['from'] !== 'string') continue;
+        const from = `+${m['from'].replace(/^\+/, '')}`;
+        const text = isObject(m['text']) ? m['text']['body'] : undefined;
+        if (m['type'] === 'text' && typeof text === 'string') {
+          out.push({ providerRef: m['id'], from, kind: 'TEXT', body: text.slice(0, 4096) });
+        } else {
+          const label = OTHER_KINDS[String(m['type'])] ?? '[Message]';
+          out.push({ providerRef: m['id'], from, kind: 'OTHER', body: label });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 export interface FakeMessageProvider extends MessageProvider {
   readonly sent: (WhatsAppTemplateMessage & { providerRef: string })[];
+  readonly sentTexts: { to: string; body: string; providerRef: string }[];
   /** Makes the next sends fail (permanent or not), for tests. */
   failNext(count: number, permanent?: boolean): void;
 }
@@ -116,10 +167,23 @@ export const FAKE_WHATSAPP_VERIFY_TOKEN = 'fake-whatsapp-verify-token';
  */
 export function createFakeMessageProvider(logger?: Logger): FakeMessageProvider {
   const sent: FakeMessageProvider['sent'] = [];
+  const sentTexts: FakeMessageProvider['sentTexts'] = [];
   let failures: { count: number; permanent: boolean } = { count: 0, permanent: false };
   return {
     name: 'FAKE',
     sent,
+    sentTexts,
+    sendText(message) {
+      if (failures.count > 0) {
+        failures.count -= 1;
+        return Promise.reject(new MessageSendError('Fake send failure', failures.permanent));
+      }
+      const providerRef = `fake.${randomUUID()}`;
+      sentTexts.push({ ...message, providerRef });
+      logger?.info({ to: message.to, providerRef }, 'WhatsApp text (not sent, fake provider)');
+      return Promise.resolve({ providerRef });
+    },
+    parseInbound: parseMetaInbound,
     failNext(count, permanent = false) {
       failures = { count, permanent };
     },

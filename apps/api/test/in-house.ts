@@ -172,5 +172,6 @@ export async function inHouse(
     app: c.app,
     email: c.email,
     payments: c.payments,
+    messages: c.messages,
   };
 }

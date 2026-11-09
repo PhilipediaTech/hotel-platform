@@ -57,6 +57,9 @@ try {
       clock: systemClock,
       messages: createMessageProvider(config, logger),
       email: createFakeEmailProvider(logger),
+      ai: createAiProvider(config, logger),
+      payments: createPaymentProvider(config, logger),
+      files,
     }),
   });
 } catch (err) {

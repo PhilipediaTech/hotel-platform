@@ -70,6 +70,8 @@ function SettingsForm({ saved }: { saved: Settings }) {
           allowDeposit: f.allowDeposit,
           depositBps: Math.round(Number(deposit) * 100),
           allowPayAtHotel: f.allowPayAtHotel,
+          assistantEnabled: f.assistantEnabled,
+          assistantNotes: f.assistantNotes || null,
         },
       }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: SETTINGS_KEY }),
@@ -178,6 +180,32 @@ function SettingsForm({ saved }: { saved: Settings }) {
         />
       </fieldset>
       <p className="text-sm text-text-muted">{t('bookingEngine.plansHint')}</p>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-sm font-semibold">{t('bookingEngine.assistant')}</legend>
+        <Check
+          id="be-assistant"
+          label={t('bookingEngine.assistantOn')}
+          checked={f.assistantEnabled}
+          onChange={(v) => set('assistantEnabled', v)}
+        />
+        <p className="text-xs text-text-muted">{t('bookingEngine.assistantHint')}</p>
+        {f.assistantEnabled && (
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="be-notes">{t('bookingEngine.assistantNotes')}</Label>
+            <textarea
+              id="be-notes"
+              className={textareaClass}
+              value={f.assistantNotes ?? ''}
+              onChange={(e) => set('assistantNotes', e.target.value)}
+            />
+          </div>
+        )}
+        {f.slug && (
+          <p className="break-all text-xs text-text-muted">
+            {t('bookingEngine.assistantLink', { code: `#${f.slug}` })}
+          </p>
+        )}
+      </fieldset>
       <div>
         <Button type="submit" disabled={save.isPending}>
           {t('bookingEngine.save')}

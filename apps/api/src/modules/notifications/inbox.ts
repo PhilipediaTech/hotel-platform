@@ -6,6 +6,7 @@ import { recordAudit } from '../../core/audit.ts';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
+import { recordEvent } from '../../core/outbox.ts';
 import {
   MessageSendError,
   type InboundMessage,
@@ -33,6 +34,8 @@ type Msg = z.input<typeof ThreadMessage>;
 
 export const WINDOW_MS = 24 * 3_600_000;
 const STOP_WORDS = new Set(['STOP', 'UNSUBSCRIBE']);
+const UNKNOWN_SENDER_REPLY =
+  'Hello. To reach a hotel here, please use the WhatsApp link on its booking page or your booking confirmation.';
 const PREVIEW = 120;
 
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -57,6 +60,8 @@ function threadOf(t: Thread, now: Date): Item {
     lastPreview: t.lastPreview,
     unreadCount: t.unreadCount,
     windowOpen: windowOpen(t, now),
+    needsStaff: t.needsStaff,
+    assistantPaused: t.assistantPausedUntil !== null && t.assistantPausedUntil > now,
   };
 }
 
@@ -75,7 +80,13 @@ function messageOf(m: Prisma.MessageGetPayload<{ include: { sentBy: true } }>): 
 // ── Incoming ────────────────────────────────────────────────────────────────────────────
 
 /** The hotel this phone belongs with: whoever was in touch last, else where it last booked. */
-async function propertyFor(db: Db, phone: string): Promise<string | null> {
+async function propertyFor(db: Db, phone: string, text: string): Promise<string | null> {
+  // A guest who came from a hotel's WhatsApp link says which hotel: that comes first (T-117).
+  const slug = /#([a-z0-9-]{3,50})/i.exec(text)?.[1]?.toLowerCase();
+  if (slug) {
+    const page = await db.bookingEngineSettings.findUnique({ where: { slug } });
+    if (page) return page.propertyId;
+  }
   const [thread, delivery] = await Promise.all([
     db.messageThread.findFirst({ where: { phone }, orderBy: { lastMessageAt: 'desc' } }),
     db.notificationDelivery.findFirst({
@@ -116,13 +127,19 @@ async function linkFor(db: Tx, organisationId: string, propertyId: string, phone
 
 /** Records incoming messages. A repeat of one already held is ignored. Answers how many. */
 export async function receiveInbound(
-  deps: Pick<InboxDeps, 'db' | 'clock'>,
+  deps: Pick<InboxDeps, 'db' | 'clock' | 'messages'>,
   inbound: readonly InboundMessage[],
 ): Promise<number> {
   let stored = 0;
   for (const m of inbound) {
-    const propertyId = await propertyFor(deps.db, m.from);
-    if (!propertyId) continue;
+    const propertyId = await propertyFor(deps.db, m.from, m.body);
+    if (!propertyId) {
+      // We can't tell which hotel they mean; say so rather than leaving them with silence.
+      await deps.messages
+        .sendText({ to: m.from, body: UNKNOWN_SENDER_REPLY })
+        .catch(() => undefined);
+      continue;
+    }
     const property = await deps.db.property.findUniqueOrThrow({ where: { id: propertyId } });
     const now = deps.clock();
     const added = await deps.db.$transaction(async (tx) => {
@@ -164,6 +181,13 @@ export async function receiveInbound(
           lastPreview: preview(m.body),
           unreadCount: { increment: 1 },
         },
+      });
+      // The assistant answers from the worker, so the webhook replies at once (T-117).
+      await recordEvent(tx, {
+        organisationId: property.organisationId,
+        propertyId,
+        type: 'whatsapp.inbound',
+        payload: { threadId: thread.id },
       });
       // M11 rule: guests can opt out of marketing messages.
       if (link.guestId && STOP_WORDS.has(m.body.trim().toUpperCase())) {
@@ -271,7 +295,13 @@ export async function sendText(
     });
     await tx.messageThread.update({
       where: { id: threadId },
-      data: { lastMessageAt: now, lastPreview: preview(body) },
+      // A person has answered: the assistant stands back for a day.
+      data: {
+        lastMessageAt: now,
+        lastPreview: preview(body),
+        needsStaff: false,
+        assistantPausedUntil: new Date(now.getTime() + WINDOW_MS),
+      },
     });
     await recordAudit(tx, {
       action: 'message.sent',
@@ -281,6 +311,19 @@ export async function sendText(
     });
     return messageOf(row);
   });
+}
+
+export async function setAssistant(deps: InboxDeps, threadId: string, active: boolean) {
+  await loadThread(deps.tenantDb, threadId);
+  const now = deps.clock();
+  await deps.tenantDb.messageThread.update({
+    where: { id: threadId },
+    data: {
+      needsStaff: false,
+      assistantPausedUntil: active ? null : new Date(now.getTime() + WINDOW_MS),
+    },
+  });
+  return threadOf(await loadThread(deps.tenantDb, threadId), now);
 }
 
 /** The approved template that invites a reply, for when the window has closed. */

@@ -152,8 +152,11 @@ export function createFakeAiProvider(logger?: Logger): FakeAiProvider {
         text = await fake.respond(request);
       } else if (request.tools?.[0] && request.runTool) {
         const [tool] = request.tools;
-        const result = await request.runTool(tool.name, { date: null });
-        text = `From the ${tool.name.replace('get_', '').replace('_', ' ')}: ${result.slice(0, 300)}`;
+        text = await request.runTool(tool.name, { date: null }).then(
+          (result) =>
+            `From the ${tool.name.replace('get_', '').replace('_', ' ')}: ${result.slice(0, 300)}`,
+          () => 'Thank you. (The local stand-in for the AI has no real answer to give.)',
+        );
       } else {
         text = request.user.slice(0, 300);
       }

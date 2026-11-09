@@ -25,7 +25,7 @@ export async function countAiUse(
   db: UsageDb,
   args: {
     organisationId: string;
-    metric: 'AI_SUMMARY' | 'AI_QUESTION';
+    metric: 'AI_SUMMARY' | 'AI_QUESTION' | 'AI_ASSISTANT';
     at: Date;
     inputTokens: number;
     outputTokens: number;
@@ -83,6 +83,21 @@ export function usesOnlyTheFacts(summary: string, facts: string): boolean {
 
 const percent = (bps: number) => `${(bps / 100).toFixed(bps % 100 === 0 ? 0 : 1)}%`;
 
+/** Active members with an email who hold owner.read or report.flash at this hotel. */
+async function summaryEmails(db: Db, p: { id: string; organisationId: string }) {
+  const members = await db.membership.findMany({
+    where: {
+      organisationId: p.organisationId,
+      active: true,
+      role: { permissions: { hasSome: ['owner.read', 'report.flash'] } },
+      OR: [{ propertyId: p.id }, { propertyId: null }],
+      user: { status: 'ACTIVE', email: { not: null } },
+    },
+    select: { user: { select: { email: true } } },
+  });
+  return [...new Set(members.flatMap((m) => (m.user.email ? [m.user.email] : [])))];
+}
+
 async function summaryFor(
   db: Db,
   ai: AiProvider,
@@ -111,12 +126,16 @@ async function summaryFor(
     },
   });
   if (already > 0) return false;
-  const recipients = await recipientsWith(db, {
-    organisationId: property.organisationId,
-    propertyId: property.id,
-    permission: 'owner.read',
-  });
-  if (recipients.length === 0) return false;
+  // WhatsApp for owners; email too for anyone who gets the flash report, such as the GM.
+  const [recipients, emails] = await Promise.all([
+    recipientsWith(db, {
+      organisationId: property.organisationId,
+      propertyId: property.id,
+      permission: 'owner.read',
+    }),
+    summaryEmails(db, property),
+  ]);
+  if (recipients.length === 0 && emails.length === 0) return false;
 
   const open = await db.leakageAlert.groupBy({
     by: ['ruleCode'],
@@ -168,6 +187,21 @@ async function summaryFor(
       channel: 'WHATSAPP',
       templateCode: 'OWNER_SUMMARY',
       recipient: r.phone,
+      ref,
+      vars: {
+        property_name: property.name,
+        business_date: dayLabel(flash.businessDate),
+        summary,
+      },
+    });
+  }
+  for (const email of emails) {
+    await queueMessage(db, {
+      organisationId: property.organisationId,
+      propertyId: property.id,
+      channel: 'EMAIL',
+      templateCode: 'OWNER_SUMMARY',
+      recipient: email,
       ref,
       vars: {
         property_name: property.name,

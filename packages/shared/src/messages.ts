@@ -137,6 +137,10 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplateDef[] = [
       v('business_date', 'Business day', '10 Nov 2026'),
       v('summary', 'Summary', 'A busy night: 72% occupancy and ₦1,620,000.00 in room revenue.'),
     ],
+    email: {
+      subject: 'Morning summary for {{property_name}}, {{business_date}}',
+      body: 'Good morning.\n\n{{property_name}}, {{business_date}}:\n\n{{summary}}\n\nOpen the app for details.',
+    },
     whatsapp: {
       name: 'owner_summary',
       category: 'UTILITY',

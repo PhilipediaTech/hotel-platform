@@ -154,6 +154,7 @@ export async function inHouse(
   return {
     ...h,
     fdId,
+    gmId: h.gm.id,
     as,
     gm,
     fd,

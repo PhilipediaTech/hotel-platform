@@ -27,6 +27,10 @@ export const ThreadItem = z
     unreadCount: z.number().int(),
     /** Within 24 hours of the guest's last message: free text can be sent. */
     windowOpen: z.boolean(),
+    /** The assistant passed this to a person, or could not answer (T-117). */
+    needsStaff: z.boolean(),
+    /** Staff have taken over: the assistant stays quiet for now. */
+    assistantPaused: z.boolean(),
   })
   .meta({ id: 'MessageThread' });
 
@@ -34,7 +38,7 @@ export const ThreadMessage = z
   .object({
     id: Uuid,
     direction: z.enum(MESSAGE_DIRECTIONS),
-    kind: z.enum(['TEXT', 'TEMPLATE', 'OTHER']),
+    kind: z.enum(['TEXT', 'TEMPLATE', 'ASSISTANT', 'OTHER']),
     body: z.string(),
     status: z.enum(INBOX_MESSAGE_STATUSES),
     sentBy: z.string().nullable(),
@@ -110,7 +114,19 @@ export const markThreadRead = defineRoute({
   response: z.object({ unreadCount: z.literal(0) }),
 });
 
+export const setThreadAssistant = defineRoute({
+  ...COMMON,
+  operationId: 'setThreadAssistant',
+  method: 'post',
+  path: '/message-threads/{threadId}/assistant',
+  summary: 'Take a conversation over from the assistant, or hand it back (T-117)',
+  params: ThreadParams,
+  body: z.object({ active: z.boolean() }),
+  response: ThreadItem,
+});
+
 export const INBOX_ROUTES = {
+  setThreadAssistant,
   listMessageThreads,
   getMessageThread,
   sendThreadMessage,

@@ -48,6 +48,9 @@ export function messagingRoutes(deps: messaging.MessagingDeps): Router {
   const t = INBOX_ROUTES;
   mountRoute(router, t.listMessageThreads, ({ query }) => inbox.listThreads(deps, query));
   mountRoute(router, t.getMessageThread, ({ params }) => inbox.getThread(deps, params.threadId));
+  mountRoute(router, t.setThreadAssistant, ({ params, body }) =>
+    inbox.setAssistant(deps, params.threadId, body.active),
+  );
   mountRoute(router, t.markThreadRead, ({ params }) => inbox.markRead(deps, params.threadId));
   mountRoute(router, t.sendThreadMessage, ({ params, body }, { tenant }) =>
     inbox.sendText(deps, tenantFrom(tenant), params.threadId, body.body),

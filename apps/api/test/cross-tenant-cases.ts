@@ -1498,6 +1498,11 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   getMessageThread: { seed: bThread },
   sendThreadMessage: { seed: bThread, body: () => ({ body: 'Leak' }), untouched: bThreadUnchanged },
   sendThreadFollowUp: { seed: bThread, body: () => ({}), untouched: bThreadUnchanged },
+  setThreadAssistant: {
+    seed: bThread,
+    body: () => ({ active: false }),
+    untouched: bThreadUnchanged,
+  },
   markThreadRead: { seed: bThread, body: () => ({}), untouched: bThreadUnchanged },
   // Reads only, from the caller's own hotel: nothing of B's can be named in the request.
   askFigures: {

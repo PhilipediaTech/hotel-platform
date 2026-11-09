@@ -8,6 +8,7 @@ import { AppError } from '../../core/errors.ts';
 import { defineJob } from '../../core/jobs.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
+import { aiAllowanceUsedUp, countAiUse } from '../../core/usage.ts';
 import { queueMessage } from '../notifications/delivery.ts';
 import { money } from '../payments/documents.ts';
 import * as reports from '../reports/service.ts';
@@ -17,44 +18,6 @@ import { lastFlash } from './service.ts';
 // The owner's AI features (PRD M14-11, M14-12, M14 rules; T-116): a plain-language morning
 // summary on WhatsApp, and questions answered from the hotel's own reports, naming the report.
 // AI only reads. Every use is counted per hotel group (usage_counters).
-
-type UsageDb = Pick<Db, 'usageCounter'>;
-
-/** Counts one use of AI against the hotel group, for its plan's allowance. */
-export async function countAiUse(
-  db: UsageDb,
-  args: {
-    organisationId: string;
-    metric: 'AI_SUMMARY' | 'AI_QUESTION' | 'AI_ASSISTANT';
-    at: Date;
-    inputTokens: number;
-    outputTokens: number;
-  },
-) {
-  const month = args.at.toISOString().slice(0, 7);
-  await db.usageCounter.upsert({
-    where: {
-      organisationId_month_metric: {
-        organisationId: args.organisationId,
-        month,
-        metric: args.metric,
-      },
-    },
-    create: {
-      organisationId: args.organisationId,
-      month,
-      metric: args.metric,
-      count: 1,
-      inputTokens: args.inputTokens,
-      outputTokens: args.outputTokens,
-    },
-    update: {
-      count: { increment: 1 },
-      inputTokens: { increment: args.inputTokens },
-      outputTokens: { increment: args.outputTokens },
-    },
-  });
-}
 
 // ── The morning summary (M14-11) ────────────────────────────────────────────────────────
 
@@ -162,23 +125,28 @@ async function summaryFor(
     }),
   ].join('\n');
 
-  // If the model is unavailable, or its figures don't match, the plain figures still go out.
+  // If the model is unavailable, its figures don't match or the month's allowance is gone,
+  // the plain figures still go out.
   let summary = plain;
-  try {
-    const result = await ai.generate({ system: SUMMARY_SYSTEM, user: facts, effort: 'low' });
-    await countAiUse(db, {
-      organisationId: property.organisationId,
-      metric: 'AI_SUMMARY',
-      at: now,
-      inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens,
-    });
-    const line = result.text.replace(/\s+/g, ' ').trim();
-    if (line && line.length <= MAX_SUMMARY_CHARS && usesOnlyTheFacts(line, facts)) summary = line;
-    else logger.warn({ propertyId: property.id }, 'AI summary set aside: figures did not match');
-  } catch (err) {
-    if (!(err instanceof AiUnavailableError)) throw err;
-    logger.warn({ propertyId: property.id }, 'AI summary unavailable; sent the plain figures');
+  if (await aiAllowanceUsedUp(db, property.organisationId, now)) {
+    logger.info({ propertyId: property.id }, 'AI allowance used up; sent the plain figures');
+  } else {
+    try {
+      const result = await ai.generate({ system: SUMMARY_SYSTEM, user: facts, effort: 'low' });
+      await countAiUse(db, {
+        organisationId: property.organisationId,
+        metric: 'AI_SUMMARY',
+        at: now,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+      });
+      const line = result.text.replace(/\s+/g, ' ').trim();
+      if (line && line.length <= MAX_SUMMARY_CHARS && usesOnlyTheFacts(line, facts)) summary = line;
+      else logger.warn({ propertyId: property.id }, 'AI summary set aside: figures did not match');
+    } catch (err) {
+      if (!(err instanceof AiUnavailableError)) throw err;
+      logger.warn({ propertyId: property.id }, 'AI summary unavailable; sent the plain figures');
+    }
   }
   for (const r of recipients) {
     await queueMessage(db, {
@@ -370,6 +338,12 @@ export async function askFigures(
   tenant: TenantContext,
   question: string,
 ): Promise<z.input<typeof AskFiguresResponse>> {
+  if (await aiAllowanceUsedUp(deps.db, tenant.organisationId, deps.clock())) {
+    throw new AppError(
+      'ALLOWANCE_USED_UP',
+      'This month’s AI allowance is used up. Questions will work again next month.',
+    );
+  }
   const available = reportsFor(deps, tenant);
   const sources: { report: string; detail: string | null }[] = [];
   const today = localDate(

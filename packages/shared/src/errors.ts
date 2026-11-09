@@ -12,6 +12,8 @@ export const ERROR_HTTP_STATUS = {
   FORBIDDEN: 403,
   MODULE_DISABLED: 403,
   PROPERTY_NOT_LIVE: 403,
+  // Not in tab 4 (T-118): the plan's AI allowance for the month is used up.
+  ALLOWANCE_USED_UP: 403,
 
   // Also returned for other tenants' records, so their existence never leaks.
   NOT_FOUND: 404,

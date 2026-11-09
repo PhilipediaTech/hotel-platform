@@ -5,9 +5,9 @@ import { z } from 'zod';
 import { AiUnavailableError, type AiProvider, type AiTool } from '../../core/ai.ts';
 import { MessageSendError, type MessageProvider } from '../../core/messaging.ts';
 import type { EventHandler } from '../../core/outbox.ts';
+import { aiAllowanceUsedUp, countAiUse } from '../../core/usage.ts';
 import { localDate } from '@hotel/shared';
 import { money } from '../payments/documents.ts';
-import { countAiUse } from '../owner/ai.ts';
 import { WINDOW_MS } from '../notifications/inbox.ts';
 import { createPublicBooking, publicAvailability, type BookingEngineDeps } from './service.ts';
 
@@ -279,6 +279,11 @@ async function send(deps: AssistantDeps, ctx: Context, body: string, handOver: b
 
 async function replyOnce(deps: AssistantDeps, ctx: Context) {
   const { thread, now } = ctx;
+  if (await aiAllowanceUsedUp(deps.db, thread.organisationId, now)) {
+    deps.logger.warn({ threadId: thread.id }, 'AI allowance used up; handed over to staff');
+    await send(deps, ctx, HANDOVER_REPLY, true);
+    return;
+  }
   const { state, runTool } = runTools(deps, ctx);
   const today = localDate(now, thread.property.timeZone);
   let text: string;

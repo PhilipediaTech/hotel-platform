@@ -11,7 +11,7 @@
     "properties_one": "{{count}} property",
     "properties_other": "{{count}} properties",
     "noPlan": "No plan",
-    "usage": "{{rooms}} active rooms · {{messages}} WhatsApp this month",
+    "usage": "{{rooms}} active rooms · {{messages}} WhatsApp · {{ai}} AI this month",
     "inSupport": "support session open",
     "plan": "Plan and prices",
     "planName": "Plan",
@@ -30,6 +30,9 @@
       "SUSPENDED": "Suspended"
     },
     "periodEnd": "Current period ends",
+    "aiAllowance": "AI uses per month",
+    "whatsappAllowance": "WhatsApp messages per month",
+    "allowanceHint": "Leave an allowance blank for no limit.",
     "savePlan": "Save plan",
     "saved": "Saved.",
     "modules": "Modules",

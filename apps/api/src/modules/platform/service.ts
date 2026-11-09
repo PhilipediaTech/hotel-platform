@@ -15,6 +15,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import { monthlyUse } from '../../core/usage.ts';
 import { addCommission } from '../partners/service.ts';
 import { facts, footer, money, render, table, totals } from '../payments/documents.ts';
 
@@ -48,6 +49,8 @@ function subscriptionOf(s: Prisma.SubscriptionGetPayload<object> | null): Subscr
     currency: s.currency,
     status: s.status as Subscription['status'],
     currentPeriodEnd: day(s.currentPeriodEnd),
+    aiAllowance: s.aiAllowance,
+    whatsappAllowance: s.whatsappAllowance,
   };
 }
 
@@ -98,25 +101,15 @@ async function sessionOf(db: Db, s: SessionRow, now: Date): Promise<SupportSessi
   };
 }
 
-const monthOf = (now: Date) => now.toISOString().slice(0, 7);
-
-/** This month's usage (M13-01): active rooms (the billing measure) and WhatsApp messages. */
+/** This month's usage (M13-01): active rooms (the billing measure), WhatsApp and AI use. */
 async function usage(db: Db, organisationId: string, now: Date) {
-  const month = monthOf(now);
-  const [activeRooms, whatsappMessages] = await Promise.all([
+  const [activeRooms, use] = await Promise.all([
     db.room.count({
       where: { organisationId, active: true, property: { status: { not: 'ARCHIVED' } } },
     }),
-    db.notificationDelivery.count({
-      where: {
-        channel: 'WHATSAPP',
-        status: { in: ['SENT', 'DELIVERED', 'READ'] },
-        createdAt: { gte: dbDate(`${month}-01`) },
-        property: { organisationId },
-      },
-    }),
+    monthlyUse(db, organisationId, now),
   ]);
-  return { month, activeRooms, whatsappMessages };
+  return { ...use, activeRooms };
 }
 
 /** Active rooms × price, or the monthly minimum if more (ADR-019 as proposed). */
@@ -237,6 +230,8 @@ export async function setSubscription(
     currency: body.currency,
     status: body.status,
     currentPeriodEnd: dbDate(body.currentPeriodEnd),
+    aiAllowance: body.aiAllowance,
+    whatsappAllowance: body.whatsappAllowance,
   };
   return deps.db.$transaction(async (tx) => {
     const before = await tx.subscription.findUnique({ where: { organisationId } });

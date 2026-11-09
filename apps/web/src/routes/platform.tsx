@@ -100,6 +100,9 @@ export function CountryPackForm({ tenant }: { tenant: Pick<Detail, 'id' | 'count
   );
 }
 
+/** A blank allowance means no limit. */
+const allowanceOf = (text: string) => (text.trim() === '' ? null : Number(text));
+
 function PlanForm({ tenant }: { tenant: Detail }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -109,6 +112,10 @@ function PlanForm({ tenant }: { tenant: Detail }) {
   const [minimum, setMinimum] = useState(s ? String(Number(s.minimumMinor) / 100) : '');
   const [status, setStatus] = useState<string>(s?.status ?? 'TRIAL');
   const [periodEnd, setPeriodEnd] = useState(s?.currentPeriodEnd ?? '');
+  const [aiAllowance, setAiAllowance] = useState(s?.aiAllowance?.toString() ?? '');
+  const [whatsappAllowance, setWhatsappAllowance] = useState(
+    s?.whatsappAllowance?.toString() ?? '',
+  );
   const save = useMutation({
     mutationFn: () =>
       api.call('setTenantSubscription', {
@@ -120,6 +127,8 @@ function PlanForm({ tenant }: { tenant: Detail }) {
           currency: 'NGN',
           status: status as (typeof SUBSCRIPTION_STATUSES)[number],
           currentPeriodEnd: periodEnd,
+          aiAllowance: allowanceOf(aiAllowance),
+          whatsappAllowance: allowanceOf(whatsappAllowance),
         },
       }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: KEY }),
@@ -194,6 +203,29 @@ function PlanForm({ tenant }: { tenant: Detail }) {
           required
         />
       </div>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="pl-ai">{t('platform.aiAllowance')}</Label>
+        <Input
+          id="pl-ai"
+          type="number"
+          min={0}
+          step={1}
+          value={aiAllowance}
+          onChange={(e) => setAiAllowance(e.target.value)}
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="pl-wa">{t('platform.whatsappAllowance')}</Label>
+        <Input
+          id="pl-wa"
+          type="number"
+          min={0}
+          step={1}
+          value={whatsappAllowance}
+          onChange={(e) => setWhatsappAllowance(e.target.value)}
+        />
+      </div>
+      <p className="text-sm text-text-muted sm:col-span-3">{t('platform.allowanceHint')}</p>
       <div className="flex items-end gap-2">
         <Button type="submit" disabled={save.isPending}>
           {t('platform.savePlan')}
@@ -502,6 +534,7 @@ export function PlatformPage() {
                     {t('platform.usage', {
                       rooms: x.usage.activeRooms,
                       messages: x.usage.whatsappMessages,
+                      ai: x.usage.aiUses,
                     })}
                   </span>
                   {x.activeSupportSession && (

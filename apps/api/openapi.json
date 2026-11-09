@@ -36,6 +36,7 @@
                   "FORBIDDEN",
                   "MODULE_DISABLED",
                   "PROPERTY_NOT_LIVE",
+                  "ALLOWANCE_USED_UP",
                   "NOT_FOUND",
                   "BOOKING_CONFLICT",
                   "VERSION_CONFLICT",
@@ -10303,12 +10304,16 @@
               },
               "whatsappMessages": {
                 "type": "integer"
+              },
+              "aiUses": {
+                "type": "integer"
               }
             },
             "required": [
               "month",
               "activeRooms",
-              "whatsappMessages"
+              "whatsappMessages",
+              "aiUses"
             ]
           },
           "activeSupportSession": {
@@ -10363,6 +10368,18 @@
           },
           "currentPeriodEnd": {
             "$ref": "#/components/schemas/IsoDate"
+          },
+          "aiAllowance": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "whatsappAllowance": {
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "required": [
@@ -10371,7 +10388,9 @@
           "minimumMinor",
           "currency",
           "status",
-          "currentPeriodEnd"
+          "currentPeriodEnd",
+          "aiAllowance",
+          "whatsappAllowance"
         ]
       },
       "SupportSession": {
@@ -10490,12 +10509,16 @@
               },
               "whatsappMessages": {
                 "type": "integer"
+              },
+              "aiUses": {
+                "type": "integer"
               }
             },
             "required": [
               "month",
               "activeRooms",
-              "whatsappMessages"
+              "whatsappMessages",
+              "aiUses"
             ]
           },
           "activeSupportSession": {
@@ -42503,6 +42526,22 @@
                   },
                   "currentPeriodEnd": {
                     "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "aiAllowance": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100000000
+                  },
+                  "whatsappAllowance": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100000000
                   }
                 },
                 "required": [
@@ -42511,7 +42550,9 @@
                   "minimumMinor",
                   "currency",
                   "status",
-                  "currentPeriodEnd"
+                  "currentPeriodEnd",
+                  "aiAllowance",
+                  "whatsappAllowance"
                 ]
               }
             }
@@ -43248,6 +43289,9 @@
                         "whatsappMessages": {
                           "type": "integer"
                         },
+                        "aiUses": {
+                          "type": "integer"
+                        },
                         "estimateMinor": {
                           "allOf": [
                             {
@@ -43266,6 +43310,7 @@
                         "month",
                         "activeRooms",
                         "whatsappMessages",
+                        "aiUses",
                         "estimateMinor"
                       ]
                     },
@@ -43575,7 +43620,7 @@
             "session": []
           }
         ],
-        "description": "Answered only from the reports the caller may open, naming them. Reads only. 503 AI_UNAVAILABLE when the AI is switched off or unreachable.",
+        "description": "Answered only from the reports the caller may open, naming them. Reads only. 503 AI_UNAVAILABLE when the AI is switched off or unreachable; 403 ALLOWANCE_USED_UP when the month’s AI allowance is gone.",
         "x-permission": "report.dashboard",
         "parameters": [
           {
@@ -43642,7 +43687,7 @@
             }
           },
           "403": {
-            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`, `ALLOWANCE_USED_UP`",
             "content": {
               "application/json": {
                 "schema": {

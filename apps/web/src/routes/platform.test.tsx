@@ -25,6 +25,8 @@ const SUB = {
   currency: 'NGN',
   status: 'ACTIVE',
   currentPeriodEnd: '2026-11-30',
+  aiAllowance: 100,
+  whatsappAllowance: 12,
 };
 const INVOICE = {
   id: id(1),
@@ -58,7 +60,7 @@ const TENANT = {
   createdAt: '2026-10-01T09:00:00Z',
   properties: 2,
   subscription: SUB,
-  usage: { month: '2026-11', activeRooms: 3, whatsappMessages: 12 },
+  usage: { month: '2026-11', activeRooms: 3, whatsappMessages: 12, aiUses: 40 },
   activeSupportSession: null,
 };
 
@@ -79,7 +81,13 @@ beforeEach(() => {
       json(200, {
         organisation: { id: ORG, name: 'Obi Hotels', legalName: null },
         subscription: SUB,
-        usage: { month: '2026-11', activeRooms: 3, whatsappMessages: 12, estimateMinor: '2000000' },
+        usage: {
+          month: '2026-11',
+          activeRooms: 3,
+          whatsappMessages: 12,
+          aiUses: 40,
+          estimateMinor: '2000000',
+        },
         invoices: [INVOICE],
         supportSessions: [SESSION],
       }),
@@ -96,6 +104,7 @@ beforeEach(() => {
         supportSessions: [],
       }),
     [`PATCH /platform/tenants/${ORG}/flags`]: () => json(200, { flags: [] }),
+    [`PUT /platform/tenants/${ORG}/subscription`]: () => json(200, SUB),
     'POST /platform/support-sessions': () => json(201, SESSION),
   };
   vi.stubGlobal(
@@ -137,6 +146,11 @@ describe('Plan and billing (S30)', () => {
       expect(
         screen.getByText(/5,000\.00 per active room per month, minimum .*20,000\.00/),
       ).toBeInTheDocument();
+      // T-118: each measured against its allowance; only the one used up is called out.
+      expect(screen.getByText('12 of 12')).toBeInTheDocument();
+      expect(screen.getByText('40 of 100')).toBeInTheDocument();
+      expect(screen.getByText(/WhatsApp allowance is used up/)).toBeInTheDocument();
+      expect(screen.queryByText(/AI allowance is used up/)).not.toBeInTheDocument();
       const invoices = screen.getByRole('region', { name: 'Invoices' });
       expect(within(invoices).getByText('INV-202610-55555555')).toBeInTheDocument();
       const support = screen.getByRole('region', { name: 'Support sessions' });
@@ -169,10 +183,23 @@ describe('Platform (S31)', () => {
     renderAt('/platform');
     const list = await screen.findByRole('navigation', { name: 'Hotel groups' });
     expect(
-      await within(list).findByText(/3 active rooms · 12 WhatsApp this month/),
+      await within(list).findByText(/3 active rooms · 12 WhatsApp · 40 AI this month/),
     ).toBeInTheDocument();
     await user.click(within(list).getByRole('button', { name: /Obi Hotels/ }));
     const detail = await screen.findByRole('article', { name: 'Obi Hotels' });
+
+    // T-118: allowances are typed per hotel group; blank means no limit.
+    const plan = within(detail).getByRole('form', { name: 'Plan and prices' });
+    const ai = within(plan).getByLabelText('AI uses per month');
+    await user.clear(ai);
+    await user.type(ai, '250');
+    await user.clear(within(plan).getByLabelText('WhatsApp messages per month'));
+    await user.click(within(plan).getByRole('button', { name: 'Save plan' }));
+    await waitFor(() =>
+      expect(sent(`PUT /platform/tenants/${ORG}/subscription`)).toEqual([
+        expect.objectContaining({ aiAllowance: 250, whatsappAllowance: null }),
+      ]),
+    );
 
     await user.click(within(detail).getByLabelText('Revenue Leakage Guard'));
     await waitFor(() =>

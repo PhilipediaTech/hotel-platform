@@ -193,7 +193,7 @@ export function createApp({
   api.use(handoverRoutes({ db, tenantDb, clock }));
   api.use(leakageRoutes({ db, tenantDb, clock }));
   api.use(messagingRoutes({ db, tenantDb, clock, messages }));
-  api.use(eventRoutes({ db, tenantDb, clock }));
+  api.use(eventRoutes({ db, tenantDb, clock, provider: payments, email }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config }));

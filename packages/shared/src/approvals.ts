@@ -91,6 +91,13 @@ export const APPROVAL_ACTIONS = [
     measure: 'none',
     backOffice: false,
   }),
+  // M9-06: an event confirmed without its signed contract or its deposit.
+  a({
+    code: 'event.confirm',
+    label: 'Confirming an event without its contract or deposit',
+    measure: 'none',
+    backOffice: true,
+  }),
   a({
     code: 'ar.over_limit',
     label: 'City-ledger transfer over the credit limit',

@@ -79,6 +79,77 @@
     "buffers": "Setup {{setup}} min, cleanup {{cleanup}} min",
     "inactive": "Not bookable",
     "edit": "Edit",
-    "addSpace": "Add a space"
+    "addSpace": "Add a space",
+    "open": "Quote and contract",
+    "quote": {
+      "title": "Quote",
+      "version": "version {{version}}",
+      "none": "No quote yet.",
+      "new": "New quote version",
+      "newVersion": "New version",
+      "cancel": "Cancel",
+      "rates": "Prices for this day:",
+      "kind": "Type",
+      "kinds": {
+        "SPACE": "Space hire",
+        "PACKAGE": "Package",
+        "CATERING": "Catering per head",
+        "EQUIPMENT": "Equipment",
+        "EXTRA": "Extra"
+      },
+      "description": "Description",
+      "quantity": "Quantity",
+      "addLine": "Add line",
+      "addCatering": "Add catering for the guests",
+      "cateringPerHead": "Catering per head",
+      "save": "Save version",
+      "taxes": "Taxes and service charge",
+      "total": "Total"
+    },
+    "contract": {
+      "title": "Contract and payments",
+      "none": "No contract yet.",
+      "new": "New contract",
+      "terms": "Terms",
+      "schedule": "Payment schedule",
+      "kind": "Payment",
+      "kinds": {
+        "DEPOSIT": "Deposit",
+        "INSTALMENT": "Instalment",
+        "DAMAGE_DEPOSIT": "Damage deposit (refundable)"
+      },
+      "due": "Due",
+      "addEntry": "Add payment",
+      "addsUp": "Deposit and instalments: {{typed}} of {{total}}",
+      "send": "Email the contract and bank details to the client",
+      "issue": "Issue contract",
+      "reissue": "Replace contract",
+      "pdf": "Download contract (PDF)",
+      "status": {
+        "ISSUED": "Waiting for signature",
+        "SIGNED": "Signed",
+        "SUPERSEDED": "Replaced",
+        "VOID": "Void"
+      },
+      "entry": { "DUE": "Due", "OVERDUE": "Overdue", "PART_PAID": "Part paid", "PAID": "Paid" },
+      "account": "Pay to {{bank}} {{number}} ({{name}})",
+      "overpaid": "{{amount}} was paid beyond the schedule. It is held for the client until the event is closed.",
+      "recordSigned": "Record signature",
+      "signedBy": "Signed by",
+      "signedOn": "Signed on",
+      "signedLine": "Signed by {{name}} on {{on}}"
+    },
+    "confirm": {
+      "button": "Confirm booking",
+      "override": "Ask to confirm anyway",
+      "reason": "Why confirm without these?",
+      "asked": "Sent to a manager to approve. The hold keeps running until it is decided.",
+      "byOverride": "Confirmed on an approved override.",
+      "missing": {
+        "NO_CONTRACT": "No contract has been issued",
+        "NOT_SIGNED": "The contract is not signed",
+        "DEPOSIT_NOT_PAID": "The deposit is not paid in full"
+      }
+    }
   }
 }

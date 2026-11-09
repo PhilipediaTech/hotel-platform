@@ -17,6 +17,7 @@ import { pgErrorInfo, type Db } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
+import { bookingHasMoney, voidUnpaidContract } from './allocation.ts';
 
 // Events and spaces, first part (PRD M9-01–M9-03, M9 rules: "no two bookings may overlap on a
 // space, including buffers; holds expire automatically"; T-119). The database's exclusion
@@ -43,6 +44,13 @@ const invalid = (path: string, message: string) =>
   new AppError('VALIDATION_ERROR', message, {
     issues: [{ path: `body.${path}`, code: 'custom', message }],
   });
+
+/** The space cannot be given back while the client's money is held against it. */
+const moneyHeld = () =>
+  new AppError(
+    'STATE_TRANSITION_INVALID',
+    'The client has paid towards this booking, so its space cannot be given back',
+  );
 
 // ── Shapes ──────────────────────────────────────────────────────────────────────────────
 
@@ -75,13 +83,13 @@ function spaceOf(s: SpaceRow): Space {
   };
 }
 
-const BOOKING_INCLUDE = {
+export const BOOKING_INCLUDE = {
   space: { select: { id: true, name: true } },
   layout: { select: { id: true, name: true } },
 } satisfies Prisma.EventBookingInclude;
 type BookingRow = Prisma.EventBookingGetPayload<{ include: typeof BOOKING_INCLUDE }>;
 
-function bookingOf(b: BookingRow): Booking {
+export function bookingOf(b: BookingRow): Booking {
   return {
     id: b.id,
     title: b.title,
@@ -95,6 +103,7 @@ function bookingOf(b: BookingRow): Booking {
     blockedUntil: iso(b.blockedUntil),
     expectedGuests: b.expectedGuests,
     holdExpiresAt: b.holdExpiresAt ? iso(b.holdExpiresAt) : null,
+    confirmedByOverride: b.confirmedByOverride,
   };
 }
 
@@ -350,6 +359,11 @@ export async function updateEnquiry(
       throw new AppError('STATE_TRANSITION_INVALID', 'This enquiry has become a booking');
     }
     if (body.status === 'LOST') {
+      const holds = await tx.eventBooking.findMany({ where: { enquiryId, status: 'HOLD' } });
+      for (const hold of holds) {
+        if (await bookingHasMoney(tx as never, hold.id)) throw moneyHeld();
+        await voidUnpaidContract(tx as never, hold.id);
+      }
       await tx.eventBooking.updateMany({
         where: { enquiryId, status: 'HOLD' },
         data: { status: 'RELEASED', holdExpiresAt: null, version: { increment: 1 } },
@@ -496,6 +510,8 @@ export async function releaseHold(deps: EventDeps, bookingId: string): Promise<B
     if (before.status !== 'HOLD') {
       throw new AppError('STATE_TRANSITION_INVALID', 'Only a hold can be released');
     }
+    if (await bookingHasMoney(tx as never, bookingId)) throw moneyHeld();
+    await voidUnpaidContract(tx as never, bookingId);
     await tx.eventBooking.update({
       where: { id: bookingId },
       data: { status: 'RELEASED', holdExpiresAt: null, version: { increment: 1 } },
@@ -532,6 +548,7 @@ export async function expireHolds(db: Db, clock: Clock, spaceId?: string): Promi
         data: { status: 'EXPIRED', version: { increment: 1 } },
       });
       if (claimed.count !== 1) return;
+      await voidUnpaidContract(tx, b.id);
       await recordAudit(tx, {
         organisationId: b.organisationId,
         propertyId: b.propertyId,

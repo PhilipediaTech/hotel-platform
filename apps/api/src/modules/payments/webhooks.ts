@@ -9,6 +9,7 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { PaymentEvent, PaymentProvider } from '../../core/payments.ts';
 import { parsePaystackEvent } from '../../core/paystack-events.ts';
+import { allocateEventPayment, LIVE_CONTRACT } from '../events/allocation.ts';
 import { numberParam, raiseAlert, ruleSettings, type RuleSettings } from '../leakage/engine.ts';
 import { settleIntent, systemShift } from './intents.ts';
 
@@ -142,7 +143,7 @@ type Target =
   { kind: 'folio'; folioId: string; windowId: string } | { kind: 'deposit'; reservationId: string };
 
 /** Where money sent to an account goes, or null when no owner can take it now. */
-async function targetOf(tx: Tx, account: Account): Promise<Target | null> {
+async function targetOf(tx: Tx, account: Account, now: Date): Promise<Target | null> {
   if (!account.active) return null;
   const folioTarget = async (folioId: string): Promise<Target | null> => {
     const folio = await tx.folio.findUnique({ where: { id: folioId }, include: { windows: true } });
@@ -170,7 +171,23 @@ async function targetOf(tx: Tx, account: Account): Promise<Target | null> {
       ? { kind: 'deposit', reservationId: bookings[0].id }
       : null;
   }
-  // Company and event accounts come with the city ledger and events.
+  if (account.ownerType === 'EVENT') {
+    // A booking still alive, under a contract still in force: its folio and schedule.
+    const contract = await tx.eventContract.findFirst({
+      where: {
+        propertyId: account.propertyId,
+        bookingId: account.ownerId,
+        status: { in: [...LIVE_CONTRACT] },
+      },
+      include: { booking: true },
+    });
+    const b = contract?.booking;
+    const alive =
+      b?.status === 'CONFIRMED' ||
+      (b?.status === 'HOLD' && b.holdExpiresAt !== null && b.holdExpiresAt > now);
+    return contract && alive ? folioTarget(contract.folioId) : null;
+  }
+  // Company accounts come with the city ledger.
   return null;
 }
 
@@ -212,6 +229,16 @@ export async function recordTransfer(
       createdAt: args.now,
     },
   });
+  if (args.target.kind === 'folio') {
+    await allocateEventPayment(tx, {
+      propertyId: args.propertyId,
+      folioId: args.target.folioId,
+      paymentId: payment.id,
+      amountMinor: args.amountMinor,
+      now: args.now,
+      userId: args.userId,
+    });
+  }
   if (args.target.kind === 'deposit') {
     await tx.depositLedgerEntry.create({
       data: {
@@ -267,7 +294,8 @@ async function payToAccount(deps: WebhookDeps, account: Account, event: Charged)
       ]);
       if (paid || queued) return;
       const property = await tx.property.findUniqueOrThrow({ where: { id: account.propertyId } });
-      const target = event.currency === property.baseCurrency ? await targetOf(tx, account) : null;
+      const target =
+        event.currency === property.baseCurrency ? await targetOf(tx, account, now) : null;
       if (!target) {
         await tx.unmatchedTransfer.create({
           data: {

@@ -184,6 +184,7 @@ describe('feature flags (M13-05)', () => {
       flags: [
         { module: 'leakage', label: 'Revenue Leakage Guard', enabled: false },
         { module: 'owner', label: 'Owner Remote Control', enabled: true },
+        { module: 'events', label: 'Events and spaces', enabled: true },
       ],
     });
     const refused = await s.owner.get('/leakage/alerts');

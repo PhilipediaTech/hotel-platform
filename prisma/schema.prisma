@@ -149,6 +149,9 @@ model Property {
   promoCodes            PromoCode[]
   guestLinks            GuestLink[]
 
+  spaces         Space[]
+  eventEnquiries EventEnquiry[]
+  eventBookings  EventBooking[]
   messageThreads MessageThread[]
 
   @@unique([organisationId, code])
@@ -289,7 +292,9 @@ model User {
   partnerPayouts     PartnerPayout[]    @relation("PartnerPayoutBy")
   partnerChanges     PartnerChange[]    @relation("PartnerChangeBy")
 
-  messagesSent Message[] @relation("MessageSentBy")
+  messagesSent   Message[]      @relation("MessageSentBy")
+  eventEnquiries EventEnquiry[]
+  eventBookings  EventBooking[]
 
   @@map("users")
 }
@@ -2566,4 +2571,125 @@ model UsageCounter {
 
   @@id([organisationId, month, metric])
   @@map("usage_counters")
+}
+
+/// An event space (M9-01; T-119).
+model Space {
+  id               String   @id @default(uuid()) @db.Uuid
+  organisationId   String   @map("organisation_id") @db.Uuid
+  propertyId       String   @map("property_id") @db.Uuid
+  code             String
+  name             String
+  description      String?
+  setupMinutes     Int      @default(0) @map("setup_minutes")
+  cleanupMinutes   Int      @default(0) @map("cleanup_minutes")
+  /// The least this space is hired for, whatever the hours.
+  minimumHireMinor BigInt   @default(0) @map("minimum_hire_minor")
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property  Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  layouts   SpaceLayout[]
+  rateRules SpaceRateRule[]
+  bookings  EventBooking[]
+
+  @@unique([propertyId, code])
+  @@map("spaces")
+}
+
+model SpaceLayout {
+  id         String  @id @default(uuid()) @db.Uuid
+  propertyId String  @map("property_id") @db.Uuid
+  spaceId    String  @map("space_id") @db.Uuid
+  name       String
+  capacity   Int
+  /// A layout taken off the list stays for the bookings that used it.
+  active     Boolean @default(true)
+
+  space    Space          @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+  bookings EventBooking[]
+
+  @@unique([spaceId, name])
+  @@map("space_layouts")
+}
+
+model SpaceRateRule {
+  id          String    @id @default(uuid()) @db.Uuid
+  propertyId  String    @map("property_id") @db.Uuid
+  spaceId     String    @map("space_id") @db.Uuid
+  name        String
+  /// HOURLY | HALF_DAY | FULL_DAY | EXTRA
+  unit        String
+  /// ALL | WEEKDAY | WEEKEND
+  dayType     String    @default("ALL") @map("day_type")
+  seasonFrom  DateTime? @map("season_from") @db.Date
+  seasonTo    DateTime? @map("season_to") @db.Date
+  amountMinor BigInt    @map("amount_minor")
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+
+  @@index([spaceId])
+  @@map("space_rate_rules")
+}
+
+model EventEnquiry {
+  id             String    @id @default(uuid()) @db.Uuid
+  organisationId String    @map("organisation_id") @db.Uuid
+  propertyId     String    @map("property_id") @db.Uuid
+  /// OPEN | WON | LOST
+  status         String    @default("OPEN")
+  contactName    String    @map("contact_name")
+  contactPhone   String?   @map("contact_phone")
+  contactEmail   String?   @map("contact_email")
+  eventType      String    @map("event_type")
+  eventDate      DateTime? @map("event_date") @db.Date
+  expectedGuests Int?      @map("expected_guests")
+  notes          String?
+  lostReason     String?   @map("lost_reason")
+  createdById    String    @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property  Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  createdBy User           @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  bookings  EventBooking[]
+
+  @@index([propertyId, status, createdAt])
+  @@map("event_enquiries")
+}
+
+/// A hold or booking of a space. event_bookings_no_overlap (raw SQL) keeps two from sharing a
+/// space at once, setup and cleanup included (M9 rules).
+model EventBooking {
+  id             String    @id @default(uuid()) @db.Uuid
+  organisationId String    @map("organisation_id") @db.Uuid
+  propertyId     String    @map("property_id") @db.Uuid
+  enquiryId      String?   @map("enquiry_id") @db.Uuid
+  spaceId        String    @map("space_id") @db.Uuid
+  layoutId       String?   @map("layout_id") @db.Uuid
+  title          String
+  /// HOLD | CONFIRMED | RELEASED | EXPIRED
+  status         String
+  startsAt       DateTime  @map("starts_at") @db.Timestamptz(6)
+  endsAt         DateTime  @map("ends_at") @db.Timestamptz(6)
+  /// The event with the space's setup and cleanup at the time it was made.
+  blockedFrom    DateTime  @map("blocked_from") @db.Timestamptz(6)
+  blockedUntil   DateTime  @map("blocked_until") @db.Timestamptz(6)
+  expectedGuests Int       @map("expected_guests")
+  holdExpiresAt  DateTime? @map("hold_expires_at") @db.Timestamptz(6)
+  createdById    String    @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version        Int       @default(0)
+
+  property  Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  enquiry   EventEnquiry? @relation(fields: [enquiryId], references: [id], onDelete: Restrict)
+  space     Space         @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+  layout    SpaceLayout?  @relation(fields: [layoutId], references: [id], onDelete: Restrict)
+  createdBy User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, blockedFrom])
+  @@index([status, holdExpiresAt])
+  @@map("event_bookings")
 }

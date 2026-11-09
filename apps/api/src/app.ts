@@ -45,6 +45,7 @@ import { taskRoutes } from './modules/tasks/routes.ts';
 import { handoverRoutes } from './modules/handovers/routes.ts';
 import { leakageRoutes } from './modules/leakage/routes.ts';
 import { messagingRoutes } from './modules/notifications/routes.ts';
+import { eventRoutes } from './modules/events/routes.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
 import { bookingEngineRoutes } from './modules/bookingengine/routes.ts';
@@ -192,6 +193,7 @@ export function createApp({
   api.use(handoverRoutes({ db, tenantDb, clock }));
   api.use(leakageRoutes({ db, tenantDb, clock }));
   api.use(messagingRoutes({ db, tenantDb, clock, messages }));
+  api.use(eventRoutes({ db, tenantDb, clock }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config }));

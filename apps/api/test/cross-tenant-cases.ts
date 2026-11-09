@@ -159,6 +159,83 @@ async function bRoom(db: Db, world: TenantWorld, propertyId: string) {
   return { roomId: room.id, roomTypeId: type.id };
 }
 
+const SPACE_BODY = {
+  code: 'LEAK',
+  name: 'Leak',
+  layouts: [{ name: 'Theatre', capacity: 10 }],
+};
+const ENQUIRY_BODY = { contactName: 'Leak', eventType: 'Leak' };
+
+async function bSpace(db: Db, world: TenantWorld, propertyId: string) {
+  const space = await db.space.create({
+    data: {
+      organisationId: orgOf(world, propertyId),
+      propertyId,
+      code: 'HALL',
+      name: 'Theirs',
+      layouts: { create: { propertyId, name: 'Theatre', capacity: 50 } },
+    },
+    include: { layouts: true },
+  });
+  return { spaceId: space.id, layoutId: space.layouts[0]?.id ?? '' };
+}
+
+async function bSpaceUnchanged(db: Db, world: TenantWorld, theirs: Record<string, string>) {
+  const space = await db.space.findUniqueOrThrow({ where: { id: theirs['spaceId'] ?? '' } });
+  expect(space.name).toBe('Theirs');
+  expect(await db.space.count({ where: { code: 'LEAK', propertyId: world.b1.id } })).toBe(0);
+}
+
+async function bEventBooking(db: Db, world: TenantWorld, propertyId: string) {
+  const { spaceId, layoutId } = await bSpace(db, world, propertyId);
+  const organisationId = orgOf(world, propertyId);
+  const enquiry = await db.eventEnquiry.create({
+    data: {
+      organisationId,
+      propertyId,
+      contactName: 'Theirs',
+      eventType: 'Wedding',
+      createdById: world.bStaff.id,
+    },
+  });
+  const booking = await db.eventBooking.create({
+    data: {
+      organisationId,
+      propertyId,
+      enquiryId: enquiry.id,
+      spaceId,
+      layoutId,
+      title: 'Theirs',
+      status: 'HOLD',
+      startsAt: new Date('2099-05-01T10:00:00Z'),
+      endsAt: new Date('2099-05-01T12:00:00Z'),
+      blockedFrom: new Date('2099-05-01T10:00:00Z'),
+      blockedUntil: new Date('2099-05-01T12:00:00Z'),
+      expectedGuests: 5,
+      holdExpiresAt: new Date('2099-04-01T10:00:00Z'),
+      createdById: world.bStaff.id,
+    },
+  });
+  return { spaceId, layoutId, enquiryId: enquiry.id, bookingId: booking.id };
+}
+
+async function bEventUnchanged(db: Db, world: TenantWorld, theirs: Record<string, string>) {
+  const booking = await db.eventBooking.findUniqueOrThrow({
+    where: { id: theirs['bookingId'] ?? '' },
+  });
+  expect(booking.status).toBe('HOLD');
+  const enquiry = await db.eventEnquiry.findUniqueOrThrow({
+    where: { id: theirs['enquiryId'] ?? '' },
+  });
+  expect(enquiry.contactName).toBe('Theirs');
+  expect(
+    await db.eventEnquiry.count({ where: { contactName: 'Leak', propertyId: world.b1.id } }),
+  ).toBe(0);
+  expect(await db.eventBooking.count({ where: { title: 'Leak', propertyId: world.b1.id } })).toBe(
+    0,
+  );
+}
+
 async function bBlock(db: Db, world: TenantWorld, propertyId: string) {
   const { roomId } = await bRoom(db, world, propertyId);
   const block = await db.roomBlock.create({
@@ -1491,6 +1568,57 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       expect(await db.guestLink.count()).toBe(0);
     },
   },
+  listSpaces: {
+    seed: bSpace,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((s) => s.id),
+  },
+  createSpace: {
+    seed: bSpace,
+    creates: true,
+    body: () => SPACE_BODY,
+    untouched: bSpaceUnchanged,
+  },
+  updateSpace: { seed: bSpace, body: () => SPACE_BODY, untouched: bSpaceUnchanged },
+  getSpaceAvailability: {
+    seed: bSpace,
+    listIds: (body) => (body as { data: { space: { id: string } }[] }).data.map((s) => s.space.id),
+    query: () => ({ startsAt: '2099-06-01T10:00:00Z', endsAt: '2099-06-01T12:00:00Z' }),
+  },
+  listEventEnquiries: {
+    seed: bEventBooking,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((e) => e.id),
+  },
+  createEventEnquiry: {
+    seed: bEventBooking,
+    creates: true,
+    body: () => ENQUIRY_BODY,
+    untouched: bEventUnchanged,
+  },
+  updateEventEnquiry: {
+    seed: bEventBooking,
+    body: () => ({ ...ENQUIRY_BODY, status: 'OPEN' }),
+    untouched: bEventUnchanged,
+  },
+  listEventBookings: {
+    seed: bEventBooking,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((b) => b.id),
+    query: () => ({ from: '2099-01-01T00:00:00Z', to: '2099-12-31T00:00:00Z' }),
+  },
+  createEventBooking: {
+    seed: bEventBooking,
+    creates: true,
+    body: (theirs) => ({
+      spaceId: theirs['spaceId'],
+      layoutId: theirs['layoutId'],
+      title: 'Leak',
+      startsAt: '2099-07-01T10:00:00Z',
+      endsAt: '2099-07-01T12:00:00Z',
+      expectedGuests: 1,
+      holdUntil: '2099-06-30T10:00:00Z',
+    }),
+    untouched: bEventUnchanged,
+  },
+  releaseEventHold: { seed: bEventBooking, body: () => ({}), untouched: bEventUnchanged },
   listMessageThreads: {
     seed: bThread,
     listIds: (body) => (body as { data: { id: string }[] }).data.map((t) => t.id),

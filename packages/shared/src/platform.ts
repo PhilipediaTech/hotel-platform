@@ -17,6 +17,7 @@ export const PLATFORM_INVOICE_STATUSES = ['ISSUED', 'PAID', 'VOID'] as const;
 export const MODULES = [
   { code: 'leakage', label: 'Revenue Leakage Guard' },
   { code: 'owner', label: 'Owner Remote Control' },
+  { code: 'events', label: 'Events and spaces' },
 ] as const;
 export type ModuleCode = (typeof MODULES)[number]['code'];
 
@@ -24,6 +25,16 @@ export type ModuleCode = (typeof MODULES)[number]['code'];
 export const MODULE_PERMISSIONS: Record<ModuleCode, readonly string[]> = {
   leakage: ['leakage.review', 'leakage.notify'],
   owner: ['owner.read'],
+  events: [
+    'space.manage',
+    'event.enquiry',
+    'event.hold',
+    'event.quote',
+    'event.contract',
+    'event.confirm',
+    'event.brief',
+    'event.close',
+  ],
 };
 
 /** Platform staff hold every platform code (T-100: PLATFORM_ADMIN_EMAILS, MFA on). */

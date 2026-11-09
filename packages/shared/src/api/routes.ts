@@ -15,6 +15,7 @@ import { MESSAGE_ROUTES } from './messages.ts';
 import { OWNER_ROUTES } from './owner.ts';
 import { BOOKING_ENGINE_ROUTES } from './booking-engine.ts';
 import { INBOX_ROUTES } from './inbox.ts';
+import { EVENT_ROUTES } from './events.ts';
 import { PARTNER_ROUTES } from './partners.ts';
 import { PLATFORM_ROUTES } from './platform.ts';
 import { REPORT_ROUTES } from './reports.ts';
@@ -53,6 +54,7 @@ export const API_ROUTES = {
   getOpenApiDocument,
   ...PARTNER_ROUTES,
   ...INBOX_ROUTES,
+  ...EVENT_ROUTES,
   ...BOOKING_ENGINE_ROUTES,
   ...AUTH_ROUTES,
   ...ACCESS_ROUTES,

@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-118 is pushed on `feat/T-118-allowances`, awaiting merge (migration: run `npm run db:deploy`). Next in V1.2: events and spaces (M9-01–M9-08), then services (M9-09), group blocks and allotments (M3-17, M2-12), automated hotel billing and suspension (M13-03, M13-06). Plan allowance sizes are Philip's to type per hotel group; no real AI key for paying hotels until they are set.
+T-119 is pushed on `feat/T-119-spaces-holds`, awaiting merge (migration and seed: run `npm run db:deploy`, `npm run seed`). Next: T-120 event quotes (versioned, event_quotes, event_quote_versions), contract and payment schedule on a dedicated virtual account (event_contracts, event_payment_schedules, event_deposits), confirm with deposit rule or approved override (M9-04–M9-06; M9 AC: an instalment paid to the event virtual account allocates to the next due instalment). Then T-121 brief and close-out, damage deposits a liability until settled (M9-07, M9-08). Then services (M9-09), group blocks and allotments (M3-17, M2-12), automated hotel billing and suspension (M13-03, M13-06).

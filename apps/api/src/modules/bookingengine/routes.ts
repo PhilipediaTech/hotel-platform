@@ -2,6 +2,7 @@ import { BOOKING_ENGINE_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as checkIn from './online-check-in.ts';
 import * as engine from './service.ts';
 
 function tenantFrom(tenant: TenantContext | null): TenantContext {
@@ -30,6 +31,24 @@ export function bookingEngineRoutes(deps: engine.BookingEngineDeps): Router {
   mountRoute(router, r.getPublicBooking, ({ params }) => engine.publicBooking(deps, params.token));
   mountRoute(router, r.cancelPublicBooking, ({ params, body }) =>
     engine.cancelPublicBooking(deps, params.token, body.acceptedFeeMinor),
+  );
+  mountRoute(router, r.getPublicCheckIn, ({ params }) =>
+    checkIn.getCheckInInfo(deps, params.token),
+  );
+  mountRoute(router, r.createPublicIdUpload, ({ params, body }) =>
+    checkIn.createIdUpload(deps, params.token, body),
+  );
+  mountRoute(router, r.submitPublicCheckIn, ({ params, body }) =>
+    checkIn.submitCheckIn(deps, params.token, body),
+  );
+  mountRoute(router, r.payPublicBalance, ({ params, body }) =>
+    checkIn.payBalance(deps, params.token, body.returnUrl),
+  );
+  mountRoute(router, r.getOnlineCheckIn, ({ params }) =>
+    checkIn.onlineCheckInForDesk(deps, params.stayId),
+  );
+  mountRoute(router, r.sendGuestLink, ({ params }, { tenant }) =>
+    checkIn.sendGuestLink(deps, tenantFrom(tenant), params.reservationId),
   );
   return router;
 }

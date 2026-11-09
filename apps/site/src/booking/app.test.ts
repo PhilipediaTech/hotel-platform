@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, type Api, type Availability, type Booking, type Property } from './api.ts';
+import {
+  ApiError,
+  type Api,
+  type Availability,
+  type Booking,
+  type CheckInInfo,
+  type Property,
+} from './api.ts';
 import { mount } from './app.ts';
 
 // The guest booking site (PRD M11-01, M11-02; S39; T-113).
@@ -61,6 +68,16 @@ const BOOKING: Booking = {
   cancellation: { allowed: true, feeMinor: '0' },
 };
 
+const CHECK_IN: CheckInInfo = {
+  closedReason: null,
+  requiredFields: ['nationality', 'idType', 'idNumber'],
+  idTypes: ['PASSPORT', 'NATIONAL_ID'],
+  dataProtectionNotice: 'ID details are held under the Act.',
+  submittedAt: null,
+  dueMinor: '7000000',
+  currency: 'NGN',
+};
+
 const created = (over: object = {}) => ({
   token: 'secret-token',
   confirmationNo: 'LAG-00042',
@@ -87,6 +104,14 @@ beforeEach(() => {
     book: vi.fn<Api['book']>().mockResolvedValue(created()),
     booking: vi.fn<Api['booking']>().mockResolvedValue(BOOKING),
     cancel: vi.fn<Api['cancel']>().mockResolvedValue({ ...BOOKING, status: 'CANCELLED' }),
+    checkInInfo: vi.fn<Api['checkInInfo']>().mockResolvedValue(CHECK_IN),
+    submitCheckIn: vi
+      .fn<Api['submitCheckIn']>()
+      .mockResolvedValue({ ...CHECK_IN, submittedAt: '2026-12-01T09:00:00Z' }),
+    uploadId: vi.fn<Api['uploadId']>().mockResolvedValue('file-1'),
+    payBalance: vi
+      .fn<Api['payBalance']>()
+      .mockResolvedValue({ paymentUrl: 'https://pay.test/bal' }),
   };
 });
 
@@ -316,5 +341,92 @@ describe('managing a booking (M11-02)', () => {
     start('/demo-lagos/manage', '?token=secret-token');
     await settle();
     expect(buttonNamed('Cancel booking')).toBeUndefined();
+  });
+});
+
+describe('online check-in (M3-20, M11-06)', () => {
+  const open = async () => {
+    start('/demo-lagos/manage', '?token=secret-token');
+    await settle();
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('Pay before you arrive');
+    });
+  };
+
+  it('asks only for what the hotel requires, and offers only its IDs', async () => {
+    await open();
+    expect(byId('f-nationality')).not.toBeNull();
+    expect(byId('f-address')).toBeNull();
+    const options = [...root.querySelectorAll('#f-idType option')].map((o) => o.textContent);
+    expect(options).toEqual(['Choose', 'Passport', 'National ID']);
+    expect(root.textContent).toContain('held under the Act');
+  });
+
+  it('needs consent, then sends the details and says it’s done', async () => {
+    await open();
+    byId('f-nationality').value = 'NG';
+    byId('f-idType').value = 'PASSPORT';
+    byId('f-idNumber').value = 'A1234567';
+    submit('Check in online');
+    expect(root.textContent).toContain('Please confirm');
+    expect(api.submitCheckIn).not.toHaveBeenCalled();
+
+    byId('consent').checked = true;
+    submit('Check in online');
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('You’ve checked in online');
+    });
+    expect(api.submitCheckIn).toHaveBeenCalledWith('secret-token', {
+      consent: true,
+      nationality: 'NG',
+      idType: 'PASSPORT',
+      idNumber: 'A1234567',
+    });
+    expect(api.uploadId).not.toHaveBeenCalled();
+  });
+
+  it('shows a server problem and lets the guest try again', async () => {
+    api.submitCheckIn.mockRejectedValueOnce(new ApiError(400, 'Enter your ID number', null, {}));
+    await open();
+    byId('consent').checked = true;
+    submit('Check in online');
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('Enter your ID number');
+    });
+    expect(buttonNamed('Check in online').disabled).toBe(false);
+  });
+
+  it('pays the balance from the link', async () => {
+    await open();
+    buttonNamed('Pay ₦70,000.00 now').click();
+    await vi.waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith('https://pay.test/bal');
+    });
+    expect(api.payBalance).toHaveBeenCalledWith(
+      'secret-token',
+      'https://book.test/demo-lagos/manage',
+    );
+  });
+
+  it('offers nothing while the booking is not confirmed', async () => {
+    api.booking.mockResolvedValue({ ...BOOKING, status: 'TENTATIVE' });
+    start('/demo-lagos/manage', '?token=secret-token');
+    await settle();
+    expect(api.checkInInfo).not.toHaveBeenCalled();
+  });
+
+  it('already done: says so, and the details can be changed', async () => {
+    api.checkInInfo.mockResolvedValue({
+      ...CHECK_IN,
+      dueMinor: '0',
+      submittedAt: '2026-12-01T09:00:00Z',
+    });
+    start('/demo-lagos/manage', '?token=secret-token');
+    await settle();
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('You’ve checked in online');
+    });
+    buttonNamed('Change my details').click();
+    expect(byId('f-nationality')).not.toBeNull();
   });
 });

@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import { Email, Phone } from './auth.ts';
 import { defineRoute } from './contract.ts';
-import { AmountMinor, IsoDate, Uuid } from './primitives.ts';
+import { AmountMinor, Instant, IsoDate, Uuid } from './primitives.ts';
 import { MEAL_PLANS } from './rates.ts';
+import { RegistrationBody } from './reservations.ts';
+import { FILE_CONTENT_TYPES } from '../files.ts';
+import { ID_TYPES, REGISTRATION_FIELDS, STAY_PURPOSES } from '../registration.ts';
 
 // The booking engine (PRD M11-01–M11-03, M11 rules; tab 4 "Public booking"; S39, S40; T-112).
 // Public routes answer at /public/v1/... (an alias of /api/v1/public/...). Availability and
@@ -322,7 +325,137 @@ export const cancelPublicBooking = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+// ── Online check-in (M3-20, M11-06; T-114) ──────────────────────────────────────────────
+
+export const OnlineCheckInInfo = z
+  .object({
+    /** Why the form can't be used now; null when it can. */
+    closedReason: z.enum(['PAY_FIRST', 'NOT_ACTIVE', 'ARRIVAL_PASSED']).nullable(),
+    requiredFields: z.array(z.enum(REGISTRATION_FIELDS)),
+    idTypes: z.array(z.enum(ID_TYPES)),
+    dataProtectionNotice: z.string().nullable(),
+    submittedAt: Instant.nullable(),
+    dueMinor: AmountMinor,
+    currency: z.string(),
+  })
+  .meta({ id: 'OnlineCheckInInfo' });
+
+export const OnlineCheckInBody = RegistrationBody.extend({
+  /** About when the guest expects to arrive, as HH:MM. */
+  arrivalTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a time like 15:30')
+    .optional(),
+  /** The guest has read the privacy notice. */
+  consent: z.literal(true),
+});
+
+export const getPublicCheckIn = defineRoute({
+  ...PUBLIC,
+  operationId: 'getPublicCheckIn',
+  method: 'get',
+  path: '/public/bookings/{token}/check-in',
+  summary: 'What online check-in needs for this booking (M3-20)',
+  params: TokenParams,
+  response: OnlineCheckInInfo,
+});
+
+export const createPublicIdUpload = defineRoute({
+  ...PUBLIC,
+  operationId: 'createPublicIdUpload',
+  method: 'post',
+  path: '/public/bookings/{token}/check-in/id-upload',
+  summary: 'A link to upload the guest’s ID (M3-20)',
+  params: TokenParams,
+  body: z.object({ contentType: z.enum(FILE_CONTENT_TYPES), sizeBytes: z.number().int().min(1) }),
+  status: 201,
+  response: z.object({
+    fileId: Uuid,
+    method: z.literal('PUT'),
+    url: z.string(),
+    headers: z.record(z.string(), z.string()),
+    expiresAt: Instant,
+  }),
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const submitPublicCheckIn = defineRoute({
+  ...PUBLIC,
+  operationId: 'submitPublicCheckIn',
+  method: 'post',
+  path: '/public/bookings/{token}/check-in',
+  summary: 'Give the hotel the registration details before arrival (M3-20)',
+  description: 'The desk finishes the check-in on arrival. Sending it again replaces the details.',
+  params: TokenParams,
+  body: OnlineCheckInBody,
+  response: OnlineCheckInInfo,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const payPublicBalance = defineRoute({
+  ...PUBLIC,
+  operationId: 'payPublicBalance',
+  method: 'post',
+  path: '/public/bookings/{token}/pay',
+  summary: 'A payment page for what is left to pay (M11-06)',
+  params: TokenParams,
+  body: z.object({ returnUrl: z.url().max(500).optional() }),
+  response: z.object({ paymentUrl: z.string(), amountMinor: AmountMinor }),
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const OnlineCheckInForDesk = z
+  .object({
+    submitted: z
+      .object({
+        nationality: z.string().nullable(),
+        address: z.string().nullable(),
+        purpose: z.enum(STAY_PURPOSES).nullable(),
+        idType: z.enum(ID_TYPES).nullable(),
+        idExpiry: IsoDate.nullable(),
+        idNumberMasked: z.string().nullable(),
+        idFileId: Uuid.nullable(),
+        arrivalTime: z.string().nullable(),
+        submittedAt: Instant,
+      })
+      .nullable(),
+  })
+  .meta({ id: 'OnlineCheckInForDesk' });
+
+export const getOnlineCheckIn = defineRoute({
+  operationId: 'getOnlineCheckIn',
+  method: 'get',
+  path: '/stays/{stayId}/online-check-in',
+  summary: 'What the guest gave online, for the desk (M3-20)',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.checkin',
+  params: z.object({ stayId: Uuid }),
+  response: OnlineCheckInForDesk,
+});
+
+export const sendGuestLink = defineRoute({
+  operationId: 'sendGuestLink',
+  method: 'post',
+  path: '/reservations/{reservationId}/guest-link',
+  summary: 'Email the guest their private link to check in online (M3-20)',
+  tags: ['Reservations'],
+  propertyScoped: true,
+  permission: 'reservation.checkin',
+  idempotent: true,
+  params: z.object({ reservationId: Uuid }),
+  body: z.object({}),
+  response: z.object({ sentTo: z.string() }),
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
 export const BOOKING_ENGINE_ROUTES = {
+  getPublicCheckIn,
+  createPublicIdUpload,
+  submitPublicCheckIn,
+  payPublicBalance,
+  getOnlineCheckIn,
+  sendGuestLink,
   getBookingEngineSettings,
   saveBookingEngineSettings,
   listPromoCodes,

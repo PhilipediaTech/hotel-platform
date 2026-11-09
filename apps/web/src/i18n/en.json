@@ -857,6 +857,14 @@
   },
   "checkIn": {
     "open": "Check in",
+    "online": {
+      "received": "This guest checked in online. Anything you leave empty below comes from what they gave.",
+      "arriving": "Expected at {{time}}.",
+      "idNumber": "ID number on file: {{number}}.",
+      "check": "Check their ID matches before giving the room.",
+      "send": "Send online check-in link",
+      "sent": "Link sent to {{email}}."
+    },
     "title": "Check in {{name}}",
     "room": "Room {{room}}",
     "registration": "Registration",

@@ -410,6 +410,40 @@ describe('Check-in (M3-08, M3-19; T-051)', () => {
       ],
     });
 
+  it('uses what the guest gave online (M3-20; T-114)', async () => {
+    permissions = [...permissions, 'reservation.checkin'];
+    handlers[`GET /reservations/${RES}`] = () => json(200, staying('CONFIRMED'));
+    handlers[`GET /stays/${STAY}/online-check-in`] = () =>
+      json(200, {
+        submitted: {
+          nationality: 'NG',
+          address: null,
+          purpose: 'LEISURE',
+          idType: 'PASSPORT',
+          idExpiry: null,
+          idNumberMasked: '•••• 5678',
+          idFileId: null,
+          arrivalTime: '15:30',
+          submittedAt: '2026-11-09T09:00:00Z',
+        },
+      });
+    handlers[`POST /stays/${STAY}/check-in`] = () =>
+      json(200, { stayId: STAY, status: 'CHECKED_IN', folioId: null, roomId: R101, version: 1 });
+    const user = userEvent.setup();
+    renderAt(`/reservations/${RES}`);
+    await user.click(await screen.findByRole('button', { name: 'Check in' }));
+    const form = screen.getByRole('form', { name: 'Check in Ada Obi' });
+    expect(await within(form).findByText(/This guest checked in online/)).toBeInTheDocument();
+    expect(within(form).getByText(/•••• 5678/)).toBeInTheDocument();
+    expect(within(form).getByText(/Expected at 15:30/)).toBeInTheDocument();
+    await user.click(within(form).getByRole('button', { name: 'Check in now' }));
+    await waitFor(() => expect(sent(`POST /stays/${STAY}/check-in`)).toHaveLength(1));
+    expect(sent(`POST /stays/${STAY}/check-in`)[0]?.body).toMatchObject({
+      registration: {},
+      useOnlineCheckIn: true,
+    });
+  });
+
   it('checks a guest in with the fields the property requires', async () => {
     permissions = [...permissions, 'reservation.checkin'];
     let current: unknown = staying('CONFIRMED');

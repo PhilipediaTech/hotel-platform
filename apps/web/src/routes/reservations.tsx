@@ -351,6 +351,9 @@ export function ReservationPage() {
         ))}
       </ul>
 
+      {r.status === 'CONFIRMED' && can('reservation.checkin') && (
+        <SendCheckInLink reservationId={r.id} />
+      )}
       {r.status === 'TENTATIVE' && can('reservation.modify') && (
         <ConfirmHold reservation={r} queryKey={key} />
       )}
@@ -1093,5 +1096,30 @@ function History({ reservationId, version }: { reservationId: string; version: n
         ))}
       </ol>
     </section>
+  );
+}
+
+/** M3-20: emails the guest their private link to check in before arriving (T-114). */
+function SendCheckInLink({ reservationId }: { reservationId: string }) {
+  const { t } = useTranslation();
+  const send = useMutation({
+    mutationFn: () => api.call('sendGuestLink', { params: { reservationId }, body: {} }),
+  });
+  return (
+    <div className="mt-3">
+      <Button size="sm" variant="secondary" disabled={send.isPending} onClick={() => send.mutate()}>
+        {t('checkIn.online.send')}
+      </Button>
+      {send.data && (
+        <Alert tone="success" className="mt-2">
+          {t('checkIn.online.sent', { email: send.data.sentTo })}
+        </Alert>
+      )}
+      {send.error && (
+        <Alert tone="critical" className="mt-2">
+          {errorMessage(send.error)}
+        </Alert>
+      )}
+    </div>
   );
 }

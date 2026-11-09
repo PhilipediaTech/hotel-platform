@@ -90,6 +90,17 @@ async function usableFile(tx: Tx, fileId: string, entityType: string, path: stri
   return file;
 }
 
+function fromOnline(
+  deps: CheckInDeps,
+  row: { details: unknown; idNumberEnc: Uint8Array<ArrayBuffer> | null; idFileId: string | null },
+): Body['registration'] {
+  return {
+    ...(row.details as Body['registration']),
+    ...(row.idNumberEnc ? { idNumber: decryptSecret(deps.idKey, row.idNumberEnc) } : {}),
+    ...(row.idFileId ? { idFileId: row.idFileId } : {}),
+  };
+}
+
 export async function checkIn(
   deps: CheckInDeps,
   tenant: TenantContext,
@@ -162,7 +173,14 @@ export async function checkIn(
     const property = await tx.property.findUniqueOrThrow({ where: { id: stay.propertyId } });
     const settings = registrationOf(property);
     const required = new Set<RegistrationField>(settings.requiredFields);
-    const reg = body.registration;
+    // What the guest gave online fills anything the desk left empty (M3-20; T-114).
+    const online = body.useOnlineCheckIn
+      ? await tx.onlineCheckIn.findFirst({ where: { stayId: stay.id } })
+      : null;
+    const reg: Body['registration'] = {
+      ...(online ? fromOnline(deps, online) : {}),
+      ...body.registration,
+    };
     const missing = settings.requiredFields.filter((f) => reg[f] === undefined);
     if (missing.length > 0) {
       throw invalid(
@@ -228,6 +246,8 @@ export async function checkIn(
       ...(required.has('purpose') && reg.purpose ? { purpose: reg.purpose } : {}),
       signature: signature ? 'SCREEN' : 'PAPER',
     };
+    // Copied to the ID record and the card: the online copy has done its job.
+    if (online) await tx.onlineCheckIn.delete({ where: { stayId: stay.id } });
     const card = await tx.registrationCard.create({
       data: {
         propertyId: stay.propertyId,
@@ -472,7 +492,23 @@ export function idPurgeJob(deps: { store: FileStore }) {
         await db.fileObject.delete({ where: { id: visitor.idFile.id } });
         await deps.store.delete(visitor.idFile.storageKey);
       }
-      logger.info({ purged: due.length, visitorPhotos: photos.length }, 'ID documents purged');
+      // Online check-ins of guests who never arrived (T-114).
+      const unused = await db.onlineCheckIn.findMany({
+        where: { purgeAfter: { lte: dbDate(today) } },
+        include: { idFile: true },
+        take: 500,
+      });
+      for (const row of unused) {
+        await db.onlineCheckIn.delete({ where: { stayId: row.stayId } });
+        if (row.idFile) {
+          await db.fileObject.delete({ where: { id: row.idFile.id } });
+          await deps.store.delete(row.idFile.storageKey);
+        }
+      }
+      logger.info(
+        { purged: due.length, visitorPhotos: photos.length, onlineCheckIns: unused.length },
+        'ID documents purged',
+      );
     },
   });
 }

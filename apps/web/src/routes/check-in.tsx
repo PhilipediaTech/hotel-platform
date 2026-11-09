@@ -86,7 +86,16 @@ export function CheckInPanel({
   });
   const set = (field: RegistrationField) => (value: string) =>
     setReg((r) => ({ ...r, [field]: value }));
-  const missing = required.filter((f) => !reg[f]?.trim());
+  // What the guest gave online before arriving (M3-20; T-114) fills what the desk leaves empty.
+  const fromGuest = useQuery({
+    queryKey: ['online-check-in', stay.id],
+    queryFn: () => api.call('getOnlineCheckIn', { params: { stayId: stay.id } }),
+    enabled: open,
+  });
+  const given = fromGuest.data?.submitted ?? null;
+  const givenBy = (f: RegistrationField) =>
+    given !== null && (f === 'idNumber' ? given.idNumberMasked : given[f]) !== null;
+  const missing = required.filter((f) => !reg[f]?.trim() && !givenBy(f));
   const ready =
     (stay.roomId !== null || roomId !== '') && missing.length === 0 && (!onScreen || signed);
 
@@ -118,6 +127,7 @@ export function CheckInPanel({
             registration: { ...registration, ...(idFileId ? { idFileId } : {}) },
             ...(signatureFileId ? { signatureFileId } : {}),
             keysIssued: Number(keys) || 0,
+            ...(given ? { useOnlineCheckIn: true } : {}),
           },
         },
         { ifMatch: `"${stay.version}"` },
@@ -177,6 +187,17 @@ export function CheckInPanel({
             ))}
           </select>
         </div>
+      )}
+
+      {given && (
+        <Alert tone="info">
+          <p>{t('checkIn.online.received')}</p>
+          {given.arrivalTime && <p>{t('checkIn.online.arriving', { time: given.arrivalTime })}</p>}
+          {given.idNumberMasked && (
+            <p>{t('checkIn.online.idNumber', { number: given.idNumberMasked })}</p>
+          )}
+          <p>{t('checkIn.online.check')}</p>
+        </Alert>
       )}
 
       {required.length > 0 && (

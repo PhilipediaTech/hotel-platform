@@ -63,6 +63,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   BookingEngineSettings: { kind: 'property', organisationField: 'organisationId' },
   PromoCode: { kind: 'property', organisationField: 'organisationId' },
   GuestLink: { kind: 'property', organisationField: 'organisationId' },
+  OnlineCheckIn: { kind: 'property', organisationField: 'organisationId' },
   BusinessDay: { kind: 'property' },
   Folio: { kind: 'property', organisationField: 'organisationId' },
   FolioLine: { kind: 'property' },

@@ -45,6 +45,11 @@ const PUBLIC_ROUTES = [
   'createPublicBooking',
   'getPublicBooking',
   'cancelPublicBooking',
+  // Reviewed in T-114: online check-in. Each needs the guest's secret link.
+  'getPublicCheckIn',
+  'createPublicIdUpload',
+  'submitPublicCheckIn',
+  'payPublicBalance',
 ];
 
 /** Reviewed in T-102: reachable after the password, before MFA (to get through MFA). */

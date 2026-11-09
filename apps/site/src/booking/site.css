@@ -119,7 +119,8 @@ label {
   font-weight: 600;
 }
 
-input:not([type='radio'], [type='checkbox']) {
+select,
+input:not([type='radio'], [type='checkbox'], [type='file']) {
   width: 100%;
   min-height: 44px;
   padding: 8px 10px;

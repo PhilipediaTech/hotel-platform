@@ -1460,6 +1460,16 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     listIds: frontDeskIds,
   },
   // Visitor register (T-057).
+  getOnlineCheckIn: {
+    seed: bReservation,
+  },
+  sendGuestLink: {
+    seed: bReservation,
+    body: () => ({}),
+    untouched: async (db) => {
+      expect(await db.guestLink.count()).toBe(0);
+    },
+  },
   getBookingEngineSettings: {
     seed: bBookingPage,
     listIds: (body) => [(body as { slug: string | null }).slug ?? 'none'],

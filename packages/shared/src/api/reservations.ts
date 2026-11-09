@@ -528,6 +528,8 @@ export const CheckInBody = z.object({
   /** The guest's signature drawn on screen (a RegistrationCard file); none = signed on paper. */
   signatureFileId: Uuid.optional(),
   keysIssued: z.number().int().min(0).max(10).default(0),
+  /** Fill what the desk leaves empty from what the guest gave online (M3-20; T-114). */
+  useOnlineCheckIn: z.boolean().default(false),
 });
 
 export const CheckInResult = z

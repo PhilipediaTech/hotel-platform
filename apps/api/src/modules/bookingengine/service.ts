@@ -63,7 +63,7 @@ const invalid = (path: string, message: string) =>
     issues: [{ path, code: 'custom', message }],
   });
 
-const linkToken = (deps: Pick<BookingEngineDeps, 'config'>, linkId: string) =>
+export const linkToken = (deps: Pick<BookingEngineDeps, 'config'>, linkId: string) =>
   createHmac('sha256', deps.config.sessionSecret)
     .update(`guest-link:${linkId}`)
     .digest('base64url');

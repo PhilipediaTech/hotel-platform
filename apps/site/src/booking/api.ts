@@ -1,5 +1,7 @@
 import type {
   getPublicAvailability,
+  OnlineCheckInBody,
+  OnlineCheckInInfo,
   PublicBooking,
   PublicBookingBody,
   PublicBookingCreated,
@@ -15,6 +17,8 @@ export type Availability = z.output<(typeof getPublicAvailability)['response']>;
 export type Booking = z.output<typeof PublicBooking>;
 export type Created = z.output<typeof PublicBookingCreated>;
 export type BookingRequest = z.input<typeof PublicBookingBody>;
+export type CheckInInfo = z.output<typeof OnlineCheckInInfo>;
+export type CheckInRequest = z.input<typeof OnlineCheckInBody>;
 
 export interface SearchRequest {
   slug: string;
@@ -31,6 +35,11 @@ export interface Api {
   book(body: BookingRequest): Promise<Created>;
   booking(token: string): Promise<Booking>;
   cancel(token: string, acceptedFeeMinor: string): Promise<Booking>;
+  checkInInfo(token: string): Promise<CheckInInfo>;
+  submitCheckIn(token: string, body: CheckInRequest): Promise<CheckInInfo>;
+  /** Sends the ID straight to storage and answers its file ID. */
+  uploadId(token: string, file: File): Promise<string>;
+  payBalance(token: string, returnUrl: string): Promise<{ paymentUrl: string }>;
 }
 
 export class ApiError extends Error {
@@ -104,5 +113,30 @@ export function createApi(base: string): Api {
     booking: (token) => call(base, `/bookings/${encodeURIComponent(token)}`),
     cancel: (token, acceptedFeeMinor) =>
       call(base, `/bookings/${encodeURIComponent(token)}/cancel`, post({ acceptedFeeMinor })),
+    checkInInfo: (token) => call(base, `/bookings/${encodeURIComponent(token)}/check-in`),
+    submitCheckIn: (token, body) =>
+      call(base, `/bookings/${encodeURIComponent(token)}/check-in`, post(body)),
+    payBalance: (token, returnUrl) =>
+      call(base, `/bookings/${encodeURIComponent(token)}/pay`, post({ returnUrl })),
+    uploadId: async (token, file) => {
+      const link = await call<{
+        fileId: string;
+        method: string;
+        url: string;
+        headers: Record<string, string>;
+      }>(
+        base,
+        `/bookings/${encodeURIComponent(token)}/check-in/id-upload`,
+        post({ contentType: file.type, sizeBytes: file.size }),
+      );
+      const sent = await fetch(link.url, {
+        method: link.method,
+        headers: link.headers,
+        body: file,
+      });
+      if (!sent.ok)
+        throw new ApiError(sent.status, 'The upload failed. Please try again.', null, {});
+      return link.fileId;
+    },
   };
 }

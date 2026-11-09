@@ -58,6 +58,7 @@ describe('migrations', () => {
       'night_audit_runs',
       'night_audit_steps',
       'notification_deliveries',
+      'online_check_ins',
       'organisations',
       'package_components',
       'partner_changes',

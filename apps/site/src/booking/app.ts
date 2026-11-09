@@ -1,4 +1,12 @@
-import { ApiError, type Api, type Availability, type Booking, type Property } from './api.ts';
+import {
+  ApiError,
+  type Api,
+  type Availability,
+  type Booking,
+  type CheckInInfo,
+  type CheckInRequest,
+  type Property,
+} from './api.ts';
 
 // The guest booking site (PRD M11-01, M11-02; S39; T-113): dates, rooms, plans, guest details,
 // pay, confirmation and manage booking. No framework, to stay small on mobile data. Everything
@@ -53,6 +61,21 @@ const STATUS: Record<string, string> = {
   CHECKED_OUT: 'Stay completed',
   CANCELLED: 'Cancelled',
   NO_SHOW: 'Missed arrival',
+};
+
+const ID_LABELS: Record<string, string> = {
+  PASSPORT: 'Passport',
+  NATIONAL_ID: 'National ID',
+  DRIVERS_LICENCE: 'Driver’s licence',
+  VOTERS_CARD: 'Voter’s card',
+  OTHER: 'Other',
+};
+const PURPOSES: Record<string, string> = {
+  BUSINESS: 'Business',
+  LEISURE: 'Leisure',
+  CONFERENCE: 'Conference',
+  FAMILY: 'Family',
+  OTHER: 'Other',
 };
 
 const messageOf = (err: unknown) =>
@@ -465,6 +488,7 @@ export function mount(root: HTMLElement, env: Env): void {
     }
     document.title = `Your booking ${b.confirmationNo}`;
     const area = h('div', {});
+    const extras = h('div', {});
     const due = BigInt(b.totalMinor) - BigInt(b.paidMinor);
     show(
       h('h1', {}, b.hotel.name),
@@ -500,8 +524,185 @@ export function mount(root: HTMLElement, env: Env): void {
         ),
         area,
       ),
+      extras,
     );
     if (b.cancellation.allowed) offerCancel(area, token, b);
+    if (b.status === 'CONFIRMED') void offerCheckIn(extras, token, b);
+  }
+
+  // ── Online check-in (M3-20, M11-06; T-114) ────────────────────────────────────────────
+
+  function select(label: string, name: string, options: [string, string][]) {
+    const id = `f-${name}`;
+    const el = h(
+      'select',
+      { id, name },
+      h('option', { value: '' }, 'Choose'),
+      ...options.map(([value, text]) => h('option', { value }, text)),
+    ) as HTMLSelectElement;
+    return { input: el, row: h('div', { class: 'field' }, h('label', { for: id }, label), el) };
+  }
+
+  async function offerCheckIn(extras: HTMLElement, token: string, b: Booking) {
+    let info: CheckInInfo;
+    try {
+      info = await env.api.checkInInfo(token);
+    } catch {
+      return; // The booking still shows; online check-in is an extra.
+    }
+    const parts: Node[] = [];
+    if (BigInt(info.dueMinor) > 0n) parts.push(payCard(token, b, info));
+    if (info.closedReason === null) {
+      parts.push(
+        info.submittedAt ? doneCard(extras, token, b, info) : checkInCard(extras, token, b, info),
+      );
+    }
+    extras.replaceChildren(...parts);
+  }
+
+  function payCard(token: string, b: Booking, info: CheckInInfo) {
+    const problem = h('div', {});
+    const pay = h(
+      'button',
+      {
+        type: 'button',
+        onclick: () => {
+          (pay as HTMLButtonElement).disabled = true;
+          env.api
+            .payBalance(token, `${env.origin}/${b.hotel.slug}/manage`)
+            .then((r) => {
+              saveToken(b.hotel.slug, token);
+              env.navigate(r.paymentUrl);
+            })
+            .catch((err: unknown) => {
+              problem.replaceChildren(alert(messageOf(err)));
+              (pay as HTMLButtonElement).disabled = false;
+            });
+        },
+      },
+      `Pay ${money(info.dueMinor, info.currency)} now`,
+    );
+    return h('section', { class: 'card' }, h('h2', {}, 'Pay before you arrive'), problem, pay);
+  }
+
+  function doneCard(extras: HTMLElement, token: string, b: Booking, info: CheckInInfo) {
+    return h(
+      'section',
+      { class: 'card' },
+      h('h2', {}, 'You’ve checked in online'),
+      h(
+        'p',
+        {},
+        'Thank you. Bring the same ID with you. The front desk will give you your room and key.',
+      ),
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'quiet',
+          onclick: () => {
+            extras.replaceChildren(checkInCard(extras, token, b, info));
+          },
+        },
+        'Change my details',
+      ),
+    );
+  }
+
+  function checkInCard(extras: HTMLElement, token: string, b: Booking, info: CheckInInfo) {
+    const need = (f: CheckInInfo['requiredFields'][number]) => info.requiredFields.includes(f);
+    const nationality = field(
+      'Nationality',
+      { name: 'nationality', maxlength: '2', autocomplete: 'country' },
+      'Two-letter country code, for example NG.',
+    );
+    const address = field('Home address', { name: 'address', autocomplete: 'street-address' });
+    const purpose = select('Purpose of stay', 'purpose', Object.entries(PURPOSES));
+    const idType = select(
+      'ID type',
+      'idType',
+      info.idTypes.map((t): [string, string] => [t, ID_LABELS[t] ?? t]),
+    );
+    const idNumber = field('ID number', { name: 'idNumber', autocomplete: 'off' });
+    const idExpiry = field('ID expiry date', { name: 'idExpiry', type: 'date' });
+    const arrivalTime = field('Expected arrival time (optional)', {
+      name: 'arrivalTime',
+      type: 'time',
+    });
+    const collectsId = need('idType') || need('idNumber') || need('idExpiry');
+    const photo = h('input', {
+      id: 'f-idPhoto',
+      type: 'file',
+      accept: 'image/jpeg,image/png,image/webp,application/pdf',
+    }) as HTMLInputElement;
+    const consent = h('input', { id: 'consent', type: 'checkbox' }) as HTMLInputElement;
+    const problem = h('div', {});
+    const submit = h('button', { type: 'submit' }, 'Check in online') as HTMLButtonElement;
+    return h(
+      'form',
+      {
+        class: 'card',
+        novalidate: true,
+        'aria-label': 'Check in online',
+        onsubmit: (event) => {
+          event.preventDefault();
+          if (!consent.checked) {
+            problem.replaceChildren(alert('Please confirm you’ve read how we use your details.'));
+            return;
+          }
+          const text = (el: { value: string }) => el.value.trim() || undefined;
+          const body = {
+            consent: true,
+            ...(need('nationality') && { nationality: text(nationality.input) }),
+            ...(need('address') && { address: text(address.input) }),
+            ...(need('purpose') && { purpose: text(purpose.input) }),
+            ...(need('idType') && { idType: text(idType.input) }),
+            ...(need('idNumber') && { idNumber: text(idNumber.input) }),
+            ...(need('idExpiry') && { idExpiry: text(idExpiry.input) }),
+            ...(text(arrivalTime.input) ? { arrivalTime: text(arrivalTime.input) } : {}),
+          } as CheckInRequest;
+          submit.disabled = true;
+          problem.replaceChildren();
+          const [file] = photo.files ?? [];
+          (file ? env.api.uploadId(token, file) : Promise.resolve(undefined))
+            .then((idFileId) =>
+              env.api.submitCheckIn(token, { ...body, ...(idFileId ? { idFileId } : {}) }),
+            )
+            .then((updated) => {
+              extras.replaceChildren(doneCard(extras, token, b, updated));
+            })
+            .catch((err: unknown) => {
+              problem.replaceChildren(alert(messageOf(err)));
+              submit.disabled = false;
+            });
+        },
+      },
+      h('h2', {}, 'Check in online'),
+      h('p', { class: 'muted' }, 'Give your details now and save time at the front desk.'),
+      need('nationality') && nationality.row,
+      need('address') && address.row,
+      need('purpose') && purpose.row,
+      need('idType') && idType.row,
+      need('idNumber') && idNumber.row,
+      need('idExpiry') && idExpiry.row,
+      collectsId &&
+        h(
+          'div',
+          { class: 'field' },
+          h('label', { for: 'f-idPhoto' }, 'Photo of your ID (optional)'),
+          photo,
+        ),
+      arrivalTime.row,
+      info.dataProtectionNotice && h('p', { class: 'muted' }, info.dataProtectionNotice),
+      h(
+        'label',
+        { for: 'consent', class: 'choice' },
+        consent,
+        'I’ve read this and my details are correct',
+      ),
+      problem,
+      submit,
+    );
   }
 
   function offerCancel(area: HTMLElement, token: string, b: Booking) {

@@ -48,7 +48,7 @@ describe('roles (M1-05)', () => {
       .get('/roles');
     expect(res.status).toBe(200);
     const roles = (res.body as { data: { name: string; memberCount: number }[] }).data;
-    expect(roles).toHaveLength(12);
+    expect(roles).toHaveLength(13);
     expect(roles.find((r) => r.name === 'Front Desk / Cashier')?.memberCount).toBe(1);
   });
 

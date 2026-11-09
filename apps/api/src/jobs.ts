@@ -30,6 +30,7 @@ import {
 } from './modules/payments/jobs.ts';
 import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 import { taskEscalationJob } from './modules/tasks/jobs.ts';
+import { eventHoldExpiryJob } from './modules/events/routes.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
 
@@ -47,6 +48,7 @@ export function workerJobs(deps: {
     roomBlockStatusJob,
     inventoryJob,
     holdExpiryJob,
+    eventHoldExpiryJob,
     stayAlertJob,
     visitorCutoffJob,
     idPurgeJob({ store: deps.files }),

@@ -87,6 +87,9 @@ const BookingEngineSettingsPage = lazy(() =>
   })),
 );
 const InboxPage = lazy(() => import('../routes/inbox.tsx').then((m) => ({ default: m.InboxPage })));
+const EventsPage = lazy(() =>
+  import('../routes/events.tsx').then((m) => ({ default: m.EventsPage })),
+);
 const BillingPage = lazy(() =>
   import('../routes/billing.tsx').then((m) => ({ default: m.BillingPage })),
 );
@@ -129,6 +132,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/leakage': <LeakagePage />,
   '/messages': <MessagesPage />,
   '/inbox': <InboxPage />,
+  '/events': <EventsPage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

@@ -240,6 +240,25 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
     ],
   },
   {
+    // Enquiries, holds, quotes, contracts, deposits
+    name: 'Event Coordinator',
+    slug: 'event-coordinator',
+    requiresMfa: false,
+    orgWide: false,
+    department: 'FO',
+    permissions: [
+      'space.manage',
+      'event.enquiry',
+      'event.hold',
+      'event.quote',
+      'event.contract',
+      'event.confirm',
+      'event.brief',
+      'event.close',
+      ...SELF_SERVICE,
+    ],
+  },
+  {
     // Own tasks, attendance, leave, handovers
     name: 'Staff Member',
     slug: 'staff',

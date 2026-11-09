@@ -240,6 +240,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-092',
   },
   {
+    id: 'events',
+    path: '/events',
+    anyOf: ['event.enquiry', 'space.manage'],
+    group: 'operations',
+    screen: 'S38',
+    ticket: 'T-119',
+  },
+  {
     id: 'inbox',
     path: '/inbox',
     anyOf: ['message.send'],

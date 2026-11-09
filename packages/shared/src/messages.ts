@@ -114,6 +114,20 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplateDef[] = [
     },
   },
   {
+    // T-115 (M11 rule): the only way back to a guest after the 24-hour window.
+    code: 'GUEST_FOLLOW_UP',
+    label: 'Follow-up to a guest',
+    audience: 'GUEST',
+    variables: [GUEST, PROPERTY],
+    whatsapp: {
+      name: 'guest_follow_up',
+      category: 'UTILITY',
+      body:
+        'Hello {{guest_name}}, {{property_name}} has an update about your message. ' +
+        'Please reply here to continue.',
+    },
+  },
+  {
     code: 'PRE_ARRIVAL',
     label: 'Before arrival',
     audience: 'GUEST',
@@ -292,6 +306,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplateDef[] = [
 export const MESSAGE_TEMPLATE_CODES = [
   'BOOKING_CONFIRMED',
   'BOOKING_REFUNDED',
+  'GUEST_FOLLOW_UP',
   'PRE_ARRIVAL',
   'PAYMENT_REQUEST',
   'FOLIO',

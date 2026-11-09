@@ -273,12 +273,23 @@ const RANK: Record<string, number> = { QUEUED: 0, SENT: 1, DELIVERED: 2, READ: 3
  * late or repeated callback changes nothing; failed is recorded unless it was already
  * delivered or read. Returns how many deliveries changed.
  */
+const earlierThan = (status: string) =>
+  Object.keys(RANK).filter((s) => (RANK[s] ?? 0) < (RANK[status] ?? 0));
+
 export async function applyStatuses(
-  db: Pick<Db, 'notificationDelivery'>,
+  db: Pick<Db, 'notificationDelivery' | 'message'>,
   updates: readonly StatusUpdate[],
 ): Promise<number> {
   let changed = 0;
   for (const u of updates) {
+    // Replies typed in the inbox (T-115) carry the same provider reference.
+    await db.message.updateMany({
+      where: {
+        providerRef: u.providerRef,
+        status: { in: u.status === 'FAILED' ? ['SENT', 'DELIVERED'] : earlierThan(u.status) },
+      },
+      data: { status: u.status, ...(u.error ? { error: u.error } : {}) },
+    });
     if (u.status === 'FAILED') {
       const r = await db.notificationDelivery.updateMany({
         where: { providerRef: u.providerRef, status: { in: ['QUEUED', 'SENT'] } },

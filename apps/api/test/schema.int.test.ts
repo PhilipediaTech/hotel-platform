@@ -54,6 +54,8 @@ describe('migrations', () => {
       'leakage_rules',
       'memberships',
       'message_templates',
+      'message_threads',
+      'messages',
       'mfa_recovery_codes',
       'night_audit_runs',
       'night_audit_steps',

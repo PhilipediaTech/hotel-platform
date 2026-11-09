@@ -394,6 +394,27 @@ async function bVisitor(db: Db, world: TenantWorld, propertyId: string) {
   return { ...theirs, visitorId: visitor.id };
 }
 
+/** A WhatsApp conversation at B (T-115). */
+async function bThread(db: Db, world: TenantWorld, propertyId: string) {
+  const thread = await db.messageThread.create({
+    data: {
+      organisationId: orgOf(world, propertyId),
+      propertyId,
+      phone: '+2348030000099',
+      lastInboundAt: new Date(),
+      lastMessageAt: new Date(),
+      lastPreview: 'Theirs',
+      unreadCount: 2,
+    },
+  });
+  return { threadId: thread.id };
+}
+
+async function bThreadUnchanged(db: Db) {
+  expect((await db.messageThread.findMany()).map((t) => t.unreadCount)).toEqual([2]);
+  expect(await db.message.count()).toBe(0);
+}
+
 /** B's booking page and a promo code (T-112). */
 async function bBookingPage(db: Db, world: TenantWorld, propertyId: string) {
   const organisationId = orgOf(world, propertyId);
@@ -1470,6 +1491,14 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       expect(await db.guestLink.count()).toBe(0);
     },
   },
+  listMessageThreads: {
+    seed: bThread,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((t) => t.id),
+  },
+  getMessageThread: { seed: bThread },
+  sendThreadMessage: { seed: bThread, body: () => ({ body: 'Leak' }), untouched: bThreadUnchanged },
+  sendThreadFollowUp: { seed: bThread, body: () => ({}), untouched: bThreadUnchanged },
+  markThreadRead: { seed: bThread, body: () => ({}), untouched: bThreadUnchanged },
   getBookingEngineSettings: {
     seed: bBookingPage,
     listIds: (body) => [(body as { slug: string | null }).slug ?? 'none'],

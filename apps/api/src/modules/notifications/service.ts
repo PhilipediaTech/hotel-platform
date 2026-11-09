@@ -24,6 +24,7 @@ import type { MessageProvider } from '../../core/messaging.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { applyStatuses, queueMessage } from './delivery.ts';
+import { receiveInbound } from './inbox.ts';
 
 // Message templates (PRD M11-05; tab 4 row "Messaging"; S29; T-024) and the WhatsApp
 // webhook (tab 4 row "Webhooks").
@@ -331,5 +332,6 @@ export async function receiveWebhook(
     throw new AppError('UNAUTHENTICATED', 'The webhook signature does not match');
   }
   await applyStatuses(deps.db, deps.messages.parseStatuses(body));
+  await receiveInbound(deps, deps.messages.parseInbound(body));
   return { received: true };
 }

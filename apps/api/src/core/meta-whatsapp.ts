@@ -1,6 +1,7 @@
 import { exampleVars, numberedBody, placeholdersOf, type MessageTemplateDef } from '@hotel/shared';
 import {
   MessageSendError,
+  parseMetaInbound,
   parseMetaStatuses,
   signatureMatches,
   type MessageProvider,
@@ -112,6 +113,34 @@ export function createMetaWhatsAppProvider(options: MetaWhatsAppOptions): Messag
         : null;
     },
     parseStatuses: parseMetaStatuses,
+    parseInbound: parseMetaInbound,
+    async sendText(message) {
+      let res: Response;
+      try {
+        res = await doFetch(`${base}/${options.phoneNumberId}/messages`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${options.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: digits(message.to),
+            type: 'text',
+            text: { body: message.body },
+          }),
+          signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
+        });
+      } catch (err) {
+        throw new MessageSendError(`Meta unreachable: ${(err as Error).name}`, false);
+      }
+      if (!res.ok) throw await graphError(res);
+      const body = (await res.json()) as { messages?: { id?: string }[] };
+      const id = body.messages?.[0]?.id;
+      if (!id) throw new MessageSendError('Meta answered without a message id', false);
+      return { providerRef: id };
+    },
   };
 }
 

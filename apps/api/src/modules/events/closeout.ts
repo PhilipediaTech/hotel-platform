@@ -200,9 +200,11 @@ async function closeOutView(db: Client, clock: () => Date, bookingId: string): P
     .reduce((sum, s) => sum + s.paidMinor, 0n);
   const damage = booking.damageTotalMinor;
   const blockers: Blocker[] = [];
-  if (booking.status !== 'CLOSED') {
-    if (booking.blockedUntil > clock()) blockers.push('EVENT_NOT_OVER');
-    if (!booking.inspectedAt) blockers.push('NOT_INSPECTED');
+  // A cancelled event is settled without an inspection: only its bill has to reach zero.
+  const cancelled = booking.status === 'CANCELLED';
+  if (booking.closedAt === null && booking.status !== 'CLOSED') {
+    if (!cancelled && booking.blockedUntil > clock()) blockers.push('EVENT_NOT_OVER');
+    if (!cancelled && !booking.inspectedAt) blockers.push('NOT_INSPECTED');
     else if (balance > 0n) blockers.push('BALANCE_DUE');
     else if (balance < 0n) blockers.push('CREDIT_TO_RETURN');
   }
@@ -364,8 +366,11 @@ export async function closeBooking(deps: EventDeps, bookingId: string) {
   const now = deps.clock();
   return deps.tenantDb.$transaction(async (tx) => {
     const booking = await lockBooking(tx, bookingId);
-    if (booking.status !== 'CONFIRMED') {
-      throw stateError('Only a confirmed booking is closed', { status: booking.status });
+    const cancelled = booking.status === 'CANCELLED';
+    if ((booking.status !== 'CONFIRMED' && !cancelled) || booking.closedAt) {
+      throw stateError('Only a confirmed or cancelled booking is closed', {
+        status: booking.status,
+      });
     }
     const view = await closeOutView(tx, deps.clock, bookingId);
     if (view.blockers.length > 0) {
@@ -383,15 +388,19 @@ export async function closeBooking(deps: EventDeps, bookingId: string) {
     });
     await tx.eventBooking.update({
       where: { id: bookingId },
-      data: { status: 'CLOSED', closedAt: now, version: { increment: 1 } },
+      data: {
+        status: cancelled ? 'CANCELLED' : 'CLOSED',
+        closedAt: now,
+        version: { increment: 1 },
+      },
     });
     await recordAudit(tx, {
       action: 'event_booking.closed',
       entityType: 'event_booking',
       entityId: bookingId,
-      before: { status: 'CONFIRMED' },
+      before: { status: booking.status },
       after: {
-        status: 'CLOSED',
+        status: cancelled ? 'CANCELLED' : 'CLOSED',
         damageDepositHeldMinor: view.damageDepositHeldMinor,
         damageDepositRetainedMinor: view.damageDepositRetainedMinor,
       },

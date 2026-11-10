@@ -22,7 +22,7 @@ import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
 import { PdfError, usePdf } from '../lib/pdf.tsx';
-import { AfterConfirming } from './event-closeout.tsx';
+import { AfterConfirming, CancelSection } from './event-closeout.tsx';
 
 registerStrings(strings);
 
@@ -717,6 +717,7 @@ function ConfirmSection({ booking, missing }: { booking: Booking; missing: strin
 /** Everything agreed with the client for one hold or booking. */
 export function BookingFile({ booking }: { booking: Booking }) {
   const { t } = useTranslation();
+  const { permissions } = useSession();
   const q = useQuery({
     queryKey: ['event-file', booking.id, 'quote'],
     queryFn: () => api.call('getEventQuotes', { params: { bookingId: booking.id } }),
@@ -726,6 +727,9 @@ export function BookingFile({ booking }: { booking: Booking }) {
       {booking.confirmedByOverride && <Alert tone="info">{t('events.confirm.byOverride')}</Alert>}
       <QuoteSection booking={booking} />
       <ContractSection booking={booking} total={q.data?.versions[0]?.totalMinor ?? null} />
+      {booking.status === 'HOLD' && permissions.includes('event.confirm') && (
+        <CancelSection booking={booking} />
+      )}
       {booking.status !== 'HOLD' && <AfterConfirming booking={booking} />}
     </div>
   );

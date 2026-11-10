@@ -65,10 +65,12 @@ async function refundable(db: Client, paymentId: string) {
     where: { paymentId },
     include: { contract: { include: { booking: true } } },
   });
-  if (held && !held.contract.booking.inspectedAt) {
+  const settling =
+    held?.contract.booking.inspectedAt || held?.contract.booking.status === 'CANCELLED';
+  if (held && !settling) {
     throw new AppError(
       'STATE_TRANSITION_INVALID',
-      'Event money can be refunded once the event has been inspected',
+      'Event money can be refunded once the event has been inspected or cancelled',
       { reason: 'EVENT_MONEY' },
     );
   }

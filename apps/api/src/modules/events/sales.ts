@@ -1,6 +1,7 @@
 import type { EVENT_CONFIRM_MISSING } from '@hotel/shared';
 import {
   calculateTaxes,
+  eventCancellationTerms,
   localDate,
   type EventConfirmBody,
   type EventContractBody,
@@ -420,6 +421,8 @@ function contractEmail(
     '',
     'Terms:',
     body.terms,
+    '',
+    eventCancellationTerms(),
   ].join('\n');
 }
 
@@ -695,6 +698,7 @@ export async function contractPdf(deps: EventDeps, bookingId: string) {
     }
     doc.font('Helvetica-Bold').fontSize(10).text('Terms', 50);
     doc.font('Helvetica').fontSize(9).text(c.terms, { width: 495 });
+    doc.moveDown(0.5).text(eventCancellationTerms(), { width: 495 });
     doc.moveDown(2);
     doc.text(
       c.signedByName

@@ -7,7 +7,8 @@
       "CONFIRMED": "Confirmed",
       "RELEASED": "Released",
       "EXPIRED": "Expired",
-      "CLOSED": "Closed"
+      "CLOSED": "Closed",
+      "CANCELLED": "Cancelled"
     },
     "enquiry": { "OPEN": "Open", "WON": "Won", "LOST": "Lost" },
     "holdEnds": "hold ends {{when}}",
@@ -170,6 +171,19 @@
         "NOT_INSPECTED": "The event has not been inspected",
         "BALANCE_DUE": "The client still owes money: take the payment on the bill",
         "CREDIT_TO_RETURN": "Money is due back to the client: refund it from the bill"
+      }
+    },
+    "cancel": {
+      "heading": "Cancel booking",
+      "rule": "Cancelled within 24 hours of booking, 30% of the deposit paid is kept; after that, 50%. Within 24 hours of the event it can no longer be cancelled. Tax is added to the amount kept.",
+      "fee": "If cancelled now: {{fee}} of the {{paid}} deposit paid is kept ({{share}}%), plus any tax. The rest of {{received}} received is refunded from the bill.",
+      "reason": "Reason for cancelling",
+      "button": "Cancel booking",
+      "done": "Cancelled. Refund what is left from the bill, then close the event.",
+      "blocked": {
+        "TOO_CLOSE": "Within 24 hours of the event it can no longer be cancelled; it will be invoiced as agreed.",
+        "NOTHING_TO_CANCEL": "Nothing has been paid: release the hold instead.",
+        "NOT_CANCELLABLE": "This booking can no longer be cancelled."
       }
     },
     "confirm": {

@@ -155,6 +155,17 @@ const INSPECTED = {
   blockers: ['CREDIT_TO_RETURN'],
 };
 
+const CANCELLABLE = {
+  allowed: true,
+  reason: null,
+  bookedAt: '2026-11-10T09:00:00Z',
+  keepBps: 3000,
+  depositPaidMinor: '40000000',
+  feeMinor: '12000000',
+  receivedMinor: '40000000',
+};
+
+let cancellation: unknown;
 let listed: unknown;
 let closeOut: unknown;
 let contractView: unknown;
@@ -166,6 +177,7 @@ const sent = (key: string) => calls.filter((c) => c.key === key);
 beforeEach(() => {
   calls.length = 0;
   listed = HOLD;
+  cancellation = { ...CANCELLABLE, allowed: false, reason: 'NOTHING_TO_CANCEL' };
   closeOut = NOT_INSPECTED;
   contractView = NO_CONTRACT;
   confirmReply = () => json(200, { ...HOLD, status: 'CONFIRMED', holdExpiresAt: null });
@@ -204,6 +216,8 @@ beforeEach(() => {
     'POST /event-bookings': () => json(201, HOLD),
     [`POST /event-bookings/${HOLD.id}/release`]: () => json(200, { ...HOLD, status: 'RELEASED' }),
     [`GET /event-bookings/${HOLD.id}/brief`]: () => json(200, BRIEF),
+    [`GET /event-bookings/${HOLD.id}/cancellation`]: () => json(200, cancellation),
+    [`POST /event-bookings/${HOLD.id}/cancel`]: () => json(200, { ...HOLD, status: 'CANCELLED' }),
     [`PUT /event-bookings/${HOLD.id}/brief`]: () => json(200, BRIEF),
     [`GET /event-bookings/${HOLD.id}/close-out`]: () => json(200, closeOut),
     [`POST /event-bookings/${HOLD.id}/inspection`]: () => json(201, closeOut),
@@ -435,6 +449,34 @@ describe('Events and spaces (S38)', { timeout: 20_000 }, () => {
     const row = await openFile(user);
     await user.click(await within(row).findByRole('button', { name: 'Close event' }));
     await waitFor(() => expect(sent(`POST /event-bookings/${HOLD.id}/close`)).toHaveLength(1));
+  });
+
+  it('cancels a confirmed booking, saying what the client keeps and loses (T-121b)', async () => {
+    listed = { ...HOLD, status: 'CONFIRMED', holdExpiresAt: null };
+    cancellation = CANCELLABLE;
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    expect(
+      await within(row).findByText(/120,000\.00 of the .{0,6}400,000\.00 deposit paid is kept/),
+    ).toBeInTheDocument();
+    const form = within(row).getByRole('form', { name: 'Cancel booking' });
+    await user.type(within(form).getByLabelText('Reason for cancelling'), 'Postponed');
+    await user.click(within(form).getByRole('button', { name: 'Cancel booking' }));
+    await waitFor(() => expect(sent(`POST /event-bookings/${HOLD.id}/cancel`)).toHaveLength(1));
+    expect(sent(`POST /event-bookings/${HOLD.id}/cancel`)[0]?.body).toEqual({
+      reason: 'Postponed',
+    });
+  });
+
+  it('within 24 hours of the event says it can no longer be cancelled', async () => {
+    listed = { ...HOLD, status: 'CONFIRMED', holdExpiresAt: null };
+    cancellation = { ...CANCELLABLE, allowed: false, reason: 'TOO_CLOSE' };
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    expect(
+      await within(row).findByText(/can no longer be cancelled; it will be invoiced/),
+    ).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument();
   });
 
   it('without space.manage the spaces can be seen but not changed', async () => {

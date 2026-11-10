@@ -1,8 +1,14 @@
-import { EVENT_CLOSEOUT_ROUTES, EVENT_ROUTES, EVENT_SALES_ROUTES } from '@hotel/shared';
+import {
+  EVENT_CANCELLATION_ROUTES,
+  EVENT_CLOSEOUT_ROUTES,
+  EVENT_ROUTES,
+  EVENT_SALES_ROUTES,
+} from '@hotel/shared';
 import express, { type Router } from 'express';
 import { defineJob } from '../../core/jobs.ts';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as cancellation from './cancellation.ts';
 import * as closeout from './closeout.ts';
 import * as sales from './sales.ts';
 import * as events from './service.ts';
@@ -74,6 +80,13 @@ export function eventRoutes(deps: sales.EventSalesDeps): Router {
     closeout.invoicePdf(deps, params.bookingId),
   );
   mountRoute(router, c.closeEvent, ({ params }) => closeout.closeBooking(deps, params.bookingId));
+  const x = EVENT_CANCELLATION_ROUTES;
+  mountRoute(router, x.getEventCancellation, ({ params }) =>
+    cancellation.getCancellation(deps, params.bookingId),
+  );
+  mountRoute(router, x.cancelEvent, ({ params, body }, { tenant }) =>
+    cancellation.cancelBooking(deps, tenantFrom(tenant), params.bookingId, body),
+  );
   return router;
 }
 

@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-121c is pushed on `feat/T-121c-cancellation-settings`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Next: services (M9-09; services, service_bookings, service.manage; capacity, booking window, price, charge-to-folio), then group blocks and allotments (M3-17, M2-12), then automated hotel billing and suspension (M13-03, M13-06).
+T-122 is pushed on `feat/T-122-services` (stacked on T-121c; merge T-121c first), awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Events and services (M9) are done. Next: group blocks and allotments (M3-17, M2-12), then automated hotel billing and suspension (M13-03, M13-06).

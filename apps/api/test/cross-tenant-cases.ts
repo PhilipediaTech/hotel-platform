@@ -512,6 +512,55 @@ async function bEventSettingsUnchanged(db: Db, world: TenantWorld) {
   expect(rule?.noticeHours).toBe(99);
 }
 
+/** A service of B's, booked by B's in-house guest (T-122). */
+async function bService(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bInHouse(db, world, propertyId);
+  const code = await db.revenueCode.create({
+    data: { propertyId, code: 'SVCB', name: 'Services', group: 'OTHER' },
+  });
+  const service = await db.service.create({
+    data: {
+      organisationId: orgOf(world, propertyId),
+      propertyId,
+      code: 'SPA',
+      name: 'Theirs',
+      category: 'SPA',
+      priceMinor: 100n,
+      durationMinutes: 60,
+      opensAt: '00:00',
+      closesAt: '23:59',
+      maxAdvanceDays: 365,
+      revenueCodeId: code.id,
+    },
+  });
+  const booking = await db.serviceBooking.create({
+    data: {
+      propertyId,
+      serviceId: service.id,
+      stayId: theirs.stayId,
+      guestName: 'Theirs',
+      startsAt: new Date('2099-06-01T10:00:00Z'),
+      endsAt: new Date('2099-06-01T11:00:00Z'),
+      amountMinor: 100n,
+      createdById: world.bStaff.id,
+    },
+  });
+  return { ...theirs, serviceId: service.id, bookingId: booking.id };
+}
+
+async function bServiceUnchanged(db: Db, world: TenantWorld, theirs: Record<string, string>) {
+  const service = await db.service.findUniqueOrThrow({ where: { id: theirs['serviceId'] ?? '' } });
+  expect(service.name).toBe('Theirs');
+  const booking = await db.serviceBooking.findUniqueOrThrow({
+    where: { id: theirs['bookingId'] ?? '' },
+  });
+  expect(booking.status).toBe('BOOKED');
+  expect(await db.service.count({ where: { code: 'LEAK', propertyId: world.b1.id } })).toBe(0);
+  expect(
+    await db.serviceBooking.count({ where: { guestName: 'Leak', propertyId: world.b1.id } }),
+  ).toBe(0);
+}
+
 async function bBookingPage(db: Db, world: TenantWorld, propertyId: string) {
   const organisationId = orgOf(world, propertyId);
   await db.bookingEngineSettings.create({
@@ -1685,6 +1734,53 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   getEventInvoicePdf: { seed: bEventBooking },
   closeEvent: { seed: bEventBooking, body: () => ({}), untouched: bEventUnchanged },
   getEventCancellation: { seed: bEventBooking },
+  listServices: {
+    seed: bService,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((s) => s.id),
+  },
+  createService: {
+    seed: bService,
+    creates: true,
+    body: () => ({
+      code: 'LEAK',
+      name: 'Leak',
+      category: 'SPA',
+      priceMinor: '100',
+      durationMinutes: 60,
+      revenueCode: 'SVCB',
+    }),
+    untouched: bServiceUnchanged,
+  },
+  updateService: {
+    seed: bService,
+    body: () => ({
+      code: 'LEAK',
+      name: 'Leak',
+      category: 'SPA',
+      priceMinor: '100',
+      durationMinutes: 60,
+    }),
+    untouched: bServiceUnchanged,
+  },
+  getServiceSlots: { seed: bService, query: () => ({ date: '2099-06-01' }) },
+  listServiceBookings: {
+    seed: bService,
+    query: () => ({ date: '2099-06-01' }),
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((b) => b.id),
+  },
+  createServiceBooking: {
+    seed: bService,
+    creates: true,
+    body: (theirs) => ({
+      serviceId: theirs['serviceId'],
+      stayId: theirs['stayId'],
+      guestName: 'Leak',
+      startsAt: '2099-06-01T12:00:00Z',
+    }),
+    untouched: bServiceUnchanged,
+  },
+  completeServiceBooking: { seed: bService, body: () => ({}), untouched: bServiceUnchanged },
+  cancelServiceBooking: { seed: bService, body: () => ({}), untouched: bServiceUnchanged },
   getEventSettings: {
     seed: bEventSettings,
     listIds: (body) => [

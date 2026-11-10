@@ -151,6 +151,8 @@ model Property {
 
   spaces                Space[]
   eventBriefs           EventBrief[]
+  services              Service[]
+  serviceBookings       ServiceBooking[]
   eventQuotes           EventQuote[]
   eventQuoteVersions    EventQuoteVersion[]
   eventContracts        EventContract[]
@@ -303,6 +305,7 @@ model User {
   eventEnquiries     EventEnquiry[]
   eventBookings      EventBooking[]
   eventBriefs        EventBrief[]        @relation("EventBriefAuthor")
+  serviceBookings    ServiceBooking[]    @relation("ServiceBookingAuthor")
   eventsInspected    EventBooking[]      @relation("EventInspector")
   eventQuoteVersions EventQuoteVersion[] @relation("EventQuoteAuthor")
   eventContracts     EventContract[]     @relation("EventContractIssuer")
@@ -752,6 +755,7 @@ model RevenueCode {
   taxRules          TaxRule[]          @relation("TaxLineCode")
   packageComponents PackageComponent[]
   folioLines        FolioLine[]
+  services          Service[]
   routingRules      RoutingRule[]
 
   @@unique([propertyId, code])
@@ -1154,26 +1158,27 @@ model Reservation {
 /// One room of a reservation, made from a quote (kept for its prices and taxes; a quote
 /// makes one stay at most). folioId is set by folios (T-060), roomId by assignment (T-050).
 model Stay {
-  id            String            @id @default(uuid()) @db.Uuid
-  propertyId    String            @map("property_id") @db.Uuid
-  reservationId String            @map("reservation_id") @db.Uuid
-  guestId       String            @map("guest_id") @db.Uuid
-  roomTypeId    String            @map("room_type_id") @db.Uuid
-  roomId        String?           @map("room_id") @db.Uuid
-  ratePlanId    String            @map("rate_plan_id") @db.Uuid
-  quoteId       String            @unique @map("quote_id") @db.Uuid
-  arrival       DateTime          @db.Date
-  departure     DateTime          @db.Date
-  adults        Int               @default(1)
-  children      Int               @default(0)
-  status        ReservationStatus
-  isDayUse      Boolean           @default(false) @map("is_day_use")
-  dayUseStart   DateTime?         @map("day_use_start") @db.Timestamptz(6)
-  dayUseEnd     DateTime?         @map("day_use_end") @db.Timestamptz(6)
-  folioId       String?           @map("folio_id") @db.Uuid
-  checkedInAt   DateTime?         @map("checked_in_at") @db.Timestamptz(6)
-  checkedOutAt  DateTime?         @map("checked_out_at") @db.Timestamptz(6)
-  version       Int               @default(0)
+  id              String            @id @default(uuid()) @db.Uuid
+  propertyId      String            @map("property_id") @db.Uuid
+  reservationId   String            @map("reservation_id") @db.Uuid
+  guestId         String            @map("guest_id") @db.Uuid
+  roomTypeId      String            @map("room_type_id") @db.Uuid
+  roomId          String?           @map("room_id") @db.Uuid
+  ratePlanId      String            @map("rate_plan_id") @db.Uuid
+  quoteId         String            @unique @map("quote_id") @db.Uuid
+  arrival         DateTime          @db.Date
+  departure       DateTime          @db.Date
+  adults          Int               @default(1)
+  children        Int               @default(0)
+  status          ReservationStatus
+  isDayUse        Boolean           @default(false) @map("is_day_use")
+  dayUseStart     DateTime?         @map("day_use_start") @db.Timestamptz(6)
+  dayUseEnd       DateTime?         @map("day_use_end") @db.Timestamptz(6)
+  folioId         String?           @map("folio_id") @db.Uuid
+  checkedInAt     DateTime?         @map("checked_in_at") @db.Timestamptz(6)
+  checkedOutAt    DateTime?         @map("checked_out_at") @db.Timestamptz(6)
+  version         Int               @default(0)
+  serviceBookings ServiceBooking[]
 
   property    Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   reservation Reservation         @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
@@ -1478,7 +1483,7 @@ model FolioLine {
   parentLineId      String?  @map("parent_line_id") @db.Uuid
   reversesLineId    String?  @unique @map("reverses_line_id") @db.Uuid
   taxRuleVersionId  String?  @map("tax_rule_version_id") @db.Uuid
-  /// STAY_NIGHT | POS_ORDER | MINIBAR | EVENT | MANUAL
+  /// STAY_NIGHT | POS_ORDER | MINIBAR | EVENT | SERVICE | MANUAL
   sourceType        String?  @map("source_type")
   sourceId          String?  @map("source_id")
   postedById        String?  @map("posted_by_id") @db.Uuid
@@ -2869,4 +2874,69 @@ model EventDeposit {
   @@index([contractId])
   @@index([paymentId])
   @@map("event_deposits")
+}
+
+/// One of the hotel's other services (PRD M9-09): laundry, parking, transfers, spa, gym, tours.
+model Service {
+  id               String  @id @default(uuid()) @db.Uuid
+  organisationId   String  @map("organisation_id") @db.Uuid
+  propertyId       String  @map("property_id") @db.Uuid
+  code             String
+  name             String
+  /// LAUNDRY | PARKING | TRANSFER | SPA | GYM | TOUR | OTHER
+  category         String
+  description      String?
+  priceMinor       BigInt  @map("price_minor")
+  /// PER_BOOKING | PER_PERSON | PER_HOUR
+  pricing          String  @default("PER_BOOKING")
+  durationMinutes  Int     @map("duration_minutes")
+  /// How many at once; null = no limit.
+  capacity         Int?
+  /// "HH:MM", the hotel's time.
+  opensAt          String  @map("opens_at")
+  closesAt         String  @map("closes_at")
+  minNoticeMinutes Int     @default(0) @map("min_notice_minutes")
+  maxAdvanceDays   Int     @default(30) @map("max_advance_days")
+  chargeToFolio    Boolean @default(true) @map("charge_to_folio")
+  revenueCodeId    String  @map("revenue_code_id") @db.Uuid
+  active           Boolean @default(true)
+
+  property    Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  revenueCode RevenueCode      @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
+  bookings    ServiceBooking[]
+
+  @@unique([propertyId, code])
+  @@map("services")
+}
+
+/// A booking of a service (PRD M9-09).
+model ServiceBooking {
+  id          String    @id @default(uuid()) @db.Uuid
+  propertyId  String    @map("property_id") @db.Uuid
+  serviceId   String    @map("service_id") @db.Uuid
+  stayId      String?   @map("stay_id") @db.Uuid
+  guestName   String    @map("guest_name")
+  startsAt    DateTime  @map("starts_at") @db.Timestamptz(6)
+  endsAt      DateTime  @map("ends_at") @db.Timestamptz(6)
+  quantity    Int       @default(1)
+  /// The price when booked, before tax.
+  amountMinor BigInt    @map("amount_minor")
+  /// BOOKED | COMPLETED | CANCELLED | NO_SHOW
+  status      String    @default("BOOKED")
+  /// The charge on the guest's folio, once delivered.
+  folioLineId String?   @unique @map("folio_line_id") @db.Uuid
+  notes       String?
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  version     Int       @default(0)
+
+  property  Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  stay      Stay?    @relation(fields: [stayId], references: [id], onDelete: Restrict)
+  createdBy User     @relation("ServiceBookingAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([serviceId, startsAt])
+  @@index([propertyId, startsAt])
+  @@map("service_bookings")
 }

@@ -99,6 +99,8 @@ describe('migrations', () => {
       'room_types',
       'rooms',
       'routing_rules',
+      'service_bookings',
+      'services',
       'sessions',
       'space_layouts',
       'space_rate_rules',

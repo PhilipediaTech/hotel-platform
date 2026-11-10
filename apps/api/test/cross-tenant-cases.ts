@@ -623,6 +623,48 @@ async function bGroupBlocksUnchanged(db: Db, world: TenantWorld) {
   expect(await db.reservation.count({ where: { groupBlockId: { not: null } } })).toBe(0);
 }
 
+/** B's company account with an invoice and a payment, and B's folio owing money (T-126). */
+async function bArAccount(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bFolio(db, world, propertyId);
+  const organisationId = orgOf(world, propertyId);
+  const company = await db.company.create({
+    data: { organisationId, kind: 'COMPANY', name: 'Theirs Ltd' },
+  });
+  const account = await db.arAccount.create({
+    data: { organisationId, propertyId, companyId: company.id, creditLimitMinor: 1000000n },
+  });
+  const invoice = await db.arInvoice.create({
+    data: {
+      propertyId,
+      arAccountId: account.id,
+      number: 'AR-THEIRS',
+      amountMinor: 1000n,
+      issuedOn: new Date('2026-11-01'),
+      dueOn: new Date('2026-12-01'),
+    },
+  });
+  const payment = await db.arPayment.create({
+    data: {
+      propertyId,
+      arAccountId: account.id,
+      method: 'BANK_TRANSFER',
+      amountMinor: 500n,
+      receivedOn: new Date('2026-11-05'),
+      createdById: world.bStaff.id,
+    },
+  });
+  return { ...theirs, accountId: account.id, invoiceId: invoice.id, paymentId: payment.id };
+}
+
+async function bArUnchanged(db: Db, world: TenantWorld) {
+  const accounts = await db.arAccount.findMany({ where: { propertyId: world.b1.id } });
+  expect(accounts.map((a) => [a.creditLimitMinor, a.status])).toEqual([[1000000n, 'ACTIVE']]);
+  expect(await db.arInvoice.count({ where: { propertyId: world.b1.id } })).toBe(1);
+  expect(await db.arPayment.count({ where: { propertyId: world.b1.id } })).toBe(1);
+  expect(await db.arAllocation.count()).toBe(0);
+  expect(await db.payment.count({ where: { method: 'AR_TRANSFER' } })).toBe(0);
+}
+
 async function bBookingPage(db: Db, world: TenantWorld, propertyId: string) {
   const organisationId = orgOf(world, propertyId);
   await db.bookingEngineSettings.create({
@@ -1887,6 +1929,51 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       rooms: [{ firstName: 'Leak', lastName: 'Leak', roomTypeId: theirs['roomTypeId'] }],
     }),
     untouched: bGroupBlocksUnchanged,
+  },
+  listArAccounts: {
+    seed: bArAccount,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((a) => a.id),
+  },
+  createArAccount: {
+    seed: bArAccount,
+    creates: true,
+    body: () => ({ companyId: crypto.randomUUID(), creditLimitMinor: '1' }),
+    untouched: bArUnchanged,
+  },
+  getArAccount: { seed: bArAccount },
+  updateArAccount: {
+    seed: bArAccount,
+    body: () => ({ creditLimitMinor: '9', termsDays: 1, status: 'CLOSED' }),
+    untouched: bArUnchanged,
+  },
+  transferToAr: {
+    seed: bArAccount,
+    body: (theirs) => ({ folioId: theirs['folioId'], amountMinor: '100' }),
+    untouched: bArUnchanged,
+  },
+  recordArPayment: {
+    seed: bArAccount,
+    body: () => ({ method: 'CASH', amountMinor: '100', receivedOn: '2026-11-01' }),
+    untouched: bArUnchanged,
+  },
+  allocateArPayment: { seed: bArAccount, body: () => ({}), untouched: bArUnchanged },
+  getArStatement: {
+    seed: bArAccount,
+    query: () => ({ from: '2026-11-01', to: '2026-11-30' }),
+  },
+  getArStatementPdf: {
+    seed: bArAccount,
+    query: () => ({ from: '2026-11-01', to: '2026-11-30' }),
+  },
+  sendArStatement: {
+    seed: bArAccount,
+    body: () => ({ from: '2026-11-01', to: '2026-11-30' }),
+    untouched: bArUnchanged,
+  },
+  getArAgeing: {
+    seed: bArAccount,
+    listIds: (body) =>
+      (body as { accounts: { accountId: string }[] }).accounts.map((a) => a.accountId),
   },
   listServices: {
     seed: bService,

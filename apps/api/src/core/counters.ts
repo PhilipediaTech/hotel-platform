@@ -9,6 +9,7 @@ export const COUNTER = {
   FOLIO: 'folio',
   TASK: 'task',
   EVENT_CONTRACT: 'event_contract',
+  AR_INVOICE: 'ar_invoice',
 } as const;
 export type CounterName = (typeof COUNTER)[keyof typeof COUNTER];
 

@@ -87,6 +87,12 @@ export function eventRoutes(deps: sales.EventSalesDeps): Router {
   mountRoute(router, x.cancelEvent, ({ params, body }, { tenant }) =>
     cancellation.cancelBooking(deps, tenantFrom(tenant), params.bookingId, body),
   );
+  mountRoute(router, x.getEventSettings, (_input, { tenant }) =>
+    cancellation.getSettings(deps, tenantFrom(tenant)),
+  );
+  mountRoute(router, x.updateEventSettings, ({ body }, { tenant }) =>
+    cancellation.updateSettings(deps, tenantFrom(tenant), body.cancellation),
+  );
   return router;
 }
 

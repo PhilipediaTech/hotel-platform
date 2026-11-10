@@ -1,5 +1,6 @@
 import {
-  EVENT_CANCELLATION,
+  cancellationRuleOf,
+  EventCancellationRule,
   type EventCancelBody,
   type EventCancellationView,
 } from '@hotel/shared';
@@ -14,7 +15,8 @@ import { LIVE_CONTRACT } from './allocation.ts';
 import { lockBooking, REVENUE_CODE } from './sales.ts';
 import { BOOKING_INCLUDE, bookingOf, type EventDeps } from './service.ts';
 
-// Cancelling an event (T-121b; the rule is EVENT_CANCELLATION, set by Philip on 2026-11-10).
+// Cancelling an event (T-121b, T-121c). The rule is the contract's own, or for a booking
+// confirmed without one, the hotel's current rule (default EVENT_CANCELLATION).
 // The share kept is of the deposit actually paid, so the fee with its tax never exceeds what
 // the client has paid. Cancelling posts that fee to the event's bill; the rest is refunded
 // through the normal refund screen (with its approval), and then the event is closed.
@@ -24,6 +26,48 @@ type View = z.input<typeof EventCancellationView>;
 
 const HOUR = 3_600_000;
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+/** The hotel's rule for contracts issued now. */
+export async function hotelRule(db: TenantDb | TenantTx, propertyId: string) {
+  const property = await db.property.findUniqueOrThrow({ where: { id: propertyId } });
+  const settings = (property.settings ?? {}) as Record<string, unknown>;
+  return cancellationRuleOf(settings['eventCancellation']);
+}
+
+export async function getSettings(deps: EventDeps, tenant: TenantContext) {
+  const property = await deps.tenantDb.property.findUniqueOrThrow({
+    where: { id: tenant.propertyId },
+  });
+  const settings = (property.settings ?? {}) as Record<string, unknown>;
+  return {
+    cancellation: cancellationRuleOf(settings['eventCancellation']),
+    isDefault: !EventCancellationRule.safeParse(settings['eventCancellation']).success,
+  };
+}
+
+export async function updateSettings(
+  deps: EventDeps,
+  tenant: TenantContext,
+  rule: EventCancellationRule,
+) {
+  await deps.tenantDb.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM properties WHERE id = ${tenant.propertyId}::uuid FOR UPDATE`;
+    const property = await tx.property.findUniqueOrThrow({ where: { id: tenant.propertyId } });
+    const settings = (property.settings ?? {}) as Record<string, unknown>;
+    await tx.property.update({
+      where: { id: tenant.propertyId },
+      data: { settings: { ...settings, eventCancellation: rule } as never },
+    });
+    await recordAudit(tx, {
+      action: 'event_settings.updated',
+      entityType: 'property',
+      entityId: tenant.propertyId,
+      before: { eventCancellation: cancellationRuleOf(settings['eventCancellation']) },
+      after: { eventCancellation: rule },
+    });
+  });
+  return getSettings(deps, tenant);
+}
 
 async function assess(db: TenantDb | TenantTx, bookingId: string, now: Date) {
   const booking = await db.eventBooking.findFirst({ where: { id: bookingId } });
@@ -36,10 +80,12 @@ async function assess(db: TenantDb | TenantTx, bookingId: string, now: Date) {
   const depositPaid = (contract?.schedule ?? [])
     .filter((s) => s.kind === 'DEPOSIT')
     .reduce((sum, s) => sum + s.paidMinor, 0n);
+  const rule = contract
+    ? cancellationRuleOf(contract.cancellationRule)
+    : await hotelRule(db, booking.propertyId);
   const bookedAt = booking.confirmedAt ?? contract?.issuedAt ?? null;
-  const early =
-    bookedAt !== null && now.getTime() - bookedAt.getTime() < EVENT_CANCELLATION.earlyHours * HOUR;
-  const keepBps = early ? EVENT_CANCELLATION.earlyKeepBps : EVENT_CANCELLATION.laterKeepBps;
+  const early = bookedAt !== null && now.getTime() - bookedAt.getTime() < rule.earlyHours * HOUR;
+  const keepBps = early ? rule.earlyKeepBps : rule.laterKeepBps;
 
   let reason: View['reason'] = null;
   const live = booking.status === 'CONFIRMED' && !booking.inspectedAt;
@@ -49,14 +95,11 @@ async function assess(db: TenantDb | TenantTx, bookingId: string, now: Date) {
   } else if (!live) {
     reason = 'NOT_CANCELLABLE';
   }
-  if (
-    !reason &&
-    booking.startsAt.getTime() - now.getTime() < EVENT_CANCELLATION.noticeHours * HOUR
-  ) {
+  if (!reason && booking.startsAt.getTime() - now.getTime() < rule.noticeHours * HOUR) {
     reason = 'TOO_CLOSE';
   }
   const fee = (depositPaid * BigInt(keepBps)) / 10_000n;
-  return { booking, contract, reason, bookedAt, keepBps, depositPaid, fee, received };
+  return { booking, contract, rule, reason, bookedAt, keepBps, depositPaid, fee, received };
 }
 
 export async function getCancellation(deps: EventDeps, bookingId: string): Promise<View> {
@@ -69,11 +112,16 @@ export async function getCancellation(deps: EventDeps, bookingId: string): Promi
     depositPaidMinor: a.depositPaid.toString(),
     feeMinor: a.fee.toString(),
     receivedMinor: a.received.toString(),
+    rule: a.rule,
   };
 }
 
-const MESSAGES: Record<NonNullable<View['reason']>, string> = {
-  TOO_CLOSE: `Within ${EVENT_CANCELLATION.noticeHours} hours of the event it can no longer be cancelled`,
+const message = (reason: NonNullable<View['reason']>, rule: EventCancellationRule) =>
+  reason === 'TOO_CLOSE'
+    ? `Within ${rule.noticeHours} hours of the event it can no longer be cancelled`
+    : MESSAGES[reason];
+
+const MESSAGES: Record<Exclude<NonNullable<View['reason']>, 'TOO_CLOSE'>, string> = {
   NOTHING_TO_CANCEL: 'Nothing has been paid on this hold: release it instead',
   NOT_CANCELLABLE: 'Only a confirmed or paid booking that has not taken place can be cancelled',
 };
@@ -90,7 +138,9 @@ export async function cancelBooking(
       await lockBooking(tx, bookingId);
       const a = await assess(tx, bookingId, now);
       if (a.reason) {
-        throw new AppError('STATE_TRANSITION_INVALID', MESSAGES[a.reason], { reason: a.reason });
+        throw new AppError('STATE_TRANSITION_INVALID', message(a.reason, a.rule), {
+          reason: a.reason,
+        });
       }
       const folioId = a.contract?.folioId ?? null;
       if (a.fee > 0n && a.contract && folioId) {

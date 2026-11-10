@@ -71,6 +71,8 @@ export const TENANT_MODELS: Record<string, Scope> = {
   EventEnquiry: { kind: 'property', organisationField: 'organisationId' },
   EventBooking: { kind: 'property', organisationField: 'organisationId' },
   EventBrief: { kind: 'property' },
+  Service: { kind: 'property', organisationField: 'organisationId' },
+  ServiceBooking: { kind: 'property' },
   EventQuote: { kind: 'property' },
   EventQuoteVersion: { kind: 'property' },
   EventContract: { kind: 'property' },

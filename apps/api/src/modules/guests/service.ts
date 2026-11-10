@@ -323,7 +323,33 @@ function companyItem(c: Company): CompanyOut {
     name: c.name,
     contacts: (c.contacts ?? []) as CompanyOut['contacts'],
     taxId: c.taxId,
+    creditLimitMinor: c.creditLimitMinor?.toString() ?? null,
+    paymentTermsDays: c.paymentTermsDays,
+    commissionBps: c.commissionBps,
+    billingInstructions: billingOf(c.billingInstructions),
     active: c.active,
+  };
+}
+
+function billingOf(value: unknown): CompanyOut['billingInstructions'] {
+  const v = (value ?? {}) as Record<string, unknown>;
+  return {
+    invoiceEmail: typeof v['invoiceEmail'] === 'string' ? v['invoiceEmail'] : null,
+    notes: typeof v['notes'] === 'string' ? v['notes'] : null,
+  };
+}
+
+/** The money fields as the database keeps them. */
+function companyData(body: {
+  creditLimitMinor?: string | null;
+  [key: string]: unknown;
+}): Record<string, unknown> {
+  const { creditLimitMinor, ...rest } = body;
+  return {
+    ...rest,
+    ...(creditLimitMinor !== undefined
+      ? { creditLimitMinor: creditLimitMinor === null ? null : BigInt(creditLimitMinor) }
+      : {}),
   };
 }
 
@@ -332,6 +358,10 @@ const auditCompany = (c: Company) => ({
   name: c.name,
   contacts: c.contacts,
   taxId: c.taxId,
+  creditLimitMinor: c.creditLimitMinor?.toString() ?? null,
+  paymentTermsDays: c.paymentTermsDays,
+  commissionBps: c.commissionBps,
+  billingInstructions: c.billingInstructions,
   active: c.active,
 });
 
@@ -354,7 +384,7 @@ export async function listCompanies(
 export async function createCompany(deps: GuestDeps, body: z.output<typeof CompanyBody>) {
   return deps.tenantDb.$transaction(async (tx) => {
     const created = await tx.company.create({
-      data: body as unknown as Prisma.CompanyUncheckedCreateInput,
+      data: companyData(body) as unknown as Prisma.CompanyUncheckedCreateInput,
     });
     await recordAudit(tx, {
       action: 'company.created',
@@ -383,7 +413,7 @@ export async function updateCompany(
     if (!before) throw new AppError('NOT_FOUND', 'Company not found');
     const after = await tx.company.update({
       where: { id: before.id },
-      data: body,
+      data: companyData(body),
     });
     const diff = changedFields(auditCompany(before), auditCompany(after));
     if (diff.keys.length > 0) {

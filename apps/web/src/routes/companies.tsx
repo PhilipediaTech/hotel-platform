@@ -11,11 +11,13 @@ import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import { api, ApiError } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
+import { toMinor } from '../lib/money.ts';
 import { Field } from './auth/layout.tsx';
 import { fieldErrorsOf, serverErrors, validated, type FieldErrors } from './settings/room-form.ts';
 
 // S13 Company profiles (PRD M3-16 basic; T-043): companies, travel agents and event clients
-// with contacts and tax ID. Credit limits, terms and commission arrive with V1.1.
+// with contacts and tax ID; credit limit, payment terms, commission, billing instructions and
+// their negotiated rates (M3-16, M2-11; T-125).
 
 type Company = z.output<typeof CompanyItem>;
 type Kind = (typeof COMPANY_KINDS)[number];
@@ -147,8 +149,45 @@ export function CompanyProfilePage() {
           <dd>{t(`companies.kinds.${company.data.kind}`)}</dd>
           <dt className="mt-2 text-text-muted">{t('companies.taxId')}</dt>
           <dd>{company.data.taxId ?? '—'}</dd>
+          <dt className="mt-2 text-text-muted">{t('companies.creditLimit')}</dt>
+          <dd>
+            {company.data.creditLimitMinor
+              ? (Number(company.data.creditLimitMinor) / 100).toLocaleString()
+              : t('companies.noLimit')}
+          </dd>
+          <dt className="mt-2 text-text-muted">{t('companies.billingNotes')}</dt>
+          <dd>{company.data.billingInstructions.notes ?? '—'}</dd>
         </dl>
       )}
+      <NegotiatedRates companyId={company.data.id} />
+    </section>
+  );
+}
+
+/** The company's own rates (M2-11): set up under Rates as kind Negotiated. */
+function NegotiatedRates({ companyId }: { companyId: string }) {
+  const { t } = useTranslation();
+  const plans = useQuery({
+    queryKey: ['rate-plans', 'for-company', companyId],
+    queryFn: async () => (await api.call('listRatePlans')).data,
+  });
+  const mine = (plans.data ?? []).filter((p) => p.companyId === companyId);
+  return (
+    <section aria-label={t('companies.rates')} className="mt-6">
+      <h2 className="font-semibold">{t('companies.rates')}</h2>
+      {plans.data && mine.length === 0 && (
+        <p className="text-sm text-text-muted">{t('companies.noRates')}</p>
+      )}
+      <ul className="mt-2 flex flex-col gap-1 text-sm">
+        {mine.map((p) => (
+          <li key={p.id}>
+            <Link to={`/rates?plan=${p.id}`} className="text-brand underline">
+              {p.code} · {p.name}
+            </Link>
+            {!p.active && <span className="text-text-muted"> · {t('companies.inactive')}</span>}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -162,6 +201,21 @@ function CompanyForm({ company, onDone }: { company: Company | null; onDone: () 
   const [name, setName] = useState(company?.name ?? '');
   const [taxId, setTaxId] = useState(company?.taxId ?? '');
   const [active, setActive] = useState(company?.active ?? true);
+  const [limit, setLimit] = useState(
+    company?.creditLimitMinor ? String(Number(company.creditLimitMinor) / 100) : '',
+  );
+  const [terms, setTerms] = useState(
+    company?.paymentTermsDays !== null && company?.paymentTermsDays !== undefined
+      ? String(company.paymentTermsDays)
+      : '',
+  );
+  const [commission, setCommission] = useState(
+    company?.commissionBps !== null && company?.commissionBps !== undefined
+      ? String(company.commissionBps / 100)
+      : '',
+  );
+  const [invoiceEmail, setInvoiceEmail] = useState(company?.billingInstructions.invoiceEmail ?? '');
+  const [billingNotes, setBillingNotes] = useState(company?.billingInstructions.notes ?? '');
   const [contacts, setContacts] = useState<Contact[]>(
     (company?.contacts ?? []).map((c) => ({
       name: c.name,
@@ -175,6 +229,11 @@ function CompanyForm({ company, onDone }: { company: Company | null; onDone: () 
     kind,
     name,
     taxId: orNull(taxId),
+    creditLimitMinor: limit.trim() ? (toMinor(limit) ?? limit) : null,
+    paymentTermsDays: terms.trim() ? Number(terms) : null,
+    commissionBps:
+      kind === 'TRAVEL_AGENT' && commission.trim() ? Math.round(Number(commission) * 100) : null,
+    billingInstructions: { invoiceEmail: orNull(invoiceEmail), notes: orNull(billingNotes) },
     contacts: contacts.map((c) => ({
       name: c.name,
       role: orNull(c.role),
@@ -243,6 +302,49 @@ function CompanyForm({ company, onDone }: { company: Company | null; onDone: () 
           onChange={(e) => setTaxId(e.target.value)}
           error={errors['taxId']}
         />
+      </div>
+      <div className="grid gap-x-4 sm:grid-cols-3">
+        <Field
+          label={t('companies.creditLimit')}
+          hint={t('companies.creditLimitHint')}
+          inputMode="decimal"
+          value={limit}
+          onChange={(e) => setLimit(e.target.value)}
+          error={errors['creditLimitMinor']}
+        />
+        <Field
+          label={t('companies.paymentTerms')}
+          type="number"
+          min={0}
+          value={terms}
+          onChange={(e) => setTerms(e.target.value)}
+          error={errors['paymentTermsDays']}
+        />
+        {kind === 'TRAVEL_AGENT' && (
+          <Field
+            label={t('companies.commission')}
+            inputMode="decimal"
+            value={commission}
+            onChange={(e) => setCommission(e.target.value)}
+            error={errors['commissionBps']}
+          />
+        )}
+        <Field
+          label={t('companies.invoiceEmail')}
+          type="email"
+          value={invoiceEmail}
+          onChange={(e) => setInvoiceEmail(e.target.value)}
+          error={errors['billingInstructions.invoiceEmail']}
+        />
+        <div className="sm:col-span-2">
+          <Field
+            label={t('companies.billingNotes')}
+            hint={t('companies.billingNotesHint')}
+            value={billingNotes}
+            onChange={(e) => setBillingNotes(e.target.value)}
+            error={errors['billingInstructions.notes']}
+          />
+        </div>
       </div>
       <fieldset className="mb-4">
         <legend className="mb-1 text-sm font-medium">{t('companies.contacts')}</legend>

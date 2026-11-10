@@ -123,6 +123,7 @@ function planItem(p: PlanRow): PlanOut {
     guarantee: p.guarantee,
     currency: p.currency,
     isPublic: p.isPublic,
+    companyId: p.companyId,
     dayUseMaxMinutes: p.dayUseMaxMinutes,
     extraAdultMinor: str(p.extraAdultMinor),
     extraChildMinor: str(p.extraChildMinor),
@@ -158,12 +159,22 @@ interface PlanShape {
   dayUseMaxMinutes: number | null;
   cancellationPolicyId: string;
   roomTypeIds: string[];
+  companyId: string | null;
+  isPublic: boolean;
 }
 
 /** The plan's references belong to this property and its fields fit its kind. */
 async function checkPlan(tx: Tx, plan: PlanShape, selfId: string | null): Promise<void> {
+  // M2-11: a negotiated rate belongs to one company or travel agent, and is never public.
   if (plan.kind === 'NEGOTIATED') {
-    throw invalid('kind', 'Negotiated rates arrive with companies (V1.1)');
+    if (!plan.companyId) throw invalid('companyId', 'Choose the company or travel agent');
+    const company = await tx.company.findUnique({ where: { id: plan.companyId } });
+    if (!company?.active || company.kind === 'EVENT_CLIENT') {
+      throw invalid('companyId', 'Choose an active company or travel agent');
+    }
+    if (plan.isPublic) throw invalid('isPublic', 'A negotiated rate is not offered publicly');
+  } else if (plan.companyId) {
+    throw invalid('companyId', 'Only a negotiated rate belongs to a company');
   }
   const derives = plan.derivationBps !== null || plan.derivationAmountMinor !== null;
   if (plan.kind === 'BAR' && (plan.parentRatePlanId || derives)) {
@@ -212,6 +223,7 @@ const auditPlan = (p: RatePlan) => ({
   cancellationPolicyId: p.cancellationPolicyId,
   guarantee: p.guarantee,
   isPublic: p.isPublic,
+  companyId: p.companyId,
   dayUseMaxMinutes: p.dayUseMaxMinutes,
   extraAdultMinor: str(p.extraAdultMinor),
   extraChildMinor: str(p.extraChildMinor),
@@ -291,6 +303,8 @@ export async function updateRatePlan(
           body.dayUseMaxMinutes !== undefined ? body.dayUseMaxMinutes : before.dayUseMaxMinutes,
         cancellationPolicyId: body.cancellationPolicyId ?? before.cancellationPolicyId,
         roomTypeIds: body.roomTypeIds ?? before.roomTypeIds,
+        companyId: before.companyId,
+        isPublic: body.isPublic ?? before.isPublic,
       },
       before.id,
     );

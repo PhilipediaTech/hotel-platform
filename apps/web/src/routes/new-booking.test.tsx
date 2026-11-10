@@ -74,6 +74,7 @@ const availability = (arrival: string, departure: string, nights: number) => ({
 });
 
 let permissions: string[];
+const COMPANY = '44444444-0000-4000-8000-000000000909';
 let handlers: Record<string, (body: unknown, url: URL) => Response>;
 const calls: { key: string; body: unknown; url: URL }[] = [];
 const sent = (key: string) => calls.filter((c) => c.key === key);
@@ -116,6 +117,23 @@ beforeEach(() => {
       });
     },
     'POST /reservations': () => json(201, { id: RES, version: 0, stays: [{ id: STAY }] }),
+    'GET /companies': () =>
+      json(200, {
+        data: [
+          {
+            id: COMPANY,
+            kind: 'COMPANY',
+            name: 'Dangote Group',
+            contacts: [],
+            taxId: null,
+            creditLimitMinor: null,
+            paymentTermsDays: null,
+            commissionBps: null,
+            billingInstructions: { invoiceEmail: null, notes: null },
+            active: true,
+          },
+        ],
+      }),
     [`GET /reservations/${RES}`]: () => failure(404, 'NOT_FOUND', 'Not found'),
     [`GET /reservations/${RES}/history`]: () => json(200, { data: [] }),
     'GET /guests': () =>
@@ -471,4 +489,24 @@ describe('New booking (S08)', () => {
     await user.clear(within(form).getByLabelText('Arrival'));
     expect(within(form).getByLabelText('Departure')).toHaveAttribute('min', TODAY);
   });
+});
+
+describe('Booking for a company (M2-11; T-125)', () => {
+  it('offers the company’s rates, quotes them for it and books for it', async () => {
+    const user = userEvent.setup();
+    renderAt('/bookings/new');
+    const form = await screen.findByRole('form', { name: 'Dates and guests' });
+    await user.selectOptions(await within(form).findByLabelText('Company or agent'), COMPANY);
+    await searchFor(user);
+    await screen.findByText('Rooms for 2 nights');
+    expect(sent('GET /availability')[0]?.url.searchParams.get('companyId')).toBe(COMPANY);
+    await user.click(screen.getByRole('button', { name: 'Add Standard on Best available' }));
+    const details = screen.getByRole('form', { name: 'Booking details' });
+    await user.type(within(details).getAllByLabelText('First name')[0] as HTMLElement, 'Ada');
+    await user.type(within(details).getAllByLabelText('Last name')[0] as HTMLElement, 'Obi');
+    await user.click(within(details).getByRole('button', { name: /^Book 1 room/ }));
+    await waitFor(() => expect(sent('POST /reservations')).toHaveLength(1));
+    expect(sent('POST /quotes')[0]?.body).toMatchObject({ companyId: COMPANY });
+    expect(sent('POST /reservations')[0]?.body).toMatchObject({ companyId: COMPANY });
+  }, 15_000);
 });

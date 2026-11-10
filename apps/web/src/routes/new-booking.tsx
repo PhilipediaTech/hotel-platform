@@ -36,6 +36,8 @@ interface Search {
   departure: string;
   adults: number;
   children: number;
+  /** Offers its negotiated rates and books for it (M2-11). */
+  companyId?: string;
 }
 
 interface Person {
@@ -105,6 +107,10 @@ export function NewBookingPage() {
   const [pending, setPending] = useState<Pending | null>(null);
 
   const arrival = walkIn ? today : draft.arrival;
+  const companies = useQuery({
+    queryKey: ['companies', 'for-booking'],
+    queryFn: async () => (await api.call('listCompanies', { query: {} })).data,
+  });
   const availability = useQuery({
     queryKey: ['bookings', session.currentPropertyId ?? '', 'availability', search],
     queryFn: () => api.call('getAvailability', { query: search as Search }),
@@ -160,6 +166,7 @@ export function NewBookingPage() {
             departure: search.departure,
             adults: room.adults,
             children: room.children,
+            ...(search.companyId ? { companyId: search.companyId } : {}),
           },
         });
         stays.push({
@@ -196,7 +203,7 @@ export function NewBookingPage() {
                 phone: orNull(booker.phone),
                 email: orNull(booker.email),
               },
-          companyId: null,
+          companyId: search.companyId ?? null,
           stays,
           notes: orNull(notes),
           ...(approvalReason?.trim() ? { approvalReason: approvalReason.trim() } : {}),
@@ -273,7 +280,7 @@ export function NewBookingPage() {
       {/* 1. Dates and guests */}
       <form
         aria-label={t('booking.searchTitle')}
-        className="mt-4 grid items-end gap-3 rounded-md border border-border bg-surface p-4 sm:grid-cols-5"
+        className="mt-4 grid items-end gap-3 rounded-md border border-border bg-surface p-4 sm:grid-cols-6"
         onSubmit={(e) => {
           e.preventDefault();
           setCart([]);
@@ -311,6 +318,28 @@ export function NewBookingPage() {
           value={String(draft.children)}
           onChange={(v) => setDraft((d) => ({ ...d, children: Number(v) }))}
         />
+        <label className="flex flex-col gap-1 text-sm">
+          {t('booking.company')}
+          <select
+            className={selectClass}
+            value={draft.companyId ?? ''}
+            onChange={(e) =>
+              setDraft((d) => {
+                const { companyId: _old, ...rest } = d;
+                return e.target.value ? { ...rest, companyId: e.target.value } : rest;
+              })
+            }
+          >
+            <option value="">{t('booking.noCompany')}</option>
+            {(companies.data ?? [])
+              .filter((c) => c.active && c.kind !== 'EVENT_CLIENT')
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
+        </label>
         <Button type="submit">{t('booking.search')}</Button>
       </form>
 

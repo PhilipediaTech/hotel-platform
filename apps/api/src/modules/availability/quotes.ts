@@ -158,10 +158,13 @@ function stayDates(arrival: string, departure: string): string[] {
   return Array.from({ length: daysBetween(arrival, departure) }, (_, i) => addDays(arrival, i));
 }
 
-/** Plans that sell a room type overnight. */
-function sells(plan: RatePlan, roomTypeId: string): boolean {
+/** Plans that sell a room type overnight; a negotiated one only to its company (M2-11). */
+function sells(plan: RatePlan, roomTypeId: string, companyId?: string): boolean {
+  const kinds = plan.kind === 'BAR' || plan.kind === 'DERIVED' || plan.kind === 'PACKAGE';
+  const negotiated =
+    plan.kind === 'NEGOTIATED' && companyId !== undefined && plan.companyId === companyId;
   return (
-    (plan.kind === 'BAR' || plan.kind === 'DERIVED' || plan.kind === 'PACKAGE') &&
+    (kinds || negotiated) &&
     (plan.roomTypeIds.length === 0 || plan.roomTypeIds.includes(roomTypeId))
   );
 }
@@ -328,7 +331,7 @@ export async function getAvailability(
     .map((type) => {
       const { available } = roomsLeft(ctx, type.id, dates);
       const plans = [...ctx.plans.values()]
-        .filter((p) => sells(p, type.id))
+        .filter((p) => sells(p, type.id, query.companyId))
         .map((plan) => {
           const p = price(ctx, plan, type.id, query, guests, discountBps);
           return {
@@ -371,7 +374,10 @@ export async function createQuote(
   const type = ctx.types.find((t) => t.id === body.roomTypeId);
   if (!type) throw invalid('body.roomTypeId', 'Choose an active room type of this property');
   const plan = ctx.plans.get(body.ratePlanId);
-  if (!plan || !sells(plan, type.id)) {
+  if (plan?.kind === 'NEGOTIATED' && plan.companyId !== body.companyId) {
+    throw invalid('body.companyId', 'This rate is for one company: choose it on the booking');
+  }
+  if (!plan || !sells(plan, type.id, body.companyId)) {
     throw invalid(
       'body.ratePlanId',
       `Choose an active rate plan that sells ${type.name} overnight`,

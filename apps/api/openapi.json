@@ -4941,6 +4941,19 @@
           "isPublic": {
             "type": "boolean"
           },
+          "companyId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
           "dayUseMaxMinutes": {
             "type": [
               "integer",
@@ -5007,6 +5020,7 @@
           "guarantee",
           "currency",
           "isPublic",
+          "companyId",
           "dayUseMaxMinutes",
           "extraAdultMinor",
           "extraChildMinor",
@@ -5765,6 +5779,52 @@
               "null"
             ]
           },
+          "creditLimitMinor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "paymentTermsDays": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "commissionBps": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "billingInstructions": {
+            "type": "object",
+            "properties": {
+              "invoiceEmail": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 254,
+                "default": null
+              },
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 1000,
+                "default": null
+              }
+            }
+          },
           "active": {
             "type": "boolean"
           }
@@ -5775,6 +5835,10 @@
           "name",
           "contacts",
           "taxId",
+          "creditLimitMinor",
+          "paymentTermsDays",
+          "commissionBps",
+          "billingInstructions",
           "active"
         ]
       },
@@ -31915,6 +31979,19 @@
                         ]
                       }
                     ]
+                  },
+                  "companyId": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Uuid"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -33458,6 +33535,14 @@
           },
           {
             "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": false,
+            "name": "companyId",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "string",
               "format": "uuid",
               "description": "Property the call acts on."
@@ -33617,6 +33702,9 @@
                     "$ref": "#/components/schemas/Uuid"
                   },
                   "ratePlanId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "companyId": {
                     "$ref": "#/components/schemas/Uuid"
                   }
                 },
@@ -34772,6 +34860,58 @@
                     ],
                     "maxLength": 30,
                     "default": null
+                  },
+                  "creditLimitMinor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                    "default": null,
+                    "example": "4500000"
+                  },
+                  "paymentTermsDays": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 365,
+                    "default": null
+                  },
+                  "commissionBps": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 5000,
+                    "default": null
+                  },
+                  "billingInstructions": {
+                    "type": "object",
+                    "properties": {
+                      "invoiceEmail": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "maxLength": 254,
+                        "default": null
+                      },
+                      "notes": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "maxLength": 1000,
+                        "default": null
+                      }
+                    },
+                    "default": {
+                      "invoiceEmail": null,
+                      "notes": null
+                    }
                   }
                 },
                 "required": [
@@ -35052,6 +35192,51 @@
                       "null"
                     ],
                     "maxLength": 30
+                  },
+                  "creditLimitMinor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                    "example": "4500000"
+                  },
+                  "paymentTermsDays": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 365
+                  },
+                  "commissionBps": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 5000
+                  },
+                  "billingInstructions": {
+                    "type": "object",
+                    "properties": {
+                      "invoiceEmail": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "maxLength": 254,
+                        "default": null
+                      },
+                      "notes": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "maxLength": 1000,
+                        "default": null
+                      }
+                    }
                   },
                   "active": {
                     "type": "boolean"

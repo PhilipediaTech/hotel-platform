@@ -70,6 +70,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   SpaceRateRule: { kind: 'property' },
   EventEnquiry: { kind: 'property', organisationField: 'organisationId' },
   EventBooking: { kind: 'property', organisationField: 'organisationId' },
+  EventBrief: { kind: 'property' },
   EventQuote: { kind: 'property' },
   EventQuoteVersion: { kind: 'property' },
   EventContract: { kind: 'property' },

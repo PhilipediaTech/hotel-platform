@@ -55,7 +55,7 @@ const stateError = (message: string, details?: Record<string, unknown>) =>
   new AppError('STATE_TRANSITION_INVALID', message, details);
 
 /** Food is taxed as food; the rest as other charges (the tax rules on each code decide). */
-const REVENUE_CODE = {
+export const REVENUE_CODE = {
   SPACE: 'MISC',
   PACKAGE: 'FNB',
   CATERING: 'FNB',
@@ -69,7 +69,7 @@ const COUNTS_TO_MINIMUM = new Set<string>(['SPACE', 'PACKAGE']);
 /** On one due date: the deposit first, the damage deposit last. */
 const KIND_ORDER: Record<string, number> = { DEPOSIT: 0, INSTALMENT: 1, DAMAGE_DEPOSIT: 2 };
 
-async function lockBooking(tx: TenantTx, bookingId: string) {
+export async function lockBooking(tx: TenantTx, bookingId: string) {
   await tx.$queryRaw`SELECT id FROM event_bookings WHERE id = ${bookingId}::uuid FOR UPDATE`;
   const booking = await tx.eventBooking.findFirst({
     where: { id: bookingId },
@@ -559,7 +559,7 @@ export async function issueContract(
   return emailed === undefined ? view : { ...view, emailed };
 }
 
-async function openEventFolio(
+export async function openEventFolio(
   tx: TenantTx,
   title: string,
   property: { id: string; baseCurrency: string },

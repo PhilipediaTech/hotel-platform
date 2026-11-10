@@ -59,11 +59,16 @@ async function refundable(db: Client, paymentId: string) {
       reason: 'IS_REFUND',
     });
   }
-  // The schedule counts this money as paid: it is settled when the event is closed (M9-08).
-  if ((await db.eventDeposit.count({ where: { paymentId } })) > 0) {
+  // The schedule counts this money as paid: until the event is inspected and its final bill
+  // is known, nothing can be said to be owed back (M9-08).
+  const held = await db.eventDeposit.findFirst({
+    where: { paymentId },
+    include: { contract: { include: { booking: true } } },
+  });
+  if (held && !held.contract.booking.inspectedAt) {
     throw new AppError(
       'STATE_TRANSITION_INVALID',
-      'Event money is settled when the event is closed, not refunded from here',
+      'Event money can be refunded once the event has been inspected',
       { reason: 'EVENT_MONEY' },
     );
   }

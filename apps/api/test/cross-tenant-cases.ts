@@ -1650,6 +1650,21 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({ override: true, reason: 'Leak' }),
     untouched: bEventUnchanged,
   },
+  getEventBrief: { seed: bEventBooking },
+  saveEventBrief: {
+    seed: bEventBooking,
+    body: () => ({ sections: [] }),
+    untouched: bEventUnchanged,
+  },
+  getEventBriefPdf: { seed: bEventBooking },
+  getEventCloseOut: { seed: bEventBooking },
+  inspectEvent: {
+    seed: bEventBooking,
+    body: () => ({ notes: 'Leak' }),
+    untouched: bEventUnchanged,
+  },
+  getEventInvoicePdf: { seed: bEventBooking },
+  closeEvent: { seed: bEventBooking, body: () => ({}), untouched: bEventUnchanged },
   listMessageThreads: {
     seed: bThread,
     listIds: (body) => (body as { data: { id: string }[] }).data.map((t) => t.id),

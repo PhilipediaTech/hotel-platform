@@ -121,6 +121,42 @@ const CONTRACT = {
   overpaidMinor: '0',
 };
 
+const PAST = { ...HOLD, status: 'CONFIRMED', holdExpiresAt: null, endsAt: '2020-01-01T15:00:00Z' };
+const BRIEF = {
+  sections: [
+    {
+      department: { id: id(11), code: 'FB', name: 'Food and beverage' },
+      instructions: '',
+      version: 0,
+      updatedAt: null,
+    },
+  ],
+};
+const NOT_INSPECTED = {
+  status: 'CONFIRMED',
+  inspection: null,
+  folio: null,
+  damageDepositHeldMinor: '0',
+  damageDepositRetainedMinor: '0',
+  blockers: ['NOT_INSPECTED'],
+  closedAt: null,
+};
+const INSPECTED = {
+  ...NOT_INSPECTED,
+  inspection: {
+    at: '2020-01-01T16:00:00Z',
+    notes: 'A cracked table',
+    damageDescription: 'Table',
+    damageTotalMinor: '2150000',
+  },
+  folio: { id: id(8), number: 'F00001', status: 'OPEN', balanceMinor: '-7850000' },
+  damageDepositHeldMinor: '10000000',
+  damageDepositRetainedMinor: '2150000',
+  blockers: ['CREDIT_TO_RETURN'],
+};
+
+let listed: unknown;
+let closeOut: unknown;
 let contractView: unknown;
 let confirmReply: () => Response;
 let permissions: string[];
@@ -129,6 +165,8 @@ const sent = (key: string) => calls.filter((c) => c.key === key);
 
 beforeEach(() => {
   calls.length = 0;
+  listed = HOLD;
+  closeOut = NOT_INSPECTED;
   contractView = NO_CONTRACT;
   confirmReply = () => json(200, { ...HOLD, status: 'CONFIRMED', holdExpiresAt: null });
   permissions = [
@@ -138,11 +176,13 @@ beforeEach(() => {
     'event.quote',
     'event.contract',
     'event.confirm',
+    'event.brief',
+    'event.close',
   ];
   const handlers: Record<string, (body: unknown) => Response> = {
     'GET /me': () => json(200, makeMe({ memberships: [membership(LAGOS, permissions)] })),
     'GET /auth/device': () => json(200, { pinSwitchAvailable: false, deviceLabel: null }),
-    'GET /event-bookings': () => json(200, { data: [HOLD] }),
+    'GET /event-bookings': () => json(200, { data: [listed] }),
     'GET /event-enquiries': () => json(200, { data: [ENQUIRY] }),
     'POST /event-enquiries': () => json(201, ENQUIRY),
     'GET /spaces': () => json(200, { data: [SPACE] }),
@@ -163,6 +203,11 @@ beforeEach(() => {
       }),
     'POST /event-bookings': () => json(201, HOLD),
     [`POST /event-bookings/${HOLD.id}/release`]: () => json(200, { ...HOLD, status: 'RELEASED' }),
+    [`GET /event-bookings/${HOLD.id}/brief`]: () => json(200, BRIEF),
+    [`PUT /event-bookings/${HOLD.id}/brief`]: () => json(200, BRIEF),
+    [`GET /event-bookings/${HOLD.id}/close-out`]: () => json(200, closeOut),
+    [`POST /event-bookings/${HOLD.id}/inspection`]: () => json(201, closeOut),
+    [`POST /event-bookings/${HOLD.id}/close`]: () => json(200, { ...HOLD, status: 'CLOSED' }),
     [`GET /event-bookings/${HOLD.id}/quotes`]: () => json(200, QUOTE),
     [`POST /event-bookings/${HOLD.id}/quotes`]: () => json(201, QUOTE),
     [`GET /event-bookings/${HOLD.id}/contract`]: () => json(200, contractView),
@@ -336,6 +381,60 @@ describe('Events and spaces (S38)', { timeout: 20_000 }, () => {
       override: true,
       reason: 'Regular client',
     });
+  });
+
+  it('writes the brief for each department of a confirmed booking (M9-07)', async () => {
+    listed = PAST;
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    const form = await within(row).findByRole('form', { name: 'Event brief' });
+    await user.type(within(form).getByLabelText('Food and beverage'), 'Buffet at 13:00');
+    await user.click(within(form).getByRole('button', { name: 'Save brief' }));
+    await waitFor(() => expect(sent(`PUT /event-bookings/${HOLD.id}/brief`)).toHaveLength(1));
+    expect(sent(`PUT /event-bookings/${HOLD.id}/brief`)[0]?.body).toEqual({
+      sections: [{ departmentId: id(11), instructions: 'Buffet at 13:00' }],
+    });
+  });
+
+  it('records the inspection with its damage and extras (M9-08)', async () => {
+    listed = PAST;
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    const form = await within(row).findByRole('form', { name: 'Inspection' });
+    await user.type(within(form).getByLabelText('What did you find?'), 'A cracked table');
+    await user.type(within(form).getByLabelText('What was damaged (if anything)'), 'Table');
+    await user.type(within(form).getByLabelText('Cost of the damage, before tax (₦)'), '20000');
+    await user.click(within(form).getByRole('button', { name: /Save inspection/ }));
+    await waitFor(() => expect(sent(`POST /event-bookings/${HOLD.id}/inspection`)).toHaveLength(1));
+    expect(sent(`POST /event-bookings/${HOLD.id}/inspection`)[0]?.body).toMatchObject({
+      notes: 'A cracked table',
+      damageMinor: '2000000',
+      damageDescription: 'Table',
+    });
+  });
+
+  it('after inspection, says what is left of the deposit and blocks closing until settled', async () => {
+    listed = PAST;
+    closeOut = INSPECTED;
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    expect(await within(row).findByText(/Money is due back/)).toBeInTheDocument();
+    expect(within(row).getByText(/The client is owed/)).toBeInTheDocument();
+    expect(within(row).getByRole('link', { name: 'Open bill F00001' })).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Close event' })).toBeDisabled();
+  });
+
+  it('closes once nothing is left to settle (M9-08)', async () => {
+    listed = PAST;
+    closeOut = {
+      ...INSPECTED,
+      folio: { ...INSPECTED.folio, balanceMinor: '0' },
+      blockers: [],
+    };
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    await user.click(await within(row).findByRole('button', { name: 'Close event' }));
+    await waitFor(() => expect(sent(`POST /event-bookings/${HOLD.id}/close`)).toHaveLength(1));
   });
 
   it('without space.manage the spaces can be seen but not changed', async () => {

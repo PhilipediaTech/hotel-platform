@@ -237,7 +237,7 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
       ['Date', date],
       ['Bill to', payerOf(folio, windowNumber ?? 1)],
       ['Guest', folio.name],
-      ...stayFacts(folio),
+      ...(folio.kind === 'EVENT' ? [] : stayFacts(folio)),
     ]);
     table(
       doc,

@@ -150,6 +150,7 @@ model Property {
   guestLinks            GuestLink[]
 
   spaces                Space[]
+  eventBriefs           EventBrief[]
   eventQuotes           EventQuote[]
   eventQuoteVersions    EventQuoteVersion[]
   eventContracts        EventContract[]
@@ -178,6 +179,7 @@ model Department {
   taskTemplates TaskTemplate[]
   tasks         Task[]
   handoverNotes HandoverNote[]
+  eventBriefs   EventBrief[]
 
   @@unique([propertyId, code])
   @@unique([propertyId, id])
@@ -300,6 +302,8 @@ model User {
   messagesSent       Message[]           @relation("MessageSentBy")
   eventEnquiries     EventEnquiry[]
   eventBookings      EventBooking[]
+  eventBriefs        EventBrief[]        @relation("EventBriefAuthor")
+  eventsInspected    EventBooking[]      @relation("EventInspector")
   eventQuoteVersions EventQuoteVersion[] @relation("EventQuoteAuthor")
   eventContracts     EventContract[]     @relation("EventContractIssuer")
 
@@ -1409,6 +1413,7 @@ model Folio {
   payments       Payment[]
   paymentIntents PaymentIntent[]
   eventContracts EventContract[]
+  eventBookings  EventBooking[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, id])
@@ -2678,7 +2683,7 @@ model EventBooking {
   spaceId             String    @map("space_id") @db.Uuid
   layoutId            String?   @map("layout_id") @db.Uuid
   title               String
-  /// HOLD | CONFIRMED | RELEASED | EXPIRED
+  /// HOLD | CONFIRMED | RELEASED | EXPIRED | CLOSED
   status              String
   startsAt            DateTime  @map("starts_at") @db.Timestamptz(6)
   endsAt              DateTime  @map("ends_at") @db.Timestamptz(6)
@@ -2690,22 +2695,54 @@ model EventBooking {
   confirmedAt         DateTime? @map("confirmed_at") @db.Timestamptz(6)
   /// Confirmed without the signed contract or the deposit, on an approved override.
   confirmedByOverride Boolean   @default(false) @map("confirmed_by_override")
+  /// The bill the final charges were posted to (M9-08).
+  folioId             String?   @map("folio_id") @db.Uuid
+  inspectedAt         DateTime? @map("inspected_at") @db.Timestamptz(6)
+  inspectedById       String?   @map("inspected_by_id") @db.Uuid
+  inspectionNotes     String?   @map("inspection_notes")
+  damageDescription   String?   @map("damage_description")
+  /// What the damage cost, with any tax on it.
+  damageTotalMinor    BigInt    @default(0) @map("damage_total_minor")
+  closedAt            DateTime? @map("closed_at") @db.Timestamptz(6)
   createdById         String    @map("created_by_id") @db.Uuid
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   version             Int       @default(0)
 
-  quote     EventQuote?
-  contracts EventContract[]
-  property  Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  enquiry   EventEnquiry?   @relation(fields: [enquiryId], references: [id], onDelete: Restrict)
-  space     Space           @relation(fields: [spaceId], references: [id], onDelete: Restrict)
-  layout    SpaceLayout?    @relation(fields: [layoutId], references: [id], onDelete: Restrict)
-  createdBy User            @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  quote       EventQuote?
+  briefs      EventBrief[]
+  folio       Folio?          @relation(fields: [folioId], references: [id], onDelete: Restrict)
+  inspectedBy User?           @relation("EventInspector", fields: [inspectedById], references: [id], onDelete: Restrict)
+  contracts   EventContract[]
+  property    Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  enquiry     EventEnquiry?   @relation(fields: [enquiryId], references: [id], onDelete: Restrict)
+  space       Space           @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+  layout      SpaceLayout?    @relation(fields: [layoutId], references: [id], onDelete: Restrict)
+  createdBy   User            @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
   @@index([propertyId, blockedFrom])
   @@index([status, holdExpiresAt])
   @@map("event_bookings")
+}
+
+/// What one department has to do for one event (PRD M9-07).
+model EventBrief {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @map("property_id") @db.Uuid
+  bookingId    String   @map("booking_id") @db.Uuid
+  departmentId String   @map("department_id") @db.Uuid
+  instructions String
+  version      Int      @default(1)
+  updatedById  String   @map("updated_by_id") @db.Uuid
+  updatedAt    DateTime @map("updated_at") @db.Timestamptz(6)
+
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  booking    EventBooking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  department Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  updatedBy  User         @relation("EventBriefAuthor", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@unique([bookingId, departmentId])
+  @@map("event_briefs")
 }
 
 /// The priced offer for one booking (PRD M9-04). Each change is a new version; none is edited.

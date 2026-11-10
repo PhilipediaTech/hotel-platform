@@ -215,6 +215,33 @@ describe('Companies', () => {
       name: 'Dangote Group',
       taxId: null,
       contacts: [{ name: 'Bola Ade', role: null, phone: '+2348012345678', email: null }],
+      // M3-16 (T-125): nothing typed, so nothing set.
+      creditLimitMinor: null,
+      paymentTermsDays: null,
+      commissionBps: null,
+      billingInstructions: { invoiceEmail: null, notes: null },
+    });
+  });
+
+  it('keeps a travel agent’s credit limit, terms, commission and billing (M3-16)', async () => {
+    const user = userEvent.setup();
+    renderAt('/companies');
+    await user.click(await screen.findByRole('button', { name: 'Add company' }));
+    const form = screen.getByRole('form', { name: 'Add company' });
+    await user.selectOptions(within(form).getByLabelText('Kind'), 'TRAVEL_AGENT');
+    await user.type(within(form).getByLabelText('Name'), 'Wakanow');
+    await user.type(within(form).getByLabelText('Credit limit (₦)'), '500000');
+    await user.type(within(form).getByLabelText('Payment terms (days)'), '30');
+    await user.type(within(form).getByLabelText('Commission (%)'), '10');
+    await user.type(within(form).getByLabelText('Send invoices to'), 'accounts@wakanow.test');
+    await user.click(within(form).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(sent('POST /companies')).toHaveLength(1));
+    expect(sent('POST /companies')[0]?.body).toMatchObject({
+      kind: 'TRAVEL_AGENT',
+      creditLimitMinor: '50000000',
+      paymentTermsDays: 30,
+      commissionBps: 1000,
+      billingInstructions: { invoiceEmail: 'accounts@wakanow.test', notes: null },
     });
   });
 });

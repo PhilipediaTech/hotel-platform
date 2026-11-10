@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-124 is pushed on `feat/T-124-billing-suspension`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). That finishes the V1.2 pure-building list. Open with Philip: the 14-day due and 14-day grace numbers. Next: the V1.1 buildable tickets (PRD release V1.1 rows), then V1.3.
+T-125 is pushed on `feat/T-125-negotiated-rates-companies`, awaiting merge (no migration). Next: city ledger M4-21 (ar_accounts, ar_invoices, ar_payments, ar_allocations in tab 3; AR transfer only within the credit limit or with approval ar.over_limit, M4 rule; statements and ageing), then M4-22 commissions, M4-23 bank import.

@@ -684,6 +684,7 @@ interface PlanDraft {
   cancellationPolicyId: string;
   guarantee: (typeof GUARANTEES)[number];
   isPublic: boolean;
+  companyId: string;
   dayUseHours: string;
   /** Suggested nightly charge per extra adult / child (T-056); empty = none. */
   extraAdult: string;
@@ -702,7 +703,7 @@ function PlanForm({ plan, r, onDone }: { plan: Plan | null; r: Rates; onDone: ()
   const [d, setD] = useState<PlanDraft>({
     code: plan?.code ?? '',
     name: plan?.name ?? '',
-    kind: (plan?.kind === 'NEGOTIATED' ? 'BAR' : plan?.kind) ?? 'BAR',
+    kind: plan?.kind ?? 'BAR',
     parentRatePlanId: plan?.parentRatePlanId ?? bars[0]?.id ?? '',
     percent:
       plan?.derivationBps !== null && plan?.derivationBps !== undefined
@@ -715,6 +716,7 @@ function PlanForm({ plan, r, onDone }: { plan: Plan | null; r: Rates; onDone: ()
     cancellationPolicyId: plan?.cancellationPolicyId ?? r.policies.data?.[0]?.id ?? '',
     guarantee: plan?.guarantee ?? 'NONE',
     isPublic: plan?.isPublic ?? false,
+    companyId: plan?.companyId ?? '',
     dayUseHours: plan?.dayUseMaxMinutes ? String(plan.dayUseMaxMinutes / 60) : '6',
     extraAdult: toNaira(plan?.extraAdultMinor ?? null),
     extraChild: toNaira(plan?.extraChildMinor ?? null),
@@ -723,6 +725,10 @@ function PlanForm({ plan, r, onDone }: { plan: Plan | null; r: Rates; onDone: ()
   });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [newPolicy, setNewPolicy] = useState(false);
+  const companies = useQuery({
+    queryKey: ['companies', 'for-rates'],
+    queryFn: async () => (await api.call('listCompanies', { query: {} })).data,
+  });
   const set = <K extends keyof PlanDraft>(k: K, v: PlanDraft[K]) => setD((x) => ({ ...x, [k]: v }));
   const follows =
     d.kind === 'DERIVED' ||
@@ -741,7 +747,8 @@ function PlanForm({ plan, r, onDone }: { plan: Plan | null; r: Rates; onDone: ()
     mealPlan: d.mealPlan,
     cancellationPolicyId: d.cancellationPolicyId,
     guarantee: d.guarantee,
-    isPublic: d.isPublic,
+    // A negotiated rate is never offered publicly (M2-11).
+    isPublic: d.kind === 'NEGOTIATED' ? false : d.isPublic,
     dayUseMaxMinutes: d.kind === 'DAY_USE' ? Math.round(Number(d.dayUseHours) * 60) : null,
     extraAdultMinor: d.kind === 'DAY_USE' ? null : toMinor(d.extraAdult),
     extraChildMinor: d.kind === 'DAY_USE' ? null : toMinor(d.extraChild),
@@ -768,6 +775,7 @@ function PlanForm({ plan, r, onDone }: { plan: Plan | null; r: Rates; onDone: ()
           ...common,
           code: d.code,
           kind: d.kind,
+          companyId: d.kind === 'NEGOTIATED' ? d.companyId || null : null,
           ...(follows ? { parentRatePlanId: d.parentRatePlanId || null, ...derivation } : {}),
         }),
       });
@@ -818,6 +826,24 @@ function PlanForm({ plan, r, onDone }: { plan: Plan | null; r: Rates; onDone: ()
           error={errors['name']}
         />
       </div>
+      {d.kind === 'NEGOTIATED' && (
+        <div className="grid gap-x-4 sm:grid-cols-3">
+          <Select
+            id="plan-company"
+            label={t('rates.plan.company')}
+            value={d.companyId}
+            disabled={plan !== null}
+            onChange={(v) => set('companyId', v)}
+            options={[
+              { value: '', label: t('rates.plan.chooseCompany') },
+              ...(companies.data ?? [])
+                .filter((c) => c.kind !== 'EVENT_CLIENT' && (c.active || c.id === d.companyId))
+                .map((c) => ({ value: c.id, label: c.name })),
+            ]}
+            error={errors['companyId']}
+          />
+        </div>
+      )}
       <p className="mb-3 text-xs text-text-muted">{t(`rates.kindHints.${d.kind}`)}</p>
       {canDerive && (
         <div className="mb-2 rounded-md border border-border p-3">

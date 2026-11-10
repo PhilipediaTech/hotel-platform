@@ -8,9 +8,9 @@ import { AmountMinor, IsoDate, Uuid } from './primitives.ts';
 
 const RATE = 'rate.manage';
 
-/** NEGOTIATED plans arrive with companies (M2-11, V1.1). */
+/** NEGOTIATED: a company's or travel agent's own rate, sold only on its bookings (M2-11). */
 export const RATE_PLAN_KINDS = ['BAR', 'DERIVED', 'PACKAGE', 'DAY_USE', 'NEGOTIATED'] as const;
-export const SELLABLE_PLAN_KINDS = ['BAR', 'DERIVED', 'PACKAGE', 'DAY_USE'] as const;
+export const SELLABLE_PLAN_KINDS = ['BAR', 'DERIVED', 'PACKAGE', 'DAY_USE', 'NEGOTIATED'] as const;
 export const MEAL_PLANS = ['ROOM_ONLY', 'BREAKFAST', 'HALF_BOARD', 'FULL_BOARD'] as const;
 export const GUARANTEES = ['NONE', 'DEPOSIT', 'CARD_ON_FILE', 'COMPANY'] as const;
 export const FEE_TYPES = ['NIGHTS', 'PERCENT'] as const;
@@ -123,6 +123,8 @@ export const RatePlanItem = z
     currency: z.string(),
     /** Offered on the booking engine and channels. */
     isPublic: z.boolean(),
+    /** A NEGOTIATED plan's company or travel agent (M2-11). */
+    companyId: Uuid.nullable(),
     dayUseMaxMinutes: z.number().int().nullable(),
     /** Suggested nightly charge per extra adult / child above the room type's base occupancy
      * (T-056); the desk can change it per person. Null = no suggestion. */
@@ -161,6 +163,8 @@ export const RatePlanBody = PlanFields.extend({
     .regex(/^[A-Z0-9_-]{2,12}$/, 'Two to twelve letters, digits, dashes or underscores'),
   kind: z.enum(RATE_PLAN_KINDS),
   parentRatePlanId: Uuid.nullable().default(null),
+  /** Required for NEGOTIATED, and only for it. Fixed once created. */
+  companyId: Uuid.nullable().default(null),
   derivationBps: PlanFields.shape.derivationBps.default(null),
   derivationAmountMinor: AmountMinor.nullable().default(null),
   roundingMinor: PlanFields.shape.roundingMinor.default('10000'),

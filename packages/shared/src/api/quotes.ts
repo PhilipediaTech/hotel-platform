@@ -37,7 +37,11 @@ const Stay = z.object({
   children: z.coerce.number().int().min(0).max(20).default(0),
 });
 
-export const AvailabilityQuery = Stay.extend({ roomTypeId: Uuid.optional() });
+/** `companyId`: also offer that company's or agent's negotiated rates (M2-11). */
+export const AvailabilityQuery = Stay.extend({
+  roomTypeId: Uuid.optional(),
+  companyId: Uuid.optional(),
+});
 
 export const AvailabilityPlan = z
   .object({
@@ -88,7 +92,12 @@ export const getAvailability = defineRoute({
   }),
 });
 
-export const QuoteBody = Stay.extend({ roomTypeId: Uuid, ratePlanId: Uuid });
+export const QuoteBody = Stay.extend({
+  roomTypeId: Uuid,
+  ratePlanId: Uuid,
+  /** Needed to quote a negotiated rate: its company or agent (M2-11). */
+  companyId: Uuid.optional(),
+});
 
 export const QuoteItem = z
   .object({

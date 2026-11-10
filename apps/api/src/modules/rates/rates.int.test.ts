@@ -114,7 +114,8 @@ describe('rate plans (M2-05, M2-08)', () => {
   it('checks each kind’s fields', async () => {
     const h = await hotel();
     const refused = async (extra: object) => issuesOf(await h.plan({ name: 'X', ...extra }));
-    expect(await refused({ code: 'NEG', kind: 'NEGOTIATED' })).toEqual(['body.kind']);
+    // T-125: a negotiated rate needs its company.
+    expect(await refused({ code: 'NEG', kind: 'NEGOTIATED' })).toEqual(['body.companyId']);
     expect(await refused({ code: 'D1', kind: 'DERIVED', derivationBps: -1000 })).toEqual([
       'body.derivationBps',
     ]);

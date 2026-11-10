@@ -519,6 +519,15 @@ async function book(
     if (block && quote.ratePlanId !== block.ratePlanId) {
       throw invalid(`${path}.quoteId`, 'A block is booked at its own rate plan');
     }
+    // M2-11: a negotiated rate is booked for its own company or agent.
+    const quotedPlan = await tx.ratePlan.findUniqueOrThrow({ where: { id: quote.ratePlanId } });
+    const bookingCompany = body.companyId ?? block?.companyId ?? null;
+    if (quotedPlan.kind === 'NEGOTIATED' && quotedPlan.companyId !== bookingCompany) {
+      throw invalid(
+        'body.companyId',
+        `${quotedPlan.name} is for one company: book it for that company`,
+      );
+    }
     const guests = await occupancy(tx, quote, path, s);
     const guest = s.guest.sameAsBooker
       ? booker

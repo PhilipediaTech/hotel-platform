@@ -497,7 +497,7 @@
       "DERIVED": "Follows a BAR plan: a percentage and/or amount off (or on top), rounded.",
       "PACKAGE": "Room plus extras (e.g. breakfast) posted to their own revenue codes. Own prices, or follows BAR.",
       "DAY_USE": "Rooms used during the day for a few hours, priced per stay.",
-      "NEGOTIATED": "Company and travel agent rates arrive with companies (V1.1)."
+      "NEGOTIATED": "A rate agreed with one company or travel agent: offered only when a booking is for them. Set its own prices, or follow BAR with a discount."
     },
     "meals": {
       "ROOM_ONLY": "Room only",
@@ -536,6 +536,8 @@
       "done_other": "{{count}} days changed."
     },
     "plan": {
+      "company": "Company or travel agent",
+      "chooseCompany": "Choose…",
       "add": "Add rate plan",
       "edit": "Edit plan",
       "editNamed": "Edit {{name}}",
@@ -665,7 +667,17 @@
     "remove": "Remove",
     "addContact": "Add contact",
     "active": "Active",
-    "details": "Company details"
+    "details": "Company details",
+    "creditLimit": "Credit limit (₦)",
+    "creditLimitHint": "What they may owe on account. Leave empty for none.",
+    "paymentTerms": "Payment terms (days)",
+    "commission": "Commission (%)",
+    "invoiceEmail": "Send invoices to",
+    "billingNotes": "Billing instructions",
+    "billingNotesHint": "For the desk and finance, e.g. room and breakfast only; extras paid by the guest.",
+    "rates": "Negotiated rates",
+    "noRates": "No negotiated rates yet. Add one under Rates, kind Negotiated.",
+    "noLimit": "No limit"
   },
   "reservations": {
     "title": "Reservations",
@@ -777,6 +789,8 @@
     "noShowNoFee": "Marked as no-show. No fee: the booking had no guarantee."
   },
   "booking": {
+    "company": "Company or agent",
+    "noCompany": "None",
     "title": "New booking",
     "walkInTitle": "Walk-in",
     "toWalkIn": "Walk-in",

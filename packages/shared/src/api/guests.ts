@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Email, Phone } from './auth.ts';
 import { defineRoute } from './contract.ts';
-import { Instant, page, PageQuery, Uuid } from './primitives.ts';
+import { AmountMinor, Instant, page, PageQuery, Uuid } from './primitives.ts';
 
 // Guests and companies (tab 4 row "Guests"; PRD M3-15, M3-18, M3-16 basic; S13; T-043).
 // Both belong to the organisation, so every property sees the same profiles. Stay history
@@ -183,6 +183,14 @@ export const CompanyContact = z.object({
   email: Email.nullable().default(null),
 });
 
+/** How the company wants to be billed (M3-16). */
+export const BillingInstructions = z.object({
+  /** Where invoices and statements go. */
+  invoiceEmail: Email.nullable().default(null),
+  /** For the desk and finance, e.g. "room and breakfast only; extras paid by the guest". */
+  notes: z.string().trim().max(1000).nullable().default(null),
+});
+
 export const CompanyItem = z
   .object({
     id: Uuid,
@@ -197,6 +205,12 @@ export const CompanyItem = z
       }),
     ),
     taxId: z.string().nullable(),
+    /** M3-16: what the company may owe on account (city ledger); null = no limit set. */
+    creditLimitMinor: AmountMinor.nullable(),
+    paymentTermsDays: z.number().int().nullable(),
+    /** A travel agent's commission, in basis points (1000 = 10%). */
+    commissionBps: z.number().int().nullable(),
+    billingInstructions: BillingInstructions,
     active: z.boolean(),
   })
   .meta({ id: 'Company' });
@@ -206,11 +220,22 @@ const CompanyFields = z.object({
   name: z.string().trim().min(1).max(160),
   contacts: z.array(CompanyContact).max(20),
   taxId: z.string().trim().max(30).nullable(),
+  creditLimitMinor: AmountMinor.refine(
+    (v) => !v.startsWith('-'),
+    'Must not be negative',
+  ).nullable(),
+  paymentTermsDays: z.number().int().min(0).max(365).nullable(),
+  commissionBps: z.number().int().min(0).max(5000).nullable(),
+  billingInstructions: BillingInstructions,
 });
 
 export const CompanyBody = CompanyFields.extend({
   contacts: z.array(CompanyContact).max(20).default([]),
   taxId: z.string().trim().max(30).nullable().default(null),
+  creditLimitMinor: CompanyFields.shape.creditLimitMinor.default(null),
+  paymentTermsDays: CompanyFields.shape.paymentTermsDays.default(null),
+  commissionBps: CompanyFields.shape.commissionBps.default(null),
+  billingInstructions: BillingInstructions.default({ invoiceEmail: null, notes: null }),
 });
 
 export const CompanyPatchBody = CompanyFields.extend({ active: z.boolean() }).partial();

@@ -561,6 +561,68 @@ async function bServiceUnchanged(db: Db, world: TenantWorld, theirs: Record<stri
   ).toBe(0);
 }
 
+/** B's group block and allotment, each holding one room type on one night (T-123). */
+async function bGroupBlocks(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  const plan = await bPlan(db, world, propertyId);
+  const agent = await db.company.create({
+    data: { organisationId, kind: 'TRAVEL_AGENT', name: 'Theirs agent' },
+  });
+  const make = async (kind: 'GROUP' | 'ALLOTMENT', code: string) => {
+    const block = await db.groupBlock.create({
+      data: {
+        organisationId,
+        propertyId,
+        kind,
+        code,
+        name: 'Theirs',
+        companyId: kind === 'ALLOTMENT' ? agent.id : null,
+        ratePlanId: plan.ratePlanId,
+        arrival: new Date('2099-06-01'),
+        departure: new Date('2099-06-02'),
+        releaseDate: kind === 'GROUP' ? new Date('2099-05-01') : null,
+        releaseDays: kind === 'ALLOTMENT' ? 7 : null,
+        createdById: world.bStaff.id,
+        nights: {
+          create: {
+            propertyId,
+            roomTypeId: plan.roomTypeId,
+            date: new Date('2099-06-01'),
+            rooms: 1,
+            remaining: 1,
+          },
+        },
+      },
+    });
+    return block.id;
+  };
+  return {
+    ...plan,
+    groupId: await make('GROUP', 'THEIRS-G'),
+    allotmentId: await make('ALLOTMENT', 'THEIRS-A'),
+    agentId: agent.id,
+  };
+}
+
+async function bGroupBlock(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bGroupBlocks(db, world, propertyId);
+  return { ...theirs, blockId: theirs.groupId };
+}
+
+async function bAllotment(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bGroupBlocks(db, world, propertyId);
+  return { ...theirs, blockId: theirs.allotmentId };
+}
+
+async function bGroupBlocksUnchanged(db: Db, world: TenantWorld) {
+  const blocks = await db.groupBlock.findMany({ where: { propertyId: world.b1.id } });
+  expect(blocks.map((b) => [b.code, b.name, b.status]).sort()).toEqual([
+    ['THEIRS-A', 'Theirs', 'ACTIVE'],
+    ['THEIRS-G', 'Theirs', 'ACTIVE'],
+  ]);
+  expect(await db.reservation.count({ where: { groupBlockId: { not: null } } })).toBe(0);
+}
+
 async function bBookingPage(db: Db, world: TenantWorld, propertyId: string) {
   const organisationId = orgOf(world, propertyId);
   await db.bookingEngineSettings.create({
@@ -1734,6 +1796,92 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   getEventInvoicePdf: { seed: bEventBooking },
   closeEvent: { seed: bEventBooking, body: () => ({}), untouched: bEventUnchanged },
   getEventCancellation: { seed: bEventBooking },
+  listGroupBlocks: {
+    seed: bGroupBlock,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((b) => b.id),
+  },
+  createGroupBlock: {
+    seed: bGroupBlock,
+    creates: true,
+    body: (theirs) => ({
+      code: 'LEAK',
+      name: 'Leak',
+      ratePlanId: theirs['ratePlanId'],
+      arrival: '2099-07-01',
+      departure: '2099-07-02',
+      releaseDate: '2099-06-01',
+      rooms: [{ roomTypeId: theirs['roomTypeId'], count: 1 }],
+    }),
+    untouched: bGroupBlocksUnchanged,
+  },
+  getGroupBlock: { seed: bGroupBlock },
+  updateGroupBlock: {
+    seed: bGroupBlock,
+    body: (theirs) => ({
+      code: 'LEAK',
+      name: 'Leak',
+      ratePlanId: theirs['ratePlanId'],
+      releaseDate: '2099-06-01',
+      rooms: [{ roomTypeId: theirs['roomTypeId'], count: 0 }],
+    }),
+    untouched: bGroupBlocksUnchanged,
+  },
+  releaseGroupBlock: {
+    seed: bGroupBlock,
+    body: () => ({ cancel: true }),
+    untouched: bGroupBlocksUnchanged,
+  },
+  bookGroupBlockRoomingList: {
+    seed: bGroupBlock,
+    body: (theirs) => ({
+      rooms: [{ firstName: 'Leak', lastName: 'Leak', roomTypeId: theirs['roomTypeId'] }],
+    }),
+    untouched: bGroupBlocksUnchanged,
+  },
+  listAllotments: {
+    seed: bAllotment,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((b) => b.id),
+  },
+  createAllotment: {
+    seed: bAllotment,
+    creates: true,
+    body: (theirs) => ({
+      code: 'LEAK',
+      name: 'Leak',
+      ratePlanId: theirs['ratePlanId'],
+      arrival: '2099-07-01',
+      departure: '2099-07-02',
+      companyId: theirs['agentId'],
+      releaseDays: 7,
+      rooms: [{ roomTypeId: theirs['roomTypeId'], count: 1 }],
+    }),
+    untouched: bGroupBlocksUnchanged,
+  },
+  getAllotment: { seed: bAllotment },
+  updateAllotment: {
+    seed: bAllotment,
+    body: (theirs) => ({
+      code: 'LEAK',
+      name: 'Leak',
+      ratePlanId: theirs['ratePlanId'],
+      companyId: theirs['agentId'],
+      releaseDays: 7,
+      rooms: [{ roomTypeId: theirs['roomTypeId'], count: 0 }],
+    }),
+    untouched: bGroupBlocksUnchanged,
+  },
+  releaseAllotment: {
+    seed: bAllotment,
+    body: () => ({ cancel: true }),
+    untouched: bGroupBlocksUnchanged,
+  },
+  bookAllotmentRoomingList: {
+    seed: bAllotment,
+    body: (theirs) => ({
+      rooms: [{ firstName: 'Leak', lastName: 'Leak', roomTypeId: theirs['roomTypeId'] }],
+    }),
+    untouched: bGroupBlocksUnchanged,
+  },
   listServices: {
     seed: bService,
     listIds: (body) => (body as { data: { id: string }[] }).data.map((s) => s.id),

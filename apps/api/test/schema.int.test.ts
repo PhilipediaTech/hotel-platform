@@ -49,6 +49,8 @@ describe('migrations', () => {
       'folio_lines',
       'folio_windows',
       'folios',
+      'group_block_nights',
+      'group_blocks',
       'guest_links',
       'guests',
       'handover_notes',

@@ -152,6 +152,8 @@ model Property {
   spaces                Space[]
   eventBriefs           EventBrief[]
   services              Service[]
+  groupBlocks           GroupBlock[]
+  groupBlockNights      GroupBlockNight[]
   serviceBookings       ServiceBooking[]
   eventQuotes           EventQuote[]
   eventQuoteVersions    EventQuoteVersion[]
@@ -306,6 +308,7 @@ model User {
   eventBookings      EventBooking[]
   eventBriefs        EventBrief[]        @relation("EventBriefAuthor")
   serviceBookings    ServiceBooking[]    @relation("ServiceBookingAuthor")
+  groupBlocks        GroupBlock[]        @relation("GroupBlockAuthor")
   eventsInspected    EventBooking[]      @relation("EventInspector")
   eventQuoteVersions EventQuoteVersion[] @relation("EventQuoteAuthor")
   eventContracts     EventContract[]     @relation("EventContractIssuer")
@@ -628,19 +631,20 @@ enum BlockKind {
 }
 
 model RoomType {
-  id             String   @id @default(uuid()) @db.Uuid
-  organisationId String   @map("organisation_id") @db.Uuid
-  propertyId     String   @map("property_id") @db.Uuid
-  code           String
-  name           String
-  baseOccupancy  Int      @default(2) @map("base_occupancy")
-  maxOccupancy   Int      @default(2) @map("max_occupancy")
-  description    String?
-  amenities      String[]
+  id               String            @id @default(uuid()) @db.Uuid
+  organisationId   String            @map("organisation_id") @db.Uuid
+  propertyId       String            @map("property_id") @db.Uuid
+  code             String
+  name             String
+  baseOccupancy    Int               @default(2) @map("base_occupancy")
+  maxOccupancy     Int               @default(2) @map("max_occupancy")
+  description      String?
+  amenities        String[]
   /// Files of kind RoomType (FILE_KINDS); shown once the scan marks them CLEAN.
-  photoFileIds   String[] @map("photo_file_ids") @db.Uuid
-  sortOrder      Int      @default(0) @map("sort_order")
-  active         Boolean  @default(true)
+  photoFileIds     String[]          @map("photo_file_ids") @db.Uuid
+  sortOrder        Int               @default(0) @map("sort_order")
+  active           Boolean           @default(true)
+  groupBlockNights GroupBlockNight[]
 
   organisation Organisation        @relation(fields: [organisationId], references: [id], onDelete: Restrict)
   property     Property            @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
@@ -870,6 +874,7 @@ model RatePlan {
   roomTypeIds           String[]     @map("room_type_ids") @db.Uuid
   active                Boolean      @default(true)
   version               Int          @default(0)
+  groupBlocks           GroupBlock[]
   createdAt             DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
   organisation       Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
@@ -1057,17 +1062,18 @@ model Guest {
 /// A company, travel agent or event client of the organisation. Basic in V1 (name, contacts,
 /// tax ID); credit limits, terms, commission and billing instructions are used from V1.1.
 model Company {
-  id                  String      @id @default(uuid()) @db.Uuid
-  organisationId      String      @map("organisation_id") @db.Uuid
+  id                  String       @id @default(uuid()) @db.Uuid
+  organisationId      String       @map("organisation_id") @db.Uuid
   kind                CompanyKind
   name                String
-  contacts            Json        @default("[]")
-  taxId               String?     @map("tax_id")
-  creditLimitMinor    BigInt?     @map("credit_limit_minor")
-  paymentTermsDays    Int?        @map("payment_terms_days")
-  commissionBps       Int?        @map("commission_bps")
-  billingInstructions Json        @default("{}") @map("billing_instructions")
-  active              Boolean     @default(true)
+  contacts            Json         @default("[]")
+  taxId               String?      @map("tax_id")
+  creditLimitMinor    BigInt?      @map("credit_limit_minor")
+  paymentTermsDays    Int?         @map("payment_terms_days")
+  commissionBps       Int?         @map("commission_bps")
+  billingInstructions Json         @default("{}") @map("billing_instructions")
+  active              Boolean      @default(true)
+  groupBlocks         GroupBlock[]
 
   organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
   bookings     Reservation[] @relation("ReservationCompany")
@@ -1117,6 +1123,8 @@ model Reservation {
   bookerGuestId  String            @map("booker_guest_id") @db.Uuid
   companyId      String?           @map("company_id") @db.Uuid
   travelAgentId  String?           @map("travel_agent_id") @db.Uuid
+  /// Picked up from a group block or allotment (T-123).
+  groupBlockId   String?           @map("group_block_id") @db.Uuid
   source         BookingSource
   channelRef     String?           @map("channel_ref")
   status         ReservationStatus @default(CONFIRMED)
@@ -1135,6 +1143,7 @@ model Reservation {
   booker         Guest                      @relation("ReservationBooker", fields: [bookerGuestId], references: [id], onDelete: Restrict)
   company        Company?                   @relation("ReservationCompany", fields: [companyId], references: [id], onDelete: Restrict)
   travelAgent    Company?                   @relation("ReservationAgent", fields: [travelAgentId], references: [id], onDelete: Restrict)
+  groupBlock     GroupBlock?                @relation(fields: [groupBlockId], references: [id], onDelete: Restrict)
   stays          Stay[]
   history        ReservationStatusHistory[]
   folios         Folio[]
@@ -2939,4 +2948,61 @@ model ServiceBooking {
   @@index([serviceId, startsAt])
   @@index([propertyId, startsAt])
   @@map("service_bookings")
+}
+
+/// Rooms held for a group (PRD M3-17) or a company's or agent's allotment (M2-12).
+model GroupBlock {
+  id             String    @id @default(uuid()) @db.Uuid
+  organisationId String    @map("organisation_id") @db.Uuid
+  propertyId     String    @map("property_id") @db.Uuid
+  /// GROUP | ALLOTMENT
+  kind           String
+  code           String
+  name           String
+  companyId      String?   @map("company_id") @db.Uuid
+  ratePlanId     String    @map("rate_plan_id") @db.Uuid
+  arrival        DateTime  @db.Date
+  /// Exclusive: the day the last guests leave.
+  departure      DateTime  @db.Date
+  /// GROUP: what is not picked up goes back on this day.
+  releaseDate    DateTime? @map("release_date") @db.Date
+  /// ALLOTMENT: each night goes back this many days before it.
+  releaseDays    Int?      @map("release_days")
+  /// ACTIVE | RELEASED | CANCELLED
+  status         String    @default("ACTIVE")
+  notes          String?
+  createdById    String    @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  releasedAt     DateTime? @map("released_at") @db.Timestamptz(6)
+  version        Int       @default(0)
+
+  property     Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  company      Company?          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  ratePlan     RatePlan          @relation(fields: [ratePlanId], references: [id], onDelete: Restrict)
+  createdBy    User              @relation("GroupBlockAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  nights       GroupBlockNight[]
+  reservations Reservation[]
+
+  @@unique([propertyId, code])
+  @@index([status])
+  @@map("group_blocks")
+}
+
+/// One room type on one night of a block: rooms agreed, and how many are still held.
+model GroupBlockNight {
+  id         String    @id @default(uuid()) @db.Uuid
+  propertyId String    @map("property_id") @db.Uuid
+  blockId    String    @map("block_id") @db.Uuid
+  roomTypeId String    @map("room_type_id") @db.Uuid
+  date       DateTime  @db.Date
+  rooms      Int
+  remaining  Int
+  releasedAt DateTime? @map("released_at") @db.Timestamptz(6)
+
+  property Property   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  block    GroupBlock @relation(fields: [blockId], references: [id], onDelete: Restrict)
+  roomType RoomType   @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+
+  @@unique([blockId, roomTypeId, date])
+  @@map("group_block_nights")
 }

@@ -67,6 +67,8 @@ export const ReservationBody = z.object({
   holdUntil: Instant.nullable().default(null),
   booker: Booker,
   companyId: Uuid.nullable().default(null),
+  /** Picked up from a group block or allotment (M3-17, M2-12): its rooms are taken first. */
+  groupBlockId: Uuid.nullable().default(null),
   /** One stay per room (M3-05): one booker, a guest per room. */
   stays: z.array(NewStay).min(1).max(20),
   notes: z.string().trim().max(2000).nullable().default(null),

@@ -90,6 +90,9 @@ const InboxPage = lazy(() => import('../routes/inbox.tsx').then((m) => ({ defaul
 const EventsPage = lazy(() =>
   import('../routes/events.tsx').then((m) => ({ default: m.EventsPage })),
 );
+const GroupsPage = lazy(() =>
+  import('../routes/groups.tsx').then((m) => ({ default: m.GroupsPage })),
+);
 const ServicesPage = lazy(() =>
   import('../routes/services.tsx').then((m) => ({ default: m.ServicesPage })),
 );
@@ -137,6 +140,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/inbox': <InboxPage />,
   '/events': <EventsPage />,
   '/services': <ServicesPage />,
+  '/groups': <GroupsPage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

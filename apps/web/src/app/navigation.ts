@@ -96,6 +96,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-042',
   },
   {
+    id: 'groups',
+    path: '/groups',
+    anyOf: ['group.manage', 'allotment.manage'],
+    group: 'operations',
+    screen: 'S09',
+    ticket: 'T-123',
+  },
+  {
     id: 'guests',
     path: '/guests',
     anyOf: ['guest.manage'],

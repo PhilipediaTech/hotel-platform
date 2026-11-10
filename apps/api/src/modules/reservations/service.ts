@@ -21,6 +21,7 @@ import {
   performOrRequest,
   type ApprovalActionHandler,
 } from '../../core/approvals.ts';
+import { pickUpFromBlock } from '../groups/pickup.ts';
 import { recordAudit } from '../../core/audit.ts';
 import type { Clock } from '../../core/clock.ts';
 import { COUNTER, nextPropertyCounter } from '../../core/counters.ts';
@@ -488,6 +489,13 @@ async function book(
     const company = await tx.company.findUnique({ where: { id: body.companyId } });
     if (!company?.active) throw invalid('body.companyId', 'Choose an active company');
   }
+  // A booking against a block takes its rooms first, at the block's rate (M3-17, M2-12).
+  const block = body.groupBlockId
+    ? await tx.groupBlock.findFirst({ where: { id: body.groupBlockId, status: 'ACTIVE' } })
+    : null;
+  if (body.groupBlockId && !block) {
+    throw invalid('body.groupBlockId', 'Choose an active group block or allotment');
+  }
   const quoteIds = body.stays.map((s) => s.quoteId);
   if (new Set(quoteIds).size !== quoteIds.length) {
     throw invalid('body.stays', 'Each room needs its own quote');
@@ -508,6 +516,9 @@ async function book(
       today,
       ignoreExpiry: approvalRequestId !== null,
     });
+    if (block && quote.ratePlanId !== block.ratePlanId) {
+      throw invalid(`${path}.quoteId`, 'A block is booked at its own rate plan');
+    }
     const guests = await occupancy(tx, quote, path, s);
     const guest = s.guest.sameAsBooker
       ? booker
@@ -523,7 +534,8 @@ async function book(
     data: {
       confirmationNo,
       bookerGuestId: booker.id,
-      companyId: body.companyId,
+      companyId: body.companyId ?? block?.companyId ?? null,
+      groupBlockId: block?.id ?? null,
       source: body.source,
       status,
       guarantee: body.guarantee,
@@ -554,7 +566,14 @@ async function book(
   // Same order everywhere, so two bookings never wait on each other's nights.
   const field = inventoryFieldOf(status);
   for (const s of [...stays].sort((a, b) => a.quote.roomTypeId.localeCompare(b.quote.roomTypeId))) {
-    if (field) {
+    if (field && block) {
+      await pickUpFromBlock(tx, {
+        propertyId: tenant.propertyId,
+        blockId: block.id,
+        ...stayRange(s.quote),
+        field,
+      });
+    } else if (field) {
       await takeInventory(tx, { propertyId: tenant.propertyId, ...stayRange(s.quote), field });
     }
   }

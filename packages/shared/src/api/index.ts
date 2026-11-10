@@ -17,6 +17,7 @@ export * from './event-sales.ts';
 export * from './event-closeout.ts';
 export * from './event-cancellation.ts';
 export * from './services.ts';
+export * from './group-blocks.ts';
 export * from './stay-alerts.ts';
 export * from './guests.ts';
 export * from './imports.ts';

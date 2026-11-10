@@ -36,6 +36,7 @@ describe('migrations', () => {
       'deposit_ledger_entries',
       'domain_events',
       'event_bookings',
+      'event_briefs',
       'event_contracts',
       'event_deposits',
       'event_enquiries',

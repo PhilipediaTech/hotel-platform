@@ -22,6 +22,7 @@ import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
 import { PdfError, usePdf } from '../lib/pdf.tsx';
+import { AfterConfirming } from './event-closeout.tsx';
 
 registerStrings(strings);
 
@@ -725,6 +726,7 @@ export function BookingFile({ booking }: { booking: Booking }) {
       {booking.confirmedByOverride && <Alert tone="info">{t('events.confirm.byOverride')}</Alert>}
       <QuoteSection booking={booking} />
       <ContractSection booking={booking} total={q.data?.versions[0]?.totalMinor ?? null} />
+      {booking.status !== 'HOLD' && <AfterConfirming booking={booking} />}
     </div>
   );
 }

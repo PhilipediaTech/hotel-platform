@@ -1,8 +1,9 @@
-import { EVENT_ROUTES, EVENT_SALES_ROUTES } from '@hotel/shared';
+import { EVENT_CLOSEOUT_ROUTES, EVENT_ROUTES, EVENT_SALES_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { defineJob } from '../../core/jobs.ts';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as closeout from './closeout.ts';
 import * as sales from './sales.ts';
 import * as events from './service.ts';
 
@@ -12,7 +13,7 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
   return tenant;
 }
 
-/** Events and spaces (M9-01–M9-06; T-119, T-120). */
+/** Events and spaces (M9-01–M9-08; T-119–T-121). */
 export function eventRoutes(deps: sales.EventSalesDeps): Router {
   const router = express.Router();
   const r = EVENT_ROUTES;
@@ -55,6 +56,24 @@ export function eventRoutes(deps: sales.EventSalesDeps): Router {
   mountRoute(router, s.confirmEventBooking, ({ params, body }, { tenant }) =>
     sales.confirmBooking(deps, tenantFrom(tenant), params.bookingId, body),
   );
+  const c = EVENT_CLOSEOUT_ROUTES;
+  mountRoute(router, c.getEventBrief, ({ params }) => closeout.getBrief(deps, params.bookingId));
+  mountRoute(router, c.saveEventBrief, ({ params, body }, { tenant }) =>
+    closeout.saveBrief(deps, tenantFrom(tenant), params.bookingId, body),
+  );
+  mountRoute(router, c.getEventBriefPdf, ({ params, query }) =>
+    closeout.briefPdf(deps, params.bookingId, query.departmentId),
+  );
+  mountRoute(router, c.getEventCloseOut, ({ params }) =>
+    closeout.getCloseOut(deps, params.bookingId),
+  );
+  mountRoute(router, c.inspectEvent, ({ params, body }, { tenant }) =>
+    closeout.inspect(deps, tenantFrom(tenant), params.bookingId, body),
+  );
+  mountRoute(router, c.getEventInvoicePdf, ({ params }) =>
+    closeout.invoicePdf(deps, params.bookingId),
+  );
+  mountRoute(router, c.closeEvent, ({ params }) => closeout.closeBooking(deps, params.bookingId));
   return router;
 }
 

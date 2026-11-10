@@ -14,6 +14,7 @@ export * from './booking-engine.ts';
 export * from './inbox.ts';
 export * from './events.ts';
 export * from './event-sales.ts';
+export * from './event-closeout.ts';
 export * from './stay-alerts.ts';
 export * from './guests.ts';
 export * from './imports.ts';

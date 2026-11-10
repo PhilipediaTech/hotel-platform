@@ -401,7 +401,8 @@ export async function listBookings(deps: EventDeps, query: { from: string; to: s
     where: {
       blockedFrom: { lt: new Date(query.to) },
       blockedUntil: { gt: new Date(query.from) },
-      ...stillBlocking(deps.clock()),
+      // A closed event no longer takes the space, but stays on the calendar as a record.
+      OR: [...stillBlocking(deps.clock()).OR, { status: 'CLOSED' }],
     },
     include: BOOKING_INCLUDE,
     orderBy: { startsAt: 'asc' },

@@ -9,7 +9,13 @@ import { AmountMinor, Instant, IsoDate, Uuid } from './primitives.ts';
 export const SPACE_RATE_UNITS = ['HOURLY', 'HALF_DAY', 'FULL_DAY', 'EXTRA'] as const;
 export const SPACE_DAY_TYPES = ['ALL', 'WEEKDAY', 'WEEKEND'] as const;
 export const EVENT_ENQUIRY_STATUSES = ['OPEN', 'WON', 'LOST'] as const;
-export const EVENT_BOOKING_STATUSES = ['HOLD', 'CONFIRMED', 'RELEASED', 'EXPIRED'] as const;
+export const EVENT_BOOKING_STATUSES = [
+  'HOLD',
+  'CONFIRMED',
+  'RELEASED',
+  'EXPIRED',
+  'CLOSED',
+] as const;
 
 /** Longest single booking of a space. */
 export const EVENT_MAX_DAYS = 14;

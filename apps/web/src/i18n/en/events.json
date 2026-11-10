@@ -6,7 +6,8 @@
       "HOLD": "On hold",
       "CONFIRMED": "Confirmed",
       "RELEASED": "Released",
-      "EXPIRED": "Expired"
+      "EXPIRED": "Expired",
+      "CLOSED": "Closed"
     },
     "enquiry": { "OPEN": "Open", "WON": "Won", "LOST": "Lost" },
     "holdEnds": "hold ends {{when}}",
@@ -138,6 +139,38 @@
       "signedBy": "Signed by",
       "signedOn": "Signed on",
       "signedLine": "Signed by {{name}} on {{on}}"
+    },
+    "brief": {
+      "title": "Event brief",
+      "heading": "Event brief for each department",
+      "save": "Save brief",
+      "pdf": "Print banquet event order"
+    },
+    "closeOut": {
+      "heading": "Inspection and close-out",
+      "inspection": "Inspection",
+      "notes": "What did you find?",
+      "damageWhat": "What was damaged (if anything)",
+      "damageCost": "Cost of the damage, before tax (₦)",
+      "addExtra": "Add something provided on the day",
+      "inspect": "Save inspection and post final charges",
+      "notYet": "Inspection opens when the event has finished.",
+      "waiting": "Waiting for the coordinator's inspection.",
+      "damageLine": "Damage: {{what}}, {{amount}}",
+      "depositLine": "Damage deposit held {{held}}, of which {{retained}} goes to damage",
+      "owes": "The client owes {{amount}}.",
+      "owed": "The client is owed {{amount}}.",
+      "settled": "The bill is at zero.",
+      "bill": "Open bill {{number}}",
+      "invoice": "Final invoice (PDF)",
+      "close": "Close event",
+      "closed": "This event is closed.",
+      "blockers": {
+        "EVENT_NOT_OVER": "Setup and cleanup are not over yet",
+        "NOT_INSPECTED": "The event has not been inspected",
+        "BALANCE_DUE": "The client still owes money: take the payment on the bill",
+        "CREDIT_TO_RETURN": "Money is due back to the client: refund it from the bill"
+      }
     },
     "confirm": {
       "button": "Confirm booking",

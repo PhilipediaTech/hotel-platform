@@ -5,7 +5,14 @@ import { ERROR_HTTP_STATUS, isErrorCode } from './errors.ts';
 const SPEC_TABLE: Record<number, string[]> = {
   400: ['VALIDATION_ERROR'],
   401: ['UNAUTHENTICATED', 'MFA_REQUIRED', 'SESSION_EXPIRED'],
-  403: ['FORBIDDEN', 'MODULE_DISABLED', 'PROPERTY_NOT_LIVE', 'ALLOWANCE_USED_UP'],
+  // SUBSCRIPTION_SUSPENDED added in T-124 (not in tab 4; M13-06 read-only).
+  403: [
+    'FORBIDDEN',
+    'MODULE_DISABLED',
+    'PROPERTY_NOT_LIVE',
+    'ALLOWANCE_USED_UP',
+    'SUBSCRIPTION_SUSPENDED',
+  ],
   404: ['NOT_FOUND'],
   409: [
     'BOOKING_CONFLICT',

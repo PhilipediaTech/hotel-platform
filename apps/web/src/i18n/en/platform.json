@@ -56,6 +56,13 @@
     "end": "End now",
     "noSupport": "No support session yet.",
     "sessionLine": "{{name}} · {{start}} → {{end}} · {{views}} records opened",
-    "open": "open"
+    "open": "open",
+    "suspension": "Payment and suspension",
+    "overdue_one": "The oldest unpaid invoice is {{count}} day past due.",
+    "overdue_other": "The oldest unpaid invoice is {{count}} days past due.",
+    "suspensionReason": "Reason (kept in the group's audit log)",
+    "suspend": "Suspend for non-payment",
+    "reactivate": "Lift the suspension",
+    "notYetSuspendable": "It can be suspended once an invoice is 14 days past due."
   }
 }

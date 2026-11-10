@@ -522,6 +522,14 @@ export async function buildMe(
   const switchedOff = await db.featureFlag.findMany({
     where: { organisationId: { in: [...organisations.keys()] }, enabled: false },
   });
+  const suspendedOrgs = new Set(
+    (
+      await db.subscription.findMany({
+        where: { organisationId: { in: [...organisations.keys()] }, status: 'SUSPENDED' },
+        select: { organisationId: true },
+      })
+    ).map((x) => x.organisationId),
+  );
   const businessDates = new Map<string, string>();
   for (const p of properties.filter((x) => x.status === 'LIVE')) {
     businessDates.set(p.id, await businessDate(db, p.id, options.clock));
@@ -546,6 +554,7 @@ export async function buildMe(
       id: o.id,
       name: o.name,
       disabledModules: switchedOff.filter((f) => f.organisationId === o.id).map((f) => f.module),
+      suspended: suspendedOrgs.has(o.id),
     })),
     platformAdmin,
     partner: await db.referralPartner.findUnique({

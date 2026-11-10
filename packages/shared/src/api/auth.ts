@@ -148,6 +148,8 @@ export const Me = z
         name: z.string(),
         /** Modules the platform switched off for this group (T-100). */
         disabledModules: z.array(z.string()),
+        /** Suspended for non-payment: readable and exportable, nothing can change (M13-06). */
+        suspended: z.boolean(),
       }),
     ),
     /** Platform staff (PLATFORM_ADMIN_EMAILS): may open S31 (T-100). */

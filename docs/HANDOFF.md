@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-123 is pushed on `feat/T-123-group-blocks`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Next: automated hotel billing and suspension (M13-03, M13-06). Open with Philip: whether a cancelled pick-up should go back into its block.
+T-124 is pushed on `feat/T-124-billing-suspension`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). That finishes the V1.2 pure-building list. Open with Philip: the 14-day due and 14-day grace numbers. Next: the V1.1 buildable tickets (PRD release V1.1 rows), then V1.3.

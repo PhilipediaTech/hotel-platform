@@ -40,6 +40,12 @@
     "supportIntro": "Our staff can only see your data through a support session you can see here: it has a reason, ends on its own within an hour, and everything opened is in your audit log.",
     "noSupport": "No support session yet.",
     "sessionLine": "{{name}} · {{start}} to {{end}} · {{views}} records opened",
-    "open": "open now"
+    "open": "open now",
+    "due": "due {{date}}",
+    "overdue": "overdue since {{date}}",
+    "paidOn": "paid {{date}}",
+    "payNow": "Pay now",
+    "checkPayment": "Check payment",
+    "notYet": "No payment yet."
   }
 }

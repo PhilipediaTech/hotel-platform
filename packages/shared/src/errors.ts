@@ -14,6 +14,8 @@ export const ERROR_HTTP_STATUS = {
   PROPERTY_NOT_LIVE: 403,
   // Not in tab 4 (T-118): the plan's AI allowance for the month is used up.
   ALLOWANCE_USED_UP: 403,
+  // Not in tab 4 (T-124, M13-06): the group is suspended for non-payment; reads still work.
+  SUBSCRIPTION_SUSPENDED: 403,
 
   // Also returned for other tenants' records, so their existence never leaks.
   NOT_FOUND: 404,

@@ -59,7 +59,7 @@ export function makeMe(over: Partial<MeResponse> = {}): MeResponse {
       pinSwitchAvailable: false,
       expiresAt: '2026-12-12T09:00:00.000Z',
     },
-    organisations: [{ id: ORG, name: 'Obi Hotels', disabledModules: [] }],
+    organisations: [{ id: ORG, name: 'Obi Hotels', disabledModules: [], suspended: false }],
     platformAdmin: false,
     partner: null,
     support: [],

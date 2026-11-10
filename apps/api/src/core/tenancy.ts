@@ -29,6 +29,8 @@ export interface TenantContext {
   permissions: ReadonlySet<string>;
   /** Modules the platform switched off for this group (T-100: MODULE_DISABLED). */
   disabledModules?: ReadonlySet<string>;
+  /** The group is suspended for non-payment: reads only (M13-06; T-124). */
+  suspended?: boolean;
   /** Set when a platform admin reads the group through a support session (T-100). */
   support?: { sessionId: string };
 }
@@ -111,6 +113,13 @@ export async function resolveTenant(
       })
     ).map((f) => f.module),
   );
+  const suspended =
+    (
+      await db.subscription.findUnique({
+        where: { organisationId: property.organisationId },
+        select: { status: true },
+      })
+    )?.status === 'SUSPENDED';
   if (memberships.length === 0) {
     // M13-02: platform staff reach a group only through an open support session.
     if (!support) return null;
@@ -131,6 +140,7 @@ export async function resolveTenant(
       roles: [{ id: session.id, name: SUPPORT_ROLE_NAME, requiresMfa: true }],
       permissions: new Set(SUPPORT_PERMISSIONS),
       disabledModules,
+      suspended,
       support: { sessionId: session.id },
     };
   }
@@ -142,6 +152,7 @@ export async function resolveTenant(
     roles: [...roles.values()].map((r) => ({ id: r.id, name: r.name, requiresMfa: r.requiresMfa })),
     permissions: new Set([...roles.values()].flatMap((r) => r.permissions)),
     disabledModules,
+    suspended,
   };
 }
 

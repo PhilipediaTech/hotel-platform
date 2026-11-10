@@ -39,6 +39,8 @@ export interface ShellSession {
   pinSwitchAvailable: boolean;
   /** The current property is open through a read-only support session (T-100). */
   support: { organisationName: string; expiresAt: string } | null;
+  /** The current property's group is suspended for non-payment: read-only (M13-06). */
+  suspended: boolean;
 }
 
 export type MeResponse = z.output<typeof Me>;
@@ -117,6 +119,9 @@ export function toShellSession(me: MeResponse, wantedPropertyId: string | null):
     support: support
       ? { organisationName: support.organisationName, expiresAt: support.expiresAt }
       : null,
+    suspended: property
+      ? (me.organisations.find((o) => o.id === property.organisationId)?.suspended ?? false)
+      : false,
   };
 }
 
@@ -192,6 +197,7 @@ export const PREVIEW_SESSION: ShellSession = {
   stayAlerts: 0,
   preview: true,
   support: null,
+  suspended: false,
   pinSwitchAvailable: false,
 };
 

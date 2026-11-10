@@ -40,6 +40,8 @@ const INVOICE = {
   currency: 'NGN',
   status: 'ISSUED',
   issuedAt: '2026-11-01T09:00:00Z',
+  dueOn: '2026-11-01',
+  paidAt: null,
 };
 const SESSION = {
   id: id(2),
@@ -62,9 +64,12 @@ const TENANT = {
   subscription: SUB,
   usage: { month: '2026-11', activeRooms: 3, whatsappMessages: 12, aiUses: 40 },
   activeSupportSession: null,
+  overdueDays: null as number | null,
+  suspendable: false,
 };
 
 let permissions: string[];
+let tenantExtra: object;
 let platformAdmin: boolean;
 const calls: { key: string; body: unknown }[] = [];
 const sent = (key: string) => calls.filter((c) => c.key === key).map((c) => c.body);
@@ -72,6 +77,7 @@ const sent = (key: string) => calls.filter((c) => c.key === key).map((c) => c.bo
 beforeEach(() => {
   calls.length = 0;
   permissions = ['subscription.read'];
+  tenantExtra = {};
   platformAdmin = false;
   const handlers: Record<string, (body: unknown) => Response> = {
     'GET /me': () =>
@@ -92,10 +98,15 @@ beforeEach(() => {
         supportSessions: [SESSION],
       }),
     'PATCH /subscription/billing': (body) => json(200, body),
+    [`POST /subscription/invoices/${INVOICE.id}/pay`]: () =>
+      json(200, { checkoutUrl: 'https://pay.test/HP-1' }),
+    [`POST /subscription/invoices/${INVOICE.id}/check`]: () => json(200, { status: 'ISSUED' }),
+    [`POST /platform/tenants/${ORG}/suspend`]: () => json(200, { status: 'SUSPENDED' }),
     'GET /platform/tenants': () => json(200, { data: [TENANT] }),
     [`GET /platform/tenants/${ORG}`]: () =>
       json(200, {
         ...TENANT,
+        ...tenantExtra,
         flags: [
           { module: 'leakage', label: 'Revenue Leakage Guard', enabled: true },
           { module: 'owner', label: 'Owner Remote Control', enabled: true },
@@ -218,5 +229,57 @@ describe('Platform (S31)', () => {
         { organisationId: ORG, reason: 'Owner reports the arrivals list is empty', minutes: 30 },
       ]),
     );
+  });
+});
+
+describe('Paying and suspension (T-124; M13-03, M13-06)', { timeout: 15_000 }, () => {
+  it(
+    'an unpaid invoice shows when it was due and can be paid or checked',
+    { timeout: 15_000 },
+    async () => {
+      const assign = vi.fn();
+      vi.stubGlobal('location', { ...window.location, assign });
+      const user = userEvent.setup();
+      renderAt('/settings/billing');
+      const invoices = await screen.findByRole('region', { name: 'Invoices' });
+      expect(await within(invoices).findByText('overdue since 2026-11-01')).toBeInTheDocument();
+      await user.click(within(invoices).getByRole('button', { name: 'Check payment' }));
+      expect(await within(invoices).findByText('No payment yet.')).toBeInTheDocument();
+      await user.click(within(invoices).getByRole('button', { name: 'Pay now' }));
+      await waitFor(() => expect(assign).toHaveBeenCalledWith('https://pay.test/HP-1'));
+    },
+  );
+
+  it('platform staff see how late a group is and suspend it with a reason', async () => {
+    platformAdmin = true;
+    tenantExtra = { overdueDays: 16, suspendable: true };
+    const user = userEvent.setup();
+    renderAt('/platform');
+    const list = await screen.findByRole('navigation', { name: 'Hotel groups' });
+    await user.click(await within(list).findByRole('button', { name: /Obi Hotels/ }));
+    const section = await screen.findByRole('region', { name: 'Payment and suspension' });
+    expect(within(section).getByText(/16 days past due/)).toBeInTheDocument();
+    await user.type(
+      within(section).getByLabelText("Reason (kept in the group's audit log)"),
+      'Unpaid since November',
+    );
+    await user.click(within(section).getByRole('button', { name: 'Suspend for non-payment' }));
+    await waitFor(() =>
+      expect(sent(`POST /platform/tenants/${ORG}/suspend`)).toEqual([
+        { reason: 'Unpaid since November' },
+      ]),
+    );
+  });
+
+  it('before the grace period ends there is nothing to press', async () => {
+    platformAdmin = true;
+    tenantExtra = { overdueDays: 3, suspendable: false };
+    const user = userEvent.setup();
+    renderAt('/platform');
+    const list = await screen.findByRole('navigation', { name: 'Hotel groups' });
+    await user.click(await within(list).findByRole('button', { name: /Obi Hotels/ }));
+    const section = await screen.findByRole('region', { name: 'Payment and suspension' });
+    expect(within(section).getByText(/once an invoice is 14 days past due/)).toBeInTheDocument();
+    expect(within(section).queryByRole('button')).not.toBeInTheDocument();
   });
 });

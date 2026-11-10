@@ -79,6 +79,7 @@ describe('migrations', () => {
       'partner_referrals',
       'payment_intents',
       'payments',
+      'platform_invoice_checkouts',
       'platform_invoices',
       'promo_codes',
       'properties',

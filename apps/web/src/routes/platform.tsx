@@ -467,6 +467,66 @@ function Support({ tenant }: { tenant: Detail }) {
   );
 }
 
+/** Suspending a group for non-payment, and lifting it (M13-06; T-124). */
+function Suspension({ tenant }: { tenant: Tenant }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [reason, setReason] = useState('');
+  const suspended = tenant.subscription?.status === 'SUSPENDED';
+  const act = useMutation({
+    mutationFn: (): Promise<{ status: string }> =>
+      suspended
+        ? api.call('reactivateTenant', { params: { organisationId: tenant.id }, body: { reason } })
+        : api.call('suspendTenant', { params: { organisationId: tenant.id }, body: { reason } }),
+    onSuccess: () => {
+      setReason('');
+      void queryClient.invalidateQueries({ queryKey: KEY });
+    },
+  });
+  if (!suspended && tenant.overdueDays === null) return null;
+  return (
+    <section aria-label={t('platform.suspension')} className="flex flex-col gap-2">
+      <h3 className="font-semibold">{t('platform.suspension')}</h3>
+      {tenant.overdueDays !== null && (
+        <p className={tenant.suspendable ? 'text-critical' : 'text-text-muted'}>
+          {t('platform.overdue', { count: tenant.overdueDays })}
+        </p>
+      )}
+      {(suspended || tenant.suspendable) && (
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            act.mutate();
+          }}
+        >
+          <div className="flex min-w-72 flex-1 flex-col gap-1">
+            <Label htmlFor={`pl-susp-${tenant.id}`}>{t('platform.suspensionReason')}</Label>
+            <Input
+              id={`pl-susp-${tenant.id}`}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              minLength={5}
+              required
+            />
+          </div>
+          <Button
+            type="submit"
+            variant={suspended ? 'secondary' : 'primary'}
+            disabled={act.isPending}
+          >
+            {suspended ? t('platform.reactivate') : t('platform.suspend')}
+          </Button>
+        </form>
+      )}
+      {!suspended && !tenant.suspendable && (
+        <p className="text-text-muted">{t('platform.notYetSuspendable')}</p>
+      )}
+      {act.error && <Alert tone="critical">{errorMessage(act.error)}</Alert>}
+    </section>
+  );
+}
+
 function TenantDetail({ id }: { id: string }) {
   const q = useQuery({
     queryKey: [...KEY, id],
@@ -481,6 +541,7 @@ function TenantDetail({ id }: { id: string }) {
     >
       <h2 className="text-lg font-semibold">{q.data.name}</h2>
       <PlanForm key={JSON.stringify(q.data.subscription)} tenant={q.data} />
+      <Suspension tenant={q.data} />
       <CountryPackForm key={q.data.countryPack} tenant={q.data} />
       <Modules tenant={q.data} />
       <Invoices tenant={q.data} />

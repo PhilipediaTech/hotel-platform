@@ -1,4 +1,5 @@
-import { RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
+import { Lock, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
+import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useSession } from '../../app/session.ts';
@@ -35,6 +36,27 @@ export function UpdateBanner() {
       <Button size="sm" onClick={() => void updateServiceWorker(true)}>
         {t('update.reload')}
       </Button>
+    </div>
+  );
+}
+
+/** The group is suspended for an unpaid invoice (M13-06): it can read, export and pay. */
+export function SuspendedBanner() {
+  const { t } = useTranslation();
+  const { suspended, permissions } = useSession();
+  if (!suspended) return null;
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center gap-2 bg-critical-subtle px-4 py-2 text-sm text-critical"
+    >
+      <Lock aria-hidden className="size-4 shrink-0" />
+      <span>{t('suspended.banner')}</span>
+      {permissions.includes('subscription.read') && (
+        <Link className="font-medium underline" to="/settings/billing">
+          {t('suspended.pay')}
+        </Link>
+      )}
     </div>
   );
 }

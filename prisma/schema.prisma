@@ -149,10 +149,15 @@ model Property {
   promoCodes            PromoCode[]
   guestLinks            GuestLink[]
 
-  spaces         Space[]
-  eventEnquiries EventEnquiry[]
-  eventBookings  EventBooking[]
-  messageThreads MessageThread[]
+  spaces                Space[]
+  eventQuotes           EventQuote[]
+  eventQuoteVersions    EventQuoteVersion[]
+  eventContracts        EventContract[]
+  eventPaymentSchedules EventPaymentSchedule[]
+  eventDeposits         EventDeposit[]
+  eventEnquiries        EventEnquiry[]
+  eventBookings         EventBooking[]
+  messageThreads        MessageThread[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -292,9 +297,11 @@ model User {
   partnerPayouts     PartnerPayout[]    @relation("PartnerPayoutBy")
   partnerChanges     PartnerChange[]    @relation("PartnerChangeBy")
 
-  messagesSent   Message[]      @relation("MessageSentBy")
-  eventEnquiries EventEnquiry[]
-  eventBookings  EventBooking[]
+  messagesSent       Message[]           @relation("MessageSentBy")
+  eventEnquiries     EventEnquiry[]
+  eventBookings      EventBooking[]
+  eventQuoteVersions EventQuoteVersion[] @relation("EventQuoteAuthor")
+  eventContracts     EventContract[]     @relation("EventContractIssuer")
 
   @@map("users")
 }
@@ -1401,6 +1408,7 @@ model Folio {
   stays          Stay[]
   payments       Payment[]
   paymentIntents PaymentIntent[]
+  eventContracts EventContract[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, id])
@@ -1698,6 +1706,7 @@ model Payment {
   note              String?
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  eventDeposits   EventDeposit[]
   property        Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   folio           Folio?               @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
   window          FolioWindow?         @relation(fields: [windowId], references: [id], onDelete: Restrict)
@@ -2662,34 +2671,159 @@ model EventEnquiry {
 /// A hold or booking of a space. event_bookings_no_overlap (raw SQL) keeps two from sharing a
 /// space at once, setup and cleanup included (M9 rules).
 model EventBooking {
-  id             String    @id @default(uuid()) @db.Uuid
-  organisationId String    @map("organisation_id") @db.Uuid
-  propertyId     String    @map("property_id") @db.Uuid
-  enquiryId      String?   @map("enquiry_id") @db.Uuid
-  spaceId        String    @map("space_id") @db.Uuid
-  layoutId       String?   @map("layout_id") @db.Uuid
-  title          String
+  id                  String    @id @default(uuid()) @db.Uuid
+  organisationId      String    @map("organisation_id") @db.Uuid
+  propertyId          String    @map("property_id") @db.Uuid
+  enquiryId           String?   @map("enquiry_id") @db.Uuid
+  spaceId             String    @map("space_id") @db.Uuid
+  layoutId            String?   @map("layout_id") @db.Uuid
+  title               String
   /// HOLD | CONFIRMED | RELEASED | EXPIRED
-  status         String
-  startsAt       DateTime  @map("starts_at") @db.Timestamptz(6)
-  endsAt         DateTime  @map("ends_at") @db.Timestamptz(6)
+  status              String
+  startsAt            DateTime  @map("starts_at") @db.Timestamptz(6)
+  endsAt              DateTime  @map("ends_at") @db.Timestamptz(6)
   /// The event with the space's setup and cleanup at the time it was made.
-  blockedFrom    DateTime  @map("blocked_from") @db.Timestamptz(6)
-  blockedUntil   DateTime  @map("blocked_until") @db.Timestamptz(6)
-  expectedGuests Int       @map("expected_guests")
-  holdExpiresAt  DateTime? @map("hold_expires_at") @db.Timestamptz(6)
-  createdById    String    @map("created_by_id") @db.Uuid
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  version        Int       @default(0)
+  blockedFrom         DateTime  @map("blocked_from") @db.Timestamptz(6)
+  blockedUntil        DateTime  @map("blocked_until") @db.Timestamptz(6)
+  expectedGuests      Int       @map("expected_guests")
+  holdExpiresAt       DateTime? @map("hold_expires_at") @db.Timestamptz(6)
+  confirmedAt         DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  /// Confirmed without the signed contract or the deposit, on an approved override.
+  confirmedByOverride Boolean   @default(false) @map("confirmed_by_override")
+  createdById         String    @map("created_by_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version             Int       @default(0)
 
-  property  Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  enquiry   EventEnquiry? @relation(fields: [enquiryId], references: [id], onDelete: Restrict)
-  space     Space         @relation(fields: [spaceId], references: [id], onDelete: Restrict)
-  layout    SpaceLayout?  @relation(fields: [layoutId], references: [id], onDelete: Restrict)
-  createdBy User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  quote     EventQuote?
+  contracts EventContract[]
+  property  Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  enquiry   EventEnquiry?   @relation(fields: [enquiryId], references: [id], onDelete: Restrict)
+  space     Space           @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+  layout    SpaceLayout?    @relation(fields: [layoutId], references: [id], onDelete: Restrict)
+  createdBy User            @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
   @@index([propertyId, blockedFrom])
   @@index([status, holdExpiresAt])
   @@map("event_bookings")
+}
+
+/// The priced offer for one booking (PRD M9-04). Each change is a new version; none is edited.
+model EventQuote {
+  id             String   @id @default(uuid()) @db.Uuid
+  propertyId     String   @map("property_id") @db.Uuid
+  bookingId      String   @unique @map("booking_id") @db.Uuid
+  currentVersion Int      @default(0) @map("current_version")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  booking  EventBooking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  versions EventQuoteVersion[]
+
+  @@map("event_quotes")
+}
+
+model EventQuoteVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  quoteId     String   @map("quote_id") @db.Uuid
+  version     Int
+  /// [{kind, description, quantity, unitMinor, amountMinor, revenueCode, taxMinor, totalMinor}]
+  lines       Json
+  netMinor    BigInt   @map("net_minor")
+  taxMinor    BigInt   @map("tax_minor")
+  totalMinor  BigInt   @map("total_minor")
+  notes       String?
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property  Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  quote     EventQuote      @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  createdBy User            @relation("EventQuoteAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  contracts EventContract[]
+
+  @@unique([quoteId, version])
+  @@map("event_quote_versions")
+}
+
+/// The agreement issued for a quote version (PRD M9-05). event_contracts_one_live (raw SQL)
+/// allows one ISSUED or SIGNED contract per booking.
+model EventContract {
+  id                 String    @id @default(uuid()) @db.Uuid
+  propertyId         String    @map("property_id") @db.Uuid
+  bookingId          String    @map("booking_id") @db.Uuid
+  quoteVersionId     String    @map("quote_version_id") @db.Uuid
+  /// The event's own bill: what is paid lands here, as a credit until the event is invoiced.
+  folioId            String    @map("folio_id") @db.Uuid
+  number             String
+  /// ISSUED | SIGNED | SUPERSEDED | VOID
+  status             String    @default("ISSUED")
+  clientName         String    @map("client_name")
+  clientEmail        String    @map("client_email")
+  clientPhone        String    @map("client_phone")
+  terms              String
+  totalMinor         BigInt    @map("total_minor")
+  damageDepositMinor BigInt    @default(0) @map("damage_deposit_minor")
+  issuedById         String    @map("issued_by_id") @db.Uuid
+  issuedAt           DateTime  @map("issued_at") @db.Timestamptz(6)
+  signedByName       String?   @map("signed_by_name")
+  signedOn           DateTime? @map("signed_on") @db.Date
+  version            Int       @default(0)
+
+  property     Property               @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  booking      EventBooking           @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  quoteVersion EventQuoteVersion      @relation(fields: [quoteVersionId], references: [id], onDelete: Restrict)
+  folio        Folio                  @relation(fields: [folioId], references: [id], onDelete: Restrict)
+  issuedBy     User                   @relation("EventContractIssuer", fields: [issuedById], references: [id], onDelete: Restrict)
+  schedule     EventPaymentSchedule[]
+  deposits     EventDeposit[]
+
+  @@unique([propertyId, number])
+  @@index([bookingId])
+  @@index([folioId])
+  @@map("event_contracts")
+}
+
+/// One amount the client owes under a contract, in the order money is applied to them.
+model EventPaymentSchedule {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  contractId  String   @map("contract_id") @db.Uuid
+  sequence    Int
+  /// DEPOSIT | INSTALMENT | DAMAGE_DEPOSIT
+  kind        String
+  dueDate     DateTime @map("due_date") @db.Date
+  amountMinor BigInt   @map("amount_minor")
+  paidMinor   BigInt   @default(0) @map("paid_minor")
+
+  property Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  contract EventContract  @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  deposits EventDeposit[]
+
+  @@unique([contractId, sequence])
+  @@map("event_payment_schedules")
+}
+
+/// Event money received and what it was applied to. All of it is held for the client: none is
+/// revenue, and a damage deposit stays a liability until it is settled (M9 rules).
+model EventDeposit {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  contractId  String   @map("contract_id") @db.Uuid
+  /// Null when the client paid more than the whole schedule (kind UNALLOCATED).
+  scheduleId  String?  @map("schedule_id") @db.Uuid
+  paymentId   String   @map("payment_id") @db.Uuid
+  /// DEPOSIT | INSTALMENT | DAMAGE_DEPOSIT | UNALLOCATED
+  kind        String
+  amountMinor BigInt   @map("amount_minor")
+  createdAt   DateTime @map("created_at") @db.Timestamptz(6)
+
+  property Property              @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  contract EventContract         @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  schedule EventPaymentSchedule? @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  payment  Payment               @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([contractId])
+  @@index([paymentId])
+  @@map("event_deposits")
 }

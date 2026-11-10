@@ -13,6 +13,7 @@ export * from './partners.ts';
 export * from './booking-engine.ts';
 export * from './inbox.ts';
 export * from './events.ts';
+export * from './event-sales.ts';
 export * from './stay-alerts.ts';
 export * from './guests.ts';
 export * from './imports.ts';

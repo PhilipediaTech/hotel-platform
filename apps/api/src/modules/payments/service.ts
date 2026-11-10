@@ -9,6 +9,7 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
+import { allocateEventPayment } from '../events/allocation.ts';
 import { enabledMethods, folioBalances, houseRights } from '../folios/service.ts';
 import { rateFor } from '../fx/service.ts';
 import { depositHeld, lockReservation, receiveDeposit } from './deposits.ts';
@@ -152,6 +153,16 @@ export async function capturePayment(
           createdAt: deps.clock(),
         } as unknown as Prisma.PaymentUncheckedCreateInput, // tenant IDs come from the client
       });
+      if (target.kind === 'folio') {
+        await allocateEventPayment(tx as never, {
+          propertyId: property.id,
+          folioId: target.folioId,
+          paymentId: payment.id,
+          amountMinor: baseAmount,
+          now: deps.clock(),
+          userId: tenant.userId,
+        });
+      }
       if (target.kind === 'deposit') {
         await receiveDeposit(tx, {
           reservationId: target.reservationId,

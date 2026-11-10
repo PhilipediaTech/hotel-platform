@@ -57,15 +57,88 @@ const HOLD = {
   blockedUntil: '2026-12-05T15:30:00Z',
   expectedGuests: 100,
   holdExpiresAt: '2026-11-13T16:00:00Z',
+  confirmedByOverride: false,
 };
 
+const QUOTE = {
+  currentVersion: 1,
+  versions: [
+    {
+      id: id(5),
+      version: 1,
+      lines: [
+        {
+          kind: 'SPACE',
+          description: 'Hall, full day',
+          quantity: 1,
+          unitMinor: '80000000',
+          amountMinor: '80000000',
+          revenueCode: 'MISC',
+          taxMinor: '6000000',
+          totalMinor: '86000000',
+          minimumHire: false,
+        },
+      ],
+      netMinor: '80000000',
+      taxMinor: '6000000',
+      totalMinor: '86000000',
+      notes: null,
+      createdAt: '2026-11-10T09:00:00Z',
+    },
+  ],
+  rates: [{ id: id(6), name: 'Weekend full day', unit: 'FULL_DAY', amountMinor: '80000000' }],
+  minimumHireMinor: '50000000',
+  expectedGuests: 100,
+};
+const NO_CONTRACT = { contract: null, missing: ['NO_CONTRACT', 'DEPOSIT_NOT_PAID'] };
+const CONTRACT = {
+  id: id(7),
+  number: 'EC00001',
+  status: 'ISSUED',
+  quoteVersion: 1,
+  clientName: 'Adaeze Obi',
+  clientEmail: 'adaeze@example.com',
+  clientPhone: '+2348011111111',
+  terms: 'Terms',
+  totalMinor: '86000000',
+  damageDepositMinor: '0',
+  issuedAt: '2026-11-10T09:00:00Z',
+  signedByName: null,
+  signedOn: null,
+  folio: { id: id(8), number: 'F00001' },
+  account: { bankName: 'Fake Bank', accountNumber: '9900000001', accountName: 'HOTEL/OBI' },
+  schedule: [
+    {
+      id: id(9),
+      sequence: 1,
+      kind: 'DEPOSIT',
+      dueDate: '2026-11-12',
+      amountMinor: '43000000',
+      paidMinor: '43000000',
+      status: 'PAID',
+    },
+  ],
+  overpaidMinor: '0',
+};
+
+let contractView: unknown;
+let confirmReply: () => Response;
 let permissions: string[];
 const calls: { key: string; body: unknown; search: string }[] = [];
 const sent = (key: string) => calls.filter((c) => c.key === key);
 
 beforeEach(() => {
   calls.length = 0;
-  permissions = ['event.enquiry', 'event.hold', 'space.manage'];
+  contractView = NO_CONTRACT;
+  confirmReply = () => json(200, { ...HOLD, status: 'CONFIRMED', holdExpiresAt: null });
+  permissions = [
+    'event.enquiry',
+    'event.hold',
+    'space.manage',
+    'event.quote',
+    'event.contract',
+    'event.confirm',
+  ];
   const handlers: Record<string, (body: unknown) => Response> = {
     'GET /me': () => json(200, makeMe({ memberships: [membership(LAGOS, permissions)] })),
     'GET /auth/device': () => json(200, { pinSwitchAvailable: false, deviceLabel: null }),
@@ -90,6 +163,12 @@ beforeEach(() => {
       }),
     'POST /event-bookings': () => json(201, HOLD),
     [`POST /event-bookings/${HOLD.id}/release`]: () => json(200, { ...HOLD, status: 'RELEASED' }),
+    [`GET /event-bookings/${HOLD.id}/quotes`]: () => json(200, QUOTE),
+    [`POST /event-bookings/${HOLD.id}/quotes`]: () => json(201, QUOTE),
+    [`GET /event-bookings/${HOLD.id}/contract`]: () => json(200, contractView),
+    [`POST /event-bookings/${HOLD.id}/contract`]: () => json(201, contractView),
+    [`POST /event-bookings/${HOLD.id}/contract/sign`]: () => json(200, contractView),
+    [`POST /event-bookings/${HOLD.id}/confirm`]: () => confirmReply(),
   };
   vi.stubGlobal(
     'fetch',
@@ -169,6 +248,93 @@ describe('Events and spaces (S38)', { timeout: 20_000 }, () => {
       setupMinutes: 60,
       minimumHireMinor: '0',
       layouts: [{ name: 'Cocktail', capacity: 80 }],
+    });
+  });
+
+  async function openFile(user: ReturnType<typeof userEvent.setup>) {
+    renderAt('/events');
+    const row = (await screen.findByText('Wedding: Adaeze Obi')).closest('li') as HTMLElement;
+    await user.click(within(row).getByRole('button', { name: 'Quote and contract' }));
+    return row;
+  }
+
+  it('saves a new quote version, offering the prices for the day (M9-04)', async () => {
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    expect(await within(row).findByText('Hall, full day')).toBeInTheDocument();
+    await user.click(within(row).getByRole('button', { name: 'New version' }));
+    await user.click(within(row).getByRole('button', { name: /Weekend full day/ }));
+    await user.click(within(row).getByRole('button', { name: 'Add catering for the guests' }));
+    const form = within(row).getByRole('form', { name: 'New quote version' });
+    const amounts = within(form).getAllByLabelText('Amount (₦)');
+    await user.type(amounts[2] as HTMLElement, '10000');
+    await user.click(within(form).getByRole('button', { name: 'Save version' }));
+    await waitFor(() => expect(sent(`POST /event-bookings/${HOLD.id}/quotes`)).toHaveLength(1));
+    expect(sent(`POST /event-bookings/${HOLD.id}/quotes`)[0]?.body).toMatchObject({
+      lines: [
+        { kind: 'SPACE', quantity: 1, unitMinor: '80000000' },
+        { kind: 'SPACE', description: 'Weekend full day', unitMinor: '80000000' },
+        { kind: 'CATERING', quantity: 100, unitMinor: '1000000' },
+      ],
+    });
+  });
+
+  it('issues a contract whose schedule starts as the quote total (M9-05)', async () => {
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    await within(row).findByText('No contract yet.');
+    await waitFor(() =>
+      expect(within(row).getByRole('button', { name: 'Issue contract' })).toBeInTheDocument(),
+    );
+    await user.click(within(row).getByRole('button', { name: 'Issue contract' }));
+    const form = within(row).getByRole('form', { name: 'New contract' });
+    await user.type(within(form).getByLabelText('Contact name'), 'Adaeze Obi');
+    await user.type(within(form).getByLabelText('Email'), 'adaeze@example.com');
+    await user.type(within(form).getByLabelText('Phone'), '+2348011111111');
+    await user.type(within(form).getByLabelText('Terms'), 'Deposit is not refundable.');
+    await user.click(within(form).getByRole('button', { name: 'Issue contract' }));
+    await waitFor(() => expect(sent(`POST /event-bookings/${HOLD.id}/contract`)).toHaveLength(1));
+    const body = sent(`POST /event-bookings/${HOLD.id}/contract`)[0]?.body as {
+      schedule: { kind: string; amountMinor: string }[];
+    };
+    expect(body.schedule.map((s) => [s.kind, s.amountMinor])).toEqual([
+      ['DEPOSIT', '43000000'],
+      ['INSTALMENT', '43000000'],
+    ]);
+  });
+
+  it('shows the event account and what was paid, and confirms when nothing is missing (M9-06)', async () => {
+    contractView = { contract: CONTRACT, missing: [] };
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    expect(await within(row).findByText(/9900000001/)).toBeInTheDocument();
+    expect(within(row).getByText(/Paid$/)).toBeInTheDocument();
+    await user.click(within(row).getByRole('button', { name: 'Confirm booking' }));
+    await waitFor(() => expect(sent(`POST /event-bookings/${HOLD.id}/confirm`)).toHaveLength(1));
+    expect(sent(`POST /event-bookings/${HOLD.id}/confirm`)[0]?.body).toMatchObject({
+      override: false,
+    });
+  });
+
+  it('with something missing, says what and asks a manager for an override (M9-06)', async () => {
+    confirmReply = () =>
+      json(202, {
+        approvalRequestId: id(10),
+        status: 'PENDING',
+        expiresAt: '2026-11-12T09:00:00Z',
+        approverRoles: ['General Manager'],
+      });
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    expect(await within(row).findByText('No contract has been issued')).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: 'Confirm booking' })).not.toBeInTheDocument();
+    const form = within(row).getByRole('form', { name: 'Ask to confirm anyway' });
+    await user.type(within(form).getByLabelText('Why confirm without these?'), 'Regular client');
+    await user.click(within(form).getByRole('button', { name: 'Ask to confirm anyway' }));
+    expect(await within(row).findByText(/Sent to a manager/)).toBeInTheDocument();
+    expect(sent(`POST /event-bookings/${HOLD.id}/confirm`)[0]?.body).toMatchObject({
+      override: true,
+      reason: 'Regular client',
     });
   });
 

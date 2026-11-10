@@ -59,6 +59,14 @@ async function refundable(db: Client, paymentId: string) {
       reason: 'IS_REFUND',
     });
   }
+  // The schedule counts this money as paid: it is settled when the event is closed (M9-08).
+  if ((await db.eventDeposit.count({ where: { paymentId } })) > 0) {
+    throw new AppError(
+      'STATE_TRANSITION_INVALID',
+      'Event money is settled when the event is closed, not refunded from here',
+      { reason: 'EVENT_MONEY' },
+    );
+  }
   const left = original.amountMinor + original.refundedBy.reduce((s, r) => s + r.amountMinor, 0n);
   return { original, left };
 }

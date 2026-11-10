@@ -19,10 +19,11 @@ import { registerStrings } from '../i18n/index.ts';
 import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
+import { BookingFile } from './event-booking.tsx';
 
 registerStrings(strings);
 
-// S38 Events and spaces (PRD M9-01–M9-03; T-119): the space calendar, the enquiry pipeline with
+// S38 Events and spaces (PRD M9-01–M9-06; T-119, T-120): the space calendar, the enquiry pipeline with
 // availability and holds, and space setup. All times are the hotel's own.
 
 type Space = z.output<typeof SpaceItem>;
@@ -77,6 +78,7 @@ function BookingRow({ b }: { b: Booking }) {
   const queryClient = useQueryClient();
   const { permissions } = useSession();
   const { time, when } = useTimes();
+  const [open, setOpen] = useState(false);
   const release = useMutation({
     mutationFn: () => api.call('releaseEventHold', { params: { bookingId: b.id }, body: {} }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: KEY }),
@@ -94,11 +96,19 @@ function BookingRow({ b }: { b: Booking }) {
           {t('events.holdEnds', { when: when(b.holdExpiresAt) })}
         </span>
       )}
+      <Button
+        size="sm"
+        variant="secondary"
+        className="ml-auto"
+        aria-expanded={open}
+        onClick={() => setOpen((x) => !x)}
+      >
+        {t('events.open')}
+      </Button>
       {b.status === 'HOLD' && permissions.includes('event.hold') && (
         <Button
           size="sm"
           variant="secondary"
-          className="ml-auto"
           disabled={release.isPending}
           onClick={() => release.mutate()}
         >
@@ -106,6 +116,7 @@ function BookingRow({ b }: { b: Booking }) {
         </Button>
       )}
       {release.error && <Alert tone="critical">{errorMessage(release.error)}</Alert>}
+      {open && <BookingFile booking={b} />}
     </li>
   );
 }

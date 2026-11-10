@@ -110,6 +110,8 @@ export const EventBookingItem = z
     blockedUntil: Instant,
     expectedGuests: z.number().int(),
     holdExpiresAt: Instant.nullable(),
+    /** Confirmed without the signed contract or the deposit, on an approved override. */
+    confirmedByOverride: z.boolean(),
   })
   .meta({ id: 'EventBooking' });
 

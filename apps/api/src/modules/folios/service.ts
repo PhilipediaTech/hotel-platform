@@ -467,7 +467,7 @@ async function openFolioFor(tx: Tx, folioId: string) {
 }
 
 /** Tax versions of a revenue code in force on `date`, with the code each tax posts to. */
-async function taxesFor(tx: Tx, code: RevenueCode, date: string) {
+export async function taxesFor(tx: Tx, code: RevenueCode, date: string) {
   const rules = await tx.taxRule.findMany({
     where: { id: { in: code.taxRuleIds } },
     include: { versions: true },

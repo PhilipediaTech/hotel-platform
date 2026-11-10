@@ -4,6 +4,7 @@ import type { Db } from './core/db.ts';
 import type { TenantDb } from './core/tenant-db.ts';
 import { discountHandler, reverseHandler } from './modules/folios/service.ts';
 import { transferHandler } from './modules/folios/transfers.ts';
+import { eventConfirmHandler } from './modules/events/sales.ts';
 import { refundHandler } from './modules/payments/refunds.ts';
 import { roomMoveHandler, roomNotReadyHandler } from './modules/reservations/rooms.ts';
 import { doNotRentHandler } from './modules/reservations/service.ts';
@@ -25,5 +26,6 @@ export function approvalHandlers(deps: {
     discountHandler(deps),
     transferHandler(deps),
     refundHandler(deps),
+    eventConfirmHandler(deps),
   ].map((h) => h as unknown as ApprovalActionHandler<never>);
 }

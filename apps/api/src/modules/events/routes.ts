@@ -1,8 +1,9 @@
-import { EVENT_ROUTES } from '@hotel/shared';
+import { EVENT_ROUTES, EVENT_SALES_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { defineJob } from '../../core/jobs.ts';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as sales from './sales.ts';
 import * as events from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -11,8 +12,8 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
   return tenant;
 }
 
-/** Events and spaces (M9-01–M9-03; T-119). */
-export function eventRoutes(deps: events.EventDeps): Router {
+/** Events and spaces (M9-01–M9-06; T-119, T-120). */
+export function eventRoutes(deps: sales.EventSalesDeps): Router {
   const router = express.Router();
   const r = EVENT_ROUTES;
   // Before /spaces/{spaceId}, which only answers PUT, for clarity when reading the list.
@@ -35,6 +36,24 @@ export function eventRoutes(deps: events.EventDeps): Router {
   );
   mountRoute(router, r.releaseEventHold, ({ params }) =>
     events.releaseHold(deps, params.bookingId),
+  );
+  const s = EVENT_SALES_ROUTES;
+  mountRoute(router, s.getEventQuotes, ({ params }) => sales.getQuotes(deps, params.bookingId));
+  mountRoute(router, s.createEventQuoteVersion, ({ params, body }, { tenant }) =>
+    sales.saveQuoteVersion(deps, tenantFrom(tenant), params.bookingId, body),
+  );
+  mountRoute(router, s.getEventContract, ({ params }) => sales.getContract(deps, params.bookingId));
+  mountRoute(router, s.getEventContractPdf, ({ params }) =>
+    sales.contractPdf(deps, params.bookingId),
+  );
+  mountRoute(router, s.issueEventContract, ({ params, body }, { tenant }) =>
+    sales.issueContract(deps, tenantFrom(tenant), params.bookingId, body),
+  );
+  mountRoute(router, s.signEventContract, ({ params, body }) =>
+    sales.signContract(deps, params.bookingId, body),
+  );
+  mountRoute(router, s.confirmEventBooking, ({ params, body }, { tenant }) =>
+    sales.confirmBooking(deps, tenantFrom(tenant), params.bookingId, body),
   );
   return router;
 }

@@ -6,6 +6,9 @@ import { AppError } from '../../core/errors.ts';
 import { isPlatformAdmin } from '../../core/platform-admin.ts';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import type { EmailProvider } from '../../core/email.ts';
+import type { PaymentProvider } from '../../core/payments.ts';
+import * as billing from './billing.ts';
 import * as platform from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -15,7 +18,9 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
 }
 
 /** Platform administration and the owner's billing page (tab 4 row "Platform"; T-100). */
-export function platformRoutes(deps: platform.PlatformDeps & { config: Config }): Router {
+export function platformRoutes(
+  deps: platform.PlatformDeps & { config: Config; provider: PaymentProvider; email: EmailProvider },
+): Router {
   const router = express.Router();
   const r = PLATFORM_ROUTES;
 
@@ -63,6 +68,20 @@ export function platformRoutes(deps: platform.PlatformDeps & { config: Config })
   );
   mountRoute(router, r.getPlatformInvoicePdf, ({ params }, { tenant }) =>
     platform.invoicePdf(deps, tenantFrom(tenant), params.invoiceId),
+  );
+
+  // Automated billing and suspension (M13-03 from V1.2, M13-06; T-124).
+  mountRoute(router, r.payPlatformInvoice, ({ params }, { tenant }) =>
+    billing.payLink(deps, tenantFrom(tenant), params.invoiceId),
+  );
+  mountRoute(router, r.checkPlatformInvoice, ({ params }, { tenant }) =>
+    billing.checkPayment(deps, tenantFrom(tenant), params.invoiceId),
+  );
+  mountRoute(router, r.suspendTenant, ({ params, body }, { req }) =>
+    billing.suspend(deps, requireAuth(req), params.organisationId, body.reason),
+  );
+  mountRoute(router, r.reactivateTenant, ({ params, body }, { req }) =>
+    billing.reactivate(deps, requireAuth(req), params.organisationId, body.reason),
   );
 
   return router;

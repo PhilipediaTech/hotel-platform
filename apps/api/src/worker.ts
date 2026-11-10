@@ -48,6 +48,8 @@ try {
       scanner: createFakeFileScanner(),
       payments: createPaymentProvider(config, logger),
       ai: createAiProvider(config, logger),
+      email: createFakeEmailProvider(logger),
+      config,
     }),
     // Email: the fake logs messages until the SES adapter (AWS account; production stops above).
     handlers: eventHandlers({

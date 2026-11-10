@@ -29,11 +29,47 @@ function useMoney() {
 const isUsedUp = (used: number, allowance: number | null | undefined) =>
   allowance !== null && allowance !== undefined && used >= allowance;
 
+/** Pay an unpaid invoice online, or ask whether a payment has come in (M13-03; T-124). */
+function PayButtons({ invoiceId }: { invoiceId: string }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const pay = useMutation({
+    mutationFn: () => api.call('payPlatformInvoice', { params: { invoiceId } }),
+    onSuccess: (r) => window.location.assign(r.checkoutUrl),
+  });
+  const check = useMutation({
+    mutationFn: () => api.call('checkPlatformInvoice', { params: { invoiceId } }),
+    onSuccess: () => void queryClient.invalidateQueries(),
+  });
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <Button size="sm" disabled={pay.isPending} onClick={() => pay.mutate()}>
+        {t('billing.payNow')}
+      </Button>
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={check.isPending}
+        onClick={() => check.mutate()}
+      >
+        {t('billing.checkPayment')}
+      </Button>
+      {check.data?.status === 'ISSUED' && (
+        <span className="text-text-muted">{t('billing.notYet')}</span>
+      )}
+      {(pay.error ?? check.error) && (
+        <Alert tone="critical">{errorMessage(pay.error ?? check.error)}</Alert>
+      )}
+    </span>
+  );
+}
+
 export function BillingPage() {
   const { t, i18n } = useTranslation();
   const money = useMoney();
   const queryClient = useQueryClient();
   const { currentPropertyId } = useSession();
+  const today = new Date().toISOString().slice(0, 10);
   const key = ['billing', currentPropertyId ?? ''];
   const page = useQuery({ queryKey: key, queryFn: () => api.call('getSubscription') });
   const pdf = usePdf();
@@ -133,6 +169,21 @@ export function BillingPage() {
               </span>
               <span className="font-semibold">{money(inv.totalMinor, inv.currency)}</span>
               <span className="text-text-muted">{t(`billing.invoiceStatus.${inv.status}`)}</span>
+              {inv.status === 'ISSUED' && inv.dueOn && (
+                <span
+                  className={inv.dueOn < today ? 'font-medium text-critical' : 'text-text-muted'}
+                >
+                  {inv.dueOn < today
+                    ? t('billing.overdue', { date: inv.dueOn })
+                    : t('billing.due', { date: inv.dueOn })}
+                </span>
+              )}
+              {inv.status === 'PAID' && inv.paidAt && (
+                <span className="text-text-muted">
+                  {t('billing.paidOn', { date: inv.paidAt.slice(0, 10) })}
+                </span>
+              )}
+              {inv.status === 'ISSUED' && <PayButtons invoiceId={inv.id} />}
               <Button
                 size="sm"
                 variant="secondary"

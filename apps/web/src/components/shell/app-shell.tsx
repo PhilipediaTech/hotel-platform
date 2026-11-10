@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router';
 import { bottomBarItems, railItems, type NavItem } from '../../app/navigation.ts';
 import { useSession } from '../../app/session.ts';
 import { cn } from '../../lib/cn.ts';
-import { OfflineBanner, SupportBanner, UpdateBanner } from './banners.tsx';
+import { OfflineBanner, SupportBanner, SuspendedBanner, UpdateBanner } from './banners.tsx';
 import { PendingChanges } from '../../offline/pending-changes.tsx';
 import { PropertyContext, TopBar } from './top-bar.tsx';
 
@@ -91,6 +91,7 @@ export function AppShell() {
         {/* Phones: the property context chip does not fit in the top bar. */}
         <PropertyContext className="flex border-b border-border bg-surface px-4 py-1 sm:hidden" />
         <SupportBanner />
+        <SuspendedBanner />
         <OfflineBanner />
         <PendingChanges />
         <UpdateBanner />

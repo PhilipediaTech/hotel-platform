@@ -2283,19 +2283,21 @@ model NotificationDelivery {
 /// What a hotel group pays (M13-03, M13-04; tab 3 as written). Prices are typed per tenant by
 /// the platform admin (Philip, 2026-11-14: ADR-019 stays Proposed, nothing priced in code).
 model Subscription {
-  organisationId    String   @id @map("organisation_id") @db.Uuid
+  organisationId    String    @id @map("organisation_id") @db.Uuid
   /// ESSENTIALS | PROFESSIONAL | GROUP
   plan              String
-  pricePerRoomMinor BigInt   @map("price_per_room_minor")
-  minimumMinor      BigInt   @map("minimum_minor")
-  currency          String   @db.Char(3)
+  pricePerRoomMinor BigInt    @map("price_per_room_minor")
+  minimumMinor      BigInt    @map("minimum_minor")
+  currency          String    @db.Char(3)
   /// TRIAL | ACTIVE | PAST_DUE | SUSPENDED
   status            String
-  currentPeriodEnd  DateTime @map("current_period_end") @db.Date
+  currentPeriodEnd  DateTime  @map("current_period_end") @db.Date
   /// AI uses per month (M14 rules; T-118); null = no limit.
-  aiAllowance       Int?     @map("ai_allowance")
+  aiAllowance       Int?      @map("ai_allowance")
   /// WhatsApp template messages per month; null = no limit.
-  whatsappAllowance Int?     @map("whatsapp_allowance")
+  whatsappAllowance Int?      @map("whatsapp_allowance")
+  /// When it was suspended for non-payment (M13-06; T-124).
+  suspendedAt       DateTime? @map("suspended_at") @db.Timestamptz(6)
 
   organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
 
@@ -2305,20 +2307,26 @@ model Subscription {
 /// The monthly invoice to a hotel group (M13-03; tab 3 as written). Issued by the platform
 /// admin; the amount is never changed afterwards (paid or voided instead).
 model PlatformInvoice {
-  id             String   @id @default(uuid()) @db.Uuid
-  organisationId String   @map("organisation_id") @db.Uuid
-  periodStart    DateTime @map("period_start") @db.Date
-  periodEnd      DateTime @map("period_end") @db.Date
-  activeRooms    Int      @map("active_rooms")
+  id             String    @id @default(uuid()) @db.Uuid
+  organisationId String    @map("organisation_id") @db.Uuid
+  periodStart    DateTime  @map("period_start") @db.Date
+  periodEnd      DateTime  @map("period_end") @db.Date
+  activeRooms    Int       @map("active_rooms")
   lines          Json
-  totalMinor     BigInt   @map("total_minor")
-  currency       String   @db.Char(3)
+  totalMinor     BigInt    @map("total_minor")
+  currency       String    @db.Char(3)
   /// ISSUED | PAID | VOID
   status         String
-  issuedAt       DateTime @map("issued_at") @db.Timestamptz(6)
+  issuedAt       DateTime  @map("issued_at") @db.Timestamptz(6)
+  /// T-124: null on invoices issued before.
+  dueOn          DateTime? @map("due_on") @db.Date
+  paidAt         DateTime? @map("paid_at") @db.Timestamptz(6)
+  /// The payment link reference it was paid through, when paid online.
+  paidRef        String?   @map("paid_ref")
 
-  organisation      Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  organisation      Organisation              @relation(fields: [organisationId], references: [id], onDelete: Restrict)
   partnerCommission PartnerCommission?
+  checkouts         PlatformInvoiceCheckout[]
 
   @@index([organisationId, periodStart])
   @@map("platform_invoices")
@@ -3005,4 +3013,20 @@ model GroupBlockNight {
 
   @@unique([blockId, roomTypeId, date])
   @@map("group_block_nights")
+}
+
+/// Every payment link made for a hotel group's invoice (T-124): a link paid late still finds
+/// its invoice.
+model PlatformInvoiceCheckout {
+  id          String   @id @default(uuid()) @db.Uuid
+  invoiceId   String   @map("invoice_id") @db.Uuid
+  provider    String
+  providerRef String   @unique @map("provider_ref")
+  checkoutUrl String   @map("checkout_url")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  invoice PlatformInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@map("platform_invoice_checkouts")
 }

@@ -78,7 +78,9 @@ describe('toShellSession', () => {
 
   it('a module the platform switched off takes its permissions away (T-100)', () => {
     const off = makeMe({
-      organisations: [{ id: ORG, name: 'Obi Hotels', disabledModules: ['leakage'] }],
+      organisations: [
+        { id: ORG, name: 'Obi Hotels', disabledModules: ['leakage'], suspended: false },
+      ],
       memberships: [membership(null, ['owner.read', 'leakage.review', 'leakage.notify'])],
     });
     expect(toShellSession(off, LAGOS).permissions).toEqual(['owner.read']);

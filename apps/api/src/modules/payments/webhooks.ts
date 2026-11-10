@@ -11,6 +11,7 @@ import type { PaymentEvent, PaymentProvider } from '../../core/payments.ts';
 import { parsePaystackEvent } from '../../core/paystack-events.ts';
 import { allocateEventPayment, LIVE_CONTRACT } from '../events/allocation.ts';
 import { numberParam, raiseAlert, ruleSettings, type RuleSettings } from '../leakage/engine.ts';
+import { settleCheckout } from '../platform/billing.ts';
 import { settleIntent, systemShift } from './intents.ts';
 
 // Payment webhooks (tab 4 POST /webhooks/payments/{provider}; M4 rules 4–7 and the AC
@@ -123,6 +124,8 @@ async function processEvent(deps: WebhookDeps, event: PaymentEvent): Promise<voi
       });
       return;
     }
+    // A hotel group paying its subscription invoice (T-124).
+    if (await settleCheckout(deps.db, deps.clock, event.reference, event)) return;
   }
   // A transfer to one of our virtual accounts.
   if (event.accountNumber) {

@@ -1,6 +1,9 @@
 import {
+  addDays,
   COUNTRY_PACKS,
+  INVOICE_DUE_DAYS,
   MODULES,
+  SUSPENSION_GRACE_DAYS,
   type PlatformInvoiceItem,
   type PlatformTenantItem,
   type SubscriptionBody,
@@ -17,6 +20,7 @@ import { AppError } from '../../core/errors.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { monthlyUse } from '../../core/usage.ts';
 import { addCommission } from '../partners/service.ts';
+import { afterPaid, overdueDays } from './billing.ts';
 import { facts, footer, money, render, table, totals } from '../payments/documents.ts';
 
 // Platform administration (PRD M13-01–M13-05, M13 rules and AC; tab 3 subscriptions,
@@ -72,6 +76,8 @@ function invoiceOf(i: Prisma.PlatformInvoiceGetPayload<object>): Invoice {
     currency: i.currency,
     status: i.status as Invoice['status'],
     issuedAt: iso(i.issuedAt),
+    dueOn: i.dueOn ? day(i.dueOn) : null,
+    paidAt: i.paidAt ? iso(i.paidAt) : null,
   };
 }
 
@@ -172,6 +178,16 @@ async function tenantOf(deps: PlatformDeps, organisationId: string): Promise<Ten
     subscription: subscriptionOf(subscription),
     usage: await usage(deps.db, organisationId, now),
     activeSupportSession: open ? await sessionOf(deps.db, open, now) : null,
+    ...(await lateness(deps.db, organisationId, day(now), subscription?.status ?? null)),
+  };
+}
+
+/** How late the group's oldest unpaid invoice is, and whether that is past the grace period. */
+async function lateness(db: Db, organisationId: string, on: string, status: string | null) {
+  const late = await overdueDays(db, organisationId, on);
+  return {
+    overdueDays: late !== null && late > 0 ? late : null,
+    suspendable: status !== 'SUSPENDED' && late !== null && late >= SUSPENSION_GRACE_DAYS,
   };
 }
 
@@ -340,6 +356,22 @@ export async function issueInvoice(
   auth: AuthContext,
   body: { organisationId: string; month: string },
 ): Promise<Invoice> {
+  return issueMonth(deps.db, body.organisationId, body.month, deps.clock(), auth);
+}
+
+/**
+ * Issues a group's invoice for a month: by platform staff (`auth`) or by the monthly run (null).
+ * Due INVOICE_DUE_DAYS after it is issued.
+ */
+export async function issueMonth(
+  db: Db,
+  organisationId: string,
+  month: string,
+  now: Date,
+  auth: AuthContext | null,
+): Promise<Invoice> {
+  const body = { organisationId, month };
+  const deps = { db, clock: () => now };
   await organisation(deps.db, body.organisationId);
   const s = await deps.db.subscription.findUnique({
     where: { organisationId: body.organisationId },
@@ -378,14 +410,26 @@ export async function issueInvoice(
           currency: s.currency,
           status: 'ISSUED',
           issuedAt: deps.clock(),
+          dueOn: dbDate(addDays(day(now), INVOICE_DUE_DAYS)),
         },
       });
-      await audit(tx as unknown as Db, auth, body.organisationId, {
+      const facts = {
         action: 'platform.invoice_issued',
         entityType: 'platform_invoice',
         entityId: row.id,
         after: { month: body.month, activeRooms, totalMinor: total.toString() },
-      });
+      };
+      if (auth) {
+        await audit(tx as unknown as Db, auth, body.organisationId, facts);
+      } else {
+        await recordAudit(tx, {
+          ...facts,
+          organisationId: body.organisationId,
+          propertyId: null,
+          actorType: 'SYSTEM',
+          actorUserId: null,
+        });
+      }
       return invoiceOf(row);
     });
   } catch (err) {
@@ -415,7 +459,10 @@ export async function updateInvoice(
         `This invoice is already ${row.status.toLowerCase()}`,
       );
     }
-    const updated = await tx.platformInvoice.update({ where: { id: row.id }, data: { status } });
+    const updated = await tx.platformInvoice.update({
+      where: { id: row.id },
+      data: { status, ...(status === 'PAID' ? { paidAt: deps.clock() } : {}) },
+    });
     if (status === 'PAID') await addCommission(tx, row, deps.clock());
     await audit(tx as unknown as Db, auth, row.organisationId, {
       action: status === 'PAID' ? 'platform.invoice_paid' : 'platform.invoice_voided',
@@ -424,6 +471,8 @@ export async function updateInvoice(
       before: { status: row.status },
       after: { status },
     });
+    // Paid, or voided by staff: nothing overdue may be left to keep the group past due.
+    await afterPaid(tx, row.organisationId, day(deps.clock()), auth);
     return invoiceOf(updated);
   });
 }

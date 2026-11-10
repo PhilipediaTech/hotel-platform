@@ -32,6 +32,7 @@ import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 import { taskEscalationJob } from './modules/tasks/jobs.ts';
 import { eventHoldExpiryJob } from './modules/events/routes.ts';
 import { groupBlockReleaseJob } from './modules/groups/routes.ts';
+import { platformBillingJob } from './modules/platform/billing.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
 
@@ -40,6 +41,8 @@ export function workerJobs(deps: {
   scanner: FileScanner;
   payments: PaymentProvider;
   ai: AiProvider;
+  email: EmailProvider;
+  config: Config;
 }): readonly JobDefinition<never>[] {
   return [
     ownerSummaryJob({ ai: deps.ai }),
@@ -51,6 +54,7 @@ export function workerJobs(deps: {
     holdExpiryJob,
     eventHoldExpiryJob,
     groupBlockReleaseJob,
+    platformBillingJob({ payments: deps.payments, email: deps.email, config: deps.config }),
     stayAlertJob,
     visitorCutoffJob,
     idPurgeJob({ store: deps.files }),

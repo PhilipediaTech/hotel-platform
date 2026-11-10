@@ -420,6 +420,17 @@ export async function createPublicBooking(
   const page = await pageOf(deps.db, body.slug);
   const repeat = await alreadyBooked(deps, page, body.bookingKey);
   if (repeat) return repeat;
+  // M13-06: a suspended hotel takes no new bookings online.
+  const subscription = await deps.db.subscription.findUnique({
+    where: { organisationId: page.property.organisationId },
+    select: { status: true },
+  });
+  if (subscription?.status === 'SUSPENDED') {
+    throw new AppError(
+      'SUBSCRIPTION_SUSPENDED',
+      'This hotel is not taking online bookings just now',
+    );
+  }
   // The provider sends the guest here after paying: only ever back to our own site.
   if (body.returnUrl && new URL(body.returnUrl).origin !== deps.config.siteOrigin) {
     throw invalid('body.returnUrl', 'Return to the booking page');

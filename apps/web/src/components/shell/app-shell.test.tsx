@@ -75,6 +75,13 @@ describe('app shell landmarks', () => {
     ).toBeInTheDocument();
   });
 
+  it('says when the hotel group is suspended for an unpaid invoice (T-124)', async () => {
+    renderApp('/front-desk', { suspended: true });
+    expect(
+      await screen.findByText(/This hotel account is suspended for an unpaid invoice/),
+    ).toBeInTheDocument();
+  });
+
   it('offers a skip link to the main content', async () => {
     renderApp('/front-desk');
     expect(await screen.findByRole('link', { name: 'Skip to content' })).toHaveAttribute(

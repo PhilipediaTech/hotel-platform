@@ -97,6 +97,10 @@
       "discard": "Discard"
     }
   },
+  "suspended": {
+    "banner": "This hotel account is suspended for an unpaid invoice. You can still see everything and export your data, but nothing can be changed until it is paid.",
+    "pay": "Pay now"
+  },
   "support": {
     "banner": "Support session for {{org}}: read-only until {{time}}. Everything you open is logged and the owner can see it."
   },

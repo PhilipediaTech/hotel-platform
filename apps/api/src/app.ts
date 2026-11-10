@@ -200,7 +200,7 @@ export function createApp({
   api.use(groupRoutes({ db, tenantDb, clock }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
-  api.use(platformRoutes({ db, clock, config }));
+  api.use(platformRoutes({ db, clock, config, provider: payments, email }));
   api.use(partnerRoutes({ db, clock, config, email }));
   api.use(
     bookingEngineRoutes({ db, tenantDb, clock, config, provider: payments, email, store: files }),

@@ -1171,6 +1171,12 @@ async function bBillingUnchanged(db: Db, world: TenantWorld) {
   expect(org.legalName).toBe('B Legal');
 }
 
+async function bInvoiceUntouched(db: Db, world: TenantWorld) {
+  const invoices = await db.platformInvoice.findMany({ where: { organisationId: world.orgB.id } });
+  expect(invoices.map((i) => i.status)).toEqual(['ISSUED']);
+  expect(await db.platformInvoiceCheckout.count()).toBe(0);
+}
+
 const taskWrite = (body?: object) => ({
   seed: bTask,
   ...(body ? { body: () => body } : {}),
@@ -2430,6 +2436,9 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bBillingUnchanged,
   },
   getPlatformInvoicePdf: { seed: bBilling },
+  // T-124: never a link for, or a look at, another group's invoice.
+  payPlatformInvoice: { seed: bBilling, body: () => ({}), untouched: bInvoiceUntouched },
+  checkPlatformInvoice: { seed: bBilling, body: () => ({}), untouched: bInvoiceUntouched },
   // The home spans properties: B's property must never be one of A's cards (T-091).
   getOwnerHome: {
     seed: (_db, _world, propertyId) => Promise.resolve({ propertyId }),

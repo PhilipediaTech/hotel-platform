@@ -9,6 +9,11 @@ export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
 export const PLATFORM_INVOICE_STATUSES = ['ISSUED', 'PAID', 'VOID'] as const;
 
+/** An invoice is due this many days after it is issued (T-124; Philip to confirm). */
+export const INVOICE_DUE_DAYS = 14;
+/** Days past due after which platform staff may suspend a group (M13-06; Philip to confirm). */
+export const SUSPENSION_GRACE_DAYS = 14;
+
 /**
  * Modules a platform admin can switch off for a hotel group (M13-05; tab 2 "a module can be
  * switched off per tenant by a feature flag; its routes return MODULE_DISABLED"). On unless a

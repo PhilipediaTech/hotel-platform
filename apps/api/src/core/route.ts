@@ -143,6 +143,14 @@ export function mountRoute<R extends RouteContract>(
       });
     }
 
+    // M13-06: a group suspended for non-payment can read and export, and pay, nothing else.
+    if (tenant?.suspended && req.method !== 'GET' && !route.allowWhenSuspended) {
+      throw new AppError(
+        'SUBSCRIPTION_SUSPENDED',
+        'This hotel account is suspended for an unpaid invoice: pay it under Billing to make changes again.',
+      );
+    }
+
     const { params, query, body } = validate();
 
     // M12-06: a report as CSV or PDF also needs the export permission.

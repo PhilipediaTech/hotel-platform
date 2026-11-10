@@ -53,6 +53,8 @@ export interface RouteContract<
   exports?: true;
   /** Platform staff only (PLATFORM_ADMIN_EMAILS, MFA on); never property-scoped (T-100). */
   platform?: true;
+  /** A change still allowed while the hotel group is suspended for non-payment (M13-06). */
+  allowWhenSuspended?: true;
   /** The module a route belongs to: switched off for the tenant, it answers MODULE_DISABLED. */
   module?: ModuleCode;
   /** Success status; 204 means no body (use `z.void()` as `response`). */

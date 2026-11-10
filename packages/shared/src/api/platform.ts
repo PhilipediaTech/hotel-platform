@@ -48,6 +48,9 @@ export const PlatformInvoiceItem = z
     currency: Currency,
     status: z.enum(PLATFORM_INVOICE_STATUSES),
     issuedAt: Instant,
+    /** Null on invoices issued before T-124. */
+    dueOn: IsoDate.nullable(),
+    paidAt: Instant.nullable(),
   })
   .meta({ id: 'PlatformInvoice' });
 
@@ -88,6 +91,10 @@ export const PlatformTenantItem = z
     subscription: SubscriptionItem.nullable(),
     usage: Usage,
     activeSupportSession: SupportSessionItem.nullable(),
+    /** Days the oldest unpaid invoice is past due; null when none is unpaid. */
+    overdueDays: z.number().int().nullable(),
+    /** Past the grace period and not suspended yet (M13-06). */
+    suspendable: z.boolean(),
   })
   .meta({ id: 'PlatformTenant' });
 
@@ -264,6 +271,7 @@ export const updateBillingDetails = defineRoute({
   tags: ['Platform'],
   propertyScoped: true,
   permission: 'subscription.read',
+  allowWhenSuspended: true,
   body: z.object({ legalName: z.string().trim().min(2).max(200) }),
   response: z.object({ legalName: z.string() }),
 });
@@ -300,7 +308,66 @@ export const setTenantCountryPack = defineRoute({
   }),
 });
 
+export const payPlatformInvoice = defineRoute({
+  operationId: 'payPlatformInvoice',
+  method: 'post',
+  path: '/subscription/invoices/{invoiceId}/pay',
+  summary: 'A payment link for one of my unpaid invoices (M13-03 from V1.2)',
+  description: 'Works while the group is suspended: paying is how it ends.',
+  tags: ['Platform'],
+  propertyScoped: true,
+  permission: 'subscription.read',
+  allowWhenSuspended: true,
+  params: z.object({ invoiceId: Uuid }),
+  response: z.object({ checkoutUrl: z.string() }),
+  errors: ['STATE_TRANSITION_INVALID', 'PAYMENT_PROVIDER_UNAVAILABLE'],
+});
+
+export const checkPlatformInvoice = defineRoute({
+  operationId: 'checkPlatformInvoice',
+  method: 'post',
+  path: '/subscription/invoices/{invoiceId}/check',
+  summary: 'Ask the payment provider whether an invoice has been paid',
+  tags: ['Platform'],
+  propertyScoped: true,
+  permission: 'subscription.read',
+  allowWhenSuspended: true,
+  params: z.object({ invoiceId: Uuid }),
+  response: z.object({ status: z.enum(PLATFORM_INVOICE_STATUSES) }),
+  errors: ['PAYMENT_PROVIDER_UNAVAILABLE'],
+});
+
+export const suspendTenant = defineRoute({
+  ...PLATFORM,
+  operationId: 'suspendTenant',
+  method: 'post',
+  path: '/platform/tenants/{organisationId}/suspend',
+  summary: 'Suspend a hotel group for non-payment after the grace period (M13-06)',
+  description:
+    'The group stays readable and exportable; every change is refused until it pays or staff reactivate it. Nothing is deleted.',
+  params: z.object({ organisationId: Uuid }),
+  body: z.object({ reason: z.string().trim().min(5).max(500) }),
+  response: z.object({ status: z.literal('SUSPENDED') }),
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const reactivateTenant = defineRoute({
+  ...PLATFORM,
+  operationId: 'reactivateTenant',
+  method: 'post',
+  path: '/platform/tenants/{organisationId}/reactivate',
+  summary: 'Lift a suspension (paying does this by itself)',
+  params: z.object({ organisationId: Uuid }),
+  body: z.object({ reason: z.string().trim().min(5).max(500) }),
+  response: z.object({ status: z.literal('ACTIVE') }),
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
 export const PLATFORM_ROUTES = {
+  payPlatformInvoice,
+  checkPlatformInvoice,
+  suspendTenant,
+  reactivateTenant,
   setTenantCountryPack,
   listPlatformTenants,
   getPlatformTenant,

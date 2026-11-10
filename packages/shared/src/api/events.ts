@@ -15,6 +15,7 @@ export const EVENT_BOOKING_STATUSES = [
   'RELEASED',
   'EXPIRED',
   'CLOSED',
+  'CANCELLED',
 ] as const;
 
 /** Longest single booking of a space. */

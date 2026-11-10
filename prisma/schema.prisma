@@ -2676,38 +2676,42 @@ model EventEnquiry {
 /// A hold or booking of a space. event_bookings_no_overlap (raw SQL) keeps two from sharing a
 /// space at once, setup and cleanup included (M9 rules).
 model EventBooking {
-  id                  String    @id @default(uuid()) @db.Uuid
-  organisationId      String    @map("organisation_id") @db.Uuid
-  propertyId          String    @map("property_id") @db.Uuid
-  enquiryId           String?   @map("enquiry_id") @db.Uuid
-  spaceId             String    @map("space_id") @db.Uuid
-  layoutId            String?   @map("layout_id") @db.Uuid
-  title               String
-  /// HOLD | CONFIRMED | RELEASED | EXPIRED | CLOSED
-  status              String
-  startsAt            DateTime  @map("starts_at") @db.Timestamptz(6)
-  endsAt              DateTime  @map("ends_at") @db.Timestamptz(6)
+  id                   String    @id @default(uuid()) @db.Uuid
+  organisationId       String    @map("organisation_id") @db.Uuid
+  propertyId           String    @map("property_id") @db.Uuid
+  enquiryId            String?   @map("enquiry_id") @db.Uuid
+  spaceId              String    @map("space_id") @db.Uuid
+  layoutId             String?   @map("layout_id") @db.Uuid
+  title                String
+  /// HOLD | CONFIRMED | RELEASED | EXPIRED | CLOSED | CANCELLED
+  status               String
+  startsAt             DateTime  @map("starts_at") @db.Timestamptz(6)
+  endsAt               DateTime  @map("ends_at") @db.Timestamptz(6)
   /// The event with the space's setup and cleanup at the time it was made.
-  blockedFrom         DateTime  @map("blocked_from") @db.Timestamptz(6)
-  blockedUntil        DateTime  @map("blocked_until") @db.Timestamptz(6)
-  expectedGuests      Int       @map("expected_guests")
-  holdExpiresAt       DateTime? @map("hold_expires_at") @db.Timestamptz(6)
-  confirmedAt         DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  blockedFrom          DateTime  @map("blocked_from") @db.Timestamptz(6)
+  blockedUntil         DateTime  @map("blocked_until") @db.Timestamptz(6)
+  expectedGuests       Int       @map("expected_guests")
+  holdExpiresAt        DateTime? @map("hold_expires_at") @db.Timestamptz(6)
+  confirmedAt          DateTime? @map("confirmed_at") @db.Timestamptz(6)
   /// Confirmed without the signed contract or the deposit, on an approved override.
-  confirmedByOverride Boolean   @default(false) @map("confirmed_by_override")
+  confirmedByOverride  Boolean   @default(false) @map("confirmed_by_override")
   /// The bill the final charges were posted to (M9-08).
-  folioId             String?   @map("folio_id") @db.Uuid
-  inspectedAt         DateTime? @map("inspected_at") @db.Timestamptz(6)
-  inspectedById       String?   @map("inspected_by_id") @db.Uuid
-  inspectionNotes     String?   @map("inspection_notes")
-  damageDescription   String?   @map("damage_description")
+  folioId              String?   @map("folio_id") @db.Uuid
+  inspectedAt          DateTime? @map("inspected_at") @db.Timestamptz(6)
+  inspectedById        String?   @map("inspected_by_id") @db.Uuid
+  inspectionNotes      String?   @map("inspection_notes")
+  damageDescription    String?   @map("damage_description")
   /// What the damage cost, with any tax on it.
-  damageTotalMinor    BigInt    @default(0) @map("damage_total_minor")
-  closedAt            DateTime? @map("closed_at") @db.Timestamptz(6)
-  createdById         String    @map("created_by_id") @db.Uuid
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  version             Int       @default(0)
+  damageTotalMinor     BigInt    @default(0) @map("damage_total_minor")
+  closedAt             DateTime? @map("closed_at") @db.Timestamptz(6)
+  cancelledAt          DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelReason         String?   @map("cancel_reason")
+  /// The share of the deposit kept, before tax (T-121b).
+  cancellationFeeMinor BigInt    @default(0) @map("cancellation_fee_minor")
+  createdById          String    @map("created_by_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version              Int       @default(0)
 
   quote       EventQuote?
   briefs      EventBrief[]

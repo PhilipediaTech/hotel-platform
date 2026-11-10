@@ -41,6 +41,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   inspectEvent: {"operationId":"inspectEvent","method":"post","path":"/event-bookings/{bookingId}/inspection","body":true,"propertyScoped":true,"idempotent":true},
   getEventInvoicePdf: {"operationId":"getEventInvoicePdf","method":"get","path":"/event-bookings/{bookingId}/invoice.pdf","propertyScoped":true,"produces":"application/pdf"},
   closeEvent: {"operationId":"closeEvent","method":"post","path":"/event-bookings/{bookingId}/close","body":true,"propertyScoped":true,"idempotent":true},
+  getEventCancellation: {"operationId":"getEventCancellation","method":"get","path":"/event-bookings/{bookingId}/cancellation","propertyScoped":true},
+  cancelEvent: {"operationId":"cancelEvent","method":"post","path":"/event-bookings/{bookingId}/cancel","body":true,"propertyScoped":true,"idempotent":true},
   getPublicCheckIn: {"operationId":"getPublicCheckIn","method":"get","path":"/public/bookings/{token}/check-in"},
   createPublicIdUpload: {"operationId":"createPublicIdUpload","method":"post","path":"/public/bookings/{token}/check-in/id-upload","body":true},
   submitPublicCheckIn: {"operationId":"submitPublicCheckIn","method":"post","path":"/public/bookings/{token}/check-in","body":true},

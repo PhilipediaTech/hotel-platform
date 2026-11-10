@@ -18,6 +18,7 @@ import { INBOX_ROUTES } from './inbox.ts';
 import { EVENT_ROUTES } from './events.ts';
 import { EVENT_SALES_ROUTES } from './event-sales.ts';
 import { EVENT_CLOSEOUT_ROUTES } from './event-closeout.ts';
+import { EVENT_CANCELLATION_ROUTES } from './event-cancellation.ts';
 import { PARTNER_ROUTES } from './partners.ts';
 import { PLATFORM_ROUTES } from './platform.ts';
 import { REPORT_ROUTES } from './reports.ts';
@@ -59,6 +60,7 @@ export const API_ROUTES = {
   ...EVENT_ROUTES,
   ...EVENT_SALES_ROUTES,
   ...EVENT_CLOSEOUT_ROUTES,
+  ...EVENT_CANCELLATION_ROUTES,
   ...BOOKING_ENGINE_ROUTES,
   ...AUTH_ROUTES,
   ...ACCESS_ROUTES,

@@ -395,7 +395,7 @@ function CloseOutSection({ booking }: { booking: Booking }) {
   return (
     <section aria-label={t('events.closeOut.heading')}>
       <h4 className="font-semibold">{t('events.closeOut.heading')}</h4>
-      {q.data.inspection ? (
+      {q.data.inspection || booking.status === 'CANCELLED' ? (
         <Settlement view={q.data} booking={booking} />
       ) : new Date(booking.endsAt) > new Date() ? (
         <p className="text-text-muted">{t('events.closeOut.notYet')}</p>
@@ -408,11 +408,79 @@ function CloseOutSection({ booking }: { booking: Booking }) {
   );
 }
 
-/** What happens once a booking is confirmed. */
+// ── Cancelling (T-121b) ─────────────────────────────────────────────────────────────────
+
+export function CancelSection({ booking }: { booking: Booking }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const money = useMoney();
+  const [reason, setReason] = useState('');
+  const q = useQuery({
+    queryKey: ['event-file', booking.id, 'cancellation'],
+    queryFn: () => api.call('getEventCancellation', { params: { bookingId: booking.id } }),
+  });
+  const cancel = useMutation({
+    mutationFn: () =>
+      api.call('cancelEvent', { params: { bookingId: booking.id }, body: { reason } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
+      void queryClient.invalidateQueries({ queryKey: ['event-file', booking.id] });
+    },
+  });
+  if (!q.data || q.data.reason === 'NOTHING_TO_CANCEL') return null;
+  return (
+    <section aria-label={t('events.cancel.heading')}>
+      <h4 className="font-semibold">{t('events.cancel.heading')}</h4>
+      <p className="text-text-muted">{t('events.cancel.rule')}</p>
+      {q.data.allowed ? (
+        <form
+          aria-label={t('events.cancel.heading')}
+          className="mt-2 flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            cancel.mutate();
+          }}
+        >
+          <p>
+            {t('events.cancel.fee', {
+              fee: money(q.data.feeMinor),
+              paid: money(q.data.depositPaidMinor),
+              share: q.data.keepBps / 100,
+              received: money(q.data.receivedMinor),
+            })}
+          </p>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor={`cancel-${booking.id}`}>{t('events.cancel.reason')}</Label>
+            <Input
+              id={`cancel-${booking.id}`}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Button type="submit" variant="secondary" disabled={cancel.isPending}>
+              {t('events.cancel.button')}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        q.data.reason && <p>{t(`events.cancel.blocked.${q.data.reason}`)}</p>
+      )}
+      {cancel.error && <Alert tone="critical">{errorMessage(cancel.error)}</Alert>}
+    </section>
+  );
+}
+
+/** What happens once a booking is confirmed (or cancelled). */
 export function AfterConfirming({ booking }: { booking: Booking }) {
+  const { permissions } = useSession();
   return (
     <>
-      <BriefSection booking={booking} />
+      {booking.status !== 'CANCELLED' && <BriefSection booking={booking} />}
+      {booking.status === 'CONFIRMED' && permissions.includes('event.confirm') && (
+        <CancelSection booking={booking} />
+      )}
       <CloseOutSection booking={booking} />
     </>
   );

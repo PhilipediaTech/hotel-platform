@@ -1665,6 +1665,12 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   getEventInvoicePdf: { seed: bEventBooking },
   closeEvent: { seed: bEventBooking, body: () => ({}), untouched: bEventUnchanged },
+  getEventCancellation: { seed: bEventBooking },
+  cancelEvent: {
+    seed: bEventBooking,
+    body: () => ({ reason: 'Leak' }),
+    untouched: bEventUnchanged,
+  },
   listMessageThreads: {
     seed: bThread,
     listIds: (body) => (body as { data: { id: string }[] }).data.map((t) => t.id),

@@ -408,6 +408,87 @@ function CloseOutSection({ booking }: { booking: Booking }) {
   );
 }
 
+// ── The hotel's cancellation rule (T-121c) ──────────────────────────────────────────────
+
+export function CancellationSettings({ canEdit }: { canEdit: boolean }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const q = useQuery({
+    queryKey: ['events', 'settings'],
+    queryFn: () => api.call('getEventSettings'),
+  });
+  const [typed, setTyped] = useState<Record<string, string>>({});
+  const save = useMutation({
+    mutationFn: () => {
+      const r = q.data?.cancellation;
+      const num = (key: string, saved: number) => Number(typed[key] ?? saved);
+      return api.call('updateEventSettings', {
+        body: {
+          cancellation: {
+            noticeHours: num('noticeHours', r?.noticeHours ?? 0),
+            earlyHours: num('earlyHours', r?.earlyHours ?? 0),
+            earlyKeepBps: Math.round(num('early', (r?.earlyKeepBps ?? 0) / 100) * 100),
+            laterKeepBps: Math.round(num('later', (r?.laterKeepBps ?? 0) / 100) * 100),
+          },
+        },
+      });
+    },
+    onSuccess: () => {
+      setTyped({});
+      void queryClient.invalidateQueries({ queryKey: ['events', 'settings'] });
+    },
+  });
+  if (!q.data) return null;
+  const r = q.data.cancellation;
+  const fields = [
+    ['noticeHours', r.noticeHours],
+    ['earlyHours', r.earlyHours],
+    ['early', r.earlyKeepBps / 100],
+    ['later', r.laterKeepBps / 100],
+  ] as const;
+  return (
+    <form
+      aria-label={t('events.settings.heading')}
+      className="mt-6 flex flex-col gap-2 rounded-md border border-border bg-surface p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <h3 className="font-semibold">{t('events.settings.heading')}</h3>
+      <p className="text-text-muted">{t('events.settings.intro')}</p>
+      {q.data.isDefault && <p className="text-text-muted">{t('events.settings.default')}</p>}
+      <div className="grid gap-2 sm:grid-cols-2">
+        {fields.map(([key, saved]) => (
+          <div key={key} className="flex flex-col gap-1">
+            <Label htmlFor={`ev-set-${key}`}>{t(`events.settings.${key}`)}</Label>
+            <Input
+              id={`ev-set-${key}`}
+              type="number"
+              min={0}
+              max={key === 'early' || key === 'later' ? 100 : 1440}
+              step={key === 'early' || key === 'later' ? 0.01 : 1}
+              value={typed[key] ?? String(saved)}
+              readOnly={!canEdit}
+              onChange={(e) => setTyped((x) => ({ ...x, [key]: e.target.value }))}
+              required
+            />
+          </div>
+        ))}
+      </div>
+      {canEdit && (
+        <div className="flex items-center gap-2">
+          <Button type="submit" size="sm" variant="secondary" disabled={save.isPending}>
+            {t('events.settings.save')}
+          </Button>
+          {save.isSuccess && <span className="text-text-muted">{t('events.settings.saved')}</span>}
+        </div>
+      )}
+      {save.error && <Alert tone="critical">{errorMessage(save.error)}</Alert>}
+    </form>
+  );
+}
+
 // ── Cancelling (T-121b) ─────────────────────────────────────────────────────────────────
 
 export function CancelSection({ booking }: { booking: Booking }) {
@@ -431,7 +512,14 @@ export function CancelSection({ booking }: { booking: Booking }) {
   return (
     <section aria-label={t('events.cancel.heading')}>
       <h4 className="font-semibold">{t('events.cancel.heading')}</h4>
-      <p className="text-text-muted">{t('events.cancel.rule')}</p>
+      <p className="text-text-muted">
+        {t('events.cancel.rule', {
+          earlyHours: q.data.rule.earlyHours,
+          early: q.data.rule.earlyKeepBps / 100,
+          later: q.data.rule.laterKeepBps / 100,
+          noticeHours: q.data.rule.noticeHours,
+        })}
+      </p>
       {q.data.allowed ? (
         <form
           aria-label={t('events.cancel.heading')}
@@ -465,7 +553,13 @@ export function CancelSection({ booking }: { booking: Booking }) {
           </div>
         </form>
       ) : (
-        q.data.reason && <p>{t(`events.cancel.blocked.${q.data.reason}`)}</p>
+        q.data.reason && (
+          <p>
+            {t(`events.cancel.blocked.${q.data.reason}`, {
+              noticeHours: q.data.rule.noticeHours,
+            })}
+          </p>
+        )
       )}
       {cancel.error && <Alert tone="critical">{errorMessage(cancel.error)}</Alert>}
     </section>

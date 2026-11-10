@@ -27,6 +27,7 @@ type Cancellation = {
   depositPaidMinor: string;
   feeMinor: string;
   receivedMinor: string;
+  rule: { noticeHours: number; earlyHours: number; earlyKeepBps: number; laterKeepBps: number };
 };
 
 // A fixed ₦400,000 deposit, whatever the hire comes to with tax; the rest is one instalment.
@@ -241,5 +242,57 @@ describe('cancelling an event (T-121b)', () => {
     const fd = await h.as(h.fdId);
     expect((await fd.send(`${h.at}/cancel`, { reason: 'X' })).status).toBe(403);
     expect((await (await h.as(h.gmId)).send(`${h.at}/cancel`, { reason: '' })).status).toBe(400);
+  });
+});
+
+describe('the hotel’s own cancellation rule (T-121c)', () => {
+  const OWN = { noticeHours: 72, earlyHours: 12, earlyKeepBps: 2000, laterKeepBps: 8000 };
+
+  it('starts as the standard rule and can be changed by space.manage only', async () => {
+    const h = await hotel();
+    expect(await h.ok(h.gm.get('/event-settings'))).toEqual({
+      cancellation: { noticeHours: 24, earlyHours: 24, earlyKeepBps: 3000, laterKeepBps: 5000 },
+      isDefault: true,
+    });
+    expect(await h.ok(h.gm.put('/event-settings', { cancellation: OWN }))).toEqual({
+      cancellation: OWN,
+      isDefault: false,
+    });
+    expect((await h.fd.put('/event-settings', { cancellation: OWN })).status).toBe(403);
+    const tooMuch = { cancellation: { ...OWN, laterKeepBps: 10001 } };
+    expect((await h.gm.put('/event-settings', tooMuch)).status).toBe(400);
+    expect(await db.auditEvent.count({ where: { action: 'event_settings.updated' } })).toBe(1);
+  });
+
+  it('a contract is printed with, and cancelled under, the rule in force when it was issued', async () => {
+    const h = await hotel();
+    await h.ok(h.gm.put('/event-settings', { cancellation: OWN }));
+    await h.confirmed();
+    expect(h.email.sent.at(-1)?.text).toContain('within 12 hours of booking: 20%');
+    // A later change to the hotel's rule leaves this contract alone.
+    await h.ok(
+      h.gm.put('/event-settings', {
+        cancellation: { noticeHours: 1, earlyHours: 1, earlyKeepBps: 0, laterKeepBps: 0 },
+      }),
+    );
+    now = new Date('2026-11-12T09:00:00Z');
+    expect(await h.preview()).toMatchObject({
+      keepBps: 8000,
+      feeMinor: '32000000',
+      rule: OWN,
+    });
+    // 72 hours' notice: on 3 December it can no longer be cancelled.
+    now = new Date('2026-12-03T11:00:00Z');
+    expect(await h.preview()).toMatchObject({ allowed: false, reason: 'TOO_CLOSE' });
+    expect(errorOf(await h.cancel()).message).toContain('Within 72 hours');
+  });
+
+  it('a booking confirmed without a contract follows the hotel’s current rule', async () => {
+    const h = await hotel();
+    await h.ok(h.gm.send(`${h.at}/confirm`, { override: true, reason: 'Regular client' }));
+    await h.ok(h.gm.put('/event-settings', { cancellation: OWN }));
+    const view = await h.preview();
+    expect(view.rule).toEqual(OWN);
+    expect(view.feeMinor).toBe('0');
   });
 });

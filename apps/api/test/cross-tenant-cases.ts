@@ -493,6 +493,25 @@ async function bThreadUnchanged(db: Db) {
 }
 
 /** B's booking page and a promo code (T-112). */
+/** B's own cancellation rule (T-121c). */
+async function bEventSettings(db: Db, _world: TenantWorld, propertyId: string) {
+  await db.property.update({
+    where: { id: propertyId },
+    data: {
+      settings: {
+        eventCancellation: { noticeHours: 99, earlyHours: 9, earlyKeepBps: 9, laterKeepBps: 9 },
+      },
+    },
+  });
+  return { noticeHours: '99' };
+}
+
+async function bEventSettingsUnchanged(db: Db, world: TenantWorld) {
+  const b = await db.property.findUniqueOrThrow({ where: { id: world.b1.id } });
+  const rule = (b.settings as { eventCancellation?: { noticeHours: number } }).eventCancellation;
+  expect(rule?.noticeHours).toBe(99);
+}
+
 async function bBookingPage(db: Db, world: TenantWorld, propertyId: string) {
   const organisationId = orgOf(world, propertyId);
   await db.bookingEngineSettings.create({
@@ -1666,6 +1685,20 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   getEventInvoicePdf: { seed: bEventBooking },
   closeEvent: { seed: bEventBooking, body: () => ({}), untouched: bEventUnchanged },
   getEventCancellation: { seed: bEventBooking },
+  getEventSettings: {
+    seed: bEventSettings,
+    listIds: (body) => [
+      String((body as { cancellation: { noticeHours: number } }).cancellation.noticeHours),
+    ],
+  },
+  updateEventSettings: {
+    seed: bEventSettings,
+    creates: true,
+    body: () => ({
+      cancellation: { noticeHours: 1, earlyHours: 1, earlyKeepBps: 1, laterKeepBps: 1 },
+    }),
+    untouched: bEventSettingsUnchanged,
+  },
   cancelEvent: {
     seed: bEventBooking,
     body: () => ({ reason: 'Leak' }),

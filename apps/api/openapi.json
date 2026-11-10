@@ -1747,6 +1747,9 @@
           },
           "receivedMinor": {
             "$ref": "#/components/schemas/AmountMinor"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/EventCancellationRule"
           }
         },
         "required": [
@@ -1756,7 +1759,54 @@
           "keepBps",
           "depositPaidMinor",
           "feeMinor",
-          "receivedMinor"
+          "receivedMinor",
+          "rule"
+        ]
+      },
+      "EventCancellationRule": {
+        "type": "object",
+        "properties": {
+          "noticeHours": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1440
+          },
+          "earlyHours": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1440
+          },
+          "earlyKeepBps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "laterKeepBps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "noticeHours",
+          "earlyHours",
+          "earlyKeepBps",
+          "laterKeepBps"
+        ]
+      },
+      "EventSettings": {
+        "type": "object",
+        "properties": {
+          "cancellation": {
+            "$ref": "#/components/schemas/EventCancellationRule"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cancellation",
+          "isDefault"
         ]
       },
       "OnlineCheckInInfo": {
@@ -18018,6 +18068,193 @@
           },
           "409": {
             "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`, `BUSINESS_DAY_CLOSED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/event-settings": {
+      "get": {
+        "operationId": "getEventSettings",
+        "summary": "The hotel’s event cancellation rule",
+        "tags": [
+          "Events"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "event.enquiry",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateEventSettings",
+        "summary": "Set the hotel’s event cancellation rule",
+        "tags": [
+          "Events"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Applies to contracts issued from now on; each contract keeps the rule printed on it.",
+        "x-permission": "space.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cancellation": {
+                    "$ref": "#/components/schemas/EventCancellationRule"
+                  }
+                },
+                "required": [
+                  "cancellation"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
             "content": {
               "application/json": {
                 "schema": {

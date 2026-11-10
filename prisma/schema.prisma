@@ -2805,6 +2805,8 @@ model EventContract {
   terms              String
   totalMinor         BigInt    @map("total_minor")
   damageDepositMinor BigInt    @default(0) @map("damage_deposit_minor")
+  /// The cancellation rule printed on this contract (T-121c); null = the default of T-121b.
+  cancellationRule   Json?     @map("cancellation_rule")
   issuedById         String    @map("issued_by_id") @db.Uuid
   issuedAt           DateTime  @map("issued_at") @db.Timestamptz(6)
   signedByName       String?   @map("signed_by_name")

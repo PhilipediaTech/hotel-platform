@@ -43,6 +43,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   closeEvent: {"operationId":"closeEvent","method":"post","path":"/event-bookings/{bookingId}/close","body":true,"propertyScoped":true,"idempotent":true},
   getEventCancellation: {"operationId":"getEventCancellation","method":"get","path":"/event-bookings/{bookingId}/cancellation","propertyScoped":true},
   cancelEvent: {"operationId":"cancelEvent","method":"post","path":"/event-bookings/{bookingId}/cancel","body":true,"propertyScoped":true,"idempotent":true},
+  getEventSettings: {"operationId":"getEventSettings","method":"get","path":"/event-settings","propertyScoped":true},
+  updateEventSettings: {"operationId":"updateEventSettings","method":"put","path":"/event-settings","body":true,"propertyScoped":true},
   getPublicCheckIn: {"operationId":"getPublicCheckIn","method":"get","path":"/public/bookings/{token}/check-in"},
   createPublicIdUpload: {"operationId":"createPublicIdUpload","method":"post","path":"/public/bookings/{token}/check-in/id-upload","body":true},
   submitPublicCheckIn: {"operationId":"submitPublicCheckIn","method":"post","path":"/public/bookings/{token}/check-in","body":true},

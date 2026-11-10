@@ -163,8 +163,10 @@ const CANCELLABLE = {
   depositPaidMinor: '40000000',
   feeMinor: '12000000',
   receivedMinor: '40000000',
+  rule: { noticeHours: 24, earlyHours: 24, earlyKeepBps: 3000, laterKeepBps: 5000 },
 };
 
+let settings: unknown;
 let cancellation: unknown;
 let listed: unknown;
 let closeOut: unknown;
@@ -177,6 +179,10 @@ const sent = (key: string) => calls.filter((c) => c.key === key);
 beforeEach(() => {
   calls.length = 0;
   listed = HOLD;
+  settings = {
+    cancellation: { noticeHours: 24, earlyHours: 24, earlyKeepBps: 3000, laterKeepBps: 5000 },
+    isDefault: true,
+  };
   cancellation = { ...CANCELLABLE, allowed: false, reason: 'NOTHING_TO_CANCEL' };
   closeOut = NOT_INSPECTED;
   contractView = NO_CONTRACT;
@@ -198,6 +204,8 @@ beforeEach(() => {
     'GET /event-enquiries': () => json(200, { data: [ENQUIRY] }),
     'POST /event-enquiries': () => json(201, ENQUIRY),
     'GET /spaces': () => json(200, { data: [SPACE] }),
+    'GET /event-settings': () => json(200, settings),
+    'PUT /event-settings': () => json(200, settings),
     'POST /spaces': () => json(201, SPACE),
     'GET /spaces/availability': () =>
       json(200, {
@@ -477,6 +485,39 @@ describe('Events and spaces (S38)', { timeout: 20_000 }, () => {
       await within(row).findByText(/can no longer be cancelled; it will be invoiced/),
     ).toBeInTheDocument();
     expect(within(row).queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument();
+  });
+
+  it('a hotel sets its own cancellation rule (T-121c)', async () => {
+    const user = userEvent.setup();
+    renderAt('/events');
+    await user.click(await screen.findByRole('tab', { name: 'Spaces' }));
+    const form = await screen.findByRole('form', { name: 'Cancellation rule' });
+    const later = within(form).getByLabelText('Share of the deposit kept after that (%)');
+    await user.clear(later);
+    await user.type(later, '60');
+    const notice = within(form).getByLabelText('No cancelling within this many hours of the event');
+    await user.clear(notice);
+    await user.type(notice, '72');
+    await user.click(within(form).getByRole('button', { name: 'Save rule' }));
+    await waitFor(() => expect(sent('PUT /event-settings')).toHaveLength(1));
+    expect(sent('PUT /event-settings')[0]?.body).toEqual({
+      cancellation: { noticeHours: 72, earlyHours: 24, earlyKeepBps: 3000, laterKeepBps: 6000 },
+    });
+  });
+
+  it('shows the cancellation rule that applies to the booking', async () => {
+    listed = { ...HOLD, status: 'CONFIRMED', holdExpiresAt: null };
+    cancellation = {
+      ...CANCELLABLE,
+      rule: { noticeHours: 48, earlyHours: 12, earlyKeepBps: 2500, laterKeepBps: 7500 },
+    };
+    const user = userEvent.setup();
+    const row = await openFile(user);
+    expect(
+      await within(row).findByText(
+        /within 12 hours of booking, 25% .* after that, 75%\. Within 48 hours/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it('without space.manage the spaces can be seen but not changed', async () => {

@@ -1,7 +1,9 @@
 import type { EVENT_CONFIRM_MISSING } from '@hotel/shared';
 import {
   calculateTaxes,
+  cancellationRuleOf,
   eventCancellationTerms,
+  type EventCancellationRule,
   localDate,
   type EventConfirmBody,
   type EventContractBody,
@@ -29,6 +31,7 @@ import type { TenantDb } from '../../core/tenant-db.ts';
 import { taxesFor } from '../folios/service.ts';
 import { facts, footer, header, money, render, table, totals } from '../payments/documents.ts';
 import { bookingHasMoney, LIVE_CONTRACT } from './allocation.ts';
+import { hotelRule } from './cancellation.ts';
 import { bookingOf, BOOKING_INCLUDE, type EventDeps } from './service.ts';
 
 // Events and spaces, second part (PRD M9-04–M9-06; T-120): the versioned quote, the contract and
@@ -402,6 +405,7 @@ function contractEmail(
   body: z.output<typeof EventContractBody>,
   number: string,
   account: Account,
+  rule: EventCancellationRule,
 ) {
   return [
     `Dear ${body.clientName},`,
@@ -422,7 +426,7 @@ function contractEmail(
     'Terms:',
     body.terms,
     '',
-    eventCancellationTerms(),
+    eventCancellationTerms(rule),
   ].join('\n');
 }
 
@@ -497,6 +501,7 @@ export async function issueContract(
         after: { ownerType: 'EVENT', ownerId: bookingId, accountNumber: issued.accountNumber },
       });
     }
+    const rule = await hotelRule(tx, booking.propertyId);
     const n = await nextPropertyCounter(tx, booking.propertyId, COUNTER.EVENT_CONTRACT);
     const contract = await tx.eventContract.create({
       data: {
@@ -509,6 +514,7 @@ export async function issueContract(
         clientPhone: body.clientPhone,
         terms: body.terms,
         totalMinor: version.totalMinor,
+        cancellationRule: rule,
         damageDepositMinor: schedule
           .filter((s) => s.kind === 'DAMAGE_DEPOSIT')
           .reduce((sum, s) => sum + BigInt(s.amountMinor), 0n),
@@ -540,7 +546,7 @@ export async function issueContract(
         totalMinor: version.totalMinor.toString(),
       },
     });
-    return { number: contract.number, title: booking.title, property };
+    return { number: contract.number, title: booking.title, property, rule };
   });
 
   let emailed: boolean | undefined;
@@ -550,7 +556,14 @@ export async function issueContract(
       .send({
         to: body.clientEmail,
         subject: `Your contract with ${created.property.name}`,
-        text: contractEmail(created.property, created.title, body, created.number, account),
+        text: contractEmail(
+          created.property,
+          created.title,
+          body,
+          created.number,
+          account,
+          created.rule,
+        ),
         tag: 'event-contract',
       })
       .then(
@@ -698,7 +711,9 @@ export async function contractPdf(deps: EventDeps, bookingId: string) {
     }
     doc.font('Helvetica-Bold').fontSize(10).text('Terms', 50);
     doc.font('Helvetica').fontSize(9).text(c.terms, { width: 495 });
-    doc.moveDown(0.5).text(eventCancellationTerms(), { width: 495 });
+    doc
+      .moveDown(0.5)
+      .text(eventCancellationTerms(cancellationRuleOf(c.cancellationRule)), { width: 495 });
     doc.moveDown(2);
     doc.text(
       c.signedByName

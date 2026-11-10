@@ -20,6 +20,7 @@ import { api } from '../lib/api.ts';
 import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
 import { BookingFile } from './event-booking.tsx';
+import { CancellationSettings } from './event-closeout.tsx';
 
 registerStrings(strings);
 
@@ -931,6 +932,7 @@ function Spaces({ canManage }: { canManage: boolean }) {
             {t('events.addSpace')}
           </Button>
         ))}
+      <CancellationSettings canEdit={canManage} />
     </section>
   );
 }

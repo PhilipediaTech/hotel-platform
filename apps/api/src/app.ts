@@ -48,6 +48,7 @@ import { messagingRoutes } from './modules/notifications/routes.ts';
 import { eventRoutes } from './modules/events/routes.ts';
 import { serviceRoutes } from './modules/services/routes.ts';
 import { groupRoutes } from './modules/groups/routes.ts';
+import { arRoutes } from './modules/ar/routes.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
 import { bookingEngineRoutes } from './modules/bookingengine/routes.ts';
@@ -198,6 +199,7 @@ export function createApp({
   api.use(eventRoutes({ db, tenantDb, clock, provider: payments, email }));
   api.use(serviceRoutes({ db, tenantDb, clock }));
   api.use(groupRoutes({ db, tenantDb, clock }));
+  api.use(arRoutes({ db, tenantDb, clock, email }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));

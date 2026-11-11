@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-125 is pushed on `feat/T-125-negotiated-rates-companies`, awaiting merge (no migration). Next: city ledger M4-21 (ar_accounts, ar_invoices, ar_payments, ar_allocations in tab 3; AR transfer only within the credit limit or with approval ar.over_limit, M4 rule; statements and ageing), then M4-22 commissions, M4-23 bank import.
+T-126 is pushed on `feat/T-126-city-ledger`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Next: travel-agent commissions M4-22 (tab 3 commissions: per stay, base, rate from company.commissionBps; status DUE / PAID / OFFSET, ar.commission), then bank statement import M4-23.

@@ -153,6 +153,10 @@ model Property {
   eventBriefs           EventBrief[]
   services              Service[]
   groupBlocks           GroupBlock[]
+  arAccounts            ArAccount[]
+  arInvoices            ArInvoice[]
+  arPayments            ArPayment[]
+  arAllocations         ArAllocation[]
   groupBlockNights      GroupBlockNight[]
   serviceBookings       ServiceBooking[]
   eventQuotes           EventQuote[]
@@ -309,6 +313,7 @@ model User {
   eventBriefs        EventBrief[]        @relation("EventBriefAuthor")
   serviceBookings    ServiceBooking[]    @relation("ServiceBookingAuthor")
   groupBlocks        GroupBlock[]        @relation("GroupBlockAuthor")
+  arPayments         ArPayment[]         @relation("ArPaymentAuthor")
   eventsInspected    EventBooking[]      @relation("EventInspector")
   eventQuoteVersions EventQuoteVersion[] @relation("EventQuoteAuthor")
   eventContracts     EventContract[]     @relation("EventContractIssuer")
@@ -1074,6 +1079,7 @@ model Company {
   billingInstructions Json         @default("{}") @map("billing_instructions")
   active              Boolean      @default(true)
   groupBlocks         GroupBlock[]
+  arAccounts          ArAccount[]
 
   organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
   bookings     Reservation[] @relation("ReservationCompany")
@@ -1428,6 +1434,7 @@ model Folio {
   paymentIntents PaymentIntent[]
   eventContracts EventContract[]
   eventBookings  EventBooking[]
+  arInvoices     ArInvoice[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, id])
@@ -1726,6 +1733,7 @@ model Payment {
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   eventDeposits   EventDeposit[]
+  arInvoice       ArInvoice?
   property        Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   folio           Folio?               @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
   window          FolioWindow?         @relation(fields: [windowId], references: [id], onDelete: Restrict)
@@ -3029,4 +3037,91 @@ model PlatformInvoiceCheckout {
 
   @@index([invoiceId])
   @@map("platform_invoice_checkouts")
+}
+
+/// A company's or travel agent's account on the city ledger (PRD M4-21).
+model ArAccount {
+  id               String   @id @default(uuid()) @db.Uuid
+  organisationId   String   @map("organisation_id") @db.Uuid
+  propertyId       String   @map("property_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  creditLimitMinor BigInt   @map("credit_limit_minor")
+  termsDays        Int      @default(30) @map("terms_days")
+  /// ACTIVE | ON_HOLD | CLOSED
+  status           String   @default("ACTIVE")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  company  Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  invoices ArInvoice[]
+  payments ArPayment[]
+
+  @@unique([propertyId, companyId])
+  @@map("ar_accounts")
+}
+
+/// What a company owes for one transferred folio window (PRD M4-21).
+model ArInvoice {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  arAccountId String   @map("ar_account_id") @db.Uuid
+  number      String
+  folioId     String?  @map("folio_id") @db.Uuid
+  /// The AR_TRANSFER payment that settled the folio window.
+  paymentId   String?  @unique @map("payment_id") @db.Uuid
+  amountMinor BigInt   @map("amount_minor")
+  issuedOn    DateTime @map("issued_on") @db.Date
+  dueOn       DateTime @map("due_on") @db.Date
+  /// E-invoicing (M4-24, V1.4).
+  einvoiceIrn String?  @map("einvoice_irn")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property    Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  account     ArAccount      @relation(fields: [arAccountId], references: [id], onDelete: Restrict)
+  folio       Folio?         @relation(fields: [folioId], references: [id], onDelete: Restrict)
+  payment     Payment?       @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  allocations ArAllocation[]
+
+  @@unique([propertyId, number])
+  @@index([arAccountId, dueOn])
+  @@map("ar_invoices")
+}
+
+/// Money received from a company on its account (PRD M4-21). Not cashier money: on no shift.
+model ArPayment {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  arAccountId String   @map("ar_account_id") @db.Uuid
+  /// BANK_TRANSFER | CASH | POS_TERMINAL | CHEQUE
+  method      String
+  amountMinor BigInt   @map("amount_minor")
+  reference   String?
+  receivedOn  DateTime @map("received_on") @db.Date
+  note        String?
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property    Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  account     ArAccount      @relation(fields: [arAccountId], references: [id], onDelete: Restrict)
+  createdBy   User           @relation("ArPaymentAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  allocations ArAllocation[]
+
+  @@index([arAccountId, receivedOn])
+  @@map("ar_payments")
+}
+
+/// How much of a payment went to an invoice (PRD M4-21).
+model ArAllocation {
+  arPaymentId String   @map("ar_payment_id") @db.Uuid
+  arInvoiceId String   @map("ar_invoice_id") @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  amountMinor BigInt   @map("amount_minor")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  payment  ArPayment @relation(fields: [arPaymentId], references: [id], onDelete: Restrict)
+  invoice  ArInvoice @relation(fields: [arInvoiceId], references: [id], onDelete: Restrict)
+
+  @@id([arPaymentId, arInvoiceId])
+  @@map("ar_allocations")
 }

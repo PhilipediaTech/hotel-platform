@@ -19,6 +19,7 @@ import { api } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { toMinor } from '../lib/money.ts';
 import { errorMessage } from '../lib/form.ts';
+import { ArTransferPanel } from './city-ledger.tsx';
 import { Payments, PrintInvoice, TakePayment } from './folio-payments.tsx';
 import { TransferForm } from './folio-transfer.tsx';
 import { PaymentLinks, VirtualAccountPanel } from './payment-links.tsx';
@@ -315,6 +316,13 @@ export function FolioPage() {
 
       {open && can('payment.capture') && current && (
         <TakePayment folio={data} windowNumber={current.number} />
+      )}
+      {open && can('ar.manage') && current && BigInt(current.balanceMinor) > 0n && (
+        <ArTransferPanel
+          folioId={data.id}
+          windowNumber={current.number}
+          balanceMinor={current.balanceMinor}
+        />
       )}
       {open && can('payment.request') && current && (
         <PaymentLinks

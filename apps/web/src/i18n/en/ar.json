@@ -1,0 +1,70 @@
+{
+  "ar": {
+    "title": "City ledger",
+    "tabs": { "accounts": "Accounts", "ageing": "Ageing" },
+    "newAccount": "Open an account",
+    "openAccount": "Open account",
+    "cancel": "Cancel",
+    "noAccounts": "No company accounts yet.",
+    "company": "Company or travel agent",
+    "creditLimit": "Credit limit (₦)",
+    "terms": "Payment terms (days)",
+    "status": "Status",
+    "statuses": { "ACTIVE": "Active", "ON_HOLD": "On hold", "CLOSED": "Closed" },
+    "save": "Save",
+    "settings": "Account settings",
+    "owes": "owes {{amount}}",
+    "overdue": "{{amount}} overdue",
+    "limitLine": "limit {{limit}}, {{days}} days",
+    "openButton": "Open",
+    "amount": "Amount (₦)",
+    "invoices": "Invoices",
+    "noInvoices": "No invoices yet.",
+    "dueOn": "due {{date}}",
+    "open": "{{amount}} to pay",
+    "paid": "Paid",
+    "payments": "Payments",
+    "unallocated": "{{amount}} not yet allocated",
+    "allocateOldest": "Allocate to the oldest invoices",
+    "methods": {
+      "BANK_TRANSFER": "Bank transfer",
+      "CASH": "Cash",
+      "POS_TERMINAL": "POS terminal",
+      "CHEQUE": "Cheque"
+    },
+    "payment": {
+      "title": "Record a payment",
+      "method": "Paid by",
+      "reference": "Reference",
+      "date": "Received on",
+      "record": "Record payment"
+    },
+    "statement": {
+      "title": "Statement",
+      "from": "From",
+      "to": "To",
+      "pdf": "Statement (PDF)",
+      "send": "Email statement",
+      "sent": "Sent to {{to}}.",
+      "opening": "Opening balance",
+      "closing": "Balance due"
+    },
+    "asOf": "As of",
+    "total": "Total",
+    "buckets": {
+      "current": "Not yet due",
+      "d1to30": "1–30 days",
+      "d31to60": "31–60 days",
+      "d61to90": "61–90 days",
+      "over90": "Over 90 days"
+    },
+    "transfer": {
+      "title": "Transfer to a company account",
+      "account": "Account",
+      "reason": "Reason (needed over the credit limit)",
+      "button": "Transfer",
+      "asked": "This takes the account over its credit limit: a manager has been asked to approve.",
+      "done": "Transferred. The bill is now on the company's account."
+    }
+  }
+}

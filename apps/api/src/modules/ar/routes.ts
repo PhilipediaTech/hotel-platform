@@ -1,7 +1,8 @@
-import { AR_ROUTES } from '@hotel/shared';
+import { AR_ROUTES, COMMISSION_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as commissions from './commissions.ts';
 import * as ar from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -10,7 +11,7 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
   return tenant;
 }
 
-/** City ledger (M4-21; T-126). */
+/** City ledger (M4-21; T-126) and travel-agent commissions (M4-22; T-127). */
 export function arRoutes(deps: ar.ArDeps): Router {
   const router = express.Router();
   const r = AR_ROUTES;
@@ -52,6 +53,17 @@ export function arRoutes(deps: ar.ArDeps): Router {
   );
   mountRoute(router, r.getArAgeing, ({ query }, { tenant }) =>
     ar.ageing(deps, tenantFrom(tenant), query.asOf),
+  );
+  // Travel-agent commissions (M4-22; T-127).
+  const c = COMMISSION_ROUTES;
+  mountRoute(router, c.listCommissions, ({ query }, { tenant }) =>
+    commissions.list(deps, tenantFrom(tenant), query),
+  );
+  mountRoute(router, c.calculateCommissions, ({ body }, { tenant }) =>
+    commissions.calculate(deps, tenantFrom(tenant), body),
+  );
+  mountRoute(router, c.settleCommissions, ({ body }, { tenant }) =>
+    commissions.settle(deps, tenantFrom(tenant), body),
   );
   return router;
 }

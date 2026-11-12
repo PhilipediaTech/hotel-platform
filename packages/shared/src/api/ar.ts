@@ -11,6 +11,8 @@ import { AmountMinor, Instant, IsoDate, PdfDocument, Uuid } from './primitives.t
 export const AR_ACCOUNT_STATUSES = ['ACTIVE', 'ON_HOLD', 'CLOSED'] as const;
 /** How a company pays its account. Not cashier money: it is not on a shift. */
 export const AR_PAY_METHODS = ['BANK_TRANSFER', 'CASH', 'POS_TERMINAL', 'CHEQUE'] as const;
+/** How a payment on the account came: a method, or a commission set off against it (T-127). */
+export const AR_PAYMENT_KINDS = [...AR_PAY_METHODS, 'COMMISSION_OFFSET'] as const;
 export const AGEING_BUCKETS = ['current', 'd1to30', 'd31to60', 'd61to90', 'over90'] as const;
 
 const Positive = AmountMinor.refine((v) => BigInt(v) > 0n, 'Must be more than nothing');
@@ -47,7 +49,7 @@ export const ArInvoiceItem = z
 export const ArPaymentItem = z
   .object({
     id: Uuid,
-    method: z.enum(AR_PAY_METHODS),
+    method: z.enum(AR_PAYMENT_KINDS),
     amountMinor: AmountMinor,
     unallocatedMinor: AmountMinor,
     reference: z.string().nullable(),

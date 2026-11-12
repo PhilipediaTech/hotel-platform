@@ -1,7 +1,7 @@
 {
   "ar": {
     "title": "City ledger",
-    "tabs": { "accounts": "Accounts", "ageing": "Ageing" },
+    "tabs": { "accounts": "Accounts", "ageing": "Ageing", "commissions": "Commissions" },
     "newAccount": "Open an account",
     "openAccount": "Open account",
     "cancel": "Cancel",
@@ -30,7 +30,33 @@
       "BANK_TRANSFER": "Bank transfer",
       "CASH": "Cash",
       "POS_TERMINAL": "POS terminal",
-      "CHEQUE": "Cheque"
+      "CHEQUE": "Cheque",
+      "COMMISSION_OFFSET": "Commission set off"
+    },
+    "commission": {
+      "explain": "Work out travel-agent commission on stays checked out in a period: the agent's rate on the room revenue, net of tax. Running it again picks up new stays and updates due ones.",
+      "from": "Checked out from",
+      "to": "To",
+      "calculate": "Calculate commissions",
+      "calculated": "{{created}} new, {{updated}} updated.",
+      "statuses": { "DUE": "Due", "PAID": "Paid", "OFFSET": "Set off" },
+      "all": "All",
+      "due": "{{amount}} due",
+      "none": "No commissions here.",
+      "agent": "Agent",
+      "stay": "Guest",
+      "checkedOut": "Checked out",
+      "base": "Room revenue",
+      "rate": "Rate",
+      "amount": "Commission",
+      "pick": "Choose the commission on {{guest}}",
+      "picked_one": "{{count}} commission chosen, {{amount}}",
+      "picked_other": "{{count}} commissions chosen, {{amount}}",
+      "settle": "Settle commissions",
+      "as": "Settle as",
+      "asPaid": "Paid to the agent",
+      "asOffset": "Set off against the agent's account",
+      "settledOn": "On"
     },
     "payment": {
       "title": "Record a payment",

@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-126 is pushed on `feat/T-126-city-ledger`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Next: travel-agent commissions M4-22 (tab 3 commissions: per stay, base, rate from company.commissionBps; status DUE / PAID / OFFSET, ar.commission), then bank statement import M4-23.
+T-127 is pushed on `feat/T-127-commissions`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Next: bank statement import M4-23, then the M5 maintenance tickets.

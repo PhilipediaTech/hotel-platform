@@ -157,6 +157,7 @@ model Property {
   arInvoices            ArInvoice[]
   arPayments            ArPayment[]
   arAllocations         ArAllocation[]
+  commissions           Commission[]
   groupBlockNights      GroupBlockNight[]
   serviceBookings       ServiceBooking[]
   eventQuotes           EventQuote[]
@@ -314,6 +315,7 @@ model User {
   serviceBookings    ServiceBooking[]    @relation("ServiceBookingAuthor")
   groupBlocks        GroupBlock[]        @relation("GroupBlockAuthor")
   arPayments         ArPayment[]         @relation("ArPaymentAuthor")
+  commissionsSettled Commission[]        @relation("CommissionSettler")
   eventsInspected    EventBooking[]      @relation("EventInspector")
   eventQuoteVersions EventQuoteVersion[] @relation("EventQuoteAuthor")
   eventContracts     EventContract[]     @relation("EventContractIssuer")
@@ -1080,6 +1082,7 @@ model Company {
   active              Boolean      @default(true)
   groupBlocks         GroupBlock[]
   arAccounts          ArAccount[]
+  commissions         Commission[]
 
   organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
   bookings     Reservation[] @relation("ReservationCompany")
@@ -1209,6 +1212,7 @@ model Stay {
   occupants   StayOccupant[]
   visitors    Visitor[]
   roomCharges RoomChargePosting[]
+  commission  Commission?
   tasks       Task[]
   card        RegistrationCard?
 
@@ -3092,7 +3096,7 @@ model ArPayment {
   id          String   @id @default(uuid()) @db.Uuid
   propertyId  String   @map("property_id") @db.Uuid
   arAccountId String   @map("ar_account_id") @db.Uuid
-  /// BANK_TRANSFER | CASH | POS_TERMINAL | CHEQUE
+  /// BANK_TRANSFER | CASH | POS_TERMINAL | CHEQUE | COMMISSION_OFFSET
   method      String
   amountMinor BigInt   @map("amount_minor")
   reference   String?
@@ -3105,6 +3109,7 @@ model ArPayment {
   account     ArAccount      @relation(fields: [arAccountId], references: [id], onDelete: Restrict)
   createdBy   User           @relation("ArPaymentAuthor", fields: [createdById], references: [id], onDelete: Restrict)
   allocations ArAllocation[]
+  commissions Commission[]
 
   @@index([arAccountId, receivedOn])
   @@map("ar_payments")
@@ -3124,4 +3129,39 @@ model ArAllocation {
 
   @@id([arPaymentId, arInvoiceId])
   @@map("ar_allocations")
+}
+
+/// Travel-agent commission on a stay (PRD M4-22; T-127). One per stay; worked out from the
+/// stay's room revenue net of tax at the agent's rate, then paid out or set off against what
+/// the agent owes on the city ledger.
+model Commission {
+  id            String    @id @default(uuid()) @db.Uuid
+  propertyId    String    @map("property_id") @db.Uuid
+  travelAgentId String    @map("travel_agent_id") @db.Uuid
+  stayId        String    @map("stay_id") @db.Uuid
+  /// The business date the stay checked out.
+  checkedOutOn  DateTime  @map("checked_out_on") @db.Date
+  baseMinor     BigInt    @map("base_minor")
+  rateBps       Int       @map("rate_bps")
+  amountMinor   BigInt    @map("amount_minor")
+  /// DUE | PAID | OFFSET
+  status        String    @default("DUE")
+  settledOn     DateTime? @map("settled_on") @db.Date
+  reference     String?
+  /// The city-ledger credit an OFFSET created.
+  arPaymentId   String?   @map("ar_payment_id") @db.Uuid
+  settledById   String?   @map("settled_by_id") @db.Uuid
+  settledAt     DateTime? @map("settled_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  property    Property   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  travelAgent Company    @relation(fields: [travelAgentId], references: [id], onDelete: Restrict)
+  stay        Stay       @relation(fields: [propertyId, stayId], references: [propertyId, id], onDelete: Restrict)
+  arPayment   ArPayment? @relation(fields: [arPaymentId], references: [id], onDelete: Restrict)
+  settledBy   User?      @relation("CommissionSettler", fields: [settledById], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, stayId])
+  @@index([propertyId, status, travelAgentId])
+  @@map("commissions")
 }

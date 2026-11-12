@@ -130,7 +130,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     id: 'ar',
     path: '/ar',
-    anyOf: ['ar.manage'],
+    anyOf: ['ar.manage', 'ar.commission'],
     group: 'revenue',
     screen: 'S32',
     ticket: 'T-126',

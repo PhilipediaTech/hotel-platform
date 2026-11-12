@@ -3,6 +3,7 @@ import {
   AGEING_BUCKETS,
   AR_ACCOUNT_STATUSES,
   AR_PAY_METHODS,
+  COMMISSION_STATUSES,
   localDate,
   type ApprovalPending,
   type ArAccountDetail,
@@ -28,6 +29,7 @@ registerStrings(strings);
 
 // S32 City ledger (PRD M4-21; T-126): company accounts, their invoices and payments,
 // allocation, statements and ageing; and, on a folio, moving what it owes to an account.
+// Travel-agent commissions (M4-22; T-127) are a tab of their own, for ar.commission.
 
 type Account = z.output<typeof ArAccountItem>;
 type Detail = z.output<typeof ArAccountDetail>;
@@ -669,16 +671,232 @@ function Ageing() {
   );
 }
 
-const TABS = ['accounts', 'ageing'] as const;
+// ── Travel-agent commissions (M4-22; T-127) ─────────────────────────────────────────────
+
+function Commissions() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { money, today } = useHotel();
+  const [status, setStatus] = useState<(typeof COMMISSION_STATUSES)[number] | ''>('DUE');
+  const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);
+  const [to, setTo] = useState(today);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [as, setAs] = useState<'PAID' | 'OFFSET'>('PAID');
+  const [settledOn, setSettledOn] = useState(today);
+  const [reference, setReference] = useState('');
+  const q = useQuery({
+    queryKey: [...KEY, 'commissions', status],
+    queryFn: () => api.call('listCommissions', { query: status ? { status } : {} }),
+  });
+  const calculate = useMutation({
+    mutationFn: () => api.call('calculateCommissions', { body: { from, to } }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: KEY }),
+  });
+  const settle = useMutation({
+    mutationFn: () =>
+      api.call('settleCommissions', {
+        body: { commissionIds: picked, as, settledOn, reference: reference || null },
+      }),
+    onSuccess: () => {
+      setPicked([]);
+      setReference('');
+      void queryClient.invalidateQueries({ queryKey: KEY });
+    },
+  });
+  const rows = q.data?.data ?? [];
+  const total = rows
+    .filter((c) => picked.includes(c.id))
+    .reduce((sum, c) => sum + BigInt(c.amountMinor), 0n);
+  return (
+    <section aria-label={t('ar.tabs.commissions')} className="flex flex-col gap-4">
+      <form
+        aria-label={t('ar.commission.calculate')}
+        className="flex flex-wrap items-end gap-2 rounded-md border border-border bg-surface p-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          calculate.mutate();
+        }}
+      >
+        <p className="w-full text-sm text-text-muted">{t('ar.commission.explain')}</p>
+        <Field
+          id="cm-from"
+          label={t('ar.commission.from')}
+          type="date"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          required
+        />
+        <Field
+          id="cm-to"
+          label={t('ar.commission.to')}
+          type="date"
+          max={today}
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          required
+        />
+        <Button type="submit" size="sm" disabled={calculate.isPending}>
+          {t('ar.commission.calculate')}
+        </Button>
+        {calculate.data && (
+          <Alert tone="success">
+            {t('ar.commission.calculated', {
+              created: calculate.data.created,
+              updated: calculate.data.updated,
+            })}
+          </Alert>
+        )}
+        {calculate.error && <Alert tone="critical">{errorMessage(calculate.error)}</Alert>}
+      </form>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="cm-status">{t('ar.status')}</Label>
+          <select
+            id="cm-status"
+            className={selectClass}
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as typeof status);
+              setPicked([]);
+            }}
+          >
+            {COMMISSION_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {t(`ar.commission.statuses.${s}`)}
+              </option>
+            ))}
+            <option value="">{t('ar.commission.all')}</option>
+          </select>
+        </div>
+        {q.data && q.data.dueMinor !== '0' && (
+          <span className="text-sm font-medium">
+            {t('ar.commission.due', { amount: money(q.data.dueMinor) })}
+          </span>
+        )}
+      </div>
+      {q.error && <Alert tone="critical">{errorMessage(q.error)}</Alert>}
+      {q.data && rows.length === 0 && (
+        <p className="text-sm text-text-muted">{t('ar.commission.none')}</p>
+      )}
+      {rows.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="text-sm">
+            <thead>
+              <tr>
+                <th className="pr-2" />
+                <th className="pr-3 text-left">{t('ar.commission.agent')}</th>
+                <th className="pr-3 text-left">{t('ar.commission.stay')}</th>
+                <th className="pr-3 text-left">{t('ar.commission.checkedOut')}</th>
+                <th className="px-2 text-right">{t('ar.commission.base')}</th>
+                <th className="px-2 text-right">{t('ar.commission.rate')}</th>
+                <th className="px-2 text-right">{t('ar.commission.amount')}</th>
+                <th className="pl-2 text-left">{t('ar.status')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c) => (
+                <tr key={c.id}>
+                  <td className="pr-2">
+                    {c.status === 'DUE' && (
+                      <input
+                        type="checkbox"
+                        aria-label={t('ar.commission.pick', { guest: c.stay.guestName })}
+                        checked={picked.includes(c.id)}
+                        onChange={(e) =>
+                          setPicked((x) =>
+                            e.target.checked ? [...x, c.id] : x.filter((id) => id !== c.id),
+                          )
+                        }
+                      />
+                    )}
+                  </td>
+                  <td className="pr-3">{c.agent.name}</td>
+                  <td className="pr-3">
+                    {c.stay.guestName}{' '}
+                    <span className="text-text-muted">{c.stay.confirmationNo}</span>
+                  </td>
+                  <td className="pr-3">{c.checkedOutOn}</td>
+                  <td className="px-2 text-right">{money(c.baseMinor)}</td>
+                  <td className="px-2 text-right">{c.rateBps / 100}%</td>
+                  <td className="px-2 text-right font-medium">{money(c.amountMinor)}</td>
+                  <td className="pl-2">
+                    {t(`ar.commission.statuses.${c.status}`)}
+                    {c.settledOn && <span className="text-text-muted"> {c.settledOn}</span>}
+                    {c.reference && <span className="text-text-muted"> {c.reference}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {picked.length > 0 && (
+        <form
+          aria-label={t('ar.commission.settle')}
+          className="flex flex-wrap items-end gap-2 rounded-md border border-border bg-surface p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            settle.mutate();
+          }}
+        >
+          <p className="w-full text-sm font-medium">
+            {t('ar.commission.picked', { count: picked.length, amount: money(total.toString()) })}
+          </p>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="cm-as">{t('ar.commission.as')}</Label>
+            <select
+              id="cm-as"
+              className={selectClass}
+              value={as}
+              onChange={(e) => setAs(e.target.value as typeof as)}
+            >
+              <option value="PAID">{t('ar.commission.asPaid')}</option>
+              <option value="OFFSET">{t('ar.commission.asOffset')}</option>
+            </select>
+          </div>
+          <Field
+            id="cm-on"
+            label={t('ar.commission.settledOn')}
+            type="date"
+            max={today}
+            value={settledOn}
+            onChange={(e) => setSettledOn(e.target.value)}
+            required
+          />
+          <Field
+            id="cm-ref"
+            label={t('ar.payment.reference')}
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+          />
+          <Button type="submit" size="sm" disabled={settle.isPending}>
+            {t('ar.commission.settle')}
+          </Button>
+          {settle.error && <Alert tone="critical">{errorMessage(settle.error)}</Alert>}
+        </form>
+      )}
+    </section>
+  );
+}
+
+const TABS = ['accounts', 'ageing', 'commissions'] as const;
+const TAB_PERMISSION = {
+  accounts: 'ar.manage',
+  ageing: 'ar.manage',
+  commissions: 'ar.commission',
+} as const;
 
 export function CityLedgerPage() {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<(typeof TABS)[number]>('accounts');
+  const { permissions } = useSession();
+  const tabs = TABS.filter((x) => permissions.includes(TAB_PERMISSION[x]));
+  const [chosen, setTab] = useState<(typeof TABS)[number] | null>(null);
+  const tab = chosen && tabs.includes(chosen) ? chosen : (tabs[0] ?? null);
   return (
     <section className="max-w-5xl">
       <h1 className="text-xl font-semibold">{t('ar.title')}</h1>
       <div role="tablist" className="mt-3 flex gap-2">
-        {TABS.map((x) => (
+        {tabs.map((x) => (
           <Button
             key={x}
             role="tab"
@@ -694,6 +912,7 @@ export function CityLedgerPage() {
       <div className="mt-4">
         {tab === 'accounts' && <Accounts />}
         {tab === 'ageing' && <Ageing />}
+        {tab === 'commissions' && <Commissions />}
       </div>
     </section>
   );

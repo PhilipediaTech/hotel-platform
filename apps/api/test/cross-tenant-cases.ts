@@ -665,6 +665,43 @@ async function bArUnchanged(db: Db, world: TenantWorld) {
   expect(await db.payment.count({ where: { method: 'AR_TRANSFER' } })).toBe(0);
 }
 
+/** B's checked-out agent booking with a due commission (T-127). */
+async function bCommission(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bArAccount(db, world, propertyId);
+  const account = await db.arAccount.findUniqueOrThrow({ where: { id: theirs.accountId } });
+  await db.company.update({
+    where: { id: account.companyId },
+    data: { kind: 'TRAVEL_AGENT', commissionBps: 1000 },
+  });
+  await db.reservation.update({
+    where: { id: theirs.reservationId },
+    data: { travelAgentId: account.companyId },
+  });
+  await db.stay.update({
+    where: { id: theirs.stayId },
+    data: { status: 'CHECKED_OUT', checkedOutAt: new Date('2026-01-15T10:00:00Z') },
+  });
+  const commission = await db.commission.create({
+    data: {
+      propertyId,
+      travelAgentId: account.companyId,
+      stayId: theirs.stayId,
+      checkedOutOn: new Date('2026-01-15'),
+      baseMinor: 1000n,
+      rateBps: 1000,
+      amountMinor: 100n,
+    },
+  });
+  return { ...theirs, commissionId: commission.id, agentId: account.companyId };
+}
+
+async function bCommissionUnchanged(db: Db, world: TenantWorld) {
+  const rows = await db.commission.findMany();
+  expect(rows.map((c) => [c.status, c.baseMinor, c.amountMinor])).toEqual([['DUE', 1000n, 100n]]);
+  expect(await db.arPayment.count({ where: { propertyId: world.b1.id } })).toBe(1);
+  expect(await db.arAllocation.count()).toBe(0);
+}
+
 async function bBookingPage(db: Db, world: TenantWorld, propertyId: string) {
   const organisationId = orgOf(world, propertyId);
   await db.bookingEngineSettings.create({
@@ -1974,6 +2011,26 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bArAccount,
     listIds: (body) =>
       (body as { accounts: { accountId: string }[] }).accounts.map((a) => a.accountId),
+  },
+  listCommissions: {
+    seed: bCommission,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((c) => c.id),
+  },
+  calculateCommissions: {
+    seed: bCommission,
+    // Works over A's own stays: it must leave B's commission alone.
+    creates: true,
+    body: () => ({ from: '2026-01-01', to: '2026-01-31' }),
+    untouched: bCommissionUnchanged,
+  },
+  settleCommissions: {
+    seed: bCommission,
+    body: (theirs) => ({
+      commissionIds: [theirs['commissionId']],
+      as: 'OFFSET',
+      settledOn: '2026-01-20',
+    }),
+    untouched: bCommissionUnchanged,
   },
   listServices: {
     seed: bService,

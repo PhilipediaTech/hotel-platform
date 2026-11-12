@@ -412,7 +412,7 @@ export async function transfer(
 // ── Payments and allocation ─────────────────────────────────────────────────────────────
 
 /** Allocates a payment's unallocated money to the account's open invoices. */
-async function allocateIn(
+export async function allocateIn(
   tx: TenantTx,
   paymentId: string,
   wanted: { invoiceId: string; amountMinor: string }[] | undefined,

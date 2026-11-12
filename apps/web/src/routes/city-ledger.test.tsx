@@ -56,6 +56,25 @@ const DETAIL = {
   ],
 };
 
+const COMMISSION = {
+  id: id(20),
+  agent: { id: id(21), name: 'Wakanow' },
+  stay: {
+    id: id(22),
+    confirmationNo: 'LAG-00042',
+    guestName: 'Ada Obi',
+    arrival: '2026-11-07',
+    departure: '2026-11-09',
+  },
+  checkedOutOn: '2026-11-09',
+  baseMinor: '10000000',
+  rateBps: 1000,
+  amountMinor: '1000000',
+  status: 'DUE',
+  settledOn: null,
+  reference: null,
+};
+
 let permissions: string[];
 let transferReply: () => Response;
 const calls: { key: string; body: unknown; search: string }[] = [];
@@ -82,6 +101,10 @@ beforeEach(() => {
         lines: [],
         closingMinor: '3000000',
       }),
+    'GET /commissions': () => json(200, { data: [COMMISSION], dueMinor: '1000000' }),
+    'POST /commissions/calculate': () => json(200, { created: 1, updated: 0, data: [COMMISSION] }),
+    'POST /commissions/settle': () =>
+      json(200, { data: [{ ...COMMISSION, status: 'OFFSET', settledOn: '2026-11-10' }] }),
     'GET /reports/ar-ageing': () =>
       json(200, {
         asOf: '2026-11-10',
@@ -170,6 +193,33 @@ describe('City ledger (S32)', { timeout: 20_000 }, () => {
     const table = await screen.findByRole('table');
     expect(within(table).getByText('1–30 days')).toBeInTheDocument();
     expect(within(table).getAllByText(/30,000\.00/).length).toBeGreaterThan(1);
+  });
+
+  it('works out commissions and sets them off against the agent’s account (M4-22)', async () => {
+    const user = userEvent.setup();
+    // Finance with commissions only: the accounts tabs are not theirs.
+    permissions = ['ar.commission'];
+    renderAt('/ar');
+    expect(await screen.findByRole('tab', { name: 'Commissions' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Accounts' })).not.toBeInTheDocument();
+    const calc = await screen.findByRole('form', { name: 'Calculate commissions' });
+    await user.click(within(calc).getByRole('button', { name: 'Calculate commissions' }));
+    expect(await within(calc).findByText('1 new, 0 updated.')).toBeInTheDocument();
+    expect(sent('POST /commissions/calculate')).toHaveLength(1);
+
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('Wakanow')).toBeInTheDocument();
+    expect(within(table).getByText('10%')).toBeInTheDocument();
+    await user.click(within(table).getByRole('checkbox', { name: /Ada Obi/ }));
+    const settle = await screen.findByRole('form', { name: 'Settle commissions' });
+    expect(within(settle).getByText(/1 commission chosen, .*10,000.00/)).toBeInTheDocument();
+    await user.selectOptions(within(settle).getByLabelText('Settle as'), 'OFFSET');
+    await user.click(within(settle).getByRole('button', { name: 'Settle commissions' }));
+    await waitFor(() => expect(sent('POST /commissions/settle')).toHaveLength(1));
+    expect(sent('POST /commissions/settle')[0]?.body).toMatchObject({
+      commissionIds: [COMMISSION.id],
+      as: 'OFFSET',
+    });
   });
 
   it('from a folio, transfers the window to an account, or says a manager was asked', async () => {

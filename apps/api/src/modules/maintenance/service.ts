@@ -12,6 +12,7 @@ import type { z } from 'zod';
 import type { Prisma } from '../../generated/prisma/client.ts';
 import { recordAudit } from '../../core/audit.ts';
 import type { Clock } from '../../core/clock.ts';
+import type { Db } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
@@ -25,6 +26,8 @@ import { loadVisible, mayLogWork, workOrderItem } from '../tasks/service.ts';
 // and outside cost logged against it.
 
 export interface MaintenanceDeps {
+  /** For the assignee check (members are read across the organisation). */
+  db: Db;
   tenantDb: TenantDb;
   clock: Clock;
 }

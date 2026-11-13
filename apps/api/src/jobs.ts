@@ -30,6 +30,7 @@ import {
 } from './modules/payments/jobs.ts';
 import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 import { taskEscalationJob } from './modules/tasks/jobs.ts';
+import { preventiveMaintenanceJob } from './modules/maintenance/preventive.ts';
 import { eventHoldExpiryJob } from './modules/events/routes.ts';
 import { groupBlockReleaseJob } from './modules/groups/routes.ts';
 import { platformBillingJob } from './modules/platform/billing.ts';
@@ -63,6 +64,7 @@ export function workerJobs(deps: {
     paymentWebhookJob({ provider: deps.payments }),
     unmatchedTransferJob,
     taskEscalationJob,
+    preventiveMaintenanceJob,
   ];
 }
 

@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-130 is pushed on `feat/T-130-assets-work-orders`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Next: preventive maintenance by calendar or run hours (M5-10).
+T-131 is pushed on `feat/T-131-preventive-maintenance`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Next: generator and meters (M5-11, M5-12).

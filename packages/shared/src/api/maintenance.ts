@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { TASK_STATUSES } from '../tasks.ts';
+import { addDays } from '../dates.ts';
+import { PRIORITIES, TASK_STATUSES } from '../tasks.ts';
 import { defineRoute } from './contract.ts';
 import { AmountMinor, Instant, IsoDate, Uuid } from './primitives.ts';
 
@@ -227,10 +228,212 @@ export const saveWorkOrder = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+// ── Preventive maintenance (M5-10 "As a manager, I schedule preventive maintenance by calendar
+// or run hours", pm.manage; S34 PM calendar; T-131) ────────────────────────────────────────
+// A plan comes due by the calendar (every N days from its due date) or by run hours (every N
+// hours on its asset's hour meter). When it is due within its lead (days or hours ahead), the
+// worker opens one maintenance task for it; verifying that task moves the plan on: the next
+// date counts from the day it was done, the next service from the meter reading then.
+
+export const PM_TRIGGERS = ['CALENDAR', 'RUN_HOURS'] as const;
+export type PmTrigger = (typeof PM_TRIGGERS)[number];
+export const PM_DUE_STATES = ['OK', 'DUE_SOON', 'OVERDUE'] as const;
+export type PmDueState = (typeof PM_DUE_STATES)[number];
+
+/** Where a plan stands today: OVERDUE past its date or hours, DUE_SOON within its lead. */
+export function pmDueState(
+  plan: {
+    trigger: PmTrigger;
+    nextDueOn: string | null;
+    leadDays: number;
+    hoursLeft: number | null;
+    leadHours: number;
+  },
+  today: string,
+): PmDueState {
+  if (plan.trigger === 'CALENDAR') {
+    if (!plan.nextDueOn) return 'OK';
+    if (plan.nextDueOn < today) return 'OVERDUE';
+    return plan.nextDueOn <= addDays(today, plan.leadDays) ? 'DUE_SOON' : 'OK';
+  }
+  if (plan.hoursLeft === null) return 'OK';
+  if (plan.hoursLeft <= 0) return 'OVERDUE';
+  return plan.hoursLeft <= plan.leadHours ? 'DUE_SOON' : 'OK';
+}
+
+/** The dates a calendar plan falls on from `from` to `to`: its next date, then every N days. */
+export function pmOccurrences(
+  nextDueOn: string,
+  everyDays: number,
+  from: string,
+  to: string,
+): string[] {
+  const out: string[] = [];
+  if (everyDays < 1) return out;
+  for (let d = nextDueOn; d <= to && out.length < 400; d = addDays(d, everyDays)) {
+    if (d >= from) out.push(d);
+  }
+  return out;
+}
+
+const Hours = z.number().int().min(0).max(1_000_000);
+
+export const PreventivePlanItem = z
+  .object({
+    id: Uuid,
+    title: z.string(),
+    instructions: z.string().nullable(),
+    asset: AssetRef.nullable(),
+    trigger: z.enum(PM_TRIGGERS),
+    everyDays: z.number().int().nullable(),
+    everyHours: z.number().int().nullable(),
+    leadDays: z.number().int(),
+    leadHours: z.number().int(),
+    /** Calendar plans: the next date it is due. */
+    nextDueOn: IsoDate.nullable(),
+    lastDoneOn: IsoDate.nullable(),
+    /** Run-hours plans: the latest meter reading, and the reading at the last service. */
+    meterHours: z.number().int().nullable(),
+    meterReadAt: Instant.nullable(),
+    lastServiceHours: z.number().int().nullable(),
+    /** Run hours until the next service (negative when past it). */
+    hoursLeft: z.number().int().nullable(),
+    dueState: z.enum(PM_DUE_STATES),
+    assignee: z.object({ id: Uuid, name: z.string() }).nullable(),
+    priority: z.enum(PRIORITIES),
+    active: z.boolean(),
+    /** The job open for it now. */
+    openTask: z
+      .object({ id: Uuid, number: z.number().int(), status: z.enum(TASK_STATUSES) })
+      .nullable(),
+  })
+  .meta({ id: 'PreventivePlan' });
+
+export const PreventivePlanBody = z
+  .object({
+    title: z.string().trim().min(3).max(120),
+    instructions: Optional(2000).default(null),
+    assetId: Uuid.nullable().default(null),
+    trigger: z.enum(PM_TRIGGERS),
+    everyDays: z.number().int().min(1).max(3660).nullable().default(null),
+    everyHours: z.number().int().min(1).max(100_000).nullable().default(null),
+    /** Calendar: the first date it is due. */
+    firstDueOn: IsoDate.nullable().default(null),
+    /** Run hours: the meter reading at the last service, and now (defaults to the same). */
+    lastServiceHours: Hours.nullable().default(null),
+    meterHours: Hours.nullable().default(null),
+    leadDays: z.number().int().min(0).max(90).default(3),
+    leadHours: z.number().int().min(0).max(10_000).default(10),
+    assigneeId: Uuid.nullable().default(null),
+    priority: z.enum(PRIORITIES).default('NORMAL'),
+  })
+  .superRefine((b, ctx) => {
+    const need = (ok: boolean, path: string, message: string) => {
+      if (!ok) ctx.addIssue({ code: 'custom', path: [path], message });
+    };
+    if (b.trigger === 'CALENDAR') {
+      need(b.everyDays !== null, 'everyDays', 'How many days between services?');
+      need(b.firstDueOn !== null, 'firstDueOn', 'When is it first due?');
+      need(b.everyHours === null, 'everyHours', 'A calendar plan has no run hours');
+    } else {
+      need(b.everyHours !== null, 'everyHours', 'How many run hours between services?');
+      need(b.assetId !== null, 'assetId', 'Run hours are counted on an asset: choose one');
+      need(b.lastServiceHours !== null, 'lastServiceHours', 'Enter the hours at the last service');
+      need(b.everyDays === null, 'everyDays', 'A run-hours plan has no day interval');
+      need(
+        b.meterHours === null || b.lastServiceHours === null || b.meterHours >= b.lastServiceHours,
+        'meterHours',
+        'The meter cannot read less than at the last service',
+      );
+    }
+  });
+
+export const PreventivePlanPatch = z
+  .object({
+    title: z.string().trim().min(3).max(120).optional(),
+    instructions: Optional(2000).optional(),
+    everyDays: z.number().int().min(1).max(3660).optional(),
+    everyHours: z.number().int().min(1).max(100_000).optional(),
+    /** Calendar: move the next date. */
+    nextDueOn: IsoDate.optional(),
+    leadDays: z.number().int().min(0).max(90).optional(),
+    leadHours: z.number().int().min(0).max(10_000).optional(),
+    assigneeId: Uuid.nullable().optional(),
+    priority: z.enum(PRIORITIES).optional(),
+    /** Paused plans open no jobs. */
+    active: z.boolean().optional(),
+  })
+  .refine((b) => Object.values(b).some((v) => v !== undefined), { message: 'Nothing to change' });
+
+export const MeterReadingBody = z.object({ hours: Hours });
+
+const PlanParams = z.object({ planId: Uuid });
+
+export const listPreventivePlans = defineRoute({
+  ...COMMON,
+  operationId: 'listPreventivePlans',
+  method: 'get',
+  path: '/preventive-plans',
+  summary: 'Preventive maintenance plans and when each is due (M5-10)',
+  permission: 'pm.manage',
+  query: z.object({
+    assetId: Uuid.optional(),
+    trigger: z.enum(PM_TRIGGERS).optional(),
+    active: z.enum(['true', 'false']).optional(),
+  }),
+  response: z.object({ data: z.array(PreventivePlanItem), today: IsoDate }),
+});
+
+export const createPreventivePlan = defineRoute({
+  ...COMMON,
+  operationId: 'createPreventivePlan',
+  method: 'post',
+  path: '/preventive-plans',
+  summary: 'Plan preventive maintenance by calendar or run hours (M5-10)',
+  description: 'A plan already due opens its job at once.',
+  permission: 'pm.manage',
+  idempotent: true,
+  status: 201,
+  body: PreventivePlanBody,
+  response: PreventivePlanItem,
+});
+
+export const updatePreventivePlan = defineRoute({
+  ...COMMON,
+  operationId: 'updatePreventivePlan',
+  method: 'patch',
+  path: '/preventive-plans/{planId}',
+  summary: 'Change, pause or resume a preventive plan (M5-10)',
+  description: 'Added beyond tab 4 (T-131).',
+  permission: 'pm.manage',
+  params: PlanParams,
+  body: PreventivePlanPatch,
+  response: PreventivePlanItem,
+});
+
+export const recordPlanHours = defineRoute({
+  ...COMMON,
+  operationId: 'recordPlanHours',
+  method: 'post',
+  path: '/preventive-plans/{planId}/hours',
+  summary: 'Record the hour-meter reading of a run-hours plan (M5-10)',
+  description:
+    'Added beyond tab 4 (T-131). A reading that brings the plan within its lead opens its job.',
+  permission: 'pm.manage',
+  idempotent: true,
+  params: PlanParams,
+  body: MeterReadingBody,
+  response: PreventivePlanItem,
+});
+
 export const MAINTENANCE_ROUTES = {
   listAssets,
   createAsset,
   getAsset,
   updateAsset,
   saveWorkOrder,
+  listPreventivePlans,
+  createPreventivePlan,
+  updatePreventivePlan,
+  recordPlanHours,
 } as const;

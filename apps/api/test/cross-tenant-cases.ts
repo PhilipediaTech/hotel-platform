@@ -1138,6 +1138,30 @@ async function bAssetUnchanged(db: Db, world: TenantWorld) {
   expect(tasks.map((t) => [t.assetId, t.workOrder?.labourMinutes])).toEqual([[assets[0]?.id, 30]]);
 }
 
+/** B's run-hours plan on their asset (T-131). */
+async function bPmPlan(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bAsset(db, world, propertyId);
+  const plan = await db.preventivePlan.create({
+    data: {
+      propertyId,
+      title: 'Their oil change',
+      assetId: theirs.assetId,
+      trigger: 'RUN_HOURS',
+      everyHours: 250,
+      meterHours: 100,
+      lastServiceHours: 0,
+    },
+  });
+  return { ...theirs, planId: plan.id };
+}
+
+async function bPmPlanUnchanged(db: Db, world: TenantWorld) {
+  const plans = await db.preventivePlan.findMany({ where: { propertyId: world.b1.id } });
+  expect(plans.map((p) => [p.title, p.meterHours, p.active, p.openTaskId])).toEqual([
+    ['Their oil change', 100, true, null],
+  ]);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -2621,6 +2645,33 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bAsset,
     body: () => ({ parts: [], labourMinutes: 1, vendorName: null, vendorCostMinor: '0' }),
     untouched: bAssetUnchanged,
+  },
+  listPreventivePlans: {
+    seed: bPmPlan,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((p) => p.id),
+  },
+  createPreventivePlan: {
+    seed: bPmPlan,
+    creates: true,
+    body: (theirs) => ({
+      title: 'Leak plan',
+      assetId: theirs['assetId'],
+      trigger: 'RUN_HOURS',
+      everyHours: 10,
+      lastServiceHours: 0,
+      meterHours: 100,
+    }),
+    untouched: bPmPlanUnchanged,
+  },
+  updatePreventivePlan: {
+    seed: bPmPlan,
+    body: () => ({ title: 'Leaked', active: false }),
+    untouched: bPmPlanUnchanged,
+  },
+  recordPlanHours: {
+    seed: bPmPlan,
+    body: () => ({ hours: 999 }),
+    untouched: bPmPlanUnchanged,
   },
   getTaskFormOptions: {
     seed: bTask,

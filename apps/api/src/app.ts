@@ -203,7 +203,7 @@ export function createApp({
   api.use(groupRoutes({ db, tenantDb, clock }));
   api.use(arRoutes({ db, tenantDb, clock, email }));
   api.use(reconciliationRoutes({ tenantDb, clock }));
-  api.use(maintenanceRoutes({ tenantDb, clock }));
+  api.use(maintenanceRoutes({ db, tenantDb, clock }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));

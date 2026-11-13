@@ -65,6 +65,36 @@
     "sendReport": "Send report ({{count}})",
     "reportSentNone": "Report sent. No discrepancies.",
     "reportSent_one": "Report sent. {{count}} discrepancy raised for the front desk.",
-    "reportSent_other": "Report sent. {{count}} discrepancies raised for the front desk."
+    "reportSent_other": "Report sent. {{count}} discrepancies raised for the front desk.",
+    "inspect": {
+      "open": "Inspect",
+      "openNamed": "Inspect room {{room}}",
+      "formNamed": "Inspection of room {{room}}",
+      "pass": "Pass",
+      "fail": "Fail and send back",
+      "cancel": "Cancel",
+      "whatFailed": "What failed",
+      "other": "Something else",
+      "reasons": {
+        "bathroom": "Bathroom not clean",
+        "bed": "Bed not made properly",
+        "dust": "Dust",
+        "towels": "Towels or linen missing",
+        "amenities": "Amenities missing",
+        "minibar": "Minibar not restocked",
+        "odour": "Bad smell",
+        "damage": "Damage to report"
+      },
+      "waiting": "Waiting for inspection",
+      "waitingRequired": "Waiting for inspection: not ready for a guest yet",
+      "passedBy": "Passed inspection ({{name}})",
+      "failedBy": "Failed inspection ({{name}}): {{reasons}}",
+      "sentBack": "Sent back by the inspector: {{reasons}}",
+      "onlyWaiting_one": "Only the {{count}} room waiting for inspection",
+      "onlyWaiting_other": "Only the {{count}} rooms waiting for inspection",
+      "required": "Rooms must pass inspection before a guest gets them",
+      "requiredHint": "On: a cleaned room is ready for check-in only after a supervisor passes it. Off: it is ready as soon as it is cleaned.",
+      "requiredNote": "Rooms must pass inspection before a guest gets them."
+    }
   }
 }

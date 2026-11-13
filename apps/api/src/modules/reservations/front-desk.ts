@@ -1,9 +1,15 @@
-import type { FrontDeskFlag, FrontDeskQuery, FrontDeskRow } from '@hotel/shared';
+import {
+  isRoomReady,
+  type FrontDeskFlag,
+  type FrontDeskQuery,
+  type FrontDeskRow,
+} from '@hotel/shared';
 import type { z } from 'zod';
 import type { Prisma } from '../../generated/prisma/client.ts';
 import { businessDate } from '../../core/business-day.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { folioBalances } from '../folios/service.ts';
+import { inspectionRequired } from '../housekeeping/settings.ts';
 import { depositsCovered } from '../payments/deposits.ts';
 import { dayUseOf, type ReservationDeps } from './service.ts';
 
@@ -27,7 +33,6 @@ const ROW = {
 
 type StayRow = Prisma.StayGetPayload<{ include: typeof ROW }>;
 
-const READY = new Set(['CLEAN', 'INSPECTED']);
 const day = (d: Date) => d.toISOString().slice(0, 10);
 const dbDate = (date: string) => new Date(`${date}T00:00:00Z`);
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -45,6 +50,8 @@ interface Seen {
   balances: Map<string, bigint>;
   /** Deposit-guaranteed bookings whose deposits received cover what is due (T-063). */
   depositPaid: Set<string>;
+  /** Only INSPECTED rooms are ready (T-129). */
+  inspection: boolean;
 }
 
 function flagsOf(s: StayRow, seen: Seen): FrontDeskFlag[] {
@@ -56,7 +63,8 @@ function flagsOf(s: StayRow, seen: Seen): FrontDeskFlag[] {
   if (expected && !s.roomId) flags.push('NO_ROOM');
   if (expected && s.room) {
     const other = seen.occupied.get(s.room.id);
-    if (!READY.has(s.room.hkStatus) || (other && other !== s.id)) flags.push('ROOM_NOT_READY');
+    if (!isRoomReady(s.room.hkStatus, seen.inspection) || (other && other !== s.id))
+      flags.push('ROOM_NOT_READY');
   }
   if (expected && s.reservation.guarantee === 'DEPOSIT' && !seen.depositPaid.has(s.reservationId)) {
     flags.push('DEPOSIT_DUE');
@@ -168,6 +176,7 @@ async function list(
     occupied: new Map(inRooms.map((s) => [s.roomId ?? '', s.id])),
     balances: new Map(),
     depositPaid: new Set(),
+    inspection: await inspectionRequired(deps.tenantDb, tenant.propertyId),
   };
   const stays = await deps.tenantDb.stay.findMany({ where: where(seen), include: ROW });
   seen.balances = await folioBalances(

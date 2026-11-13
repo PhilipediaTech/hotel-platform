@@ -2,7 +2,9 @@ import { HOUSEKEEPING_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as inspections from './inspections.ts';
 import * as hk from './service.ts';
+import * as settings from './settings.ts';
 import * as reports from './status-reports.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -11,7 +13,7 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
   return tenant;
 }
 
-/** Housekeeping (tab 4 row "Housekeeping"; T-080, morning status reports T-081). */
+/** Housekeeping (tab 4 row "Housekeeping"; T-080, morning status reports T-081, inspection T-129). */
 export function housekeepingRoutes(deps: hk.HousekeepingDeps): Router {
   const router = express.Router();
   const r = HOUSEKEEPING_ROUTES;
@@ -33,6 +35,12 @@ export function housekeepingRoutes(deps: hk.HousekeepingDeps): Router {
   );
   mountRoute(router, r.submitStatusReport, ({ body }, { tenant }) =>
     reports.submitStatusReport(deps, tenantFrom(tenant), body),
+  );
+  mountRoute(router, r.recordInspection, ({ body }, { tenant }) =>
+    inspections.recordInspection(deps, tenantFrom(tenant), body),
+  );
+  mountRoute(router, r.updateHousekeepingSettings, ({ body }, { tenant }) =>
+    settings.updateHousekeepingSettings(deps, tenantFrom(tenant), body),
   );
 
   return router;

@@ -111,6 +111,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   UnmatchedTransfer: { kind: 'property' },
   HkAssignment: { kind: 'property' },
   RoomStatusReport: { kind: 'property' },
+  Inspection: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

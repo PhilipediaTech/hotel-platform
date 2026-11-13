@@ -430,7 +430,8 @@ export const getCalendar = defineRoute({
 const StayParams = z.object({ stayId: Uuid });
 
 /** Why a free room is not ready for a guest arriving today (M3-07). */
-export const ROOM_PROBLEMS = ['NOT_CLEAN', 'OCCUPIED'] as const;
+/** NOT_INSPECTED: clean, but the hotel requires inspection first (T-129). */
+export const ROOM_PROBLEMS = ['NOT_CLEAN', 'NOT_INSPECTED', 'OCCUPIED'] as const;
 
 export const AssignableRoom = z
   .object({

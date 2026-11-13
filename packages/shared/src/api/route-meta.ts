@@ -266,6 +266,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   updateAssignment: {"operationId":"updateAssignment","method":"patch","path":"/housekeeping/assignments/{assignmentId}","body":true,"propertyScoped":true,"idempotent":true},
   listStatusReports: {"operationId":"listStatusReports","method":"get","path":"/housekeeping/status-reports","propertyScoped":true},
   submitStatusReport: {"operationId":"submitStatusReport","method":"post","path":"/housekeeping/status-reports","body":true,"propertyScoped":true,"idempotent":true},
+  recordInspection: {"operationId":"recordInspection","method":"post","path":"/inspections","body":true,"propertyScoped":true,"idempotent":true},
+  updateHousekeepingSettings: {"operationId":"updateHousekeepingSettings","method":"put","path":"/housekeeping/settings","body":true,"propertyScoped":true},
   listTasks: {"operationId":"listTasks","method":"get","path":"/tasks","propertyScoped":true},
   createTask: {"operationId":"createTask","method":"post","path":"/tasks","body":true,"propertyScoped":true,"idempotent":true},
   getTaskFormOptions: {"operationId":"getTaskFormOptions","method":"get","path":"/tasks/form-options","propertyScoped":true},

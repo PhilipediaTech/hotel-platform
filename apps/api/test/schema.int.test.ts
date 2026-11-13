@@ -64,6 +64,7 @@ describe('migrations', () => {
       'id_documents',
       'idempotency_keys',
       'import_jobs',
+      'inspections',
       'invitations',
       'key_issues',
       'leakage_alerts',

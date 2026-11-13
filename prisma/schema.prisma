@@ -140,6 +140,7 @@ model Property {
   unmatchedTransfers   UnmatchedTransfer[]
   hkAssignments        HkAssignment[]
   roomStatusReports    RoomStatusReport[]
+  inspections          Inspection[]
   taskTemplates        TaskTemplate[]
   tasks                Task[]
   handoverNotes        HandoverNote[]
@@ -298,6 +299,7 @@ model User {
   paymentIntents     PaymentIntent[]
   hkAssignments      HkAssignment[]
   roomStatusReports  RoomStatusReport[]
+  inspections        Inspection[]
   tasksReported      Task[]             @relation("TaskReporter")
   tasksAssigned      Task[]             @relation("TaskAssignee")
   tasksVerified      Task[]             @relation("TaskVerifier")
@@ -702,6 +704,7 @@ model Room {
   keyIssues      KeyIssue[]
   hkAssignments  HkAssignment[]
   statusReports  RoomStatusReport[]
+  inspections    Inspection[]
   tasks          Task[]
 
   @@unique([propertyId, number])
@@ -2110,6 +2113,26 @@ model RoomStatusReport {
 
   @@index([propertyId, businessDate, roomId])
   @@map("room_status_reports")
+}
+
+/// Room inspection (PRD M5-06; tab 3; T-129): pass sets the room INSPECTED, fail sends it back
+/// to DIRTY with the reasons.
+model Inspection {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  roomId      String   @map("room_id") @db.Uuid
+  inspectorId String   @map("inspector_id") @db.Uuid
+  passed      Boolean
+  failReasons String[] @map("fail_reasons")
+  at          DateTime @default(now()) @db.Timestamptz(6)
+
+  property  Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  room      Room     @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+  inspector User     @relation(fields: [inspectorId], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, at])
+  @@index([propertyId, roomId, at])
+  @@map("inspections")
 }
 
 // ── Tasks (PRD M6-01–M6-05, M6 rules 1–2, M5-07; tab 3; T-082) ───────────────────────────

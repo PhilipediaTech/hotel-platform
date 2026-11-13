@@ -1,5 +1,6 @@
 import {
   DEFAULT_CHECKLISTS,
+  isRoomReady,
   type AssignBody,
   type AssignmentPatch,
   type BoardRoom,
@@ -16,6 +17,8 @@ import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
+import { inspectionItem, inspectionsToday } from './inspections.ts';
+import { housekeepingSettings } from './settings.ts';
 import { reportsOf } from './status-reports.ts';
 
 // Housekeeping (PRD M5-01–M5-04, M5 rules 1–2; tab 4 row "Housekeeping"; T-080). A business
@@ -26,7 +29,7 @@ import { reportsOf } from './status-reports.ts';
 // board makes it on first look too (the same rows: one per room and date). An attendant
 // works a room through PENDING → IN_PROGRESS ⇄ PAUSED → DONE: starting sets the room CLEANING,
 // completing (every checklist item ticked) sets it CLEAN, so it can be given to a guest at
-// once (inspection, M5-06, is V1.1).
+// once, or, where the hotel requires inspection, once a supervisor passes it (M5-06, T-129).
 
 export interface HousekeepingDeps {
   db: Db;
@@ -37,6 +40,7 @@ export interface HousekeepingDeps {
 type Tx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
 type Client = TenantDb | Tx;
 type Assignment = Prisma.HkAssignmentGetPayload<{ include: { room: true; attendant: true } }>;
+type Inspected = Parameters<typeof inspectionItem>[0];
 
 /** Deep cleans added to a day's list, at most (vacant rooms longest without one). */
 export const DEEP_CLEANS_PER_DAY = 2;
@@ -47,7 +51,10 @@ const dbDate = (date: string) => new Date(`${date}T00:00:00Z`);
 const checklistOf = (kind: HkTaskKind) =>
   DEFAULT_CHECKLISTS[kind].map((item) => ({ item, done: false }));
 
-function assignmentItem(a: Assignment): z.input<typeof HkAssignmentItem> {
+export function assignmentItem(
+  a: Assignment,
+  inspection?: Inspected | null,
+): z.input<typeof HkAssignmentItem> {
   return {
     id: a.id,
     businessDate: day(a.businessDate),
@@ -63,6 +70,7 @@ function assignmentItem(a: Assignment): z.input<typeof HkAssignmentItem> {
     minibar: (a.minibar ?? []) as { item: string; quantity: number }[],
     notes: a.notes,
     hkStatus: a.room.hkStatus,
+    inspection: inspection ? inspectionItem(inspection) : null,
   };
 }
 
@@ -172,7 +180,7 @@ export async function getBoard(
 ) {
   const date = await businessDate(deps.tenantDb, tenant.propertyId, deps.clock);
   await ensureCleaningList(deps.tenantDb, tenant.propertyId, date);
-  const [rooms, assignments, fo, attendants, reports] = await Promise.all([
+  const [rooms, assignments, fo, attendants, reports, inspected, settings] = await Promise.all([
     deps.tenantDb.room.findMany({
       where: { active: true },
       include: { roomType: true },
@@ -182,6 +190,8 @@ export async function getBoard(
     frontOffice(deps.tenantDb, date),
     attendantsOf(deps, tenant),
     reportsOf(deps.tenantDb, date),
+    inspectionsToday(deps.tenantDb, tenant.propertyId, deps.clock),
+    housekeepingSettings(deps.tenantDb, tenant.propertyId),
   ]);
   const byRoom = new Map(assignments.map((a) => [a.roomId, a]));
   const floors = [...new Set(rooms.flatMap((r) => (r.floor ? [r.floor] : [])))];
@@ -190,7 +200,8 @@ export async function getBoard(
     const here = fo.occupied.get(r.id);
     const arrival = fo.arriving.has(r.id);
     const a = byRoom.get(r.id);
-    const ready = r.hkStatus === 'CLEAN' || r.hkStatus === 'INSPECTED';
+    const ready = isRoomReady(r.hkStatus, settings.inspectionRequired);
+    const inspection = inspected.get(r.id) ?? null;
     return {
       roomId: r.id,
       number: r.number,
@@ -206,12 +217,14 @@ export async function getBoard(
           : a && a.kind !== 'STAYOVER' && a.kind !== 'DEEP_CLEAN'
             ? 'NORMAL'
             : 'LOW',
-      assignment: a ? assignmentItem(a) : null,
+      awaitingInspection: r.hkStatus === 'CLEAN',
+      assignment: a ? assignmentItem(a, inspection) : null,
+      inspection: inspection ? inspectionItem(inspection) : null,
       observed: reports.latest.get(r.id)?.observed ?? null,
       discrepancy: reports.discrepancy.get(r.id) ?? null,
     };
   });
-  return { businessDate: date, floors, rooms: data, attendants };
+  return { businessDate: date, floors, rooms: data, attendants, settings };
 }
 
 /**
@@ -313,7 +326,8 @@ export async function assignRooms(
     include: WITH,
     orderBy: { room: { number: 'asc' } },
   });
-  return { data: rows.map(assignmentItem) };
+  const inspected = await inspectionsToday(deps.tenantDb, tenant.propertyId, deps.clock);
+  return { data: rows.map((a) => assignmentItem(a, inspected.get(a.roomId))) };
 }
 
 export async function myAssignments(deps: HousekeepingDeps, tenant: TenantContext) {
@@ -326,7 +340,8 @@ export async function myAssignments(deps: HousekeepingDeps, tenant: TenantContex
   // Rooms to do first, done ones last.
   const order = { IN_PROGRESS: 0, PAUSED: 1, PENDING: 2, DONE: 3 } as Record<string, number>;
   rows.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
-  return { businessDate: date, data: rows.map(assignmentItem) };
+  const inspected = await inspectionsToday(deps.tenantDb, tenant.propertyId, deps.clock);
+  return { businessDate: date, data: rows.map((a) => assignmentItem(a, inspected.get(a.roomId))) };
 }
 
 export async function updateAssignment(
@@ -398,7 +413,8 @@ export async function updateAssignment(
         });
       }
       Object.assign(data, { status: 'DONE', completedAt: now });
-      // M5 AC: with inspection off a completed room is CLEAN, ready for a guest at once.
+      // M5 AC: with inspection off a completed room is CLEAN, ready for a guest at once; with
+      // it on, CLEAN waits for a supervisor's pass (T-129).
       roomStatus = 'CLEAN';
     }
     await tx.hkAssignment.update({ where: { id: a.id }, data });
@@ -429,5 +445,6 @@ export async function updateAssignment(
     }
   });
   const row = await deps.tenantDb.hkAssignment.findUniqueOrThrow({ where: { id }, include: WITH });
-  return assignmentItem(row);
+  const inspected = await inspectionsToday(deps.tenantDb, tenant.propertyId, deps.clock);
+  return assignmentItem(row, inspected.get(row.roomId));
 }

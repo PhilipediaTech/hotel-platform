@@ -767,6 +767,7 @@
       "noneFree": "No room of this type is free on those nights",
       "problems": {
         "NOT_CLEAN": "not clean yet",
+        "NOT_INSPECTED": "clean, not inspected yet",
         "OCCUPIED": "guest still in it"
       },
       "managerReason": "This room is not ready: why give it now? A manager approves.",

@@ -524,6 +524,7 @@ describe('rule settings (M6-07, M6-09)', () => {
       ['SHIFT_VARIANCE', true, false, false],
       ['UNMATCHED_TRANSFER', true, true, false],
       ['VISITOR_OVERSTAY', true, true, false],
+      ['FUEL_VARIANCE', true, true, false],
     ]);
     expect(rules.find((r) => r.code === 'VISITOR_OVERSTAY')?.params).toEqual([
       expect.objectContaining({ key: 'cutoffHour', value: 23, default: 23 }),

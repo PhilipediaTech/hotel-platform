@@ -145,6 +145,8 @@ model Property {
   tasks                Task[]
   assets               Asset[]
   preventivePlans      PreventivePlan[]
+  generators           Generator[]
+  meterReadings        MeterReading[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
 
@@ -270,50 +272,54 @@ model User {
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  sessions           Session[]
-  memberships        Membership[]
-  authTokens         AuthToken[]
-  mfaRecoveryCodes   MfaRecoveryCode[]
-  auditEvents        AuditEvent[]
-  idempotencyKeys    IdempotencyKey[]
-  approvalsRequested ApprovalRequest[]  @relation("RequestedBy")
-  approvalsDecided   ApprovalRequest[]  @relation("DecidedBy")
-  invitationsSent    Invitation[]       @relation("InvitedBy")
-  filesUploaded      FileObject[]
-  roomBlocksCreated  RoomBlock[]
-  importJobs         ImportJob[]
-  keysIssued         KeyIssue[]
-  occupantsAdded     StayOccupant[]     @relation("OccupantAddedBy")
-  occupantsRemoved   StayOccupant[]     @relation("OccupantRemovedBy")
-  visitorsSignedIn   Visitor[]          @relation("VisitorSignedInBy")
-  visitorsSignedOut  Visitor[]          @relation("VisitorSignedOutBy")
-  cardsSigned        RegistrationCard[]
-  daysClosed         BusinessDay[]
-  folioLinesPosted   FolioLine[]
-  shifts             CashierShift[]     @relation("ShiftCashier")
-  shiftsSignedOff    CashierShift[]     @relation("ShiftSignedOff")
-  cashReceived       CashHandover[]
-  leakageAlerts      LeakageAlert[]
-  alertOutcomes      AlertOutcome[]
-  paymentsReceived   Payment[]
-  exchangeRatesSet   ExchangeRate[]
-  nightAuditsStarted NightAuditRun[]
-  paymentIntents     PaymentIntent[]
-  hkAssignments      HkAssignment[]
-  roomStatusReports  RoomStatusReport[]
-  inspections        Inspection[]
-  tasksReported      Task[]             @relation("TaskReporter")
-  tasksAssigned      Task[]             @relation("TaskAssignee")
-  tasksVerified      Task[]             @relation("TaskVerifier")
-  taskEvents         TaskEvent[]
-  preventivePlans    PreventivePlan[]   @relation("PlanAssignee")
-  handoversWritten   HandoverNote[]     @relation("HandoverWriter")
-  handoversAcked     HandoverNote[]     @relation("HandoverAcknowledger")
-  invitationsClaimed Invitation[]       @relation("AcceptedBy")
-  supportSessions    SupportSession[]
-  referralPartner    ReferralPartner?
-  partnerPayouts     PartnerPayout[]    @relation("PartnerPayoutBy")
-  partnerChanges     PartnerChange[]    @relation("PartnerChangeBy")
+  sessions             Session[]
+  memberships          Membership[]
+  authTokens           AuthToken[]
+  mfaRecoveryCodes     MfaRecoveryCode[]
+  auditEvents          AuditEvent[]
+  idempotencyKeys      IdempotencyKey[]
+  approvalsRequested   ApprovalRequest[]  @relation("RequestedBy")
+  approvalsDecided     ApprovalRequest[]  @relation("DecidedBy")
+  invitationsSent      Invitation[]       @relation("InvitedBy")
+  filesUploaded        FileObject[]
+  roomBlocksCreated    RoomBlock[]
+  importJobs           ImportJob[]
+  keysIssued           KeyIssue[]
+  occupantsAdded       StayOccupant[]     @relation("OccupantAddedBy")
+  occupantsRemoved     StayOccupant[]     @relation("OccupantRemovedBy")
+  visitorsSignedIn     Visitor[]          @relation("VisitorSignedInBy")
+  visitorsSignedOut    Visitor[]          @relation("VisitorSignedOutBy")
+  cardsSigned          RegistrationCard[]
+  daysClosed           BusinessDay[]
+  folioLinesPosted     FolioLine[]
+  shifts               CashierShift[]     @relation("ShiftCashier")
+  shiftsSignedOff      CashierShift[]     @relation("ShiftSignedOff")
+  cashReceived         CashHandover[]
+  leakageAlerts        LeakageAlert[]
+  alertOutcomes        AlertOutcome[]
+  paymentsReceived     Payment[]
+  exchangeRatesSet     ExchangeRate[]
+  nightAuditsStarted   NightAuditRun[]
+  paymentIntents       PaymentIntent[]
+  hkAssignments        HkAssignment[]
+  roomStatusReports    RoomStatusReport[]
+  inspections          Inspection[]
+  tasksReported        Task[]             @relation("TaskReporter")
+  tasksAssigned        Task[]             @relation("TaskAssignee")
+  tasksVerified        Task[]             @relation("TaskVerifier")
+  taskEvents           TaskEvent[]
+  preventivePlans      PreventivePlan[]   @relation("PlanAssignee")
+  generatorRunsStarted GeneratorRun[]     @relation("RunStartedBy")
+  generatorRunsStopped GeneratorRun[]     @relation("RunStoppedBy")
+  fuelMovements        FuelMovement[]
+  meterReadings        MeterReading[]
+  handoversWritten     HandoverNote[]     @relation("HandoverWriter")
+  handoversAcked       HandoverNote[]     @relation("HandoverAcknowledger")
+  invitationsClaimed   Invitation[]       @relation("AcceptedBy")
+  supportSessions      SupportSession[]
+  referralPartner      ReferralPartner?
+  partnerPayouts       PartnerPayout[]    @relation("PartnerPayoutBy")
+  partnerChanges       PartnerChange[]    @relation("PartnerChangeBy")
 
   messagesSent        Message[]             @relation("MessageSentBy")
   eventEnquiries      EventEnquiry[]
@@ -2318,11 +2324,12 @@ model Asset {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  property Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  property  Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   // Same property is checked by the service (Prisma can't mix a required and an optional column).
-  room     Room?            @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  tasks    Task[]
-  plans    PreventivePlan[]
+  room      Room?            @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  tasks     Task[]
+  plans     PreventivePlan[]
+  generator Generator?
 
   @@unique([propertyId, tag])
   @@index([propertyId, status])
@@ -2366,6 +2373,79 @@ model PreventivePlan {
 
   @@index([propertyId, active])
   @@map("preventive_plans")
+}
+
+/// Generators (M5-11; tab 3; T-132). Each is an asset of the register; the tank is the diesel
+/// store that feeds it. Runs and fuel movements have no property column: they are reached
+/// through their generator.
+model Generator {
+  id                  String   @id @default(uuid()) @db.Uuid
+  propertyId          String   @map("property_id") @db.Uuid
+  assetId             String   @unique @map("asset_id") @db.Uuid
+  name                String
+  tankLitresMilli     Int      @map("tank_litres_milli")
+  serviceEveryMinutes Int?     @map("service_every_minutes")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  asset         Asset          @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  runs          GeneratorRun[]
+  fuelMovements FuelMovement[]
+
+  @@index([propertyId])
+  @@map("generators")
+}
+
+model GeneratorRun {
+  id          String    @id @default(uuid()) @db.Uuid
+  generatorId String    @map("generator_id") @db.Uuid
+  startedAt   DateTime  @map("started_at") @db.Timestamptz(6)
+  stoppedAt   DateTime? @map("stopped_at") @db.Timestamptz(6)
+  startedById String    @map("started_by_id") @db.Uuid
+  stoppedById String?   @map("stopped_by_id") @db.Uuid
+
+  generator Generator @relation(fields: [generatorId], references: [id], onDelete: Restrict)
+  startedBy User      @relation("RunStartedBy", fields: [startedById], references: [id], onDelete: Restrict)
+  stoppedBy User?     @relation("RunStoppedBy", fields: [stoppedById], references: [id], onDelete: Restrict)
+
+  @@index([generatorId, startedAt])
+  @@map("generator_runs")
+}
+
+/// RECEIVED (delivered into the tank), ISSUED (drawn from it) or LEVEL_CHECK (a dip reading).
+model FuelMovement {
+  id          String   @id @default(uuid()) @db.Uuid
+  generatorId String   @map("generator_id") @db.Uuid
+  kind        String
+  litresMilli Int      @map("litres_milli")
+  costMinor   BigInt?  @map("cost_minor")
+  supplier    String?
+  fileId      String?  @map("file_id") @db.Uuid
+  byUserId    String   @map("by_user_id") @db.Uuid
+  at          DateTime @default(now()) @db.Timestamptz(6)
+
+  generator Generator @relation(fields: [generatorId], references: [id], onDelete: Restrict)
+  byUser    User      @relation(fields: [byUserId], references: [id], onDelete: Restrict)
+
+  @@index([generatorId, at])
+  @@map("fuel_movements")
+}
+
+/// Meter readings (M5-12; tab 3; T-132): GRID, WATER, GAS or a meter the hotel names.
+model MeterReading {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  meter      String
+  reading    BigInt
+  byUserId   String   @map("by_user_id") @db.Uuid
+  at         DateTime @default(now()) @db.Timestamptz(6)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  byUser   User     @relation(fields: [byUserId], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, meter, at])
+  @@map("meter_readings")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

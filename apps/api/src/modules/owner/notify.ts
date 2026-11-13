@@ -99,6 +99,8 @@ export function alertDetail(
       return `Room ${str(e['roomNumber']) || '?'}: housekeeping saw ${str(e['observed']).toLowerCase().replaceAll('_', ' ')}, the front office shows ${str(e['frontOffice']).toLowerCase()}.`;
     case 'VISITOR_OVERSTAY':
       return `${str(e['visitor']) || 'A visitor'} is still signed in with ${str(e['guest']) || 'a guest'} in room ${str(e['room']) || '?'} after the ${str(e['cutoffHour'])}:00 cut-off.`;
+    case 'FUEL_VARIANCE':
+      return `${str(e['generator']) || 'A generator'}: ${str(e['missingLitres'])} litres of diesel unaccounted for (${str(e['percent'])}% of ${str(e['accountableLitres'])} litres) since the check on ${str(e['since'])}.`;
     case 'UNMATCHED_TRANSFER':
       return `A transfer of ${money(minor(e['amountMinor']), str(e['currency']) || currency)}${
         str(e['reference']) ? ` (reference ${str(e['reference'])})` : ''

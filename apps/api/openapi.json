@@ -11798,6 +11798,436 @@
           "openTask"
         ]
       },
+      "Generator": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "tag": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "tag",
+              "name"
+            ]
+          },
+          "tankLitresMilli": {
+            "type": "integer"
+          },
+          "serviceEveryMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "running": {
+            "$ref": "#/components/schemas/GeneratorRun"
+          },
+          "minutesToday": {
+            "type": "integer"
+          },
+          "totalMinutes": {
+            "type": "integer"
+          },
+          "lastCheck": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "litresMilli": {
+                "type": "integer"
+              },
+              "at": {
+                "$ref": "#/components/schemas/Instant"
+              }
+            },
+            "required": [
+              "litresMilli",
+              "at"
+            ]
+          },
+          "receivedMilli": {
+            "type": "integer"
+          },
+          "issuedMilli": {
+            "type": "integer"
+          },
+          "expectedMilli": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "asset",
+          "tankLitresMilli",
+          "serviceEveryMinutes",
+          "running",
+          "minutesToday",
+          "totalMinutes",
+          "lastCheck",
+          "receivedMilli",
+          "issuedMilli",
+          "expectedMilli"
+        ]
+      },
+      "GeneratorRun": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "startedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "stoppedAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "startedBy": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "stoppedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "minutes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "startedAt",
+          "stoppedAt",
+          "startedBy",
+          "stoppedBy",
+          "minutes"
+        ]
+      },
+      "GeneratorDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "tag": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "tag",
+              "name"
+            ]
+          },
+          "tankLitresMilli": {
+            "type": "integer"
+          },
+          "serviceEveryMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "running": {
+            "$ref": "#/components/schemas/GeneratorRun"
+          },
+          "minutesToday": {
+            "type": "integer"
+          },
+          "totalMinutes": {
+            "type": "integer"
+          },
+          "lastCheck": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "litresMilli": {
+                "type": "integer"
+              },
+              "at": {
+                "$ref": "#/components/schemas/Instant"
+              }
+            },
+            "required": [
+              "litresMilli",
+              "at"
+            ]
+          },
+          "receivedMilli": {
+            "type": "integer"
+          },
+          "issuedMilli": {
+            "type": "integer"
+          },
+          "expectedMilli": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeneratorRun"
+            }
+          },
+          "fuel": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FuelMovement"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "asset",
+          "tankLitresMilli",
+          "serviceEveryMinutes",
+          "running",
+          "minutesToday",
+          "totalMinutes",
+          "lastCheck",
+          "receivedMilli",
+          "issuedMilli",
+          "expectedMilli",
+          "runs",
+          "fuel"
+        ]
+      },
+      "FuelMovement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "RECEIVED",
+              "ISSUED",
+              "LEVEL_CHECK"
+            ]
+          },
+          "litresMilli": {
+            "type": "integer"
+          },
+          "costMinor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "supplier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "by": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "variance": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "openingMilli": {
+                "type": "integer"
+              },
+              "receivedMilli": {
+                "type": "integer"
+              },
+              "issuedMilli": {
+                "type": "integer"
+              },
+              "closingMilli": {
+                "type": "integer"
+              },
+              "varianceMilli": {
+                "type": "integer"
+              },
+              "accountableMilli": {
+                "type": "integer"
+              },
+              "varianceBps": {
+                "type": "integer"
+              },
+              "alerted": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "openingMilli",
+              "receivedMilli",
+              "issuedMilli",
+              "closingMilli",
+              "varianceMilli",
+              "accountableMilli",
+              "varianceBps",
+              "alerted"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "litresMilli",
+          "costMinor",
+          "supplier",
+          "by",
+          "at",
+          "variance"
+        ]
+      },
+      "MeterReading": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "meter": {
+            "type": "string"
+          },
+          "reading": {
+            "type": "string"
+          },
+          "usage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hoursSincePrevious": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "by": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "at": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "required": [
+          "id",
+          "meter",
+          "reading",
+          "usage",
+          "hoursSincePrevious",
+          "by",
+          "at"
+        ]
+      },
       "Task": {
         "type": "object",
         "properties": {
@@ -13027,6 +13457,7 @@
               "SHIFT_VARIANCE",
               "UNMATCHED_TRANSFER",
               "VISITOR_OVERSTAY",
+              "FUEL_VARIANCE",
               null
             ]
           },
@@ -13128,6 +13559,7 @@
               "SHIFT_VARIANCE",
               "UNMATCHED_TRANSFER",
               "VISITOR_OVERSTAY",
+              "FUEL_VARIANCE",
               null
             ]
           },
@@ -52711,6 +53143,1069 @@
         }
       }
     },
+    "/generators": {
+      "get": {
+        "operationId": "listGenerators",
+        "summary": "Generators with their run and fuel position (M5-11)",
+        "tags": [
+          "Utilities"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "utility.log",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Generator"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createGenerator",
+        "summary": "Add a generator: an asset of the register with a diesel tank (M5-11)",
+        "tags": [
+          "Utilities"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "utility.log",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assetId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 80
+                  },
+                  "tankLitresMilli": {
+                    "type": "integer",
+                    "minimum": 1000,
+                    "maximum": 100000000
+                  },
+                  "serviceEveryMinutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 60,
+                    "maximum": 600000,
+                    "default": null
+                  }
+                },
+                "required": [
+                  "assetId",
+                  "name",
+                  "tankLitresMilli"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratorDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generators/{generatorId}": {
+      "get": {
+        "operationId": "getGenerator",
+        "summary": "A generator with its runs and fuel log (M5-11)",
+        "tags": [
+          "Utilities"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Added beyond tab 4 (T-132).",
+        "x-permission": "utility.log",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "generatorId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratorDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generators/{generatorId}/runs": {
+      "post": {
+        "operationId": "startGeneratorRun",
+        "summary": "Log a generator start (M5-11)",
+        "tags": [
+          "Utilities"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "utility.log",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "generatorId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "$ref": "#/components/schemas/Instant"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratorDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generator-runs/{runId}/stop": {
+      "patch": {
+        "operationId": "stopGeneratorRun",
+        "summary": "Log a generator stop (M5-11)",
+        "tags": [
+          "Utilities"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "The run's hours go on the generator's run-hours maintenance plans (M5-10), which may open their jobs.",
+        "x-permission": "utility.log",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "runId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "$ref": "#/components/schemas/Instant"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratorDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fuel-movements": {
+      "post": {
+        "operationId": "recordFuelMovement",
+        "summary": "Log diesel received or issued, or a fuel check (M5-11, M5 rule 4)",
+        "tags": [
+          "Utilities"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "A check works out the variance since the last one and raises the FUEL_VARIANCE leakage alert when the fuel missing is over the threshold.",
+        "x-permission": "utility.log",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "generatorId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "RECEIVED",
+                      "ISSUED",
+                      "LEVEL_CHECK"
+                    ]
+                  },
+                  "litresMilli": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000000
+                  },
+                  "costMinor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                    "default": null,
+                    "example": "4500000"
+                  },
+                  "supplier": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120,
+                    "default": null
+                  },
+                  "at": {
+                    "$ref": "#/components/schemas/Instant"
+                  }
+                },
+                "required": [
+                  "generatorId",
+                  "kind",
+                  "litresMilli"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "movement": {
+                      "$ref": "#/components/schemas/FuelMovement"
+                    },
+                    "generator": {
+                      "$ref": "#/components/schemas/Generator"
+                    }
+                  },
+                  "required": [
+                    "movement",
+                    "generator"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meter-readings": {
+      "post": {
+        "operationId": "recordMeterReading",
+        "summary": "Record a meter reading: electricity, water, gas… (M5-12)",
+        "tags": [
+          "Utilities"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "utility.log",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "meter": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 40
+                  },
+                  "reading": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9]\\d{0,15})$"
+                  },
+                  "at": {
+                    "$ref": "#/components/schemas/Instant"
+                  }
+                },
+                "required": [
+                  "meter",
+                  "reading"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeterReading"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listMeterReadings",
+        "summary": "Meter readings with the usage between them (M5-12)",
+        "tags": [
+          "Utilities"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Added beyond tab 4 (T-132). The latest 100, newest first.",
+        "x-permission": "utility.log",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 40
+            },
+            "required": false,
+            "name": "meter",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MeterReading"
+                      }
+                    },
+                    "meters": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meters"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks": {
       "get": {
         "operationId": "listTasks",
@@ -55750,7 +57245,8 @@
                 "REVERSAL_PATTERN",
                 "SHIFT_VARIANCE",
                 "UNMATCHED_TRANSFER",
-                "VISITOR_OVERSTAY"
+                "VISITOR_OVERSTAY",
+                "FUEL_VARIANCE"
               ]
             },
             "required": false,
@@ -56245,7 +57741,8 @@
                               "REVERSAL_PATTERN",
                               "SHIFT_VARIANCE",
                               "UNMATCHED_TRANSFER",
-                              "VISITOR_OVERSTAY"
+                              "VISITOR_OVERSTAY",
+                              "FUEL_VARIANCE"
                             ]
                           },
                           "label": {
@@ -56453,7 +57950,8 @@
                             "REVERSAL_PATTERN",
                             "SHIFT_VARIANCE",
                             "UNMATCHED_TRANSFER",
-                            "VISITOR_OVERSTAY"
+                            "VISITOR_OVERSTAY",
+                            "FUEL_VARIANCE"
                           ]
                         },
                         "enabled": {
@@ -56481,7 +57979,7 @@
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 6
+                    "maxItems": 7
                   }
                 },
                 "required": [
@@ -56515,7 +58013,8 @@
                               "REVERSAL_PATTERN",
                               "SHIFT_VARIANCE",
                               "UNMATCHED_TRANSFER",
-                              "VISITOR_OVERSTAY"
+                              "VISITOR_OVERSTAY",
+                              "FUEL_VARIANCE"
                             ]
                           },
                           "label": {

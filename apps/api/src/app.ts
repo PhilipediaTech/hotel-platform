@@ -51,6 +51,7 @@ import { groupRoutes } from './modules/groups/routes.ts';
 import { arRoutes } from './modules/ar/routes.ts';
 import { reconciliationRoutes } from './modules/reconciliation/routes.ts';
 import { maintenanceRoutes } from './modules/maintenance/routes.ts';
+import { utilitiesRoutes } from './modules/utilities/routes.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
 import { bookingEngineRoutes } from './modules/bookingengine/routes.ts';
@@ -204,6 +205,7 @@ export function createApp({
   api.use(arRoutes({ db, tenantDb, clock, email }));
   api.use(reconciliationRoutes({ tenantDb, clock }));
   api.use(maintenanceRoutes({ db, tenantDb, clock }));
+  api.use(utilitiesRoutes({ tenantDb, clock }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));

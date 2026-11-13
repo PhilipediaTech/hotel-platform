@@ -96,6 +96,9 @@ const CityLedgerPage = lazy(() =>
 const MaintenancePage = lazy(() =>
   import('../routes/maintenance.tsx').then((m) => ({ default: m.MaintenancePage })),
 );
+const UtilitiesPage = lazy(() =>
+  import('../routes/utilities.tsx').then((m) => ({ default: m.UtilitiesPage })),
+);
 const ReconciliationPage = lazy(() =>
   import('../routes/reconciliation.tsx').then((m) => ({ default: m.ReconciliationPage })),
 );
@@ -153,6 +156,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/ar': <CityLedgerPage />,
   '/reconciliation': <ReconciliationPage />,
   '/maintenance': <MaintenancePage />,
+  '/utilities': <UtilitiesPage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

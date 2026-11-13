@@ -14,15 +14,16 @@ import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
 import maintenanceStrings from '../i18n/en/maintenance.json';
 import { registerStrings } from '../i18n/index.ts';
+import { PlansView } from './preventive.tsx';
 import { useFormats } from './reservations.tsx';
 import { amountToMinor, hoursAndMinutes } from './work-order.tsx';
 
 registerStrings(maintenanceStrings);
 
-// S34 Assets, work orders, PM (PRD M5-08, M5-09; T-130). Jobs: the open maintenance tasks
-// (each opens on the task page, where parts, time and cost are logged). Assets: the register
-// with location, serial, warranty and vendor, and each asset's service history. The PM
-// calendar follows with M5-10.
+// S34 Assets, work orders, PM (PRD M5-08, M5-09, M5-10; T-130, T-131). Jobs: the open
+// maintenance tasks (each opens on the task page, where parts, time and cost are logged).
+// Assets: the register with location, serial, warranty and vendor, and each asset's service
+// history. Plans (pm.manage): the PM calendar and run-hours plans (preventive.tsx).
 
 type Asset = z.output<typeof AssetItem>;
 type Detail = z.output<typeof AssetDetail>;
@@ -41,14 +42,23 @@ function useKey(...parts: string[]) {
 
 export function MaintenancePage() {
   const { t } = useTranslation();
+  const { permissions } = useSession();
   const [params, setParams] = useSearchParams();
-  const view = params.get('asset') || params.get('view') === 'assets' ? 'assets' : 'jobs';
-  const show = (v: 'jobs' | 'assets') => setParams(v === 'jobs' ? {} : { view: v });
+  const canPlan = permissions.includes('pm.manage');
+  const views = canPlan ? (['jobs', 'assets', 'plans'] as const) : (['jobs', 'assets'] as const);
+  type View = (typeof views)[number];
+  const asked = params.get('view');
+  const view: View = params.get('asset')
+    ? 'assets'
+    : (views as readonly string[]).includes(asked ?? '')
+      ? (asked as View)
+      : 'jobs';
+  const show = (v: View) => setParams(v === 'jobs' ? {} : { view: v });
   return (
     <section className="max-w-6xl">
       <h1 className="text-xl font-semibold">{t('mnt.title')}</h1>
       <div role="tablist" aria-label={t('mnt.views')} className="mt-3 flex gap-2">
-        {(['jobs', 'assets'] as const).map((v) => (
+        {views.map((v) => (
           <Button
             key={v}
             role="tab"
@@ -61,7 +71,7 @@ export function MaintenancePage() {
           </Button>
         ))}
       </div>
-      {view === 'jobs' ? <Jobs /> : <Assets />}
+      {view === 'jobs' ? <Jobs /> : view === 'assets' ? <Assets /> : <PlansView />}
     </section>
   );
 }

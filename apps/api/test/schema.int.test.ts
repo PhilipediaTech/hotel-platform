@@ -89,6 +89,7 @@ describe('migrations', () => {
       'payments',
       'platform_invoice_checkouts',
       'platform_invoices',
+      'preventive_plans',
       'promo_codes',
       'properties',
       'property_counters',

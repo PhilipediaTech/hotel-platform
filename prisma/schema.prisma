@@ -144,6 +144,7 @@ model Property {
   taskTemplates        TaskTemplate[]
   tasks                Task[]
   assets               Asset[]
+  preventivePlans      PreventivePlan[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
 
@@ -305,6 +306,7 @@ model User {
   tasksAssigned      Task[]             @relation("TaskAssignee")
   tasksVerified      Task[]             @relation("TaskVerifier")
   taskEvents         TaskEvent[]
+  preventivePlans    PreventivePlan[]   @relation("PlanAssignee")
   handoversWritten   HandoverNote[]     @relation("HandoverWriter")
   handoversAcked     HandoverNote[]     @relation("HandoverAcknowledger")
   invitationsClaimed Invitation[]       @relation("AcceptedBy")
@@ -2215,21 +2217,22 @@ model Task {
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   version         Int        @default(0)
 
-  organisation Organisation     @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  property     Property         @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
-  department   Department       @relation(fields: [propertyId, departmentId], references: [propertyId, id], onDelete: Restrict)
+  organisation   Organisation     @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property       Property         @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  department     Department       @relation(fields: [propertyId, departmentId], references: [propertyId, id], onDelete: Restrict)
   // Same property is checked by the service (Prisma can't mix a required and an optional column in one relation).
-  template     TaskTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  room         Room?            @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  stay         Stay?            @relation(fields: [stayId], references: [id], onDelete: Restrict)
-  guest        Guest?           @relation(fields: [guestId], references: [id], onDelete: Restrict)
-  reportedBy   User?            @relation("TaskReporter", fields: [reportedById], references: [id], onDelete: SetNull)
-  assignee     User?            @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  verifiedBy   User?            @relation("TaskVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  template       TaskTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  room           Room?            @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  stay           Stay?            @relation(fields: [stayId], references: [id], onDelete: Restrict)
+  guest          Guest?           @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  reportedBy     User?            @relation("TaskReporter", fields: [reportedById], references: [id], onDelete: SetNull)
+  assignee       User?            @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  verifiedBy     User?            @relation("TaskVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
   // Same property is checked by the service, as for the room.
-  asset        Asset?           @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  events       TaskEvent[]
-  workOrder    WorkOrderDetail?
+  asset          Asset?           @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  events         TaskEvent[]
+  workOrder      WorkOrderDetail?
+  preventivePlan PreventivePlan?
 
   @@unique([propertyId, number])
   @@index([propertyId, status])
@@ -2315,14 +2318,54 @@ model Asset {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  property Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   // Same property is checked by the service (Prisma can't mix a required and an optional column).
-  room     Room?    @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  room     Room?            @relation(fields: [roomId], references: [id], onDelete: Restrict)
   tasks    Task[]
+  plans    PreventivePlan[]
 
   @@unique([propertyId, tag])
   @@index([propertyId, status])
   @@map("assets")
+}
+
+/// Preventive maintenance (M5-10; T-131). Not modelled in tab 3: a plan comes due by the
+/// calendar (every N days) or by run hours (every N hours on the asset's hour meter); when it
+/// is due, the worker opens one maintenance task for it. Verifying that task moves the plan on.
+model PreventivePlan {
+  id               String    @id @default(uuid()) @db.Uuid
+  propertyId       String    @map("property_id") @db.Uuid
+  title            String
+  instructions     String?
+  assetId          String?   @map("asset_id") @db.Uuid
+  /// CALENDAR | RUN_HOURS
+  trigger          String
+  everyDays        Int?      @map("every_days")
+  everyHours       Int?      @map("every_hours")
+  /// The job opens this many days (calendar) or hours (run hours) before it is due.
+  leadDays         Int       @default(3) @map("lead_days")
+  leadHours        Int       @default(10) @map("lead_hours")
+  nextDueOn        DateTime? @map("next_due_on") @db.Date
+  lastDoneOn       DateTime? @map("last_done_on") @db.Date
+  /// The latest hour-meter reading, and the reading at the last service.
+  meterHours       Int?      @map("meter_hours")
+  meterReadAt      DateTime? @map("meter_read_at") @db.Timestamptz(6)
+  lastServiceHours Int?      @map("last_service_hours")
+  assigneeId       String?   @map("assignee_id") @db.Uuid
+  priority         String    @default("NORMAL")
+  active           Boolean   @default(true)
+  /// The job open for it now.
+  openTaskId       String?   @unique @map("open_task_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  asset    Asset?   @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  assignee User?    @relation("PlanAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  openTask Task?    @relation(fields: [openTaskId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, active])
+  @@map("preventive_plans")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

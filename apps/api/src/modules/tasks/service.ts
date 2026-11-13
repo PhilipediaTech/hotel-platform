@@ -445,7 +445,12 @@ export const dueFrom = (now: Date, slaMinutes: number | null | undefined) =>
   slaMinutes ? new Date(now.getTime() + slaMinutes * 60_000) : null;
 
 /** An assignee must be an active member of the property who works tasks. */
-async function checkAssignee(deps: TaskDeps, tenant: TenantContext, userId: string, path: string) {
+export async function checkAssignee(
+  deps: TaskDeps,
+  tenant: TenantContext,
+  userId: string,
+  path: string,
+) {
   const workers = await workersOf(deps.db, tenant);
   if (!workers.some((w) => w.id === userId)) {
     throw invalid(path, 'Choose a member of this property who works on tasks');

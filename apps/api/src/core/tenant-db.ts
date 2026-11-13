@@ -113,6 +113,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   RoomStatusReport: { kind: 'property' },
   Inspection: { kind: 'property' },
   Asset: { kind: 'property' },
+  PreventivePlan: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

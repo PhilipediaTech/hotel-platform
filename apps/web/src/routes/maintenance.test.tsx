@@ -250,3 +250,114 @@ describe('Work order on the task page (M5-08)', () => {
     expect(within(panel).getByRole('link', { name: 'AC-1 · Split AC 1' })).toBeInTheDocument();
   }, 20_000);
 });
+
+// S34 PM calendar (PRD M5-10; T-131).
+
+const plan = (n: number, extra: object = {}) => ({
+  id: id(n),
+  title: `Plan ${n}`,
+  instructions: null,
+  asset: null,
+  trigger: 'CALENDAR',
+  everyDays: 30,
+  everyHours: null,
+  leadDays: 3,
+  leadHours: 10,
+  nextDueOn: '2026-11-12',
+  lastDoneOn: null,
+  meterHours: null,
+  meterReadAt: null,
+  lastServiceHours: null,
+  hoursLeft: null,
+  dueState: 'DUE_SOON',
+  assignee: null,
+  priority: 'NORMAL',
+  active: true,
+  openTask: null,
+  ...extra,
+});
+
+describe('Maintenance plans (S34, M5-10)', () => {
+  beforeEach(() => {
+    permissions = ['wo.work', 'task.work', 'asset.manage', 'pm.manage'];
+    handlers['GET /preventive-plans'] = () =>
+      json(200, {
+        today: '2026-11-10',
+        data: [
+          plan(1, {
+            title: 'Clean AC filters',
+            asset: { id: id(1), tag: 'AC-1', name: 'Split AC 1' },
+            openTask: { id: id(5), number: 5, status: 'ASSIGNED' },
+          }),
+          plan(2, { title: 'Test fire alarms', nextDueOn: '2026-11-05', dueState: 'OVERDUE' }),
+          plan(3, {
+            title: 'Change oil',
+            trigger: 'RUN_HOURS',
+            everyDays: null,
+            everyHours: 250,
+            nextDueOn: null,
+            meterHours: 1100,
+            lastServiceHours: 1000,
+            hoursLeft: 150,
+            dueState: 'OK',
+            asset: { id: id(2), tag: 'GEN-1', name: 'Generator' },
+          }),
+        ],
+      });
+  });
+
+  it('shows the plans tab only with pm.manage', async () => {
+    permissions = ['wo.work', 'task.work', 'asset.manage'];
+    handlers['GET /tasks'] = () => json(200, { data: [], nextCursor: null });
+    renderAt('/maintenance');
+    await screen.findByRole('tab', { name: 'Assets' });
+    expect(screen.queryByRole('tab', { name: 'Plans' })).not.toBeInTheDocument();
+  }, 15_000);
+
+  it('shows the PM calendar and takes a meter reading', async () => {
+    handlers[`POST /preventive-plans/${id(3)}/hours`] = (body) =>
+      json(200, plan(3, { trigger: 'RUN_HOURS', ...(body as object) }));
+    const user = userEvent.setup();
+    renderAt('/maintenance?view=plans');
+    const agenda = await screen.findByRole('list', { name: 'Preventive maintenance by date' });
+    // Every 30 days from 12 November: two dates in the six weeks shown.
+    expect(within(agenda).getAllByText(/Clean AC filters/)).toHaveLength(2);
+    expect(within(agenda).getByRole('link', { name: 'Job #5 · Assigned' })).toBeInTheDocument();
+    const overdue = screen.getByRole('list', { name: 'Overdue' });
+    expect(within(overdue).getByText('Test fire alarms')).toBeInTheDocument();
+    const hours = screen.getByRole('list', { name: 'By run hours' });
+    expect(within(hours).getByText(/150 h to go/)).toBeInTheDocument();
+
+    await user.type(within(hours).getByLabelText('Meter reading (hours)'), '1245');
+    await user.click(within(hours).getByRole('button', { name: 'Save reading' }));
+    await waitFor(() => expect(sent(`POST /preventive-plans/${id(3)}/hours`)).toHaveLength(1));
+    expect(sent(`POST /preventive-plans/${id(3)}/hours`)[0]?.body).toEqual({ hours: 1245 });
+  }, 15_000);
+
+  it('plans maintenance by run hours', async () => {
+    handlers['POST /preventive-plans'] = (body) => json(201, plan(9, body as object));
+    const user = userEvent.setup();
+    renderAt('/maintenance?view=plans');
+    await user.click(await screen.findByRole('button', { name: 'Plan maintenance' }));
+    const form = screen.getByRole('form', { name: 'New maintenance plan' });
+    await user.type(within(form).getByLabelText('What to do'), 'Change oil and filter');
+    await within(form).findByRole('option', { name: 'AC-2 · Split AC 2' });
+    await user.selectOptions(within(form).getByLabelText('Asset'), id(2));
+    await user.click(within(form).getByLabelText('Run hours'));
+    await user.type(within(form).getByLabelText('Meter at last service (hours)'), '1000');
+    await user.click(within(form).getByRole('button', { name: 'Save plan' }));
+    await waitFor(() => expect(sent('POST /preventive-plans')).toHaveLength(1));
+    expect(sent('POST /preventive-plans')[0]?.body).toEqual({
+      title: 'Change oil and filter',
+      instructions: '',
+      assetId: id(2),
+      trigger: 'RUN_HOURS',
+      everyHours: 250,
+      lastServiceHours: 1000,
+      meterHours: null,
+      leadHours: 10,
+      assigneeId: null,
+      priority: 'NORMAL',
+    });
+  }, 15_000);
+});

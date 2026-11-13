@@ -4,7 +4,8 @@
     "views": "Show",
     "view": {
       "jobs": "Jobs",
-      "assets": "Assets"
+      "assets": "Assets",
+      "plans": "Plans"
     },
     "room": "Room {{number}}",
     "close": "Close",
@@ -101,6 +102,65 @@
       "badPart": "Check the quantity and cost of {{name}}",
       "badTime": "Hours and minutes are whole numbers (minutes 0 to 59)",
       "badAmount": "Enter an amount like 1500 or 1,500.00"
+    },
+    "pm": {
+      "add": "Plan maintenance",
+      "none": "No preventive maintenance planned yet.",
+      "calendar": "Due {{from}} to {{to}}",
+      "earlier": "Earlier",
+      "later": "Later",
+      "overdue": "Overdue",
+      "agenda": "Preventive maintenance by date",
+      "nothingDue": "Nothing falls due in these weeks.",
+      "paused": "Paused",
+      "byHours": "By run hours",
+      "state": {
+        "OK": "On schedule",
+        "DUE_SOON": "Due soon",
+        "OVERDUE": "Overdue"
+      },
+      "everyDays_one": "every day",
+      "everyDays_other": "every {{count}} days",
+      "everyHours_one": "every run hour",
+      "everyHours_other": "every {{count}} run hours",
+      "meter": "meter {{hours}} h",
+      "hoursLeft": "{{hours}} h to go",
+      "hoursOver": "{{hours}} h past due",
+      "nextDue": "next {{date}}",
+      "lastDone": "last done {{date}}",
+      "job": "Job #{{number}} · {{status}}",
+      "reading": "Meter reading (hours)",
+      "saveReading": "Save reading",
+      "pause": "Pause",
+      "resume": "Resume",
+      "form": "New maintenance plan",
+      "title": "What to do",
+      "asset": "Asset",
+      "noAsset": "No asset",
+      "trigger": "Comes due by",
+      "triggers": {
+        "CALENDAR": "Calendar",
+        "RUN_HOURS": "Run hours"
+      },
+      "everyDaysField": "Every (days)",
+      "firstDueOn": "First due on",
+      "leadDays": "Open the job (days before)",
+      "everyHoursField": "Every (run hours)",
+      "lastServiceHours": "Meter at last service (hours)",
+      "meterHours": "Meter now (hours, if different)",
+      "leadHours": "Open the job (hours before)",
+      "assignee": "Give the job to",
+      "noAssignee": "Not assigned",
+      "priority": "Priority",
+      "priorities": {
+        "LOW": "Low",
+        "NORMAL": "Normal",
+        "HIGH": "High",
+        "CRITICAL": "Critical"
+      },
+      "instructions": "Instructions for the job",
+      "save": "Save plan",
+      "badNumber": "Intervals, lead and meter readings are whole numbers"
     }
   }
 }

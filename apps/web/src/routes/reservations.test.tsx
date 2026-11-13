@@ -280,6 +280,17 @@ describe('Reservation detail', () => {
 
   it('offers no no-show before the arrival date has closed', async () => {
     permissions = [...permissions, 'reservation.noshow'];
+    // Arriving tomorrow by the real clock (the fixture's own dates have passed).
+    const tomorrow = addDays(localDate(new Date(), 'Africa/Lagos'), 1);
+    handlers[`GET /reservations/${RES}`] = () =>
+      json(
+        200,
+        reservation({
+          stays: [
+            { ...reservation().stays[0], arrival: tomorrow, departure: addDays(tomorrow, 2) },
+          ],
+        }),
+      );
     renderAt(`/reservations/${RES}`);
     await screen.findByRole('heading', { name: /LAG-00001/ });
     expect(screen.queryByRole('button', { name: 'Mark as no-show' })).toBeNull();

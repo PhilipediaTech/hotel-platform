@@ -11199,6 +11199,391 @@
           "reopened"
         ]
       },
+      "Asset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "room": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "number": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "number"
+            ]
+          },
+          "serial": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vendor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warrantyUntil": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "underWarranty": {
+            "type": "boolean"
+          },
+          "costMinor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "IN_SERVICE",
+              "OUT_OF_SERVICE",
+              "RETIRED"
+            ]
+          },
+          "openJobs": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "tag",
+          "name",
+          "category",
+          "location",
+          "room",
+          "serial",
+          "vendor",
+          "warrantyUntil",
+          "underWarranty",
+          "costMinor",
+          "status",
+          "openJobs"
+        ]
+      },
+      "AssetDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "room": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "number": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "number"
+            ]
+          },
+          "serial": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vendor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warrantyUntil": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "underWarranty": {
+            "type": "boolean"
+          },
+          "costMinor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "IN_SERVICE",
+              "OUT_OF_SERVICE",
+              "RETIRED"
+            ]
+          },
+          "openJobs": {
+            "type": "integer"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceRecord"
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "jobs": {
+                "type": "integer"
+              },
+              "labourMinutes": {
+                "type": "integer"
+              },
+              "costMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              }
+            },
+            "required": [
+              "jobs",
+              "labourMinutes",
+              "costMinor"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "tag",
+          "name",
+          "category",
+          "location",
+          "room",
+          "serial",
+          "vendor",
+          "warrantyUntil",
+          "underWarranty",
+          "costMinor",
+          "status",
+          "openJobs",
+          "history",
+          "totals"
+        ]
+      },
+      "ServiceRecord": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "REPORTED",
+              "TRIAGED",
+              "ASSIGNED",
+              "ACKNOWLEDGED",
+              "IN_PROGRESS",
+              "ON_HOLD",
+              "RESOLVED",
+              "VERIFIED",
+              "CLOSED"
+            ]
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "resolvedAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "assignee": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "labourMinutes": {
+            "type": "integer"
+          },
+          "costMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          }
+        },
+        "required": [
+          "taskId",
+          "number",
+          "title",
+          "type",
+          "status",
+          "createdAt",
+          "resolvedAt",
+          "assignee",
+          "labourMinutes",
+          "costMinor"
+        ]
+      },
+      "WorkOrder": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 999
+                },
+                "costMinor": {
+                  "type": "string",
+                  "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                  "example": "4500000"
+                }
+              },
+              "required": [
+                "name",
+                "quantity",
+                "costMinor"
+              ]
+            }
+          },
+          "labourMinutes": {
+            "type": "integer"
+          },
+          "vendorName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "partsCostMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "vendorCostMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "costMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          }
+        },
+        "required": [
+          "parts",
+          "labourMinutes",
+          "vendorName",
+          "partsCostMinor",
+          "vendorCostMinor",
+          "costMinor"
+        ]
+      },
       "Task": {
         "type": "object",
         "properties": {
@@ -11305,6 +11690,28 @@
             "required": [
               "id",
               "number"
+            ]
+          },
+          "asset": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "tag": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "tag",
+              "name"
             ]
           },
           "stayId": {
@@ -11452,6 +11859,7 @@
           "priority",
           "status",
           "room",
+          "asset",
           "stayId",
           "guest",
           "reportedBy",
@@ -11571,6 +11979,28 @@
             "required": [
               "id",
               "number"
+            ]
+          },
+          "asset": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "tag": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "tag",
+              "name"
             ]
           },
           "stayId": {
@@ -11729,6 +12159,22 @@
           },
           "canComment": {
             "type": "boolean"
+          },
+          "workOrder": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkOrder"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "canLogWork": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -11742,6 +12188,7 @@
           "priority",
           "status",
           "room",
+          "asset",
           "stayId",
           "guest",
           "reportedBy",
@@ -11755,7 +12202,9 @@
           "createdAt",
           "events",
           "actions",
-          "canComment"
+          "canComment",
+          "workOrder",
+          "canLogWork"
         ]
       },
       "TaskEvent": {
@@ -50420,6 +50869,921 @@
         }
       }
     },
+    "/assets": {
+      "get": {
+        "operationId": "listAssets",
+        "summary": "The asset register (M5-09)",
+        "tags": [
+          "Maintenance"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Needs asset.manage, or wo.work to pick the asset a job is on.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "IN_SERVICE",
+                "OUT_OF_SERVICE",
+                "RETIRED"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "required": false,
+            "name": "category",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": false,
+            "name": "roomId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Asset"
+                      }
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "categories"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAsset",
+        "summary": "Add an asset to the register (M5-09)",
+        "tags": [
+          "Maintenance"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-permission": "asset.manage",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 30
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "category": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 40
+                  },
+                  "location": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120,
+                    "default": null
+                  },
+                  "roomId": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Uuid"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "serial": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 80,
+                    "default": null
+                  },
+                  "vendor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120,
+                    "default": null
+                  },
+                  "warrantyUntil": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/IsoDate"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "costMinor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                    "default": null,
+                    "example": "4500000"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "IN_SERVICE",
+                      "OUT_OF_SERVICE",
+                      "RETIRED"
+                    ],
+                    "default": "IN_SERVICE"
+                  }
+                },
+                "required": [
+                  "tag",
+                  "name",
+                  "category"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/{assetId}": {
+      "get": {
+        "operationId": "getAsset",
+        "summary": "An asset with its service history (M5-09)",
+        "tags": [
+          "Maintenance"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Added beyond tab 4 (T-130). Needs asset.manage or wo.work.",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "assetId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateAsset",
+        "summary": "Change an asset: location, warranty, status… (M5-09)",
+        "tags": [
+          "Maintenance"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Added beyond tab 4 (T-130).",
+        "x-permission": "asset.manage",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "assetId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 30
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "category": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 40
+                  },
+                  "location": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120
+                  },
+                  "roomId": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Uuid"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "serial": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 80
+                  },
+                  "vendor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120
+                  },
+                  "warrantyUntil": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/IsoDate"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "costMinor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                    "example": "4500000"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "IN_SERVICE",
+                      "OUT_OF_SERVICE",
+                      "RETIRED"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/work-orders/{taskId}/detail": {
+      "post": {
+        "operationId": "saveWorkOrder",
+        "summary": "Log the parts, time and outside cost of a job, and the asset it is on (M5-08)",
+        "tags": [
+          "Maintenance"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Replaces what was logged. The assignee (wo.work) or a manager with task.assign, until the task is verified. States and after photos are the task routes (start, hold, resolve with photos).",
+        "x-permission": "wo.work",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "taskId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "parts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "quantity": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 999
+                        },
+                        "costMinor": {
+                          "type": "string",
+                          "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                          "example": "4500000"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "quantity",
+                        "costMinor"
+                      ]
+                    },
+                    "maxItems": 30
+                  },
+                  "labourMinutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 43200
+                  },
+                  "vendorName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120
+                  },
+                  "vendorCostMinor": {
+                    "type": "string",
+                    "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                    "example": "4500000"
+                  },
+                  "assetId": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Uuid"
+                      },
+                      {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "parts",
+                  "labourMinutes",
+                  "vendorName",
+                  "vendorCostMinor"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "taskId": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "workOrder": {
+                      "$ref": "#/components/schemas/WorkOrder"
+                    },
+                    "asset": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        "tag": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "tag",
+                        "name"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "taskId",
+                    "workOrder",
+                    "asset"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks": {
       "get": {
         "operationId": "listTasks",
@@ -50517,6 +51881,14 @@
             },
             "required": false,
             "name": "roomId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": false,
+            "name": "assetId",
             "in": "query"
           },
           {
@@ -50704,6 +52076,9 @@
                     ]
                   },
                   "roomId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "assetId": {
                     "$ref": "#/components/schemas/Uuid"
                   },
                   "stayId": {

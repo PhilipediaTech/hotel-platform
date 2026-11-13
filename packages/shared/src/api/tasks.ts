@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { FAULT_CATEGORIES, PRIORITIES, TASK_ACTIONS, TASK_STATUSES, TASK_TYPES } from '../tasks.ts';
 import { defineRoute } from './contract.ts';
+import { AssetRef, WorkOrderItem } from './maintenance.ts';
 import { Instant, IsoDate, page, PageQuery, Uuid } from './primitives.ts';
 
 // Tasks (PRD M6-01–M6-05, M6 rules 1–2, M5-07, M5 rule 3; tab 4 row "Tasks"; S18 tasks queue
@@ -37,6 +38,8 @@ export const TaskItem = z
     priority: z.enum(PRIORITIES),
     status: z.enum(TASK_STATUSES),
     room: z.object({ id: Uuid, number: z.string() }).nullable(),
+    /** The asset the job is on (T-130). */
+    asset: AssetRef.nullable(),
     stayId: Uuid.nullable(),
     guest: Person.nullable(),
     reportedBy: Person.nullable(),
@@ -72,6 +75,10 @@ export const TaskDetail = TaskItem.extend({
   actions: z.array(z.enum(TASK_ACTIONS)),
   /** Whether the signed-in user may comment. */
   canComment: z.boolean(),
+  /** Parts, time and outside cost logged on the job (M5-08; T-130), if any. */
+  workOrder: WorkOrderItem.nullable(),
+  /** Whether the signed-in user may log parts, time and cost now (T-130). */
+  canLogWork: z.boolean(),
 }).meta({ id: 'TaskDetail' });
 
 export const listTasks = defineRoute({
@@ -90,6 +97,7 @@ export const listTasks = defineRoute({
     departmentId: Uuid.optional(),
     type: z.enum(TASK_TYPES).optional(),
     roomId: Uuid.optional(),
+    assetId: Uuid.optional(),
     overdue: z.enum(['true']).optional(),
   }),
   response: page(TaskItem),
@@ -106,6 +114,8 @@ export const CreateTaskBody = z
     description: z.string().trim().max(2000).optional(),
     priority: z.enum(PRIORITIES).optional(),
     roomId: Uuid.optional(),
+    /** The asset the job is on (T-130). */
+    assetId: Uuid.optional(),
     stayId: Uuid.optional(),
     guestId: Uuid.optional(),
     /** Managers only (task.assign): who does it and by when. */

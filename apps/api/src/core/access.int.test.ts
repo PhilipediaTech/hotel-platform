@@ -77,6 +77,8 @@ const MEMBER_ROUTES: Record<string, string> = {
   listCompanies: 'reference list (booking for a company)',
   getCompany: 'reference list (booking for a company)',
   listStatusReports: 'housekeeping status reports, mayReport in the service',
+  listAssets: 'asset register, mayRead in the service (asset.manage or wo.work)',
+  getAsset: 'asset register, mayRead in the service (asset.manage or wo.work)',
   submitStatusReport: 'mayReport (housekeeping/status-reports.ts)',
   listTasks: 'only tasks the caller may see (loadVisible)',
   createTask: 'task.create or task.report (tasks/service.ts)',

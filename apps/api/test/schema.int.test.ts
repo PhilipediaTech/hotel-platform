@@ -27,6 +27,7 @@ describe('migrations', () => {
       'ar_allocations',
       'ar_invoices',
       'ar_payments',
+      'assets',
       'audit_events',
       'auth_tokens',
       'bank_statement_lines',
@@ -132,6 +133,7 @@ describe('migrations', () => {
       'virtual_accounts',
       'visitors',
       'webhook_events',
+      'work_order_details',
     ]);
   });
 });

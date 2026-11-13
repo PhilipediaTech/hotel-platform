@@ -24,6 +24,7 @@ import { errorMessage } from '../lib/form.ts';
 import tasksStrings from '../i18n/en/tasks.json';
 import { registerStrings } from '../i18n/index.ts';
 import { useFormats } from './reservations.tsx';
+import { WorkOrderPanel } from './work-order.tsx';
 import { sendOrQueue, type Queueable } from '../offline/queue.ts';
 import { useOfflineWho } from '../offline/use-offline-key.ts';
 
@@ -532,6 +533,10 @@ export function TaskPage() {
         {row(t('tasks.detail.created'), formats.when(d.createdAt))}
       </dl>
       <Actions task={d} onDone={onDone} />
+      <WorkOrderPanel
+        task={d}
+        onSaved={() => void queryClient.invalidateQueries({ queryKey: key })}
+      />
       <h2 className="mt-6 text-base font-semibold">{t('tasks.detail.timeline')}</h2>
       <ol aria-label={t('tasks.detail.timeline')} className="mt-2 flex flex-col gap-2">
         {d.events.map((e) => (

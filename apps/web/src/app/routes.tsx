@@ -93,6 +93,9 @@ const EventsPage = lazy(() =>
 const CityLedgerPage = lazy(() =>
   import('../routes/city-ledger.tsx').then((m) => ({ default: m.CityLedgerPage })),
 );
+const MaintenancePage = lazy(() =>
+  import('../routes/maintenance.tsx').then((m) => ({ default: m.MaintenancePage })),
+);
 const ReconciliationPage = lazy(() =>
   import('../routes/reconciliation.tsx').then((m) => ({ default: m.ReconciliationPage })),
 );
@@ -149,6 +152,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/groups': <GroupsPage />,
   '/ar': <CityLedgerPage />,
   '/reconciliation': <ReconciliationPage />,
+  '/maintenance': <MaintenancePage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

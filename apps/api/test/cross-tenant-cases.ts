@@ -1112,6 +1112,32 @@ async function bTask(db: Db, world: TenantWorld, propertyId: string) {
   return { ...theirs, departmentId: department.id, templateId: template.id, taskId: task.id };
 }
 
+/** B's asset with a fault task on it, work logged (T-130). */
+async function bAsset(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bTask(db, world, propertyId);
+  const asset = await db.asset.create({
+    data: { propertyId, tag: 'B-AC', name: 'Their AC', category: 'Air conditioning' },
+  });
+  await db.task.update({
+    where: { id: theirs.taskId },
+    data: {
+      assetId: asset.id,
+      workOrder: { create: { labourMinutes: 30, costMinor: 500n, vendorName: 'B vendor' } },
+    },
+  });
+  return { ...theirs, assetId: asset.id };
+}
+
+async function bAssetUnchanged(db: Db, world: TenantWorld) {
+  const assets = await db.asset.findMany({ where: { propertyId: world.b1.id } });
+  expect(assets.map((a) => [a.tag, a.status, a.location])).toEqual([['B-AC', 'IN_SERVICE', null]]);
+  const tasks = await db.task.findMany({
+    where: { propertyId: world.b1.id },
+    include: { workOrder: true },
+  });
+  expect(tasks.map((t) => [t.assetId, t.workOrder?.labourMinutes])).toEqual([[assets[0]?.id, 30]]);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -2569,6 +2595,32 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     creates: true,
     body: (theirs) => ({ templateId: theirs['templateId'], roomId: theirs['roomId'] }),
     untouched: bTaskUnchanged,
+  },
+  listAssets: {
+    seed: bAsset,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((a) => a.id),
+  },
+  createAsset: {
+    seed: bAsset,
+    creates: true,
+    body: (theirs) => ({
+      tag: 'LEAK',
+      name: 'Leak',
+      category: 'Leak',
+      roomId: theirs['roomId'],
+    }),
+    untouched: bAssetUnchanged,
+  },
+  getAsset: { seed: bAsset },
+  updateAsset: {
+    seed: bAsset,
+    body: () => ({ location: 'Leak', status: 'RETIRED' }),
+    untouched: bAssetUnchanged,
+  },
+  saveWorkOrder: {
+    seed: bAsset,
+    body: () => ({ parts: [], labourMinutes: 1, vendorName: null, vendorCostMinor: '0' }),
+    untouched: bAssetUnchanged,
   },
   getTaskFormOptions: {
     seed: bTask,

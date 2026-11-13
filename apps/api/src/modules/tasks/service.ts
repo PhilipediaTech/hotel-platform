@@ -17,6 +17,7 @@ import {
   type TaskTemplateBody,
   type TaskTemplateItem,
   type TaskType,
+  type WorkOrderItem,
 } from '@hotel/shared';
 import type { z } from 'zod';
 import type { Prisma } from '../../generated/prisma/client.ts';
@@ -48,6 +49,7 @@ const include = {
   department: true,
   template: { select: { id: true, name: true } },
   room: { select: { id: true, number: true } },
+  asset: { select: { id: true, tag: true, name: true } },
   guest: { select: { id: true, firstName: true, lastName: true } },
   reportedBy: { select: { id: true, name: true } },
   assignee: { select: { id: true, name: true } },
@@ -56,6 +58,7 @@ const include = {
 const detailInclude = {
   ...include,
   events: { orderBy: { id: 'asc' }, include: { by: { select: { id: true, name: true } } } },
+  workOrder: true,
 } satisfies Prisma.TaskInclude;
 
 type TaskRow = Prisma.TaskGetPayload<{ include: typeof include }>;
@@ -89,6 +92,7 @@ function taskItem(t: TaskRow, now: Date): z.input<typeof TaskItem> {
     priority: t.priority,
     status: t.status,
     room: t.room,
+    asset: t.asset,
     stayId: t.stayId,
     guest: t.guest
       ? { id: t.guest.id, name: `${t.guest.firstName} ${t.guest.lastName}`.trim() }
@@ -128,6 +132,42 @@ function mayAct(
   }
 }
 
+/** Parts, time and outside cost of a job (M5-08; T-130), as the API answers them. */
+export function workOrderItem(w: {
+  parts: Prisma.JsonValue;
+  labourMinutes: number;
+  vendorName: string | null;
+  costMinor: bigint;
+}): z.input<typeof WorkOrderItem> {
+  const parts = (Array.isArray(w.parts) ? w.parts : []) as {
+    name: string;
+    quantity: number;
+    costMinor: string;
+  }[];
+  const partsCost = parts.reduce((sum, p) => sum + BigInt(p.costMinor), 0n);
+  return {
+    parts,
+    labourMinutes: w.labourMinutes,
+    vendorName: w.vendorName,
+    partsCostMinor: partsCost.toString(),
+    vendorCostMinor: (w.costMinor - partsCost).toString(),
+    costMinor: w.costMinor.toString(),
+  };
+}
+
+/**
+ * Whether `tenant` may log parts, time and cost on the job now (T-130): its assignee with
+ * wo.work, or a manager with task.assign, until it is verified.
+ */
+export function mayLogWork(
+  tenant: TenantContext,
+  t: { status: TaskStatus; assigneeId: string | null },
+) {
+  if (t.status === 'VERIFIED' || t.status === 'CLOSED') return false;
+  const p = tenant.permissions;
+  return p.has('task.assign') || (p.has('wo.work') && t.assigneeId === tenant.userId);
+}
+
 function taskDetail(
   t: TaskDetailRow,
   tenant: TenantContext,
@@ -147,6 +187,8 @@ function taskDetail(
     })),
     actions: TASK_ACTIONS.filter((a) => mayAct(tenant, t, a)),
     canComment: true,
+    workOrder: t.workOrder ? workOrderItem(t.workOrder) : null,
+    canLogWork: mayLogWork(tenant, t),
   };
 }
 
@@ -156,13 +198,13 @@ function visibleTo(tenant: TenantContext): Prisma.TaskWhereInput {
   return { OR: [{ reportedById: tenant.userId }, { assigneeId: tenant.userId }] };
 }
 
-async function loadVisible(db: Client, tenant: TenantContext, taskId: string) {
+export async function loadVisible(db: Client, tenant: TenantContext, taskId: string) {
   const task = await db.task.findFirst({ where: { id: taskId, ...visibleTo(tenant) } });
   if (!task) throw new AppError('NOT_FOUND', 'Task not found.');
   return task;
 }
 
-async function detailOf(db: Client, tenant: TenantContext, taskId: string, now: Date) {
+export async function detailOf(db: Client, tenant: TenantContext, taskId: string, now: Date) {
   const task = await db.task.findUniqueOrThrow({ where: { id: taskId }, include: detailInclude });
   return taskDetail(task, tenant, now);
 }
@@ -331,6 +373,7 @@ export interface NewTask {
   description?: string | null;
   priority: Priority;
   roomId?: string | null;
+  assetId?: string | null;
   stayId?: string | null;
   guestId?: string | null;
   assigneeId?: string | null;
@@ -355,6 +398,7 @@ export async function insertTask(tx: Tx, propertyId: string, input: NewTask) {
       priority: input.priority,
       status,
       roomId: input.roomId ?? null,
+      assetId: input.assetId ?? null,
       stayId: input.stayId ?? null,
       guestId: input.guestId ?? null,
       reportedById: input.reportedById,
@@ -434,6 +478,10 @@ export async function createTask(
     }
     const room = body.roomId ? await tx.room.findUnique({ where: { id: body.roomId } }) : null;
     if (body.roomId && !room) throw invalid('roomId', 'Choose a room of this property');
+    const asset = body.assetId
+      ? await tx.asset.findFirst({ where: { id: body.assetId, status: { not: 'RETIRED' } } })
+      : null;
+    if (body.assetId && !asset) throw invalid('assetId', 'Choose an asset of this property');
     if (body.stayId && !(await tx.stay.findUnique({ where: { id: body.stayId } }))) {
       throw invalid('stayId', 'Choose a stay of this property');
     }
@@ -445,10 +493,16 @@ export async function createTask(
       type: body.type ?? template?.type ?? 'GENERAL',
       templateId: template?.id ?? null,
       departmentId,
-      title: !body.title && room ? `${name}: room ${room.number}` : name,
+      title:
+        !body.title && room
+          ? `${name}: room ${room.number}`
+          : !body.title && asset
+            ? `${name}: ${asset.name}`
+            : name,
       description: body.description ?? null,
       priority: body.priority ?? template?.priority ?? 'NORMAL',
-      roomId: room?.id ?? null,
+      roomId: room?.id ?? asset?.roomId ?? null,
+      assetId: asset?.id ?? null,
       stayId: body.stayId ?? null,
       guestId: body.guestId ?? null,
       assigneeId: body.assigneeId ?? null,
@@ -473,6 +527,7 @@ export async function listTasks(
     departmentId?: string | undefined;
     type?: TaskType | undefined;
     roomId?: string | undefined;
+    assetId?: string | undefined;
     overdue?: 'true' | undefined;
   },
 ) {
@@ -495,6 +550,7 @@ export async function listTasks(
       query.departmentId ? { departmentId: query.departmentId } : {},
       query.type ? { type: query.type } : {},
       query.roomId ? { roomId: query.roomId } : {},
+      query.assetId ? { assetId: query.assetId } : {},
       query.overdue ? { status: { in: [...OPEN_TASK_STATUSES] }, dueAt: { lte: now } } : {},
       before !== null ? { number: { lt: before } } : {},
     ],

@@ -35,6 +35,7 @@ const task = (n: number, extra: object = {}) => ({
   priority: 'NORMAL',
   status: 'ASSIGNED',
   room: { id: id(60), number: '102' },
+  asset: null,
   stayId: null,
   guest: null,
   reportedBy: { id: id(91), name: 'Desk Ade' },
@@ -65,6 +66,8 @@ const detail = (n: number, extra: object = {}) => ({
   ],
   actions: ['acknowledge'],
   canComment: true,
+  workOrder: null,
+  canLogWork: false,
   ...extra,
 });
 

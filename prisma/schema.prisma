@@ -143,6 +143,7 @@ model Property {
   inspections          Inspection[]
   taskTemplates        TaskTemplate[]
   tasks                Task[]
+  assets               Asset[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
 
@@ -706,6 +707,7 @@ model Room {
   statusReports  RoomStatusReport[]
   inspections    Inspection[]
   tasks          Task[]
+  assets         Asset[]
 
   @@unique([propertyId, number])
   // Target of composite foreign keys: blocks and connecting rooms stay within the property.
@@ -2186,7 +2188,7 @@ model TaskTemplate {
 /// A piece of work with an owner and a deadline. Lifecycle (M6 rule 1): REPORTED → TRIAGED →
 /// ASSIGNED → ACKNOWLEDGED → IN_PROGRESS ⇄ ON_HOLD → RESOLVED → VERIFIED; a reopen returns it
 /// to ASSIGNED. escalationLevel counts the SLA escalations done (M6-05: once per level).
-/// assetId points at an asset once assets exist (M5-08, V1.1).
+/// assetId: the asset the job is on (M5-08, M5-09; T-130).
 model Task {
   id              String     @id @default(uuid()) @db.Uuid
   organisationId  String     @map("organisation_id") @db.Uuid
@@ -2213,18 +2215,21 @@ model Task {
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   version         Int        @default(0)
 
-  organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  property     Property      @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
-  department   Department    @relation(fields: [propertyId, departmentId], references: [propertyId, id], onDelete: Restrict)
+  organisation Organisation     @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property     Property         @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  department   Department       @relation(fields: [propertyId, departmentId], references: [propertyId, id], onDelete: Restrict)
   // Same property is checked by the service (Prisma can't mix a required and an optional column in one relation).
-  template     TaskTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  room         Room?         @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  stay         Stay?         @relation(fields: [stayId], references: [id], onDelete: Restrict)
-  guest        Guest?        @relation(fields: [guestId], references: [id], onDelete: Restrict)
-  reportedBy   User?         @relation("TaskReporter", fields: [reportedById], references: [id], onDelete: SetNull)
-  assignee     User?         @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  verifiedBy   User?         @relation("TaskVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  template     TaskTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  room         Room?            @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  stay         Stay?            @relation(fields: [stayId], references: [id], onDelete: Restrict)
+  guest        Guest?           @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  reportedBy   User?            @relation("TaskReporter", fields: [reportedById], references: [id], onDelete: SetNull)
+  assignee     User?            @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  verifiedBy   User?            @relation("TaskVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  // Same property is checked by the service, as for the room.
+  asset        Asset?           @relation(fields: [assetId], references: [id], onDelete: Restrict)
   events       TaskEvent[]
+  workOrder    WorkOrderDetail?
 
   @@unique([propertyId, number])
   @@index([propertyId, status])
@@ -2273,6 +2278,51 @@ model TaskEvent {
 
   @@index([taskId])
   @@map("task_events")
+}
+
+/// Parts, time and outside cost of a work order (PRD M5-08; tab 3; T-130). No property column
+/// (tab 3): written and read through its (scoped) task. costMinor is the outside cost: the
+/// parts plus any vendor's charge.
+model WorkOrderDetail {
+  taskId        String  @id @map("task_id") @db.Uuid
+  /// [{ name, quantity, costMinor }] with costMinor the line total, as a string of minor units.
+  parts         Json    @default("[]")
+  labourMinutes Int     @default(0) @map("labour_minutes")
+  vendorName    String? @map("vendor_name")
+  costMinor     BigInt  @default(0) @map("cost_minor")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Restrict)
+
+  @@map("work_order_details")
+}
+
+/// Asset register (PRD M5-09; tab 3; T-130): equipment with its location, serial, warranty and
+/// vendor. Its service history is the tasks (work orders) on it.
+model Asset {
+  id            String    @id @default(uuid()) @db.Uuid
+  propertyId    String    @map("property_id") @db.Uuid
+  tag           String
+  name          String
+  category      String
+  location      String?
+  roomId        String?   @map("room_id") @db.Uuid
+  serial        String?
+  vendor        String?
+  warrantyUntil DateTime? @map("warranty_until") @db.Date
+  costMinor     BigInt?   @map("cost_minor")
+  /// IN_SERVICE | OUT_OF_SERVICE | RETIRED
+  status        String    @default("IN_SERVICE")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  // Same property is checked by the service (Prisma can't mix a required and an optional column).
+  room     Room?    @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  tasks    Task[]
+
+  @@unique([propertyId, tag])
+  @@index([propertyId, status])
+  @@map("assets")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

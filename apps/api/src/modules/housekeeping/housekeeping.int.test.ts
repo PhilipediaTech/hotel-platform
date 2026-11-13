@@ -509,3 +509,216 @@ describe('morning room-status report', () => {
     ]);
   });
 });
+
+// Inspection (PRD M5-06 "As a supervisor, I inspect a room (pass/fail with reasons); fail sends
+// it back to dirty"; M5 rule 1 "DIRTY → CLEANING → CLEAN → INSPECTED (if inspection on)";
+// tab 4 POST /inspections; T-129).
+describe('inspection', () => {
+  type Inspected = {
+    inspection: { passed: boolean; failReasons: string[]; inspector: { id: string } };
+    hkStatus: string;
+    reopened: Assignment | null;
+  };
+  type BoardWith = {
+    settings: { inspectionRequired: boolean };
+    rooms: {
+      number: string;
+      hkStatus: string;
+      awaitingInspection: boolean;
+      inspection: { passed: boolean; failReasons: string[] } | null;
+      assignment: { inspection: { passed: boolean } | null } | null;
+    }[];
+  };
+
+  async function cleaned(h: Awaited<ReturnType<typeof hotel>>) {
+    const sup = await h.as(
+      (await db.membership.findFirstOrThrow({ where: { roleId: h.role('hk-supervisor') } })).userId,
+    );
+    await db.room.update({ where: { id: h.room['103'] }, data: { hkStatus: 'DIRTY' } });
+    await h.ok(
+      sup.send('/housekeeping/assignments', {
+        roomIds: [h.room['103']],
+        attendantId: h.kemiUser.id,
+      }),
+    );
+    const kemi = await h.as(h.kemiUser.id);
+    const clean = async () => {
+      const [job] = (await h.ok<{ data: Assignment[] }>(kemi.get('/housekeeping/my-assignments')))
+        .data;
+      if (!job) throw new Error('no job');
+      const patch = (body: object) =>
+        h.ok<Assignment>(
+          kemi
+            .patch(`/housekeeping/assignments/${job.id}`, body)
+            .set('Idempotency-Key', randomUUID()),
+        );
+      await patch({ action: 'START' });
+      await patch({ checklist: job.checklist.map((c) => ({ ...c, done: true })) });
+      return patch({ action: 'COMPLETE' });
+    };
+    await clean();
+    return { sup, kemi, clean };
+  }
+
+  /** A booking arriving TODAY for the default room type. */
+  async function arriving(h: Awaited<ReturnType<typeof hotel>>, first: string) {
+    const type = await db.roomType.findFirstOrThrow({ where: { propertyId: h.p1.id } });
+    const bar = await db.ratePlan.findFirstOrThrow({ where: { propertyId: h.p1.id, code: 'BAR' } });
+    const quote = await h.ok<{ quoteId: string }>(
+      h.fd.post('/quotes', {
+        roomTypeId: type.id,
+        ratePlanId: bar.id,
+        arrival: TODAY,
+        departure: '2026-11-12',
+        adults: 1,
+      }),
+    );
+    const res = await h.ok<{ stays: { id: string; version: number }[] }>(
+      h.fd.send('/reservations', {
+        source: 'PHONE',
+        booker: { firstName: first, lastName: 'Ade' },
+        stays: [{ quoteId: quote.quoteId }],
+      }),
+    );
+    return res.stays[0] as { id: string; version: number };
+  }
+
+  it('a fail sends the room back to dirty and to its attendant; a pass sets it INSPECTED (M5-06)', async () => {
+    const h = await hotel();
+    const { sup, kemi, clean } = await cleaned(h);
+    const inspect = (who: typeof sup, body: object) =>
+      who.send('/inspections', { roomId: h.room['103'], ...body });
+
+    let board = await h.ok<BoardWith>(sup.get('/housekeeping/board'));
+    expect(board.settings).toEqual({ inspectionRequired: false });
+    expect(board.rooms.find((r) => r.number === '103')).toMatchObject({
+      hkStatus: 'CLEAN',
+      awaitingInspection: true,
+      inspection: null,
+    });
+
+    // Only with hk.inspect; a fail needs a reason, a pass has none.
+    expect((await inspect(kemi, { passed: true })).status).toBe(403);
+    expect(errorOf(await inspect(sup, { passed: false })).code).toBe('VALIDATION_ERROR');
+    expect(errorOf(await inspect(sup, { passed: true, failReasons: ['Dust'] })).code).toBe(
+      'VALIDATION_ERROR',
+    );
+
+    const failed = await h.ok<Inspected>(
+      inspect(sup, { passed: false, failReasons: ['Hair in the sink', 'No towels'] }),
+    );
+    expect(failed.hkStatus).toBe('DIRTY');
+    expect(failed.inspection).toMatchObject({
+      passed: false,
+      failReasons: ['Hair in the sink', 'No towels'],
+    });
+    expect(failed.reopened).toMatchObject({ status: 'PENDING', completedAt: null });
+    expect(failed.reopened?.checklist.every((c) => !c.done)).toBe(true);
+    expect((await db.room.findUniqueOrThrow({ where: { id: h.room['103'] } })).hkStatus).toBe(
+      'DIRTY',
+    );
+    const audit = await db.auditEvent.findFirstOrThrow({
+      where: { action: 'housekeeping.inspection_failed' },
+    });
+    expect(audit.after).toMatchObject({ failReasons: ['Hair in the sink', 'No towels'] });
+
+    // Back on Kemi's list with the reasons on it.
+    const mine = await h.ok<{
+      data: (Assignment & { inspection: { passed: boolean; failReasons: string[] } | null })[];
+    }>(kemi.get('/housekeeping/my-assignments'));
+    expect(mine.data[0]).toMatchObject({
+      roomNumber: '103',
+      status: 'PENDING',
+      inspection: { passed: false, failReasons: ['Hair in the sink', 'No towels'] },
+    });
+
+    // A dirty room can't be inspected until it is clean again.
+    expect(errorOf(await inspect(sup, { passed: true })).code).toBe('STATE_TRANSITION_INVALID');
+
+    await clean();
+    const passed = await h.ok<Inspected>(inspect(sup, { passed: true }));
+    expect(passed).toMatchObject({ hkStatus: 'INSPECTED', reopened: null });
+    board = await h.ok<BoardWith>(sup.get('/housekeeping/board'));
+    expect(board.rooms.find((r) => r.number === '103')).toMatchObject({
+      hkStatus: 'INSPECTED',
+      awaitingInspection: false,
+      inspection: { passed: true, failReasons: [] },
+      assignment: { inspection: { passed: true } },
+    });
+
+    // A spot check of a room already passed is allowed; every inspection is kept.
+    await h.ok(inspect(sup, { passed: true }));
+    expect(await db.inspection.count({ where: { roomId: h.room['103'] } })).toBe(3);
+  });
+
+  it('with inspection required, a clean room is not ready for a guest until it passes', async () => {
+    const h = await hotel();
+    const { sup } = await cleaned(h);
+    const dayo = await arriving(h, 'Dayo');
+    // While inspection is off, the clean room 103 is ready and is given to Dayo.
+    await h.ok(
+      h.fd
+        .send(`/stays/${dayo.id}/assign-room`, { roomId: h.room['103'] })
+        .set('If-Match', `"${dayo.version}"`),
+    );
+
+    // Only someone who sets up the property chooses.
+    const put = (who: typeof sup, inspectionRequired: boolean) =>
+      who.put('/housekeeping/settings', { inspectionRequired });
+    expect((await put(sup, true)).status).toBe(403);
+    expect((await put(h.fd, true)).status).toBe(403);
+    expect(await h.ok(put(h.gm, true))).toEqual({ inspectionRequired: true });
+    const audit = await db.auditEvent.findFirstOrThrow({
+      where: { action: 'housekeeping.settings_updated' },
+    });
+    expect(audit.after).toEqual({ inspectionRequired: true });
+    expect((await h.ok<BoardWith>(sup.get('/housekeeping/board'))).settings).toEqual({
+      inspectionRequired: true,
+    });
+
+    // Now CLEAN is not enough: the arrival is flagged and check-in refused.
+    const flags = async () =>
+      (
+        await h.ok<{ data: { stayId: string; flags: string[] }[] }>(
+          h.fd.get('/front-desk/arrivals'),
+        )
+      ).data.find((r) => r.stayId === dayo.id)?.flags;
+    expect(await flags()).toContain('ROOM_NOT_READY');
+    const registration = {
+      nationality: 'NG',
+      purpose: 'BUSINESS',
+      idType: 'PASSPORT',
+      idNumber: 'D1234567',
+    };
+    const checkIn = async () => {
+      const { version } = await db.stay.findUniqueOrThrow({ where: { id: dayo.id } });
+      return h.fd
+        .send(`/stays/${dayo.id}/check-in`, { registration })
+        .set('If-Match', `"${version}"`);
+    };
+    expect(errorOf(await checkIn())).toMatchObject({
+      code: 'ROOM_NOT_READY',
+      details: { problems: ['NOT_INSPECTED'] },
+    });
+
+    // Passed, it is ready.
+    await h.ok(sup.send('/inspections', { roomId: h.room['103'], passed: true }));
+    expect(await flags()).not.toContain('ROOM_NOT_READY');
+    expect((await checkIn()).status).toBe(200);
+  });
+
+  it('shows the desk a clean room as not inspected, and as ready again when turned off', async () => {
+    const h = await hotel();
+    await h.ok(h.gm.put('/housekeeping/settings', { inspectionRequired: true }));
+    const efe = await arriving(h, 'Efe');
+    const problems = async () =>
+      (
+        await h.ok<{ data: { id: string; problems: string[] }[] }>(
+          h.fd.get(`/stays/${efe.id}/rooms`),
+        )
+      ).data.find((r) => r.id === h.room['103'])?.problems;
+    expect(await problems()).toEqual(['NOT_INSPECTED']);
+    await h.ok(h.gm.put('/housekeeping/settings', { inspectionRequired: false }));
+    expect(await problems()).toEqual([]);
+  });
+});

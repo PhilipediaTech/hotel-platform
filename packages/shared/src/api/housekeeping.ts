@@ -9,7 +9,8 @@ import { Instant, IsoDate, Uuid } from './primitives.ts';
 // date has a cleaning list, one assignment per room: departures, stayovers, arrivals and a few
 // deep cleans, made when night audit opens the day (or on first look at the board). A
 // supervisor assigns rooms to attendants; the attendant starts, pauses and completes a room
-// against its checklist. Inspection (M5-06) follows with V1.1.
+// against its checklist. A supervisor then inspects it (M5-06, T-129): pass or fail with
+// reasons; a hotel can require inspection before a room is given to a guest.
 
 export const HK_TASK_KINDS = ['DEPARTURE', 'STAYOVER', 'ARRIVAL', 'DEEP_CLEAN'] as const;
 export const ASSIGNMENT_STATUSES = ['PENDING', 'IN_PROGRESS', 'PAUSED', 'DONE'] as const;
@@ -48,6 +49,50 @@ export const DEFAULT_CHECKLISTS: Record<HkTaskKind, readonly string[]> = {
 };
 
 const Person = z.object({ id: Uuid, name: z.string() });
+
+// Inspection (PRD M5-06 "As a supervisor, I inspect a room (pass/fail with reasons); fail sends
+// it back to dirty", hk.inspect; M5 rule 1 "DIRTY → CLEANING → CLEAN → INSPECTED (if inspection
+// on)"; tab 3 inspections; tab 4 POST /inspections; T-129).
+
+/** The hotel's housekeeping choices, kept in the property settings. */
+export const HousekeepingSettings = z
+  .object({
+    /**
+     * Rooms must pass inspection before they are given to a guest: only INSPECTED rooms are
+     * ready. Off, a cleaned (CLEAN) room is ready at once (M5 AC).
+     */
+    inspectionRequired: z.boolean(),
+  })
+  .meta({ id: 'HousekeepingSettings' });
+export type HousekeepingSettings = z.output<typeof HousekeepingSettings>;
+
+export const DEFAULT_HOUSEKEEPING_SETTINGS: HousekeepingSettings = { inspectionRequired: false };
+
+/** The housekeeping settings in a property's settings object; the defaults until chosen. */
+export function housekeepingSettingsOf(settings: unknown): HousekeepingSettings {
+  const raw =
+    settings && typeof settings === 'object'
+      ? (settings as Record<string, unknown>)['housekeeping']
+      : undefined;
+  const parsed = HousekeepingSettings.safeParse(raw);
+  return parsed.success ? parsed.data : DEFAULT_HOUSEKEEPING_SETTINGS;
+}
+
+/** A room can be given to a guest moving in now (housekeeping side only). */
+export function isRoomReady(hkStatus: string, inspectionRequired: boolean): boolean {
+  return hkStatus === 'INSPECTED' || (!inspectionRequired && hkStatus === 'CLEAN');
+}
+
+export const InspectionItem = z
+  .object({
+    id: Uuid,
+    roomId: Uuid,
+    passed: z.boolean(),
+    failReasons: z.array(z.string()),
+    at: Instant,
+    inspector: Person,
+  })
+  .meta({ id: 'Inspection' });
 const ChecklistItem = z.object({ item: z.string().trim().min(1).max(120), done: z.boolean() });
 const MinibarEntry = z.object({
   item: z.string().trim().min(1).max(80),
@@ -71,6 +116,8 @@ export const HkAssignmentItem = z
     notes: z.string().nullable(),
     /** The room's housekeeping status now. */
     hkStatus: z.string(),
+    /** The room's latest inspection of the business day (T-129), if any. */
+    inspection: InspectionItem.nullable(),
   })
   .meta({ id: 'HkAssignment' });
 
@@ -87,7 +134,11 @@ export const BoardRoom = z
     arrival: z.boolean(),
     /** HIGH when a guest arrives today and the room is not ready yet. */
     priority: z.enum(HK_PRIORITIES),
+    /** Cleaned and waiting for a supervisor to inspect it (T-129). */
+    awaitingInspection: z.boolean(),
     assignment: HkAssignmentItem.nullable(),
+    /** The room's latest inspection of the business day (T-129), if any. */
+    inspection: InspectionItem.nullable(),
     /** The morning report of the business date (T-081), if any. */
     observed: z.enum(OBSERVED_STATUSES).nullable(),
     /** The discrepancy raised for the room today (T-081), if any. */
@@ -110,6 +161,8 @@ export const getHousekeepingBoard = defineRoute({
     rooms: z.array(BoardRoom),
     /** Who can be given rooms (hk.work here). */
     attendants: z.array(Person),
+    /** The hotel's housekeeping settings (T-129). */
+    settings: HousekeepingSettings,
   }),
 });
 
@@ -162,7 +215,7 @@ export const updateAssignment = defineRoute({
   summary: 'Start, pause or complete a room; tick its checklist, note minibar use',
   description:
     'An attendant works only the rooms given to them (with hk.assign as well, any room). Completing ' +
-    'needs every checklist item ticked and sets the room CLEAN (inspection comes with V1.1).',
+    'needs every checklist item ticked and sets the room CLEAN; a supervisor then inspects it (T-129).',
   tags: ['Housekeeping'],
   propertyScoped: true,
   permission: 'hk.work',
@@ -251,6 +304,67 @@ export const submitStatusReport = defineRoute({
   }),
 });
 
+export const InspectionBody = z
+  .object({
+    roomId: Uuid,
+    passed: z.boolean(),
+    /** What failed: needed when the room fails, none when it passes. */
+    failReasons: z.array(z.string().trim().min(2).max(120)).max(10).default([]),
+  })
+  .refine((b) => b.passed || b.failReasons.length > 0, {
+    path: ['failReasons'],
+    message: 'Say what failed',
+  })
+  .refine((b) => !b.passed || b.failReasons.length === 0, {
+    path: ['failReasons'],
+    message: 'A room that passes has no fail reasons',
+  })
+  .refine((b) => new Set(b.failReasons.map((r) => r.toLowerCase())).size === b.failReasons.length, {
+    path: ['failReasons'],
+    message: 'Each reason once',
+  });
+
+export const InspectionResult = z
+  .object({
+    inspection: InspectionItem,
+    /** The room's housekeeping status after the inspection: INSPECTED or DIRTY. */
+    hkStatus: z.string(),
+    /** The day's cleaning job, opened again for its attendant after a fail. */
+    reopened: HkAssignmentItem.nullable(),
+  })
+  .meta({ id: 'InspectionResult' });
+
+export const recordInspection = defineRoute({
+  operationId: 'recordInspection',
+  method: 'post',
+  path: '/inspections',
+  summary: 'Inspect a cleaned room: pass sets it INSPECTED, fail sends it back to DIRTY (M5-06)',
+  description:
+    'The room must be CLEAN or INSPECTED (a spot check). A fail opens the day’s cleaning job ' +
+    'again for its attendant, checklist unticked, with the reasons shown on it.',
+  tags: ['Housekeeping'],
+  propertyScoped: true,
+  permission: 'hk.inspect',
+  idempotent: true,
+  status: 201,
+  body: InspectionBody,
+  response: InspectionResult,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const updateHousekeepingSettings = defineRoute({
+  operationId: 'updateHousekeepingSettings',
+  method: 'put',
+  path: '/housekeeping/settings',
+  summary: 'Choose whether rooms must pass inspection before a guest gets them',
+  description: 'Added beyond tab 4 (T-129). The board answers the current settings.',
+  tags: ['Housekeeping'],
+  propertyScoped: true,
+  permission: 'property.setup',
+  body: HousekeepingSettings,
+  response: HousekeepingSettings,
+});
+
 export const HOUSEKEEPING_ROUTES = {
   getHousekeepingBoard,
   assignRooms,
@@ -258,4 +372,6 @@ export const HOUSEKEEPING_ROUTES = {
   updateAssignment,
   listStatusReports,
   submitStatusReport,
+  recordInspection,
+  updateHousekeepingSettings,
 } as const;

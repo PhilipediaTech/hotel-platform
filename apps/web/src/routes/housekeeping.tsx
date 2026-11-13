@@ -5,7 +5,7 @@ import {
   type ObservedStatus,
 } from '@hotel/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
@@ -31,9 +31,24 @@ registerStrings(housekeepingStrings);
 // floor, plus its morning report and any discrepancy; the supervisor selects rooms and gives
 // them to an attendant. My rooms is the attendant's phone screen: start, pause and complete
 // each room, tick its checklist, note minibar use, and send the morning room-status report.
+// A supervisor inspects cleaned rooms from the board (M5-06; T-129): pass, or fail with
+// reasons, which puts the room back on its attendant's list.
 
 type Room = z.output<typeof BoardRoom>;
 type Assignment = z.output<typeof HkAssignmentItem>;
+type Inspection = NonNullable<Room['inspection']>;
+
+/** Common reasons a room fails, offered as ticks; the inspector can add their own. */
+const FAIL_REASONS = [
+  'bathroom',
+  'bed',
+  'dust',
+  'towels',
+  'amenities',
+  'minibar',
+  'odour',
+  'damage',
+] as const;
 
 const selectClass = 'h-11 rounded-md border border-border bg-surface px-3 text-sm';
 const HK_TONE: Record<string, string> = {
@@ -59,6 +74,7 @@ export function HousekeepingPage() {
   const [floor, setFloor] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [attendantId, setAttendantId] = useState('');
+  const [toInspect, setToInspect] = useState(false);
   const key = useHkKey('board');
   const savedAs = useOfflineKey(`hk-board:${floor}`);
   const board = useQuery({
@@ -77,7 +93,12 @@ export function HousekeepingPage() {
     },
   });
   const canAssign = permissions.includes('hk.assign');
+  const canInspect = permissions.includes('hk.inspect');
+  const canSetUp = permissions.includes('property.setup');
   const data = board.data;
+  const waiting = data?.rooms.filter((r) => r.awaitingInspection).length ?? 0;
+  const shown = data ? data.rooms.filter((r) => !toInspect || r.awaitingInspection) : [];
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: key });
   const toggle = (id: string) =>
     setSelected((s) => {
       const next = new Set(s);
@@ -115,6 +136,17 @@ export function HousekeepingPage() {
                 </select>
               </div>
             )}
+            {canInspect && (
+              <label className="flex min-h-11 items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-5"
+                  checked={toInspect}
+                  onChange={(e) => setToInspect(e.target.checked)}
+                />
+                {t('hk.inspect.onlyWaiting', { count: waiting })}
+              </label>
+            )}
             {canAssign && (
               <form
                 aria-label={t('hk.assign')}
@@ -146,16 +178,26 @@ export function HousekeepingPage() {
               </form>
             )}
           </div>
+          {canSetUp ? (
+            <InspectionSetting required={data.settings.inspectionRequired} onSaved={refresh} />
+          ) : (
+            data.settings.inspectionRequired && (
+              <p className="mt-3 text-sm text-text-muted">{t('hk.inspect.requiredNote')}</p>
+            )
+          )}
           {assign.error && (
             <Alert tone="critical" className="mt-3">
               {errorMessage(assign.error)}
             </Alert>
           )}
           <ul aria-label={t('hk.rooms')} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {data.rooms.map((r) => (
+            {shown.map((r) => (
               <RoomTile
                 key={r.roomId}
                 room={r}
+                required={data.settings.inspectionRequired}
+                canInspect={canInspect}
+                onInspected={refresh}
                 selectable={canAssign && r.assignment?.status !== 'DONE'}
                 selected={selected.has(r.roomId)}
                 onToggle={() => toggle(r.roomId)}
@@ -170,6 +212,9 @@ export function HousekeepingPage() {
 
 function RoomTile(props: {
   room: Room;
+  required: boolean;
+  canInspect: boolean;
+  onInspected: () => void;
   selectable: boolean;
   selected: boolean;
   onToggle: () => void;
@@ -177,6 +222,8 @@ function RoomTile(props: {
   const { t } = useTranslation();
   const r = props.room;
   const a = r.assignment;
+  const [inspecting, setInspecting] = useState(false);
+  const inspectable = r.hkStatus === 'CLEAN' || r.hkStatus === 'INSPECTED';
   return (
     <li
       className={cn(
@@ -223,7 +270,161 @@ function RoomTile(props: {
         </p>
       )}
       {r.discrepancy && <Discrepancy rule={r.discrepancy} />}
+      {r.awaitingInspection && (
+        <p className="mt-1 text-xs font-medium text-warning">
+          {props.required ? t('hk.inspect.waitingRequired') : t('hk.inspect.waiting')}
+        </p>
+      )}
+      {r.inspection && <InspectionNote inspection={r.inspection} />}
+      {props.canInspect && inspectable && !inspecting && (
+        <Button
+          variant="secondary"
+          className="mt-2 h-11"
+          aria-label={t('hk.inspect.openNamed', { room: r.number })}
+          onClick={() => setInspecting(true)}
+        >
+          {t('hk.inspect.open')}
+        </Button>
+      )}
+      {inspecting && (
+        <InspectForm
+          room={r}
+          onClose={() => setInspecting(false)}
+          onDone={() => {
+            setInspecting(false);
+            props.onInspected();
+          }}
+        />
+      )}
     </li>
+  );
+}
+
+/** The room's latest inspection today: passed, or failed with its reasons (T-129). */
+function InspectionNote({ inspection: i }: { inspection: Inspection }) {
+  const { t } = useTranslation();
+  return i.passed ? (
+    <p className="mt-1 flex items-start gap-1 text-xs text-success">
+      <CheckCircle2 aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+      {t('hk.inspect.passedBy', { name: i.inspector.name })}
+    </p>
+  ) : (
+    <p className="mt-1 flex items-start gap-1 text-xs font-medium text-critical">
+      <XCircle aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+      {t('hk.inspect.failedBy', { name: i.inspector.name, reasons: i.failReasons.join('; ') })}
+    </p>
+  );
+}
+
+/** S16 inspection (M5-06; T-129): pass, or fail with ticked and written reasons. */
+function InspectForm(props: { room: Room; onClose: () => void; onDone: () => void }) {
+  const { t } = useTranslation();
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [other, setOther] = useState('');
+  const reasons = [
+    ...FAIL_REASONS.filter((r) => ticked.has(r)).map((r) => t(`hk.inspect.reasons.${r}`)),
+    ...(other.trim().length >= 2 ? [other.trim()] : []),
+  ];
+  const send = useMutation({
+    mutationFn: (passed: boolean) =>
+      api.call('recordInspection', {
+        body: { roomId: props.room.roomId, passed, failReasons: passed ? [] : reasons },
+      }),
+    onSuccess: props.onDone,
+  });
+  const otherId = `fail-other-${props.room.roomId}`;
+  return (
+    <form
+      aria-label={t('hk.inspect.formNamed', { room: props.room.number })}
+      className="mt-2 flex flex-col gap-2 border-t border-border pt-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (reasons.length > 0) send.mutate(false);
+      }}
+    >
+      <Button
+        type="button"
+        className="h-11"
+        disabled={send.isPending}
+        onClick={() => send.mutate(true)}
+      >
+        {t('hk.inspect.pass')}
+      </Button>
+      <fieldset>
+        <legend className="text-xs font-medium">{t('hk.inspect.whatFailed')}</legend>
+        {FAIL_REASONS.map((r) => (
+          <label key={r} className="flex min-h-11 items-center gap-2">
+            <input
+              type="checkbox"
+              className="size-5"
+              checked={ticked.has(r)}
+              onChange={(e) =>
+                setTicked((s) => {
+                  const next = new Set(s);
+                  if (e.target.checked) next.add(r);
+                  else next.delete(r);
+                  return next;
+                })
+              }
+            />
+            {t(`hk.inspect.reasons.${r}`)}
+          </label>
+        ))}
+      </fieldset>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={otherId}>{t('hk.inspect.other')}</Label>
+        <Input
+          id={otherId}
+          maxLength={120}
+          value={other}
+          onChange={(e) => setOther(e.target.value)}
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="submit"
+          variant="secondary"
+          className="h-11"
+          disabled={reasons.length === 0 || send.isPending}
+        >
+          {t('hk.inspect.fail')}
+        </Button>
+        <Button type="button" variant="ghost" className="h-11" onClick={props.onClose}>
+          {t('hk.inspect.cancel')}
+        </Button>
+      </div>
+      {send.error && <Alert tone="critical">{errorMessage(send.error)}</Alert>}
+    </form>
+  );
+}
+
+/** Whether rooms must pass inspection before a guest gets them (T-129; property.setup). */
+function InspectionSetting(props: { required: boolean; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const save = useMutation({
+    mutationFn: (inspectionRequired: boolean) =>
+      api.call('updateHousekeepingSettings', { body: { inspectionRequired } }),
+    onSuccess: props.onSaved,
+  });
+  return (
+    <div className="mt-3">
+      <label className="flex min-h-11 items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="size-5"
+          checked={save.isPending ? save.variables : props.required}
+          disabled={save.isPending}
+          onChange={(e) => save.mutate(e.target.checked)}
+        />
+        {t('hk.inspect.required')}
+      </label>
+      <p className="text-xs text-text-muted">{t('hk.inspect.requiredHint')}</p>
+      {save.error && (
+        <Alert tone="critical" className="mt-2">
+          {errorMessage(save.error)}
+        </Alert>
+      )}
+    </div>
   );
 }
 
@@ -441,6 +642,11 @@ function MyRoom({ assignment: a, queryKey }: { assignment: Assignment; queryKey:
         </span>
         <span className="text-sm text-text-muted">{t(`hk.status.${a.status}`)}</span>
       </div>
+      {a.inspection && !a.inspection.passed && !done && (
+        <Alert tone="critical" className="mt-2">
+          {t('hk.inspect.sentBack', { reasons: a.inspection.failReasons.join('; ') })}
+        </Alert>
+      )}
       {!done && (
         <div className="mt-3 flex flex-wrap gap-2">
           {!working && (

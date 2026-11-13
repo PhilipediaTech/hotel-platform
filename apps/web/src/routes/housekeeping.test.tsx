@@ -9,7 +9,8 @@ import { routes } from '../app/routes.tsx';
 import { setApiPropertyId } from '../lib/api.ts';
 import { LAGOS, makeMe, membership } from '../test/me-fixture.ts';
 
-// S16 Room board and S17 My rooms (PRD M5-01–M5-05; T-080, morning report T-081).
+// S16 Room board and S17 My rooms (PRD M5-01–M5-06; T-080, morning report T-081,
+// inspection T-129).
 
 const json = (status: number, body?: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
@@ -38,6 +39,7 @@ const assignment = (n: number, extra: object = {}) => ({
   minibar: [],
   notes: null,
   hkStatus: 'DIRTY',
+  inspection: null,
   ...extra,
 });
 
@@ -51,7 +53,9 @@ const room = (n: number, extra: object = {}) => ({
   dueOut: false,
   arrival: false,
   priority: 'NORMAL',
+  awaitingInspection: false,
   assignment: assignment(n),
+  inspection: null,
   observed: null,
   discrepancy: null,
   ...extra,
@@ -122,6 +126,7 @@ describe('Room board (S16)', () => {
           room(3, { observed: 'OCCUPIED', discrepancy: 'OCCUPIED_NO_FOLIO' }),
         ],
         attendants: [KEMI],
+        settings: { inspectionRequired: false },
       });
     handlers['POST /housekeeping/assignments'] = () => json(200, { data: [] });
     const user = userEvent.setup();
@@ -145,7 +150,137 @@ describe('Room board (S16)', () => {
   }, 15_000);
 });
 
+describe('Inspection (S16, M5-06)', () => {
+  const SUPER = { id: id(91), name: 'Sola Super' };
+  const board =
+    (rooms: object[], inspectionRequired = false) =>
+    () =>
+      json(200, {
+        businessDate: '2026-11-10',
+        floors: ['1'],
+        rooms,
+        attendants: [KEMI],
+        settings: { inspectionRequired },
+      });
+
+  it('fails a cleaned room with reasons, and passes another', async () => {
+    permissions = ['hk.read', 'hk.inspect'];
+    handlers['GET /housekeeping/board'] = board([
+      room(1, { hkStatus: 'CLEAN', awaitingInspection: true }),
+      room(2, { hkStatus: 'CLEAN', awaitingInspection: true }),
+      room(3, {
+        hkStatus: 'DIRTY',
+        inspection: {
+          id: id(70),
+          roomId: id(3),
+          passed: false,
+          failReasons: ['Dust'],
+          at: '2026-11-10T09:00:00Z',
+          inspector: SUPER,
+        },
+      }),
+    ]);
+    handlers['POST /inspections'] = (body) =>
+      json(201, {
+        inspection: {
+          id: id(71),
+          ...(body as object),
+          at: '2026-11-10T10:00:00Z',
+          inspector: SUPER,
+        },
+        hkStatus: (body as { passed: boolean }).passed ? 'INSPECTED' : 'DIRTY',
+        reopened: null,
+      });
+    const user = userEvent.setup();
+    renderAt('/housekeeping');
+    const rooms = await screen.findByRole('list', { name: 'Rooms' });
+    expect(within(rooms).getAllByText('Waiting for inspection')).toHaveLength(2);
+    expect(within(rooms).getByText('Failed inspection (Sola Super): Dust')).toBeInTheDocument();
+    // A dirty room has nothing to inspect.
+    expect(screen.queryByRole('button', { name: 'Inspect room 103' })).not.toBeInTheDocument();
+    // Only rooms waiting.
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Only the 2 rooms waiting for inspection' }),
+    );
+    expect(within(rooms).queryByText('103')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Inspect room 101' }));
+    const form = screen.getByRole('form', { name: 'Inspection of room 101' });
+    const fail = within(form).getByRole('button', { name: 'Fail and send back' });
+    expect(fail).toBeDisabled();
+    await user.click(within(form).getByRole('checkbox', { name: 'Bathroom not clean' }));
+    await user.type(within(form).getByLabelText('Something else'), 'Hair on the pillow');
+    await user.click(fail);
+    await waitFor(() => expect(sent('POST /inspections')).toHaveLength(1));
+    expect(sent('POST /inspections')[0]?.body).toEqual({
+      roomId: id(1),
+      passed: false,
+      failReasons: ['Bathroom not clean', 'Hair on the pillow'],
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Inspect room 102' }));
+    const form2 = screen.getByRole('form', { name: 'Inspection of room 102' });
+    await user.click(within(form2).getByRole('button', { name: 'Pass' }));
+    await waitFor(() => expect(sent('POST /inspections')).toHaveLength(2));
+    expect(sent('POST /inspections')[1]?.body).toEqual({
+      roomId: id(2),
+      passed: true,
+      failReasons: [],
+    });
+  }, 15_000);
+
+  it('lets the manager require inspection; others only see that it is on', async () => {
+    permissions = ['hk.read', 'property.setup'];
+    let required = false;
+    handlers['GET /housekeeping/board'] = () =>
+      board([room(1, { hkStatus: 'CLEAN', awaitingInspection: true })], required)();
+    handlers['PUT /housekeeping/settings'] = (body) => {
+      required = (body as { inspectionRequired: boolean }).inspectionRequired;
+      return json(200, body);
+    };
+    const user = userEvent.setup();
+    renderAt('/housekeeping');
+    const box = await screen.findByRole('checkbox', {
+      name: 'Rooms must pass inspection before a guest gets them',
+    });
+    expect(box).not.toBeChecked();
+    await user.click(box);
+    await waitFor(() => expect(sent('PUT /housekeeping/settings')).toHaveLength(1));
+    expect(sent('PUT /housekeeping/settings')[0]?.body).toEqual({ inspectionRequired: true });
+    expect(
+      await screen.findByText('Waiting for inspection: not ready for a guest yet'),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(box).toBeChecked());
+  }, 15_000);
+});
+
 describe('My rooms (S17)', () => {
+  it('shows why the inspector sent a room back', async () => {
+    permissions = ['hk.work'];
+    handlers['GET /housekeeping/my-assignments'] = () =>
+      json(200, {
+        businessDate: '2026-11-10',
+        data: [
+          assignment(1, {
+            attendant: KEMI,
+            inspection: {
+              id: id(70),
+              roomId: id(1),
+              passed: false,
+              failReasons: ['Dust', 'No towels'],
+              at: '2026-11-10T09:00:00Z',
+              inspector: { id: id(91), name: 'Sola Super' },
+            },
+          }),
+        ],
+      });
+    renderAt('/my-rooms');
+    const card = await screen.findByRole('listitem', { name: 'Room 101' });
+    expect(
+      within(card).getByText('Sent back by the inspector: Dust; No towels'),
+    ).toBeInTheDocument();
+  }, 15_000);
+
   it('starts a room, ticks the checklist and completes it', async () => {
     permissions = ['hk.work'];
     let current = assignment(1, { attendant: KEMI });

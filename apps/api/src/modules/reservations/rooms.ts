@@ -1,4 +1,5 @@
 import {
+  isRoomReady,
   MODIFIABLE_STATUSES,
   type AssignableRoom,
   type AssignRoomBody,
@@ -18,6 +19,7 @@ import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { propertyToday } from '../availability/inventory.ts';
+import { inspectionRequired } from '../housekeeping/settings.ts';
 import { getReservation, type ReservationDeps } from './service.ts';
 
 // Rooms for stays (PRD M3-07, M3-11; tab 3 room_allocations; T-050). A stay holds a room
@@ -46,7 +48,6 @@ type Move = z.output<typeof MoveBody>;
 /** The approval context plus the time the action runs. */
 export type Ctx = ExecuteContext & { now: Date };
 
-const READY = new Set(['CLEAN', 'INSPECTED']);
 /** M1 rule 2 "room move after 00:00": moves from midnight until 05:00 at the property. */
 const LATE_MOVE_UNTIL_HOUR = 5;
 
@@ -161,10 +162,16 @@ export async function dayUseFreeRooms(
   });
 }
 
-/** M3-07: why a room is not ready for a guest moving in today (empty when it is). */
-export async function problemsOf(db: Client, room: Room, stayId: string) {
+/**
+ * M3-07: why a room is not ready for a guest moving in today (empty when it is). With
+ * inspection required (T-129) a CLEAN room is not ready until it passes.
+ */
+export async function problemsOf(db: Client, room: Room, stayId: string, inspection?: boolean) {
   const problems: z.input<typeof AssignableRoom>['problems'] = [];
-  if (!READY.has(room.hkStatus)) problems.push('NOT_CLEAN');
+  const required = inspection ?? (await inspectionRequired(db, room.propertyId));
+  if (!isRoomReady(room.hkStatus, required)) {
+    problems.push(room.hkStatus === 'CLEAN' ? 'NOT_INSPECTED' : 'NOT_CLEAN');
+  }
   const occupant = await db.stay.count({
     where: { roomId: room.id, status: 'CHECKED_IN', id: { not: stayId } },
   });
@@ -179,6 +186,7 @@ export async function listAssignableRooms(deps: ReservationDeps, stayId: string)
   const from = stay.status === 'CHECKED_IN' ? later(day(stay.arrival), today) : day(stay.arrival);
   const rooms = await freeRooms(deps.tenantDb, stay, from, day(stay.departure));
   const movingInToday = from <= today;
+  const required = await inspectionRequired(deps.tenantDb, stay.propertyId);
   const data: z.input<typeof AssignableRoom>[] = [];
   for (const room of rooms.filter((r) => r.id !== stay.roomId)) {
     data.push({
@@ -186,7 +194,7 @@ export async function listAssignableRooms(deps: ReservationDeps, stayId: string)
       number: room.number,
       floor: room.floor,
       hkStatus: room.hkStatus,
-      problems: movingInToday ? await problemsOf(deps.tenantDb, room, stay.id) : [],
+      problems: movingInToday ? await problemsOf(deps.tenantDb, room, stay.id, required) : [],
     });
   }
   return { data };

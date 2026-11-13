@@ -1036,6 +1036,35 @@ async function bAssignmentUnchanged(db: Db, world: TenantWorld) {
   expect(rows.map((r) => [r.status, r.attendantId, r.notes])).toEqual([['PENDING', null, null]]);
 }
 
+/** B's clean room, inspected once, and B's housekeeping settings (T-129). */
+async function bInspection(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bRoom(db, world, propertyId);
+  await db.room.update({ where: { id: theirs.roomId }, data: { hkStatus: 'CLEAN' } });
+  const inspector = await db.user.findFirstOrThrow();
+  await db.inspection.create({
+    data: {
+      propertyId,
+      roomId: theirs.roomId,
+      inspectorId: inspector.id,
+      passed: true,
+      failReasons: [],
+    },
+  });
+  await db.property.update({
+    where: { id: propertyId },
+    data: { settings: { housekeeping: { inspectionRequired: true } } },
+  });
+  return theirs;
+}
+
+async function bInspectionUnchanged(db: Db, world: TenantWorld) {
+  const rooms = await db.room.findMany({ where: { propertyId: world.b1.id } });
+  expect(rooms.map((r) => r.hkStatus)).toEqual(['CLEAN']);
+  expect(await db.inspection.count({ where: { propertyId: world.b1.id } })).toBe(1);
+  const b = await db.property.findUniqueOrThrow({ where: { id: world.b1.id } });
+  expect(b.settings).toMatchObject({ housekeeping: { inspectionRequired: true } });
+}
+
 /** B's room with a morning report on it (T-081). */
 async function bReport(db: Db, world: TenantWorld, propertyId: string) {
   const theirs = await bRoom(db, world, propertyId);
@@ -2519,6 +2548,17 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     creates: true,
     body: (theirs) => ({ entries: [{ roomId: theirs['roomId'], observed: 'OCCUPIED' }] }),
     untouched: bReportUnchanged,
+  },
+  recordInspection: {
+    seed: bInspection,
+    body: (theirs) => ({ roomId: theirs['roomId'], passed: false, failReasons: ['Leak'] }),
+    untouched: bInspectionUnchanged,
+  },
+  updateHousekeepingSettings: {
+    seed: bInspection,
+    creates: true,
+    body: () => ({ inspectionRequired: false }),
+    untouched: bInspectionUnchanged,
   },
   listTasks: {
     seed: bTask,

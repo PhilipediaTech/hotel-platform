@@ -158,6 +158,8 @@ model Property {
   arPayments            ArPayment[]
   arAllocations         ArAllocation[]
   commissions           Commission[]
+  bankStatementLines    BankStatementLine[]
+  reconciliationMatches ReconciliationMatch[]
   groupBlockNights      GroupBlockNight[]
   serviceBookings       ServiceBooking[]
   eventQuotes           EventQuote[]
@@ -308,17 +310,19 @@ model User {
   partnerPayouts     PartnerPayout[]    @relation("PartnerPayoutBy")
   partnerChanges     PartnerChange[]    @relation("PartnerChangeBy")
 
-  messagesSent       Message[]           @relation("MessageSentBy")
-  eventEnquiries     EventEnquiry[]
-  eventBookings      EventBooking[]
-  eventBriefs        EventBrief[]        @relation("EventBriefAuthor")
-  serviceBookings    ServiceBooking[]    @relation("ServiceBookingAuthor")
-  groupBlocks        GroupBlock[]        @relation("GroupBlockAuthor")
-  arPayments         ArPayment[]         @relation("ArPaymentAuthor")
-  commissionsSettled Commission[]        @relation("CommissionSettler")
-  eventsInspected    EventBooking[]      @relation("EventInspector")
-  eventQuoteVersions EventQuoteVersion[] @relation("EventQuoteAuthor")
-  eventContracts     EventContract[]     @relation("EventContractIssuer")
+  messagesSent        Message[]             @relation("MessageSentBy")
+  eventEnquiries      EventEnquiry[]
+  eventBookings       EventBooking[]
+  eventBriefs         EventBrief[]          @relation("EventBriefAuthor")
+  serviceBookings     ServiceBooking[]      @relation("ServiceBookingAuthor")
+  groupBlocks         GroupBlock[]          @relation("GroupBlockAuthor")
+  arPayments          ArPayment[]           @relation("ArPaymentAuthor")
+  commissionsSettled  Commission[]          @relation("CommissionSettler")
+  bankLinesImported   BankStatementLine[]   @relation("BankLineImporter")
+  reconciliationsMade ReconciliationMatch[] @relation("ReconciliationAuthor")
+  eventsInspected     EventBooking[]        @relation("EventInspector")
+  eventQuoteVersions  EventQuoteVersion[]   @relation("EventQuoteAuthor")
+  eventContracts      EventContract[]       @relation("EventContractIssuer")
 
   @@map("users")
 }
@@ -1750,6 +1754,7 @@ model Payment {
   matchedTransfer UnmatchedTransfer?
   depositEntries  DepositLedgerEntry[]
   alertOutcomes   AlertOutcome[]
+  reconciliation  ReconciliationMatch?
 
   @@index([propertyId, businessDate])
   @@index([folioId])
@@ -3105,11 +3110,12 @@ model ArPayment {
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  property    Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  account     ArAccount      @relation(fields: [arAccountId], references: [id], onDelete: Restrict)
-  createdBy   User           @relation("ArPaymentAuthor", fields: [createdById], references: [id], onDelete: Restrict)
-  allocations ArAllocation[]
-  commissions Commission[]
+  property       Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  account        ArAccount            @relation(fields: [arAccountId], references: [id], onDelete: Restrict)
+  createdBy      User                 @relation("ArPaymentAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  allocations    ArAllocation[]
+  commissions    Commission[]
+  reconciliation ReconciliationMatch?
 
   @@index([arAccountId, receivedOn])
   @@map("ar_payments")
@@ -3164,4 +3170,63 @@ model Commission {
   @@unique([propertyId, stayId])
   @@index([propertyId, status, travelAgentId])
   @@map("commissions")
+}
+
+// ───────────────────────── Bank reconciliation (T-128) ─────────────────────────
+
+/// A transaction on an imported bank statement (PRD M4-23; S37). Signed: money in positive.
+model BankStatementLine {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @map("property_id") @db.Uuid
+  /// Lines imported together share it.
+  importId     String   @map("import_id") @db.Uuid
+  /// The hotel's own name for the account, e.g. "GTBank 0123456789".
+  bankAccount  String   @map("bank_account")
+  fileName     String?  @map("file_name")
+  postedOn     DateTime @map("posted_on") @db.Date
+  description  String
+  reference    String?
+  amountMinor  BigInt   @map("amount_minor")
+  balanceMinor BigInt?  @map("balance_minor")
+  /// Same account, date, amount, reference, narration and place among its twins: imported once.
+  fingerprint  String
+  /// UNMATCHED | MATCHED
+  status       String   @default("UNMATCHED")
+  importedById String   @map("imported_by_id") @db.Uuid
+  importedAt   DateTime @default(now()) @map("imported_at") @db.Timestamptz(6)
+
+  property   Property              @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  importedBy User                  @relation("BankLineImporter", fields: [importedById], references: [id], onDelete: Restrict)
+  matches    ReconciliationMatch[]
+
+  @@unique([propertyId, fingerprint])
+  @@unique([propertyId, id])
+  @@index([propertyId, status, postedOn])
+  @@map("bank_statement_lines")
+}
+
+/// What explains a statement line: payments in the books, a difference, or a reason.
+model ReconciliationMatch {
+  id              String   @id @default(uuid()) @db.Uuid
+  propertyId      String   @map("property_id") @db.Uuid
+  statementLineId String   @map("statement_line_id") @db.Uuid
+  /// PAYMENT | AR_PAYMENT | DIFFERENCE | EXPLAINED
+  kind            String
+  paymentId       String?  @unique @map("payment_id") @db.Uuid
+  arPaymentId     String?  @unique @map("ar_payment_id") @db.Uuid
+  amountMinor     BigInt   @map("amount_minor")
+  /// Made by auto-match rather than by hand.
+  auto            Boolean  @default(false)
+  note            String?
+  createdById     String   @map("created_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property  Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  line      BankStatementLine @relation(fields: [propertyId, statementLineId], references: [propertyId, id], onDelete: Cascade)
+  payment   Payment?          @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  arPayment ArPayment?        @relation(fields: [arPaymentId], references: [id], onDelete: Restrict)
+  createdBy User              @relation("ReconciliationAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, statementLineId])
+  @@map("reconciliation_matches")
 }

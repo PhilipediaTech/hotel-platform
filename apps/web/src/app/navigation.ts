@@ -136,6 +136,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-126',
   },
   {
+    id: 'reconciliation',
+    path: '/reconciliation',
+    anyOf: ['recon.manage'],
+    group: 'revenue',
+    screen: 'S37',
+    ticket: 'T-128',
+  },
+  {
     id: 'unmatched-transfers',
     path: '/folios?view=unmatched',
     anyOf: ['payment.capture'],

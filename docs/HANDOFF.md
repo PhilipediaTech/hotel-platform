@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-127 is pushed on `feat/T-127-commissions`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Next: bank statement import M4-23, then the M5 maintenance tickets.
+T-128 is pushed on `feat/T-128-bank-reconciliation`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Next: the M5 maintenance and inspection tickets.

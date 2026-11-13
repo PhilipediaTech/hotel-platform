@@ -23,6 +23,7 @@ import { SERVICE_ROUTES } from './services.ts';
 import { GROUP_BLOCK_ROUTES } from './group-blocks.ts';
 import { AR_ROUTES } from './ar.ts';
 import { COMMISSION_ROUTES } from './commissions.ts';
+import { RECONCILIATION_ROUTES } from './reconciliation.ts';
 import { PARTNER_ROUTES } from './partners.ts';
 import { PLATFORM_ROUTES } from './platform.ts';
 import { REPORT_ROUTES } from './reports.ts';
@@ -69,6 +70,7 @@ export const API_ROUTES = {
   ...GROUP_BLOCK_ROUTES,
   ...AR_ROUTES,
   ...COMMISSION_ROUTES,
+  ...RECONCILIATION_ROUTES,
   ...BOOKING_ENGINE_ROUTES,
   ...AUTH_ROUTES,
   ...ACCESS_ROUTES,

@@ -78,6 +78,8 @@ export const TENANT_MODELS: Record<string, Scope> = {
   ArPayment: { kind: 'property' },
   ArAllocation: { kind: 'property' },
   Commission: { kind: 'property' },
+  BankStatementLine: { kind: 'property' },
+  ReconciliationMatch: { kind: 'property' },
   GroupBlockNight: { kind: 'property' },
   ServiceBooking: { kind: 'property' },
   EventQuote: { kind: 'property' },

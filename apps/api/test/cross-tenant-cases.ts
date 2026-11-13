@@ -665,6 +665,30 @@ async function bArUnchanged(db: Db, world: TenantWorld) {
   expect(await db.payment.count({ where: { method: 'AR_TRANSFER' } })).toBe(0);
 }
 
+/** B's unmatched statement line, the same as B's city-ledger receipt (T-128). */
+async function bBankLine(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bArAccount(db, world, propertyId);
+  const line = await db.bankStatementLine.create({
+    data: {
+      propertyId,
+      importId: '0d0d0d0d-0000-4000-8000-0000000000bb',
+      bankAccount: 'Theirs',
+      postedOn: new Date('2026-11-05'),
+      description: 'THEIR RECEIPT',
+      amountMinor: 500n,
+      fingerprint: 'theirs',
+      importedById: world.bStaff.id,
+    },
+  });
+  return { ...theirs, lineId: line.id };
+}
+
+async function bBankLineUnchanged(db: Db, world: TenantWorld) {
+  const lines = await db.bankStatementLine.findMany({ where: { propertyId: world.b1.id } });
+  expect(lines.map((l) => [l.description, l.status])).toEqual([['THEIR RECEIPT', 'UNMATCHED']]);
+  expect(await db.reconciliationMatch.count()).toBe(0);
+}
+
 /** B's checked-out agent booking with a due commission (T-127). */
 async function bCommission(db: Db, world: TenantWorld, propertyId: string) {
   const theirs = await bArAccount(db, world, propertyId);
@@ -2031,6 +2055,47 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       settledOn: '2026-01-20',
     }),
     untouched: bCommissionUnchanged,
+  },
+  importBankStatement: {
+    seed: bBankLine,
+    // Imports to A's own property and auto-matches A's own lines only.
+    creates: true,
+    body: () => ({
+      bankAccount: 'Ours',
+      lines: [{ postedOn: '2026-01-05', description: 'THEIR RECEIPT', amountMinor: '500' }],
+    }),
+    untouched: bBankLineUnchanged,
+  },
+  listBankStatementLines: {
+    seed: bBankLine,
+    query: () => ({ from: '2026-11-01', to: '2026-11-30' }),
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((l) => l.id),
+  },
+  listBookEntries: {
+    seed: bBankLine,
+    query: () => ({ from: '2026-11-01', to: '2026-11-30' }),
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((e) => e.id),
+  },
+  autoMatchBankLines: {
+    seed: bBankLine,
+    creates: true,
+    body: () => ({}),
+    untouched: bBankLineUnchanged,
+  },
+  matchBankLine: {
+    seed: bBankLine,
+    body: (theirs) => ({ arPaymentIds: [theirs['paymentId']] }),
+    untouched: bBankLineUnchanged,
+  },
+  explainBankLine: {
+    seed: bBankLine,
+    body: () => ({ note: 'Not yours' }),
+    untouched: bBankLineUnchanged,
+  },
+  unmatchBankLine: {
+    seed: bBankLine,
+    body: () => ({ reason: 'Not yours' }),
+    untouched: bBankLineUnchanged,
   },
   listServices: {
     seed: bService,

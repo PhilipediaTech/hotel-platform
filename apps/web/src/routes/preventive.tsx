@@ -18,7 +18,11 @@ import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
+import maintenanceStrings from '../i18n/en/maintenance.json';
+import { registerStrings } from '../i18n/index.ts';
 import { useFormats } from './reservations.tsx';
+
+registerStrings(maintenanceStrings);
 
 // S34 PM calendar (PRD M5-10; T-131). Calendar plans on an agenda of the coming weeks (each
 // plan's next date, then every N days); run-hours plans with their meter, hours left and a

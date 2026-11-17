@@ -49,6 +49,14 @@ f1b8606 plus this branch). ✔ met, ◐ partly (gap named), ✖ open, — not ap
   vulnerabilities.** CI now fails on any finding there, at any severity.
 - **Whole tree:** 0 critical, 0 high, 13 moderate, 2 low. CI still fails on high or critical.
 
+**High or critical waivers** live in `scripts/audit-waivers.json`. CI runs `npm run audit`
+(`scripts/audit.mjs`), which fails on any high or critical advisory not listed there, and on a
+listed one once its `until` date has passed. The runtime audit takes no waivers.
+
+| Advisory            | Package (via)                                            | Severity | Fix                                        | Waiver                                                                                                                            | Until      |
+| ------------------- | -------------------------------------------------------- | -------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| GHSA-fc5q-39xc-vjpf | picomatch ≤4.0.7 (vite, vitest, tinyglobby, lint-staged) | high     | none yet: every published version affected | ReDoS on extglob patterns. Dev and build tooling only, on globs we write ourselves. Approved 2026-11-17. Upgrade when 4.0.8 ships | 2027-01-31 |
+
 Waivers for the moderate and low findings, all in tooling that never ships:
 
 | Package (via)                                               | Severity | Used for                    | Fix                                                   | Waiver                                                                               |

@@ -31,6 +31,7 @@ import {
 import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 import { taskEscalationJob } from './modules/tasks/jobs.ts';
 import { preventiveMaintenanceJob } from './modules/maintenance/preventive.ts';
+import { checklistsJob } from './modules/checklists/service.ts';
 import { eventHoldExpiryJob } from './modules/events/routes.ts';
 import { groupBlockReleaseJob } from './modules/groups/routes.ts';
 import { platformBillingJob } from './modules/platform/billing.ts';
@@ -65,6 +66,7 @@ export function workerJobs(deps: {
     unmatchedTransferJob,
     taskEscalationJob,
     preventiveMaintenanceJob,
+    checklistsJob,
   ];
 }
 

@@ -64,9 +64,10 @@ jobs:
         run: npm run build
       - name: Bundle budget (300 KB)
         run: npm run size -w apps/web
-      # Release checklist (tab 8): no high or critical issue without a waiver (docs/SECURITY.md).
+      # Release checklist (tab 8): no high or critical issue without a waiver (docs/SECURITY.md,
+      # scripts/audit-waivers.json; a waiver lapses on its date).
       - name: Dependency audit
-        run: npm audit --audit-level=high
+        run: npm run audit
       # What ships to servers and browsers stays at zero known issues of any severity (T-102).
       - name: Dependency audit (runtime packages)
         run: npm audit --omit=dev --audit-level=low

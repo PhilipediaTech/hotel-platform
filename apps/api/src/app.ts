@@ -53,6 +53,7 @@ import { reconciliationRoutes } from './modules/reconciliation/routes.ts';
 import { maintenanceRoutes } from './modules/maintenance/routes.ts';
 import { utilitiesRoutes } from './modules/utilities/routes.ts';
 import { lostFoundRoutes } from './modules/lostfound/routes.ts';
+import { checklistRoutes } from './modules/checklists/routes.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
 import { bookingEngineRoutes } from './modules/bookingengine/routes.ts';
@@ -208,6 +209,7 @@ export function createApp({
   api.use(maintenanceRoutes({ db, tenantDb, clock }));
   api.use(utilitiesRoutes({ tenantDb, clock }));
   api.use(lostFoundRoutes({ db, tenantDb, clock }));
+  api.use(checklistRoutes({ db, tenantDb, clock }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));

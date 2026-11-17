@@ -37,6 +37,8 @@ describe('migrations', () => {
       'cash_counts',
       'cash_handovers',
       'cashier_shifts',
+      'checklist_runs',
+      'checklists',
       'commissions',
       'companies',
       'departments',

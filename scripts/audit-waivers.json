@@ -1,0 +1,8 @@
+[
+  {
+    "id": "GHSA-fc5q-39xc-vjpf",
+    "package": "picomatch <=4.0.7 (vite, vitest, tinyglobby, lint-staged, anymatch)",
+    "reason": "Every published version is affected and no fix exists yet. Dev and build tooling only, matching globs we write ourselves; the runtime audit stays at zero. Upgrade when picomatch 4.0.8 or later ships.",
+    "until": "2027-01-31"
+  }
+]

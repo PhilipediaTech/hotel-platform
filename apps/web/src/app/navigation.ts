@@ -233,6 +233,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-133',
   },
   {
+    // No screen of its own in tab 5: next to S18 tasks, whose CHECKLIST type it feeds.
+    id: 'checklists',
+    path: '/checklists',
+    anyOf: ['checklist.manage', 'task.work'],
+    group: 'operations',
+    screen: 'S18',
+    ticket: 'T-134',
+  },
+  {
     id: 'my-jobs',
     path: '/tasks?assignee=me',
     anyOf: ['task.work'],

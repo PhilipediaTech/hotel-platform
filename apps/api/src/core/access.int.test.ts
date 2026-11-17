@@ -86,6 +86,10 @@ const MEMBER_ROUTES: Record<string, string> = {
   getTask: 'only a task the caller may see (loadVisible)',
   addTaskComment: 'only a task the caller may see (loadVisible)',
   listTaskTemplates: 'reference list',
+  listChecklistRuns:
+    'task.work or checklist.manage; own and unassigned runs (checklists/service.ts)',
+  completeChecklistRun:
+    'task.work or checklist.manage; own and unassigned runs (checklists/service.ts)',
 };
 
 const sorted = (xs: string[]) => [...xs].sort();

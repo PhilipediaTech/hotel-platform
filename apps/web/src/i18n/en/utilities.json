@@ -1,0 +1,71 @@
+{
+  "utl": {
+    "title": "Utilities",
+    "views": "Show",
+    "view": { "generators": "Generators", "meters": "Meters" },
+    "cancel": "Cancel",
+    "gen": {
+      "add": "Add generator",
+      "none": "No generators yet. Add the generator to the asset register first.",
+      "list": "Generators",
+      "running": "Running",
+      "stopped": "Stopped",
+      "since": "since {{when}} ({{time}})",
+      "today": "{{time}} today",
+      "tank": "tank {{litres}} L",
+      "start": "Log start",
+      "stop": "Log stop",
+      "fuelAndLog": "Fuel and log",
+      "hide": "Hide",
+      "runs": "Runs",
+      "noRuns": "No runs yet.",
+      "now": "now",
+      "form": "New generator",
+      "asset": "Asset",
+      "chooseAsset": "Choose the asset",
+      "name": "Name",
+      "tankField": "Tank (litres)",
+      "serviceField": "Service every (run hours, optional)",
+      "save": "Add generator"
+    },
+    "fuel": {
+      "position": "Checked {{checked}} L {{when}} · received {{received}} L · issued {{issued}} L since · expected now {{expected}} L",
+      "noCheck": "No fuel check yet: the first check sets the opening level.",
+      "form": "Log fuel",
+      "kind": "What",
+      "kinds": {
+        "RECEIVED": "Diesel received",
+        "ISSUED": "Diesel issued",
+        "LEVEL_CHECK": "Fuel check"
+      },
+      "litres": "Litres",
+      "levelLitres": "Litres in the tank",
+      "cost": "Cost (₦)",
+      "supplier": "Supplier",
+      "save": "Save",
+      "saved": "Saved.",
+      "missing": "{{litres}} L missing ({{percent}}%)",
+      "balanced": "{{litres}} L over ({{percent}}%)",
+      "alerted": "Leakage alert raised.",
+      "log": "Fuel log",
+      "empty": "No fuel logged yet.",
+      "badNumber": "Enter litres like 250 or 250.5, and amounts like 150,000"
+    },
+    "meter": {
+      "form": "Record a meter reading",
+      "meter": "Meter",
+      "names": { "GRID": "Electricity (grid)", "WATER": "Water", "GAS": "Gas" },
+      "other": "Another meter…",
+      "otherName": "Meter name",
+      "reading": "Reading",
+      "save": "Save reading",
+      "first": "First reading of {{meter}} saved.",
+      "used": "{{meter}}: {{usage}} used in {{hours}} h.",
+      "none": "No readings yet.",
+      "list": "Meter readings",
+      "when": "When",
+      "usage": "Used since last",
+      "by": "By"
+    }
+  }
+}

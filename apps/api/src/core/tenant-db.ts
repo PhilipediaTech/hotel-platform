@@ -114,6 +114,11 @@ export const TENANT_MODELS: Record<string, Scope> = {
   Inspection: { kind: 'property' },
   Asset: { kind: 'property' },
   PreventivePlan: { kind: 'property' },
+  // Runs and fuel movements have no property column: reach them through their generator.
+  Generator: { kind: 'property' },
+  MeterReading: { kind: 'property' },
+  // Lost and found events have no property column: reach them through their item.
+  LostFoundItem: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

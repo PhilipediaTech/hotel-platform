@@ -365,7 +365,7 @@ export const PreventivePlanPatch = z
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), { message: 'Nothing to change' });
 
-export const MeterReadingBody = z.object({ hours: Hours });
+export const PlanHoursBody = z.object({ hours: Hours });
 
 const PlanParams = z.object({ planId: Uuid });
 
@@ -422,7 +422,7 @@ export const recordPlanHours = defineRoute({
   permission: 'pm.manage',
   idempotent: true,
   params: PlanParams,
-  body: MeterReadingBody,
+  body: PlanHoursBody,
   response: PreventivePlanItem,
 });
 

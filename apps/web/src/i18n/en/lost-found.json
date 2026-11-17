@@ -1,0 +1,66 @@
+{
+  "lf": {
+    "title": "Lost and found",
+    "statusTabs": "Show",
+    "statuses": { "HELD": "Held", "RETURNED": "Returned", "DISPOSED": "Disposed of" },
+    "search": "Search LF number, item, room or place",
+    "add": "Log a found item",
+    "none": "Nothing here.",
+    "list": "Found items",
+    "valuable": "Valuable",
+    "unclaimed": "Unclaimed: may be disposed of",
+    "room": "Room {{number}}",
+    "found": "found {{when}} by {{name}}",
+    "heldBy": "held by {{name}} in {{place}}",
+    "returnedTo": "returned to {{name}}",
+    "owner": "Likely owner: {{name}} ({{phone}})",
+    "noPhone": "no phone on file",
+    "keepUntil": "Keep until {{date}}.",
+    "returnDetail": "Returned to {{name}} ({{phone}}), identified by: {{id}}",
+    "trail": "Custody trail",
+    "events": {
+      "LOGGED": "Logged",
+      "CUSTODY": "Handed over",
+      "RETURNED": "Returned",
+      "DISPOSED": "Disposed of",
+      "NOTE": "Note"
+    },
+    "handOver": "Hand over",
+    "giveBack": "Return to owner",
+    "dispose": "Dispose of",
+    "forms": {
+      "new": "Found item",
+      "custody": "Hand over",
+      "return": "Return to owner",
+      "dispose": "Dispose of"
+    },
+    "save": {
+      "new": "Log item",
+      "custody": "Hand over",
+      "return": "Return item",
+      "dispose": "Dispose of item"
+    },
+    "cancel": "Cancel",
+    "description": "What is it",
+    "category": "Category",
+    "roomField": "Found in room",
+    "noRoom": "Not in a room",
+    "foundWhere": "Or found at",
+    "storage": "Kept in",
+    "custodian": "Held by",
+    "me": "Me ({{name}})",
+    "valuableField": "Valuable (cash, jewellery, documents, electronics): kept 180 days, never discarded",
+    "note": "Note",
+    "toName": "Given to",
+    "toPhone": "Their phone",
+    "idNote": "How they were identified",
+    "disposal": "What happened to it",
+    "disposeNote": "What was done and who took it",
+    "disposals": {
+      "DISCARDED": "Discarded",
+      "DONATED": "Donated",
+      "POLICE": "Handed to the police",
+      "OTHER": "Other"
+    }
+  }
+}

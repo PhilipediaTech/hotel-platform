@@ -73,6 +73,8 @@
     "ar": "City ledger",
     "reconciliation": "Bank reconciliation",
     "maintenance": "Maintenance",
+    "utilities": "Utilities",
+    "lost-found": "Lost and found",
     "settings-booking-engine": "Booking page",
     "partner": "Partner account",
     "unmatched-transfers": "Unmatched transfers"

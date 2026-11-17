@@ -120,6 +120,25 @@ export const LEAKAGE_RULES = [
       },
     ],
   },
+  {
+    // M5 rule 4 (T-132): opening litres + received − issued − closing litres, over 5%.
+    code: 'FUEL_VARIANCE',
+    label: 'Fuel variance',
+    trigger:
+      'A generator fuel check finds less diesel than the last check plus deliveries minus issues',
+    alertCodes: ['FUEL_VARIANCE'],
+    canDisable: true,
+    params: [
+      {
+        key: 'maxPercent',
+        label: 'Missing more than (% of fuel to account for)',
+        kind: 'count',
+        default: 5,
+        min: 0,
+        max: 100,
+      },
+    ],
+  },
 ] as const satisfies readonly LeakageRuleDef[];
 
 export type LeakageRuleCode = (typeof LEAKAGE_RULES)[number]['code'];
@@ -147,6 +166,7 @@ export const LEAKAGE_ALERT_LABELS: Record<string, string> = {
   SHIFT_VARIANCE: 'Cash variance',
   UNMATCHED_TRANSFER: 'Unmatched transfer',
   VISITOR_OVERSTAY: 'Visitor past cut-off',
+  FUEL_VARIANCE: 'Fuel variance',
 };
 
 export const ALERT_OUTCOMES = ['EXPLAINED', 'RECOVERED', 'ACTION_TAKEN', 'FALSE_POSITIVE'] as const;

@@ -2,7 +2,7 @@ import {
   addDays,
   pmDueState,
   zonedInstant,
-  type MeterReadingBody,
+  type PlanHoursBody,
   type PmTrigger,
   type PreventivePlanBody,
   type PreventivePlanItem,
@@ -377,7 +377,7 @@ export async function recordHours(
   deps: MaintenanceDeps,
   tenant: TenantContext,
   planId: string,
-  body: z.output<typeof MeterReadingBody>,
+  body: z.output<typeof PlanHoursBody>,
 ) {
   return deps.tenantDb.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM preventive_plans WHERE id = ${planId}::uuid FOR UPDATE`;

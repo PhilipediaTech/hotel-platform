@@ -1162,6 +1162,71 @@ async function bPmPlanUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** B's generator on their asset, running, with a fuel check; and a meter reading (T-132). */
+async function bGenerator(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bAsset(db, world, propertyId);
+  const userId = (await db.user.findFirstOrThrow()).id;
+  const generator = await db.generator.create({
+    data: {
+      propertyId,
+      assetId: theirs.assetId,
+      name: 'Their generator',
+      tankLitresMilli: 1_000_000,
+      runs: { create: { startedAt: new Date(Date.now() - 3_600_000), startedById: userId } },
+      fuelMovements: { create: { kind: 'LEVEL_CHECK', litresMilli: 500_000, byUserId: userId } },
+    },
+    include: { runs: true },
+  });
+  await db.meterReading.create({
+    data: { propertyId, meter: 'GRID', reading: 1000n, byUserId: userId },
+  });
+  return { ...theirs, generatorId: generator.id, runId: generator.runs[0]?.id ?? '' };
+}
+
+async function bGeneratorUnchanged(db: Db, world: TenantWorld) {
+  const gens = await db.generator.findMany({
+    where: { propertyId: world.b1.id },
+    include: { runs: true, fuelMovements: true },
+  });
+  expect(gens.map((g) => [g.name, g.runs.map((r) => r.stoppedAt), g.fuelMovements.length])).toEqual(
+    [['Their generator', [null], 1]],
+  );
+  const readings = await db.meterReading.findMany({ where: { propertyId: world.b1.id } });
+  expect(readings.map((r) => [r.meter, r.reading])).toEqual([['GRID', 1000n]]);
+}
+
+/** B's held lost-and-found item, past its keep-until date (T-133). */
+async function bLostItem(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bRoom(db, world, propertyId);
+  const userId = (await db.user.findFirstOrThrow()).id;
+  const item = await db.lostFoundItem.create({
+    data: {
+      propertyId,
+      number: 1,
+      description: 'Their phone',
+      category: 'Phone',
+      foundAt: new Date(),
+      roomId: theirs.roomId,
+      foundById: userId,
+      storageLocation: 'Their office',
+      custodianId: userId,
+      keepUntil: new Date('2026-01-01T00:00:00Z'),
+      events: { create: { kind: 'LOGGED', byUserId: userId } },
+    },
+  });
+  return { ...theirs, itemId: item.id };
+}
+
+async function bLostItemUnchanged(db: Db, world: TenantWorld) {
+  const items = await db.lostFoundItem.findMany({
+    where: { propertyId: world.b1.id },
+    include: { events: true },
+  });
+  expect(items.map((i) => [i.description, i.status, i.storageLocation, i.events.length])).toEqual([
+    ['Their phone', 'HELD', 'Their office', 1],
+  ]);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -2672,6 +2737,85 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bPmPlan,
     body: () => ({ hours: 999 }),
     untouched: bPmPlanUnchanged,
+  },
+  listGenerators: {
+    seed: bGenerator,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((g) => g.id),
+  },
+  createGenerator: {
+    seed: bGenerator,
+    creates: true,
+    body: (theirs) => ({ assetId: theirs['assetId'], name: 'Leak', tankLitresMilli: 5000 }),
+    untouched: bGeneratorUnchanged,
+  },
+  getGenerator: { seed: bGenerator },
+  startGeneratorRun: {
+    seed: bGenerator,
+    body: () => ({}),
+    untouched: bGeneratorUnchanged,
+  },
+  stopGeneratorRun: {
+    seed: bGenerator,
+    body: () => ({}),
+    untouched: bGeneratorUnchanged,
+  },
+  recordFuelMovement: {
+    seed: bGenerator,
+    creates: true,
+    body: (theirs) => ({
+      generatorId: theirs['generatorId'],
+      kind: 'ISSUED',
+      litresMilli: 1000,
+    }),
+    untouched: bGeneratorUnchanged,
+  },
+  recordMeterReading: {
+    seed: bGenerator,
+    creates: true,
+    body: () => ({ meter: 'GRID', reading: '5' }),
+    untouched: bGeneratorUnchanged,
+  },
+  listMeterReadings: {
+    seed: bGenerator,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((r) => r.id),
+  },
+  listLostItems: {
+    seed: bLostItem,
+    listIds: (body) => {
+      const b = body as {
+        data: { id: string }[];
+        custodians: { id: string }[];
+        rooms: { id: string }[];
+      };
+      return [...b.data, ...b.custodians, ...b.rooms].map((x) => x.id);
+    },
+  },
+  createLostItem: {
+    seed: bLostItem,
+    creates: true,
+    body: (theirs) => ({
+      description: 'Leak',
+      category: 'Other',
+      roomId: theirs['roomId'],
+      storageLocation: 'Leak',
+    }),
+    untouched: bLostItemUnchanged,
+  },
+  getLostItem: { seed: bLostItem },
+  moveLostItem: {
+    seed: bLostItem,
+    body: () => ({ storageLocation: 'Leak', custodianId: '00000000-0000-4000-8000-000000000000' }),
+    untouched: bLostItemUnchanged,
+  },
+  returnLostItem: {
+    seed: bLostItem,
+    body: () => ({ toName: 'Leak', idNote: 'Leak' }),
+    untouched: bLostItemUnchanged,
+  },
+  disposeLostItem: {
+    seed: bLostItem,
+    body: () => ({ disposal: 'DISCARDED', note: 'Leak' }),
+    untouched: bLostItemUnchanged,
   },
   getTaskFormOptions: {
     seed: bTask,

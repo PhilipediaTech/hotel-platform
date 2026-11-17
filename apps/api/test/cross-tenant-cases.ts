@@ -1267,6 +1267,45 @@ async function bChecklistUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** B's staff member with a certification and an emergency contact (T-136). */
+async function bStaff(db: Db, _world: TenantWorld, propertyId: string) {
+  const { organisationId } = await db.property.findUniqueOrThrow({ where: { id: propertyId } });
+  const department = await db.department.create({
+    data: { organisationId, propertyId, code: 'THEIRS', name: 'Their department' },
+  });
+  const staff = await db.staffProfile.create({
+    data: {
+      propertyId,
+      number: 1,
+      name: 'Their cook',
+      departmentId: department.id,
+      jobTitle: 'Cook',
+      employmentType: 'MONTHLY_SALARY',
+      startDate: new Date('2026-01-01T00:00:00Z'),
+      emergencyName: 'Their contact',
+      certifications: {
+        create: { name: 'Their cert', expiresOn: new Date('2026-11-20T00:00:00Z') },
+      },
+    },
+    include: { certifications: true },
+  });
+  return {
+    staffId: staff.id,
+    certificationId: staff.certifications[0]?.id ?? '',
+    departmentId: department.id,
+  };
+}
+
+async function bStaffUnchanged(db: Db, world: TenantWorld) {
+  const staff = await db.staffProfile.findMany({
+    where: { propertyId: world.b1.id },
+    include: { certifications: true },
+  });
+  expect(
+    staff.map((x) => [x.name, x.status, x.emergencyName, x.certifications.map((c) => c.name)]),
+  ).toEqual([['Their cook', 'ACTIVE', 'Their contact', ['Their cert']]]);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -2893,6 +2932,47 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({ results: [{ ok: false, note: 'Leak' }] }),
     untouched: bChecklistUnchanged,
   },
+  listStaff: {
+    seed: bStaff,
+    listIds: (body) => {
+      const b = body as {
+        data: { id: string }[];
+        departments: { id: string }[];
+        people: { id: string }[];
+      };
+      return [...b.data, ...b.departments, ...b.people].map((x) => x.id);
+    },
+  },
+  createStaff: {
+    seed: bStaff,
+    creates: true,
+    body: (theirs) => ({
+      name: 'Leak',
+      jobTitle: 'Leak',
+      employmentType: 'HOURLY',
+      startDate: '2026-01-01',
+      departmentId: theirs['departmentId'],
+    }),
+    untouched: bStaffUnchanged,
+  },
+  getStaff: { seed: bStaff },
+  updateStaff: {
+    seed: bStaff,
+    body: () => ({ name: 'Leak', endDate: '2026-11-01' }),
+    untouched: bStaffUnchanged,
+  },
+  getEmergencyContact: { seed: bStaff },
+  addCertification: {
+    seed: bStaff,
+    body: () => ({ name: 'Leak' }),
+    untouched: bStaffUnchanged,
+  },
+  updateCertification: {
+    seed: bStaff,
+    body: () => ({ name: 'Leak' }),
+    untouched: bStaffUnchanged,
+  },
+  removeCertification: { seed: bStaff, untouched: bStaffUnchanged },
   getTaskFormOptions: {
     seed: bTask,
     listIds: (body) => {

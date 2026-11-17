@@ -99,6 +99,7 @@ const MaintenancePage = lazy(() =>
 const UtilitiesPage = lazy(() =>
   import('../routes/utilities.tsx').then((m) => ({ default: m.UtilitiesPage })),
 );
+const StaffPage = lazy(() => import('../routes/staff.tsx').then((m) => ({ default: m.StaffPage })));
 const ChecklistsPage = lazy(() =>
   import('../routes/checklists.tsx').then((m) => ({ default: m.ChecklistsPage })),
 );
@@ -165,6 +166,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/utilities': <UtilitiesPage />,
   '/lost-found': <LostFoundPage />,
   '/checklists': <ChecklistsPage />,
+  '/staff': <StaffPage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

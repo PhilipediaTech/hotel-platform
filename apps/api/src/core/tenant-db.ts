@@ -121,6 +121,8 @@ export const TENANT_MODELS: Record<string, Scope> = {
   LostFoundItem: { kind: 'property' },
   Checklist: { kind: 'property' },
   ChecklistRun: { kind: 'property' },
+  // Certifications have no property column: reach them through their staff profile.
+  StaffProfile: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

@@ -126,6 +126,8 @@ describe('migrations', () => {
       'space_layouts',
       'space_rate_rules',
       'spaces',
+      'staff_certifications',
+      'staff_profiles',
       'stay_nights',
       'stay_occupants',
       'stays',

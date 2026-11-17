@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-132 is pushed on `feat/T-132-generator-meters`, awaiting merge (run `npm run db:deploy` and `npm run db:generate`). Next: lost and found (M5-13).
+T-132 and T-133 are pushed (T-133 on `feat/T-133-lost-and-found`, which contains T-132); merging T-133 merges both (run `npm run db:deploy` and `npm run db:generate`). Next: checklists (M6-12, M6-13).

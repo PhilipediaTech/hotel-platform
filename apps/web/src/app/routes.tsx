@@ -99,6 +99,9 @@ const MaintenancePage = lazy(() =>
 const UtilitiesPage = lazy(() =>
   import('../routes/utilities.tsx').then((m) => ({ default: m.UtilitiesPage })),
 );
+const LostFoundPage = lazy(() =>
+  import('../routes/lost-found.tsx').then((m) => ({ default: m.LostFoundPage })),
+);
 const ReconciliationPage = lazy(() =>
   import('../routes/reconciliation.tsx').then((m) => ({ default: m.ReconciliationPage })),
 );
@@ -157,6 +160,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/reconciliation': <ReconciliationPage />,
   '/maintenance': <MaintenancePage />,
   '/utilities': <UtilitiesPage />,
+  '/lost-found': <LostFoundPage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

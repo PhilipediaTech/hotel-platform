@@ -41,6 +41,7 @@ export * from './virtual-accounts.ts';
 export * from './housekeeping.ts';
 export * from './maintenance.ts';
 export * from './utilities.ts';
+export * from './lost-found.ts';
 export * from './tasks.ts';
 export * from './handovers.ts';
 export * from './leakage.ts';

@@ -224,6 +224,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-132',
   },
   {
+    // No screen of its own in tab 5: S17 has the attendant's lost item.
+    id: 'lost-found',
+    path: '/lost-found',
+    anyOf: ['lostfound.manage'],
+    group: 'operations',
+    screen: 'S17',
+    ticket: 'T-133',
+  },
+  {
     id: 'my-jobs',
     path: '/tasks?assignee=me',
     anyOf: ['task.work'],

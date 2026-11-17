@@ -73,6 +73,8 @@ describe('migrations', () => {
       'key_issues',
       'leakage_alerts',
       'leakage_rules',
+      'lost_found_events',
+      'lost_found_items',
       'memberships',
       'message_templates',
       'message_threads',

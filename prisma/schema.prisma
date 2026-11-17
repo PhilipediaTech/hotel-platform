@@ -147,6 +147,7 @@ model Property {
   preventivePlans      PreventivePlan[]
   generators           Generator[]
   meterReadings        MeterReading[]
+  lostFoundItems       LostFoundItem[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
 
@@ -313,6 +314,11 @@ model User {
   generatorRunsStopped GeneratorRun[]     @relation("RunStoppedBy")
   fuelMovements        FuelMovement[]
   meterReadings        MeterReading[]
+  lostItemsFound       LostFoundItem[]    @relation("LostFoundBy")
+  lostItemsHeld        LostFoundItem[]    @relation("LostCustodian")
+  lostItemsClosed      LostFoundItem[]    @relation("LostClosedBy")
+  lostFoundEvents      LostFoundEvent[]   @relation("LostEventBy")
+  lostFoundCustody     LostFoundEvent[]   @relation("LostEventCustodian")
   handoversWritten     HandoverNote[]     @relation("HandoverWriter")
   handoversAcked       HandoverNote[]     @relation("HandoverAcknowledger")
   invitationsClaimed   Invitation[]       @relation("AcceptedBy")
@@ -716,6 +722,7 @@ model Room {
   inspections    Inspection[]
   tasks          Task[]
   assets         Asset[]
+  lostFoundItems LostFoundItem[]
 
   @@unique([propertyId, number])
   // Target of composite foreign keys: blocks and connecting rooms stay within the property.
@@ -1235,6 +1242,8 @@ model Stay {
 
   // Target of the composite foreign key from room allocations.
   onlineCheckIn OnlineCheckIn?
+
+  lostFoundItems LostFoundItem[]
 
   @@unique([propertyId, id])
   @@index([propertyId, arrival])
@@ -2446,6 +2455,72 @@ model MeterReading {
 
   @@index([propertyId, meter, at])
   @@map("meter_readings")
+}
+
+/// Lost and found (M5-13; T-133). Not modelled in tab 3: columns designed here. An item is held
+/// (with a storage place and a custodian) until it is returned to its owner or disposed of
+/// after it has been kept long enough. Its events are the custody trail.
+model LostFoundItem {
+  id              String    @id @default(uuid()) @db.Uuid
+  propertyId      String    @map("property_id") @db.Uuid
+  number          Int
+  description     String
+  category        String
+  /// Cash, jewellery, documents, electronics: kept longer, never discarded.
+  valuable        Boolean   @default(false)
+  foundAt         DateTime  @map("found_at") @db.Timestamptz(6)
+  foundWhere      String?   @map("found_where")
+  roomId          String?   @map("room_id") @db.Uuid
+  /// The stay most likely to own it (the room's guest at the time).
+  stayId          String?   @map("stay_id") @db.Uuid
+  foundById       String    @map("found_by_id") @db.Uuid
+  storageLocation String    @map("storage_location")
+  custodianId     String    @map("custodian_id") @db.Uuid
+  /// HELD | RETURNED | DISPOSED
+  status          String    @default("HELD")
+  keepUntil       DateTime  @map("keep_until") @db.Date
+  returnedToName  String?   @map("returned_to_name")
+  returnedToPhone String?   @map("returned_to_phone")
+  /// How the owner was identified, e.g. "Passport ending 4567".
+  returnedIdNote  String?   @map("returned_id_note")
+  /// DISCARDED | DONATED | POLICE | OTHER
+  disposal        String?
+  closedAt        DateTime? @map("closed_at") @db.Timestamptz(6)
+  closedById      String?   @map("closed_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property  Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  // Same property is checked by the service.
+  room      Room?            @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  stay      Stay?            @relation(fields: [stayId], references: [id], onDelete: Restrict)
+  foundBy   User             @relation("LostFoundBy", fields: [foundById], references: [id], onDelete: Restrict)
+  custodian User             @relation("LostCustodian", fields: [custodianId], references: [id], onDelete: Restrict)
+  closedBy  User?            @relation("LostClosedBy", fields: [closedById], references: [id], onDelete: Restrict)
+  events    LostFoundEvent[]
+
+  @@unique([propertyId, number])
+  @@index([propertyId, status])
+  @@map("lost_found_items")
+}
+
+/// The custody trail (append-only): LOGGED | CUSTODY | RETURNED | DISPOSED | NOTE.
+model LostFoundEvent {
+  id              BigInt   @id @default(autoincrement())
+  itemId          String   @map("item_id") @db.Uuid
+  kind            String
+  note            String?
+  storageLocation String?  @map("storage_location")
+  custodianId     String?  @map("custodian_id") @db.Uuid
+  byUserId        String   @map("by_user_id") @db.Uuid
+  at              DateTime @default(now()) @db.Timestamptz(6)
+
+  item      LostFoundItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  custodian User?         @relation("LostEventCustodian", fields: [custodianId], references: [id], onDelete: Restrict)
+  byUser    User          @relation("LostEventBy", fields: [byUserId], references: [id], onDelete: Restrict)
+
+  @@index([itemId])
+  @@map("lost_found_events")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

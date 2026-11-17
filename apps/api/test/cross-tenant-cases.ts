@@ -1195,6 +1195,38 @@ async function bGeneratorUnchanged(db: Db, world: TenantWorld) {
   expect(readings.map((r) => [r.meter, r.reading])).toEqual([['GRID', 1000n]]);
 }
 
+/** B's held lost-and-found item, past its keep-until date (T-133). */
+async function bLostItem(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bRoom(db, world, propertyId);
+  const userId = (await db.user.findFirstOrThrow()).id;
+  const item = await db.lostFoundItem.create({
+    data: {
+      propertyId,
+      number: 1,
+      description: 'Their phone',
+      category: 'Phone',
+      foundAt: new Date(),
+      roomId: theirs.roomId,
+      foundById: userId,
+      storageLocation: 'Their office',
+      custodianId: userId,
+      keepUntil: new Date('2026-01-01T00:00:00Z'),
+      events: { create: { kind: 'LOGGED', byUserId: userId } },
+    },
+  });
+  return { ...theirs, itemId: item.id };
+}
+
+async function bLostItemUnchanged(db: Db, world: TenantWorld) {
+  const items = await db.lostFoundItem.findMany({
+    where: { propertyId: world.b1.id },
+    include: { events: true },
+  });
+  expect(items.map((i) => [i.description, i.status, i.storageLocation, i.events.length])).toEqual([
+    ['Their phone', 'HELD', 'Their office', 1],
+  ]);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -2746,6 +2778,44 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   listMeterReadings: {
     seed: bGenerator,
     listIds: (body) => (body as { data: { id: string }[] }).data.map((r) => r.id),
+  },
+  listLostItems: {
+    seed: bLostItem,
+    listIds: (body) => {
+      const b = body as {
+        data: { id: string }[];
+        custodians: { id: string }[];
+        rooms: { id: string }[];
+      };
+      return [...b.data, ...b.custodians, ...b.rooms].map((x) => x.id);
+    },
+  },
+  createLostItem: {
+    seed: bLostItem,
+    creates: true,
+    body: (theirs) => ({
+      description: 'Leak',
+      category: 'Other',
+      roomId: theirs['roomId'],
+      storageLocation: 'Leak',
+    }),
+    untouched: bLostItemUnchanged,
+  },
+  getLostItem: { seed: bLostItem },
+  moveLostItem: {
+    seed: bLostItem,
+    body: () => ({ storageLocation: 'Leak', custodianId: '00000000-0000-4000-8000-000000000000' }),
+    untouched: bLostItemUnchanged,
+  },
+  returnLostItem: {
+    seed: bLostItem,
+    body: () => ({ toName: 'Leak', idNote: 'Leak' }),
+    untouched: bLostItemUnchanged,
+  },
+  disposeLostItem: {
+    seed: bLostItem,
+    body: () => ({ disposal: 'DISCARDED', note: 'Leak' }),
+    untouched: bLostItemUnchanged,
   },
   getTaskFormOptions: {
     seed: bTask,

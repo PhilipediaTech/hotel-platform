@@ -292,7 +292,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     id: 'reports',
     path: '/reports',
-    anyOf: ['report.dashboard', 'report.audit', 'report.tax', 'report.flash'],
+    anyOf: ['report.dashboard', 'report.audit', 'report.tax', 'report.flash', 'report.ops'],
     group: 'revenue',
     screen: 'S28',
     ticket: 'T-092',

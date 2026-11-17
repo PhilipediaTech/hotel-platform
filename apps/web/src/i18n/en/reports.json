@@ -7,7 +7,8 @@
       "flash": "Flash",
       "trial": "Trial balance",
       "cashier": "Cashier",
-      "tax": "Tax"
+      "tax": "Tax",
+      "operations": "Operations"
     },
     "date": "Closed day",
     "lastClosed": "Last closed day",
@@ -73,6 +74,31 @@
       "taxable": "Taxable",
       "total": "Total tax",
       "empty": "No tax was charged in this period."
+    },
+    "ops": {
+      "scope": "Who",
+      "all": "All tasks",
+      "byDepartment": "By department",
+      "byPerson": "Workload by person",
+      "personNote": "Listed by name, not ranked. Read each figure with the person’s task count, severity, time on hold and working pattern.",
+      "empty": "No tasks reported in this period.",
+      "unassigned_one": "{{count}} task given to no one.",
+      "unassigned_other": "{{count}} tasks given to no one.",
+      "created": "Tasks",
+      "severity": "Low / normal / high / critical",
+      "open": "Open",
+      "overdue": "Overdue now",
+      "ack": "Acknowledge (median / 90%)",
+      "resolve": "Resolve (median / 90%)",
+      "reopen": "Reopened",
+      "sla": "SLA met",
+      "hold": "On hold",
+      "pattern": "Working pattern (night / morning / afternoon / evening)",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "none": "—",
+      "minutes": "{{value}} min",
+      "hours": "{{value}} h"
     }
   }
 }

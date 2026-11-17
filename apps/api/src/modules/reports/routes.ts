@@ -2,6 +2,7 @@ import { REPORT_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import { operations } from './operations.ts';
 import * as reports from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -28,6 +29,9 @@ export function reportRoutes(deps: reports.ReportDeps): Router {
   );
   mountRoute(router, r.getTaxReport, ({ query }, { tenant }) =>
     reports.tax(deps, tenantFrom(tenant), query),
+  );
+  mountRoute(router, r.getOperationsReport, ({ query }, { tenant }) =>
+    operations(deps, tenantFrom(tenant), query),
   );
   return router;
 }

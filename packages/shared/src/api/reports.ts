@@ -259,6 +259,100 @@ export const askFigures = defineRoute({
   errors: ['AI_UNAVAILABLE', 'ALLOWANCE_USED_UP'],
 });
 
+// ── Operations (PRD M6-12 "As a manager, I see operations metrics (acknowledge time, resolve
+// time, overdue, reopen rate, SLA) with workload context", report.ops; tab 4 GET
+// /reports/operations; M6 rule 5: performance views always show task count with severity, time
+// on hold and working pattern, never a single-number staff ranking; T-135) ──────────────────
+
+/** Most days one operations report covers. */
+export const MAX_OPS_DAYS = 92;
+const ByPriority = z.object({
+  LOW: z.number().int(),
+  NORMAL: z.number().int(),
+  HIGH: z.number().int(),
+  CRITICAL: z.number().int(),
+});
+const Minutes = z.number().int().nullable();
+
+/** One set of figures: the whole property, a department or a person. */
+export const OpsFigures = z
+  .object({
+    created: z.number().int(),
+    bySeverity: ByPriority,
+    resolved: z.number().int(),
+    open: z.number().int(),
+    /** Still open and past their deadline now. */
+    overdue: z.number().int(),
+    /** From being given to someone to their acknowledging it; null with none. */
+    ackMedianMinutes: Minutes,
+    ackP90Minutes: Minutes,
+    /** From being reported to being resolved. */
+    resolveMedianMinutes: Minutes,
+    resolveP90Minutes: Minutes,
+    /** Reopened at least once, of those resolved at least once (basis points). */
+    reopenRateBps: z.number().int().nullable(),
+    /** Resolved by their deadline, of those with a deadline that were resolved or are late. */
+    slaMetBps: z.number().int().nullable(),
+    slaTasks: z.number().int(),
+    /** Time spent ON_HOLD, all tasks together. */
+    holdMinutes: z.number().int(),
+  })
+  .meta({ id: 'OpsFigures' });
+
+export const DAY_PARTS = ['NIGHT', 'MORNING', 'AFTERNOON', 'EVENING'] as const;
+
+export const OperationsReport = z
+  .object({
+    from: IsoDate,
+    to: IsoDate,
+    totals: OpsFigures,
+    departments: z.array(z.object({ departmentId: Uuid, name: z.string(), figures: OpsFigures })),
+    /**
+     * Workload by assignee, in name order. Each person's figures sit beside their working
+     * pattern (when they acted on tasks, by part of the day, and on how many days).
+     */
+    people: z.array(
+      z.object({
+        userId: Uuid,
+        name: z.string(),
+        figures: OpsFigures,
+        pattern: z.object({
+          NIGHT: z.number().int(),
+          MORNING: z.number().int(),
+          AFTERNOON: z.number().int(),
+          EVENING: z.number().int(),
+          daysActive: z.number().int(),
+        }),
+      }),
+    ),
+    /** Tasks given to no one. */
+    unassigned: z.number().int(),
+    definitions: z.string(),
+  })
+  .meta({ id: 'OperationsReport' });
+
+export const getOperationsReport = defineRoute({
+  operationId: 'getOperationsReport',
+  method: 'get',
+  path: '/reports/operations',
+  summary: 'Operations metrics with workload context (M6-12)',
+  description:
+    'Tasks reported from `from` to `to` (property dates, at most ' +
+    `${MAX_OPS_DAYS} days; default the last 30 days), by department and by person. No staff ` +
+    'ranking: each person shows task count by severity, time on hold and working pattern ' +
+    '(M6 rule 5). `?format=csv` answers the file and needs report.export (M12-06).',
+  tags: ['Reports'],
+  propertyScoped: true,
+  permission: 'report.ops',
+  exports: true,
+  query: z.object({
+    from: IsoDate.optional(),
+    to: IsoDate.optional(),
+    format: z.enum(['json', 'csv']).default('json'),
+  }),
+  response: OperationsReport,
+});
+
 export const REPORT_ROUTES = {
   askFigures,
   getDashboardReport,
@@ -266,4 +360,5 @@ export const REPORT_ROUTES = {
   getTrialBalanceReport,
   getCashierReport,
   getTaxReport,
+  getOperationsReport,
 } as const;

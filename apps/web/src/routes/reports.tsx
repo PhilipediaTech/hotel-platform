@@ -1,5 +1,7 @@
 import type {
   CashierReport,
+  OperationsReport,
+  OpsFigures,
   DashboardReport,
   FlashReport,
   TaxReport,
@@ -28,13 +30,14 @@ registerStrings(reportStrings);
 // day or period to show, the figures with their definitions (M12 rule), and CSV or PDF for
 // holders of report.export.
 
-type Tab = 'dashboard' | 'flash' | 'trial' | 'cashier' | 'tax';
+type Tab = 'dashboard' | 'flash' | 'trial' | 'cashier' | 'tax' | 'operations';
 const TABS: { id: Tab; permission: string }[] = [
   { id: 'dashboard', permission: 'report.dashboard' },
   { id: 'flash', permission: 'report.audit' },
   { id: 'trial', permission: 'report.audit' },
   { id: 'cashier', permission: 'report.audit' },
   { id: 'tax', permission: 'report.tax' },
+  { id: 'operations', permission: 'report.ops' },
 ];
 const OPERATION = {
   dashboard: 'getDashboardReport',
@@ -42,6 +45,7 @@ const OPERATION = {
   trial: 'getTrialBalanceReport',
   cashier: 'getCashierReport',
   tax: 'getTaxReport',
+  operations: 'getOperationsReport',
 } as const;
 
 const pct = (bps: number) => `${(bps / 100).toFixed(1)}%`;
@@ -88,7 +92,15 @@ function Definitions({ text }: { text: string }) {
 }
 
 /** CSV is saved; PDF opens in a new tab (as other documents do). */
-function ExportButtons({ tab, query }: { tab: Tab; query: Record<string, string> }) {
+function ExportButtons({
+  tab,
+  query,
+  withPdf = true,
+}: {
+  tab: Tab;
+  query: Record<string, string>;
+  withPdf?: boolean;
+}) {
   const { t } = useTranslation();
   const session = useSession();
   const pdf = usePdf();
@@ -116,14 +128,16 @@ function ExportButtons({ tab, query }: { tab: Tab; query: Record<string, string>
       <Button size="sm" variant="secondary" onClick={() => void saveCsv()}>
         {t('reports.csv')}
       </Button>
-      <Button
-        size="sm"
-        variant="secondary"
-        disabled={pdf.busy}
-        onClick={() => void pdf.open(() => download('pdf'), `${tab}.pdf`)}
-      >
-        {t('reports.pdf')}
-      </Button>
+      {withPdf && (
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={pdf.busy}
+          onClick={() => void pdf.open(() => download('pdf'), `${tab}.pdf`)}
+        >
+          {t('reports.pdf')}
+        </Button>
+      )}
       {error ? <Alert tone="critical">{errorMessage(error)}</Alert> : null}
       <PdfError error={pdf.error} />
     </div>
@@ -481,6 +495,188 @@ function Tax() {
   );
 }
 
+// ── Operations (PRD M6-12; M6 rule 5: no staff ranking; T-135) ──────────────────────────
+
+function daysBefore(date: string, days: number) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+type OpsRow = {
+  key: string;
+  name: string;
+  figures: z.output<typeof OpsFigures>;
+  extra?: ReactNode;
+};
+
+function OpsTable({ label, rows }: { label: string; rows: OpsRow[] }) {
+  const { t } = useTranslation();
+  const time = (m: number | null) => {
+    if (m === null) return t('reports.ops.none');
+    if (m >= 120) return t('reports.ops.hours', { value: (m / 60).toFixed(1) });
+    return t('reports.ops.minutes', { value: m });
+  };
+  const rate = (b: number | null) => (b === null ? t('reports.ops.none') : pct(b));
+  const withPattern = rows.some((r) => r.extra !== undefined);
+  const head = (key: string) => (
+    <th key={key} className="py-1 pr-2 text-right font-normal">
+      {t(`reports.ops.${key}`)}
+    </th>
+  );
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[56rem] text-sm" aria-label={label}>
+        <thead>
+          <tr className="border-b border-border text-left text-text-muted">
+            <th className="py-1 pr-2 font-normal">{t('reports.ops.scope')}</th>
+            {[
+              'created',
+              'severity',
+              'open',
+              'overdue',
+              'ack',
+              'resolve',
+              'reopen',
+              'sla',
+              'hold',
+            ].map(head)}
+            {withPattern && head('pattern')}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ key, name, figures: f, extra }) => (
+            <tr key={key} className="border-b border-border">
+              <th scope="row" className="py-1 pr-2 text-left font-medium">
+                {name}
+              </th>
+              <td className="py-1 pr-2 text-right">{f.created}</td>
+              <td className="py-1 pr-2 text-right">
+                {[
+                  f.bySeverity.LOW,
+                  f.bySeverity.NORMAL,
+                  f.bySeverity.HIGH,
+                  f.bySeverity.CRITICAL,
+                ].join(' / ')}
+              </td>
+              <td className="py-1 pr-2 text-right">{f.open}</td>
+              <td className={cn('py-1 pr-2 text-right', f.overdue > 0 && 'text-critical')}>
+                {f.overdue}
+              </td>
+              <td className="py-1 pr-2 text-right">
+                {time(f.ackMedianMinutes)} / {time(f.ackP90Minutes)}
+              </td>
+              <td className="py-1 pr-2 text-right">
+                {time(f.resolveMedianMinutes)} / {time(f.resolveP90Minutes)}
+              </td>
+              <td className="py-1 pr-2 text-right">{rate(f.reopenRateBps)}</td>
+              <td className="py-1 pr-2 text-right">{rate(f.slaMetBps)}</td>
+              <td className="py-1 pr-2 text-right">{time(f.holdMinutes)}</td>
+              {withPattern && <td className="py-1 text-right">{extra}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Operations() {
+  const { t } = useTranslation();
+  const session = useSession();
+  const today = session.businessDate ?? new Date().toISOString().slice(0, 10);
+  const [from, setFrom] = useState(daysBefore(today, 29));
+  const [to, setTo] = useState(today);
+  const [period, setPeriod] = useState({ from: daysBefore(today, 29), to: today });
+  const q = useQuery({
+    queryKey: useKey('operations', period.from, period.to),
+    queryFn: () => api.call('getOperationsReport', { query: period }),
+  });
+  const r: z.output<typeof OperationsReport> | undefined = q.data;
+  return (
+    <div>
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setPeriod({ from, to });
+        }}
+      >
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="ops-from">{t('reports.from')}</Label>
+          <Input id="ops-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="ops-to">{t('reports.to')}</Label>
+          <Input id="ops-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        <Button type="submit" variant="secondary">
+          {t('reports.show')}
+        </Button>
+      </form>
+      {q.error && (
+        <Alert tone="critical" className="mt-3">
+          {errorMessage(q.error)}
+        </Alert>
+      )}
+      {r && (
+        <div className="mt-3">
+          <ExportButtons tab="operations" query={period} withPdf={false} />
+          {r.totals.created === 0 ? (
+            <p className="mt-2 text-sm text-text-muted">{t('reports.ops.empty')}</p>
+          ) : (
+            <>
+              <Section title={t('reports.ops.byDepartment')}>
+                <OpsTable
+                  label={t('reports.ops.byDepartment')}
+                  rows={[
+                    { key: 'all', name: t('reports.ops.all'), figures: r.totals },
+                    ...r.departments.map((d) => ({
+                      key: d.departmentId,
+                      name: d.name,
+                      figures: d.figures,
+                    })),
+                  ]}
+                />
+              </Section>
+              <Section title={t('reports.ops.byPerson')}>
+                <p className="mb-2 text-sm text-text-muted">{t('reports.ops.personNote')}</p>
+                <OpsTable
+                  label={t('reports.ops.byPerson')}
+                  rows={r.people.map((p) => ({
+                    key: p.userId,
+                    name: p.name,
+                    figures: p.figures,
+                    extra: (
+                      <>
+                        {[
+                          p.pattern.NIGHT,
+                          p.pattern.MORNING,
+                          p.pattern.AFTERNOON,
+                          p.pattern.EVENING,
+                        ].join(' / ')}{' '}
+                        <span className="text-text-muted">
+                          ({t('reports.ops.days', { count: p.pattern.daysActive })})
+                        </span>
+                      </>
+                    ),
+                  }))}
+                />
+                {r.unassigned > 0 && (
+                  <p className="mt-2 text-sm text-text-muted">
+                    {t('reports.ops.unassigned', { count: r.unassigned })}
+                  </p>
+                )}
+              </Section>
+            </>
+          )}
+          <Definitions text={r.definitions} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ReportsPage() {
   const { t } = useTranslation();
   const session = useSession();
@@ -514,6 +710,7 @@ export function ReportsPage() {
           <ClosedDay key={current} tab={current} />
         )}
         {current === 'tax' && <Tax />}
+        {current === 'operations' && <Operations />}
       </div>
     </section>
   );

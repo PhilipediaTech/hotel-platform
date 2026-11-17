@@ -2997,6 +2997,13 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     listIds: (body) =>
       (body as { authorities: { authority: string }[] }).authorities.map((a) => a.authority),
   },
+  getOperationsReport: {
+    seed: bTask,
+    listIds: (body) => {
+      const b = body as { departments: { departmentId: string }[]; people: { userId: string }[] };
+      return [...b.departments.map((d) => d.departmentId), ...b.people.map((x) => x.userId)];
+    },
+  },
   getSubscription: {
     seed: bBilling,
     listIds: (body) => (body as { invoices: { id: string }[] }).invoices.map((i) => i.id),

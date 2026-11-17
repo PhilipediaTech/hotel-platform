@@ -16101,6 +16101,204 @@
           "definitions"
         ]
       },
+      "OperationsReport": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "to": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/OpsFigures"
+          },
+          "departments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "departmentId": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "figures": {
+                  "$ref": "#/components/schemas/OpsFigures"
+                }
+              },
+              "required": [
+                "departmentId",
+                "name",
+                "figures"
+              ]
+            }
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "figures": {
+                  "$ref": "#/components/schemas/OpsFigures"
+                },
+                "pattern": {
+                  "type": "object",
+                  "properties": {
+                    "NIGHT": {
+                      "type": "integer"
+                    },
+                    "MORNING": {
+                      "type": "integer"
+                    },
+                    "AFTERNOON": {
+                      "type": "integer"
+                    },
+                    "EVENING": {
+                      "type": "integer"
+                    },
+                    "daysActive": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "NIGHT",
+                    "MORNING",
+                    "AFTERNOON",
+                    "EVENING",
+                    "daysActive"
+                  ]
+                }
+              },
+              "required": [
+                "userId",
+                "name",
+                "figures",
+                "pattern"
+              ]
+            }
+          },
+          "unassigned": {
+            "type": "integer"
+          },
+          "definitions": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "totals",
+          "departments",
+          "people",
+          "unassigned",
+          "definitions"
+        ]
+      },
+      "OpsFigures": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer"
+          },
+          "bySeverity": {
+            "type": "object",
+            "properties": {
+              "LOW": {
+                "type": "integer"
+              },
+              "NORMAL": {
+                "type": "integer"
+              },
+              "HIGH": {
+                "type": "integer"
+              },
+              "CRITICAL": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "resolved": {
+            "type": "integer"
+          },
+          "open": {
+            "type": "integer"
+          },
+          "overdue": {
+            "type": "integer"
+          },
+          "ackMedianMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "ackP90Minutes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "resolveMedianMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "resolveP90Minutes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reopenRateBps": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "slaMetBps": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "slaTasks": {
+            "type": "integer"
+          },
+          "holdMinutes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created",
+          "bySeverity",
+          "resolved",
+          "open",
+          "overdue",
+          "ackMedianMinutes",
+          "ackP90Minutes",
+          "resolveMedianMinutes",
+          "resolveP90Minutes",
+          "reopenRateBps",
+          "slaMetBps",
+          "slaTasks",
+          "holdMinutes"
+        ]
+      },
       "ExchangeRates": {
         "type": "object",
         "properties": {
@@ -64375,6 +64573,137 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TaxReport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/operations": {
+      "get": {
+        "operationId": "getOperationsReport",
+        "summary": "Operations metrics with workload context (M6-12)",
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Tasks reported from `from` to `to` (property dates, at most 92 days; default the last 30 days), by department and by person. No staff ranking: each person shows task count by severity, time on hold and working pattern (M6 rule 5). `?format=csv` answers the file and needs report.export (M12-06).",
+        "x-permission": "report.ops",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "default": "json"
+            },
+            "required": false,
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. With ?format=csv or pdf, the file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsReport"
                 }
               },
               "text/csv": {

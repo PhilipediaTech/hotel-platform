@@ -351,6 +351,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   getTrialBalanceReport: {"operationId":"getTrialBalanceReport","method":"get","path":"/reports/trial-balance","propertyScoped":true,"exports":true},
   getCashierReport: {"operationId":"getCashierReport","method":"get","path":"/reports/cashier","propertyScoped":true,"exports":true},
   getTaxReport: {"operationId":"getTaxReport","method":"get","path":"/reports/tax","propertyScoped":true,"exports":true},
+  getOperationsReport: {"operationId":"getOperationsReport","method":"get","path":"/reports/operations","propertyScoped":true,"exports":true},
   getExchangeRates: {"operationId":"getExchangeRates","method":"get","path":"/exchange-rates/{date}","propertyScoped":true},
   putExchangeRates: {"operationId":"putExchangeRates","method":"put","path":"/exchange-rates/{date}","body":true,"propertyScoped":true},
 };

@@ -74,12 +74,12 @@ async function keptRun(deps: ReportDeps, date: string | undefined) {
   );
 }
 
-async function property(deps: ReportDeps, tenant: TenantContext): Promise<Property> {
+export async function property(deps: ReportDeps, tenant: TenantContext): Promise<Property> {
   return deps.tenantDb.property.findUniqueOrThrow({ where: { id: tenant.propertyId } });
 }
 
 /** Exports are audited (who took which figures out, and when). */
-async function issued(
+export async function issued(
   deps: ReportDeps,
   name: string,
   format: Format,

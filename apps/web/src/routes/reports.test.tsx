@@ -94,6 +94,92 @@ const DASHBOARD = {
   definitions: 'Month to date: closed days of this month.',
 };
 
+const OPERATIONS = {
+  from: '2026-10-13',
+  to: '2026-11-11',
+  totals: {
+    created: 3,
+    bySeverity: {
+      LOW: 1,
+      NORMAL: 1,
+      HIGH: 1,
+      CRITICAL: 0,
+    },
+    resolved: 1,
+    open: 2,
+    overdue: 1,
+    ackMedianMinutes: 10,
+    ackP90Minutes: 30,
+    resolveMedianMinutes: 180,
+    resolveP90Minutes: 180,
+    reopenRateBps: 5000,
+    slaMetBps: 5000,
+    slaTasks: 2,
+    holdMinutes: 60,
+  },
+  departments: [
+    {
+      departmentId: '88888888-0000-4000-8000-000000000001',
+      name: 'Maintenance',
+      figures: {
+        created: 2,
+        bySeverity: {
+          LOW: 1,
+          NORMAL: 1,
+          HIGH: 1,
+          CRITICAL: 0,
+        },
+        resolved: 1,
+        open: 2,
+        overdue: 1,
+        ackMedianMinutes: 10,
+        ackP90Minutes: 30,
+        resolveMedianMinutes: 180,
+        resolveP90Minutes: 180,
+        reopenRateBps: 5000,
+        slaMetBps: 5000,
+        slaTasks: 2,
+        holdMinutes: 60,
+      },
+    },
+  ],
+  people: [
+    {
+      userId: '88888888-0000-4000-8000-000000000002',
+      name: 'Tunde Tech',
+      figures: {
+        created: 2,
+        bySeverity: {
+          LOW: 1,
+          NORMAL: 1,
+          HIGH: 1,
+          CRITICAL: 0,
+        },
+        resolved: 1,
+        open: 2,
+        overdue: 1,
+        ackMedianMinutes: 10,
+        ackP90Minutes: 30,
+        resolveMedianMinutes: 180,
+        resolveP90Minutes: 180,
+        reopenRateBps: 5000,
+        slaMetBps: 5000,
+        slaTasks: 2,
+        holdMinutes: 60,
+      },
+      pattern: {
+        NIGHT: 0,
+        MORNING: 4,
+        AFTERNOON: 1,
+        EVENING: 0,
+        daysActive: 1,
+      },
+    },
+  ],
+  unassigned: 1,
+  definitions: 'People are listed by name, never ranked.',
+};
+
 let permissions: string[];
 const calls: URL[] = [];
 
@@ -106,6 +192,7 @@ beforeEach(() => {
     'GET /reports/flash': () => json(200, FLASH),
     'GET /reports/tax': () => json(200, TAX),
     'GET /reports/dashboard': () => json(200, DASHBOARD),
+    'GET /reports/operations': () => json(200, OPERATIONS),
   };
   vi.stubGlobal(
     'fetch',
@@ -200,5 +287,37 @@ describe('Dashboard (S05)', () => {
     expect(within(month).getByText(/45,000\.00/)).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Balances' })).toHaveTextContent('123,456.00');
     expect(screen.getByRole('table', { name: 'Open alerts' })).toHaveTextContent('Cash variance');
+  });
+  it('shows operations metrics by department and person, unranked (M6-12)', async () => {
+    permissions = ['report.ops', 'report.export'];
+    const user = userEvent.setup();
+    renderAt('/reports');
+    const tabs = await screen.findByRole('tablist', { name: 'Reports' });
+    expect(within(tabs).getByRole('tab', { name: 'Operations' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    const depts = await screen.findByRole('table', { name: 'By department' });
+    expect(within(depts).getByRole('row', { name: /All tasks/ })).toHaveTextContent(
+      '1 / 1 / 1 / 0',
+    );
+    expect(within(depts).getByRole('row', { name: /Maintenance/ })).toHaveTextContent('3.0 h');
+    const people = screen.getByRole('table', { name: 'Workload by person' });
+    expect(within(people).getByRole('row', { name: /Tunde Tech/ })).toHaveTextContent(
+      '0 / 4 / 1 / 0 (1 day)',
+    );
+    expect(screen.getByText(/not ranked/)).toBeInTheDocument();
+    expect(screen.getByText('1 task given to no one.')).toBeInTheDocument();
+    // CSV only: no PDF of this report.
+    expect(screen.queryByRole('button', { name: 'Open PDF' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Download CSV' }));
+    await waitFor(() =>
+      expect(
+        calls.some(
+          (u) =>
+            u.pathname.endsWith('/reports/operations') && u.searchParams.get('format') === 'csv',
+        ),
+      ).toBe(true),
+    );
   });
 });

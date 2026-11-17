@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-134 (recurring checklists) is pushed on `feat/T-134-checklists`, with the CI audit waiver commit before it; merging it brings both (run `npm run db:deploy` and `npm run db:generate`). Next: operations metrics (M6-12, report.ops).
+T-135 (operations metrics) is pushed on `feat/T-135-ops-metrics`; it has no migration. Next: workforce (M7).

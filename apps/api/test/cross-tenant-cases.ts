@@ -1227,6 +1227,46 @@ async function bLostItemUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** B's daily checklist with a pending run (T-134). */
+async function bChecklist(db: Db, _world: TenantWorld, propertyId: string) {
+  const userId = (await db.user.findFirstOrThrow()).id;
+  const { organisationId } = await db.property.findUniqueOrThrow({ where: { id: propertyId } });
+  const department = await db.department.create({
+    data: { organisationId, propertyId, code: 'THEIRS', name: 'Their department' },
+  });
+  const checklist = await db.checklist.create({
+    data: {
+      propertyId,
+      name: 'Their pool checks',
+      departmentId: department.id,
+      items: ['Chlorine level'],
+      frequency: 'DAILY',
+      dueTime: '09:00',
+      createdById: userId,
+    },
+  });
+  const run = await db.checklistRun.create({
+    data: {
+      propertyId,
+      checklistId: checklist.id,
+      dueOn: new Date('2030-01-01T00:00:00Z'),
+      dueAt: new Date('2030-01-01T08:00:00Z'),
+      items: ['Chlorine level'],
+    },
+  });
+  return { checklistId: checklist.id, runId: run.id, departmentId: department.id };
+}
+
+async function bChecklistUnchanged(db: Db, world: TenantWorld) {
+  const lists = await db.checklist.findMany({
+    where: { propertyId: world.b1.id },
+    include: { runs: true },
+  });
+  expect(lists.map((l) => [l.name, l.active, l.runs.map((r) => [r.status, r.problems])])).toEqual([
+    ['Their pool checks', true, [['PENDING', 0]]],
+  ]);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -2816,6 +2856,42 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bLostItem,
     body: () => ({ disposal: 'DISCARDED', note: 'Leak' }),
     untouched: bLostItemUnchanged,
+  },
+  listChecklists: {
+    seed: bChecklist,
+    listIds: (body) => {
+      const b = body as {
+        data: { id: string }[];
+        departments: { id: string }[];
+        assignees: { id: string }[];
+      };
+      return [...b.data, ...b.departments, ...b.assignees].map((x) => x.id);
+    },
+  },
+  createChecklist: {
+    seed: bChecklist,
+    creates: true,
+    body: (theirs) => ({
+      name: 'Leak',
+      departmentId: theirs['departmentId'],
+      items: ['Leak'],
+      frequency: 'DAILY',
+    }),
+    untouched: bChecklistUnchanged,
+  },
+  updateChecklist: {
+    seed: bChecklist,
+    body: () => ({ name: 'Leak', active: false }),
+    untouched: bChecklistUnchanged,
+  },
+  listChecklistRuns: {
+    seed: bChecklist,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((r) => r.id),
+  },
+  completeChecklistRun: {
+    seed: bChecklist,
+    body: () => ({ results: [{ ok: false, note: 'Leak' }] }),
+    untouched: bChecklistUnchanged,
   },
   getTaskFormOptions: {
     seed: bTask,

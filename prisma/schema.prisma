@@ -148,6 +148,8 @@ model Property {
   generators           Generator[]
   meterReadings        MeterReading[]
   lostFoundItems       LostFoundItem[]
+  checklists           Checklist[]
+  checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
 
@@ -197,6 +199,7 @@ model Department {
   tasks         Task[]
   handoverNotes HandoverNote[]
   eventBriefs   EventBrief[]
+  checklists    Checklist[]
 
   @@unique([propertyId, code])
   @@unique([propertyId, id])
@@ -317,6 +320,10 @@ model User {
   lostItemsFound       LostFoundItem[]    @relation("LostFoundBy")
   lostItemsHeld        LostFoundItem[]    @relation("LostCustodian")
   lostItemsClosed      LostFoundItem[]    @relation("LostClosedBy")
+  checklistsAssigned   Checklist[]        @relation("ChecklistAssignee")
+  checklistsCreated    Checklist[]        @relation("ChecklistCreatedBy")
+  checklistRunsGiven   ChecklistRun[]     @relation("ChecklistRunAssignee")
+  checklistRunsDone    ChecklistRun[]     @relation("ChecklistRunDoneBy")
   lostFoundEvents      LostFoundEvent[]   @relation("LostEventBy")
   lostFoundCustody     LostFoundEvent[]   @relation("LostEventCustodian")
   handoversWritten     HandoverNote[]     @relation("HandoverWriter")
@@ -2248,6 +2255,7 @@ model Task {
   events         TaskEvent[]
   workOrder      WorkOrderDetail?
   preventivePlan PreventivePlan?
+  checklistRun   ChecklistRun?
 
   @@unique([propertyId, number])
   @@index([propertyId, status])
@@ -2521,6 +2529,74 @@ model LostFoundEvent {
 
   @@index([itemId])
   @@map("lost_found_events")
+}
+
+/// A recurring checklist (PRD M6-13: opening checks, fire equipment, pool; checklist.manage;
+/// T-134). Tab 3 names the table for V1.1 without columns; they are designed here. It comes due
+/// every day, on one weekday or on one day of the month, by a local time, and is given to one
+/// person (or left open to anyone who works tasks).
+model Checklist {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @map("property_id") @db.Uuid
+  name         String
+  departmentId String   @map("department_id") @db.Uuid
+  /// The checks, in order (1 to 50).
+  items        String[]
+  /// DAILY | WEEKLY | MONTHLY
+  frequency    String
+  /// ISO weekday 1 (Monday) to 7, for WEEKLY.
+  weekday      Int?
+  /// 1 to 28, for MONTHLY.
+  monthDay     Int?     @map("month_day")
+  /// Local time it is due by, HH:MM.
+  dueTime      String   @default("23:59") @map("due_time")
+  assigneeId   String?  @map("assignee_id") @db.Uuid
+  active       Boolean  @default(true)
+  createdById  String   @map("created_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property   Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  // Same property is checked by the service.
+  department Department     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  assignee   User?          @relation("ChecklistAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  createdBy  User           @relation("ChecklistCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  runs       ChecklistRun[]
+
+  @@index([propertyId, active])
+  @@map("checklists")
+}
+
+/// One day's turn of a checklist (T-134): the checks as they were that day, and each answer.
+/// PENDING until done; MISSED once its day has passed undone.
+model ChecklistRun {
+  id            String    @id @default(uuid()) @db.Uuid
+  propertyId    String    @map("property_id") @db.Uuid
+  checklistId   String    @map("checklist_id") @db.Uuid
+  dueOn         DateTime  @map("due_on") @db.Date
+  dueAt         DateTime  @map("due_at") @db.Timestamptz(6)
+  items         String[]
+  assigneeId    String?   @map("assignee_id") @db.Uuid
+  /// PENDING | DONE | MISSED
+  status        String    @default("PENDING")
+  /// [{ item, ok, note }] in the order of items, once done.
+  results       Json      @default("[]")
+  problems      Int       @default(0)
+  /// The task opened for the problems found, if any.
+  taskId        String?   @unique @map("task_id") @db.Uuid
+  completedById String?   @map("completed_by_id") @db.Uuid
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  checklist   Checklist @relation(fields: [checklistId], references: [id], onDelete: Restrict)
+  assignee    User?     @relation("ChecklistRunAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  completedBy User?     @relation("ChecklistRunDoneBy", fields: [completedById], references: [id], onDelete: Restrict)
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: Restrict)
+
+  @@unique([checklistId, dueOn])
+  @@index([propertyId, dueOn])
+  @@map("checklist_runs")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

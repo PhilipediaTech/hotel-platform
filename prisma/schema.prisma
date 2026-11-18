@@ -154,6 +154,7 @@ model Property {
   rotaPatterns         RotaPattern[]
   shiftAssignments     ShiftAssignment[]
   leaveRequests        LeaveRequest[]
+  attendanceEvents     AttendanceEvent[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -334,6 +335,7 @@ model User {
   staffProfiles        StaffProfile[]     @relation("StaffLogin")
   staffManaged         StaffProfile[]     @relation("StaffManager")
   leaveDecided         LeaveRequest[]     @relation("LeaveDecidedBy")
+  attendanceRecorded   AttendanceEvent[]  @relation("AttendanceRecordedBy")
   lostFoundEvents      LostFoundEvent[]   @relation("LostEventBy")
   lostFoundCustody     LostFoundEvent[]   @relation("LostEventCustodian")
   handoversWritten     HandoverNote[]     @relation("HandoverWriter")
@@ -2637,6 +2639,8 @@ model StaffProfile {
   emergencyName     String?   @map("emergency_name")
   emergencyPhone    String?   @map("emergency_phone")
   emergencyRelation String?   @map("emergency_relation")
+  /// When they agreed to location-based clock-in (M7 rule: consent and a privacy notice).
+  locationConsentAt DateTime? @map("location_consent_at") @db.Timestamptz(6)
   /// ACTIVE | LEFT
   status            String    @default("ACTIVE")
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2651,6 +2655,7 @@ model StaffProfile {
   duties         Duty[]
   shifts         ShiftAssignment[]
   leaveRequests  LeaveRequest[]
+  attendance     AttendanceEvent[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, userId])
@@ -2776,6 +2781,37 @@ model LeaveRequest {
   @@index([propertyId, status])
   @@index([staffId, startDate])
   @@map("leave_requests")
+}
+
+/// A clock-in or clock-out (M7-04): on the shared tablet (PIN session and a photo) or on the
+/// member's own phone, checked against the property's network or location when enabled.
+model AttendanceEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  propertyId     String   @map("property_id") @db.Uuid
+  staffId        String   @map("staff_id") @db.Uuid
+  /// IN | OUT
+  kind           String
+  at             DateTime @db.Timestamptz(6)
+  /// TABLET | PHONE
+  channel        String
+  ip             String?
+  /// Sent by the phone when location is checked (with the member's consent).
+  latitude       Decimal? @db.Decimal(9, 6)
+  longitude      Decimal? @db.Decimal(9, 6)
+  accuracyMeters Int?     @map("accuracy_meters")
+  /// The tablet photo (files row, entity type AttendanceEvent).
+  photoFileId    String?  @map("photo_file_id") @db.Uuid
+  deviceLabel    String?  @map("device_label")
+  recordedById   String   @map("recorded_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  staff      StaffProfile @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  recordedBy User         @relation("AttendanceRecordedBy", fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, at])
+  @@index([staffId, at])
+  @@map("attendance_events")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

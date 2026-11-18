@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-137 (duties, rotas and leave) is pushed on `feat/T-137-rotas-leave` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: attendance (M7-04).
+T-138 (attendance: clock in and out) is pushed on `feat/T-138-attendance` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: timesheets, pay items and payroll export (M7-06–M7-08).

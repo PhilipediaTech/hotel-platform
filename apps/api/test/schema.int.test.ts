@@ -28,6 +28,7 @@ describe('migrations', () => {
       'ar_invoices',
       'ar_payments',
       'assets',
+      'attendance_events',
       'audit_events',
       'auth_tokens',
       'bank_statement_lines',

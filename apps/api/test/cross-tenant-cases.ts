@@ -1375,6 +1375,59 @@ async function bWorkUnchanged(db: Db, world: TenantWorld) {
   expect((await db.leaveRequest.findMany({ where })).map((l) => l.status)).toEqual(['PENDING']);
 }
 
+/** B's attendance: a clocked-in profile and its settings with a network address (T-138). */
+async function bAttendance(db: Db, world: TenantWorld, propertyId: string) {
+  const staff = await db.staffProfile.create({
+    data: {
+      propertyId,
+      number: 1,
+      name: 'Their cook',
+      userId: world.bStaff.id,
+      jobTitle: 'Cook',
+      employmentType: 'HOURLY',
+      startDate: new Date('2026-01-01T00:00:00Z'),
+    },
+  });
+  const event = await db.attendanceEvent.create({
+    data: {
+      propertyId,
+      staffId: staff.id,
+      kind: 'IN',
+      at: new Date(),
+      channel: 'PHONE',
+      recordedById: world.bStaff.id,
+    },
+  });
+  const address = '198.51.100.7';
+  const property = await db.property.findUniqueOrThrow({ where: { id: propertyId } });
+  await db.property.update({
+    where: { id: propertyId },
+    data: {
+      settings: {
+        ...((property.settings ?? {}) as object),
+        attendance: {
+          employmentTypes: ['HOURLY'],
+          phoneAllowed: true,
+          network: { enabled: true, addresses: [address] },
+          location: { enabled: false, latitude: null, longitude: null, radiusMeters: 200 },
+          privacyNotice: 'Their own privacy notice for location checks.',
+        },
+      } as never,
+    },
+  });
+  return { staffId: staff.id, eventId: event.id, address };
+}
+
+async function bAttendanceUnchanged(db: Db, world: TenantWorld) {
+  const events = await db.attendanceEvent.findMany({ where: { propertyId: world.b1.id } });
+  expect(events.map((e) => e.kind)).toEqual(['IN']);
+  const staff = await db.staffProfile.findFirstOrThrow({ where: { propertyId: world.b1.id } });
+  expect(staff.locationConsentAt).toBeNull();
+  const property = await db.property.findUniqueOrThrow({ where: { id: world.b1.id } });
+  const settings = (property.settings ?? {}) as { attendance?: { network?: unknown } };
+  expect(settings.attendance?.network).toEqual({ enabled: true, addresses: ['198.51.100.7'] });
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -3042,6 +3095,49 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bStaffUnchanged,
   },
   removeCertification: { seed: bStaff, untouched: bStaffUnchanged },
+  getMyAttendance: {
+    seed: bAttendance,
+    listIds: (body) => {
+      const b = body as { staff: { id: string } | null; recent: { id: string }[] };
+      return [...(b.staff ? [b.staff.id] : []), ...b.recent.map((e) => e.id)];
+    },
+  },
+  clockAttendance: {
+    seed: bAttendance,
+    creates: true,
+    body: () => ({ kind: 'OUT' }),
+    untouched: bAttendanceUnchanged,
+  },
+  setLocationConsent: {
+    seed: bAttendance,
+    creates: true,
+    body: () => ({ consent: true }),
+    untouched: bAttendanceUnchanged,
+  },
+  listAttendance: {
+    seed: bAttendance,
+    listIds: (body) => {
+      const b = body as { events: { id: string }[]; inNow: { id: string }[] };
+      return [...b.events, ...b.inNow].map((x) => x.id);
+    },
+  },
+  getAttendanceSettings: {
+    seed: bAttendance,
+    listIds: (body) =>
+      (body as { settings: { network: { addresses: string[] } } }).settings.network.addresses,
+  },
+  updateAttendanceSettings: {
+    seed: bAttendance,
+    creates: true,
+    body: () => ({
+      employmentTypes: ['HOURLY'],
+      phoneAllowed: false,
+      network: { enabled: false, addresses: [] },
+      location: { enabled: false, latitude: null, longitude: null, radiusMeters: 200 },
+      privacyNotice: 'A leak attempt notice that is long enough.',
+    }),
+    untouched: bAttendanceUnchanged,
+  },
   listDuties: {
     seed: bWork,
     listIds: (body) => {

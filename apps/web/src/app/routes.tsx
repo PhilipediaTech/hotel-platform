@@ -106,6 +106,9 @@ const DutiesPage = lazy(() =>
 const RotaPage = lazy(() =>
   import('../routes/workforce.tsx').then((m) => ({ default: m.RotaPage })),
 );
+const AttendancePage = lazy(() =>
+  import('../routes/attendance.tsx').then((m) => ({ default: m.AttendancePage })),
+);
 const LeavePage = lazy(() =>
   import('../routes/workforce.tsx').then((m) => ({ default: m.LeavePage })),
 );
@@ -179,6 +182,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/duties': <DutiesPage />,
   '/rota': <RotaPage />,
   '/leave': <LeavePage />,
+  '/attendance': <AttendancePage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

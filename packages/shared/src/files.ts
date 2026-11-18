@@ -2,7 +2,7 @@
 // uploaded for one kind of record, named by `entityType`: the kind decides who may upload
 // and download it, which content types are accepted and how large it may be. Tickets that
 // attach files to their records add their kind here (ID documents and signatures T-051,
-// task photos T-082).
+// task photos T-082, clock-in photos T-138).
 
 export const FILE_CONTENT_TYPES = [
   'image/jpeg',
@@ -89,6 +89,16 @@ export const FILE_KINDS = [
     permission: 'task.report',
     contentTypes: ['image/jpeg', 'image/png', 'image/webp'],
     maxBytes: 5 * MB,
+    retentionClass: 'STANDARD',
+  }),
+  // Clock-in photos on the shared tablet (M7-04 'PIN + photo'; T-138). Taken by staff, seen by
+  // the managers who approve timesheets.
+  k({
+    entityType: 'AttendanceEvent',
+    permission: 'attendance.clock',
+    readPermission: 'timesheet.approve',
+    contentTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    maxBytes: 2 * MB,
     retentionClass: 'STANDARD',
   }),
 ] as const;

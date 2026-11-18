@@ -127,6 +127,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   RotaPattern: { kind: 'property' },
   ShiftAssignment: { kind: 'property' },
   LeaveRequest: { kind: 'property' },
+  AttendanceEvent: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

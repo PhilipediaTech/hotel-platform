@@ -32,6 +32,7 @@ import { roomBlockStatusJob } from './modules/rooms/jobs.ts';
 import { taskEscalationJob } from './modules/tasks/jobs.ts';
 import { preventiveMaintenanceJob } from './modules/maintenance/preventive.ts';
 import { checklistsJob } from './modules/checklists/service.ts';
+import { staffDocumentPurgeJob } from './modules/staff/documents.ts';
 import { certificationRemindersJob } from './modules/staff/service.ts';
 import { eventHoldExpiryJob } from './modules/events/routes.ts';
 import { groupBlockReleaseJob } from './modules/groups/routes.ts';
@@ -61,6 +62,7 @@ export function workerJobs(deps: {
     stayAlertJob,
     visitorCutoffJob,
     idPurgeJob({ store: deps.files }),
+    staffDocumentPurgeJob({ store: deps.files }),
     // The fake keeps its links in the API process: nothing for the worker to ask.
     ...(deps.payments.name === 'FAKE' ? [] : [paymentLinkCheckJob({ provider: deps.payments })]),
     paymentWebhookJob({ provider: deps.payments }),

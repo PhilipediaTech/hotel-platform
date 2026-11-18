@@ -47,6 +47,7 @@ export * from './staff.ts';
 export * from './workforce.ts';
 export * from './attendance.ts';
 export * from './payroll.ts';
+export * from './staff-documents.ts';
 export * from './tasks.ts';
 export * from './handovers.ts';
 export * from './leakage.ts';

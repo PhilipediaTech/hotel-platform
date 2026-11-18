@@ -2,7 +2,7 @@
 // uploaded for one kind of record, named by `entityType`: the kind decides who may upload
 // and download it, which content types are accepted and how large it may be. Tickets that
 // attach files to their records add their kind here (ID documents and signatures T-051,
-// task photos T-082, clock-in photos T-138).
+// task photos T-082, clock-in photos T-138, staff documents T-140).
 
 export const FILE_CONTENT_TYPES = [
   'image/jpeg',
@@ -22,6 +22,8 @@ export interface FileKindDef {
   permission: string;
   /** Needed to download; null = any member of the property. */
   readPermission?: string | null;
+  /** Opened only through its record's own (audited) route, never the generic download link. */
+  ownDownloadRoute?: true;
   contentTypes: readonly FileContentType[];
   maxBytes: number;
   retentionClass: 'STANDARD';
@@ -99,6 +101,16 @@ export const FILE_KINDS = [
     readPermission: 'timesheet.approve',
     contentTypes: ['image/jpeg', 'image/png', 'image/webp'],
     maxBytes: 2 * MB,
+    retentionClass: 'STANDARD',
+  }),
+  // Staff documents (M7-09 'contract, guarantor form, ID ... with restricted access and
+  // retention'; T-140): opened only through the staff record, each look audited.
+  k({
+    entityType: 'StaffDocument',
+    permission: 'staff.docs',
+    ownDownloadRoute: true,
+    contentTypes: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+    maxBytes: 10 * MB,
     retentionClass: 'STANDARD',
   }),
 ] as const;

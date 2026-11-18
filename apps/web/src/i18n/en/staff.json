@@ -2,7 +2,10 @@
   "st": {
     "title": "Staff",
     "statusTabs": "Show",
-    "statuses": { "ACTIVE": "Current staff", "LEFT": "Left" },
+    "statuses": {
+      "ACTIVE": "Current staff",
+      "LEFT": "Left"
+    },
     "search": "Search name, job or ST number",
     "add": "Add a staff member",
     "list": "Staff directory",
@@ -70,6 +73,35 @@
     "emergencyPhone": "Emergency contact phone",
     "emergencyRelation": "Relationship",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "docs": {
+      "title": "Documents",
+      "restricted": "Restricted. Each time a document is opened, it is recorded.",
+      "none": "No documents.",
+      "types": {
+        "CONTRACT": "Contract",
+        "GUARANTOR": "Guarantor form",
+        "ID": "ID",
+        "CERTIFICATE": "Certificate",
+        "OTHER": "Other"
+      },
+      "scan": {
+        "PENDING": "Being checked…",
+        "CLEAN": "Ready",
+        "INFECTED": "Blocked by the security check"
+      },
+      "keptUntil": "deleted after {{date}}",
+      "open": "Open",
+      "remove": "Delete",
+      "add": "Add a document",
+      "form": "Document",
+      "type": "Type",
+      "name": "Title",
+      "file": "File (PDF or photo)",
+      "chooseFile": "Choose a file.",
+      "retention": "How long documents are kept",
+      "retentionHint": "Months after the person's last day. Then the document is deleted for good.",
+      "saved": "Saved."
+    }
   }
 }

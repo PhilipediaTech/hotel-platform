@@ -23,12 +23,13 @@ import { toMinor } from '../lib/money.ts';
 import staffStrings from '../i18n/en/staff.json';
 import { registerStrings } from '../i18n/index.ts';
 import { useFormats } from './reservations.tsx';
+import { DocumentRetention, StaffDocuments } from './staff-documents.tsx';
 
 registerStrings(staffStrings);
 
 // S36 Staff and workforce (PRD M7-01, M7-10; T-136): the directory, each profile with its
 // certifications, and the restricted emergency contact (shown on request; each look is
-// audited by the API). Duties, rota, attendance, leave and timesheets come with later tickets.
+// audited by the API), and its documents (T-140).
 
 type Item = z.output<typeof StaffItem>;
 type Detail = z.output<typeof StaffDetail>;
@@ -50,6 +51,7 @@ function useKey(...parts: string[]) {
 
 export function StaffPage() {
   const { t } = useTranslation();
+  const { permissions } = useSession();
   const [params, setParams] = useSearchParams();
   const status = (STAFF_STATUSES as readonly string[]).includes(params.get('status') ?? '')
     ? (params.get('status') as StaffStatus)
@@ -142,12 +144,14 @@ export function StaffPage() {
           </li>
         ))}
       </ul>
+      {permissions.includes('staff.docs') && <DocumentRetention />}
     </section>
   );
 }
 
 function StaffPanel(props: { item: Item; departments: Option[]; people: Person[] }) {
   const { t } = useTranslation();
+  const { permissions } = useSession();
   const f = useFormats();
   const queryClient = useQueryClient();
   const root = useKey();
@@ -240,6 +244,7 @@ function StaffPanel(props: { item: Item; departments: Option[]; people: Person[]
               />
             )}
           </section>
+          {permissions.includes('staff.docs') && <StaffDocuments staffId={d.id} />}
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" className="h-11" onClick={() => setEditing(true)}>
               {t('st.edit')}

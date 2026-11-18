@@ -1306,6 +1306,75 @@ async function bStaffUnchanged(db: Db, world: TenantWorld) {
   ).toEqual([['Their cook', 'ACTIVE', 'Their contact', ['Their cert']]]);
 }
 
+/** B's duty, rota (a shift and a draft slot) and a pending leave request (T-137). */
+async function bWork(db: Db, world: TenantWorld, propertyId: string) {
+  const { organisationId } = await db.property.findUniqueOrThrow({ where: { id: propertyId } });
+  const department = await db.department.create({
+    data: { organisationId, propertyId, code: 'THEIRS', name: 'Their department' },
+  });
+  const staff = await db.staffProfile.create({
+    data: {
+      propertyId,
+      number: 1,
+      name: 'Their cook',
+      userId: world.bStaff.id,
+      departmentId: department.id,
+      jobTitle: 'Cook',
+      employmentType: 'MONTHLY_SALARY',
+      startDate: new Date('2026-01-01T00:00:00Z'),
+    },
+  });
+  const duty = await db.duty.create({
+    data: { propertyId, staffId: staff.id, title: 'Their duty', weekdays: [1] },
+  });
+  const shift = await db.rotaPattern.create({
+    data: {
+      propertyId,
+      departmentId: department.id,
+      name: 'Their shift',
+      startTime: '07:00',
+      endTime: '15:00',
+    },
+  });
+  const slot = await db.shiftAssignment.create({
+    data: {
+      propertyId,
+      patternId: shift.id,
+      staffId: staff.id,
+      date: new Date('2026-11-17T00:00:00Z'),
+    },
+  });
+  const leave = await db.leaveRequest.create({
+    data: {
+      propertyId,
+      staffId: staff.id,
+      type: 'ANNUAL',
+      startDate: new Date('2026-11-17T00:00:00Z'),
+      endDate: new Date('2026-11-18T00:00:00Z'),
+    },
+  });
+  return {
+    departmentId: department.id,
+    staffId: staff.id,
+    dutyId: duty.id,
+    shiftId: shift.id,
+    assignmentId: slot.id,
+    leaveId: leave.id,
+  };
+}
+
+async function bWorkUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.duty.findMany({ where })).map((d) => [d.title, d.active])).toEqual([
+    ['Their duty', true],
+  ]);
+  expect((await db.rotaPattern.findMany({ where })).map((p) => [p.name, p.active])).toEqual([
+    ['Their shift', true],
+  ]);
+  expect((await db.shiftAssignment.findMany({ where })).map((a) => a.status)).toEqual(['DRAFT']);
+  expect((await db.leaveRequest.findMany({ where })).map((l) => l.status)).toEqual(['PENDING']);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -2973,6 +3042,88 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bStaffUnchanged,
   },
   removeCertification: { seed: bStaff, untouched: bStaffUnchanged },
+  listDuties: {
+    seed: bWork,
+    listIds: (body) => {
+      const b = body as { data: { id: string }[]; staff: { id: string }[] };
+      return [...b.data, ...b.staff].map((x) => x.id);
+    },
+  },
+  createDuty: {
+    seed: bWork,
+    creates: true,
+    body: (theirs) => ({ staffId: theirs['staffId'], title: 'Leak' }),
+    untouched: bWorkUnchanged,
+  },
+  updateDuty: {
+    seed: bWork,
+    body: () => ({ title: 'Leak', active: false }),
+    untouched: bWorkUnchanged,
+  },
+  getRota: {
+    seed: bWork,
+    query: (theirs) => ({
+      departmentId: theirs['departmentId'] ?? '',
+      from: '2026-11-16',
+      to: '2026-11-22',
+    }),
+  },
+  addRotaShift: {
+    seed: bWork,
+    body: () => ({ name: 'Leak', startTime: '08:00', endTime: '09:00' }),
+    untouched: bWorkUnchanged,
+  },
+  updateRotaShift: {
+    seed: bWork,
+    body: () => ({ name: 'Leak', active: false }),
+    untouched: bWorkUnchanged,
+  },
+  assignShift: {
+    seed: bWork,
+    creates: true,
+    body: (theirs) => ({
+      shiftId: theirs['shiftId'],
+      staffId: theirs['staffId'],
+      date: '2026-11-19',
+    }),
+    untouched: bWorkUnchanged,
+  },
+  unassignShift: { seed: bWork, untouched: bWorkUnchanged },
+  publishRota: {
+    seed: bWork,
+    body: () => ({ from: '2026-11-16', period: 'WEEKLY' }),
+    untouched: bWorkUnchanged,
+  },
+  getMyWork: {
+    seed: bWork,
+    listIds: (body) => {
+      const b = body as {
+        duties: { id: string }[];
+        shifts: { id: string }[];
+        leave: { id: string }[];
+      };
+      return [...b.duties, ...b.shifts, ...b.leave].map((x) => x.id);
+    },
+  },
+  requestLeave: {
+    seed: bWork,
+    creates: true,
+    body: () => ({ type: 'ANNUAL', startDate: '2026-12-01', endDate: '2026-12-02' }),
+    untouched: bWorkUnchanged,
+  },
+  cancelLeave: { seed: bWork, untouched: bWorkUnchanged },
+  listLeave: {
+    seed: bWork,
+    listIds: (body) => {
+      const b = body as { data: { id: string }[] };
+      return [...b.data].map((x) => x.id);
+    },
+  },
+  decideLeave: {
+    seed: bWork,
+    body: () => ({ decision: 'APPROVE' }),
+    untouched: bWorkUnchanged,
+  },
   getTaskFormOptions: {
     seed: bTask,
     listIds: (body) => {

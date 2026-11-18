@@ -33,6 +33,7 @@ import { UTILITIES_ROUTES } from './utilities.ts';
 import { LOST_FOUND_ROUTES } from './lost-found.ts';
 import { CHECKLISTS_ROUTES } from './checklists.ts';
 import { STAFF_ROUTES } from './staff.ts';
+import { WORKFORCE_ROUTES } from './workforce.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
 import { NIGHT_AUDIT_ROUTES } from './night-audit.ts';
@@ -106,6 +107,7 @@ export const API_ROUTES = {
   ...LOST_FOUND_ROUTES,
   ...CHECKLISTS_ROUTES,
   ...STAFF_ROUTES,
+  ...WORKFORCE_ROUTES,
   ...TASK_ROUTES,
   ...HANDOVER_ROUTES,
   ...LEAKAGE_ROUTES,

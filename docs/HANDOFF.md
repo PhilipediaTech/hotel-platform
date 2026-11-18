@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-136 (staff profiles and certification reminders) is pushed on `feat/T-136-staff-profiles` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: duties, rotas and leave (M7-02, M7-03, M7-05).
+T-137 (duties, rotas and leave) is pushed on `feat/T-137-rotas-leave` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: attendance (M7-04).

@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-139 (timesheets, advances and deductions, payroll export) is pushed on `feat/T-139-payroll` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: staff documents (M7-09), the last workforce ticket.
+T-140 (staff documents) is pushed on `feat/T-140-staff-documents` (run `npm run db:deploy` and `npm run db:generate` after merging). Workforce (M7) is complete. Next: lite POS (M8-01–M8-05).

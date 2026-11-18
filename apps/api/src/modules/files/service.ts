@@ -84,6 +84,9 @@ export async function getDownloadUrl(deps: FileDeps, tenant: TenantContext, file
   if (!file) throw new AppError('NOT_FOUND', 'File not found.');
   const kind = file.entityType ? fileKind(file.entityType) : undefined;
   const permission = kind ? fileReadPermission(kind) : null;
+  if (kind?.ownDownloadRoute) {
+    throw new AppError('FORBIDDEN', 'Open this file from its record.', {});
+  }
   if (!kind || (permission !== null && !tenant.permissions.has(permission))) {
     throw new AppError('FORBIDDEN', 'You do not have permission to open this file.', {
       ...(permission ? { permission } : {}),

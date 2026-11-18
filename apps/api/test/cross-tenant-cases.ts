@@ -1480,6 +1480,68 @@ async function bPayrollUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** B's staff member with a filed contract, and B's own document retention (T-140). */
+async function bStaffDocs(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  const staff = await db.staffProfile.create({
+    data: {
+      propertyId,
+      number: 1,
+      name: 'Their cook',
+      jobTitle: 'Cook',
+      employmentType: 'MONTHLY_SALARY',
+      startDate: new Date('2026-01-01T00:00:00Z'),
+    },
+  });
+  const file = await db.fileObject.create({
+    data: {
+      organisationId,
+      propertyId,
+      storageKey: `test/${crypto.randomUUID()}`,
+      contentType: 'application/pdf',
+      sizeBytes: 1000,
+      scan: 'CLEAN',
+      entityType: 'StaffDocument',
+      uploadedById: world.bStaff.id,
+    },
+  });
+  const doc = await db.staffDocument.create({
+    data: {
+      propertyId,
+      staffId: staff.id,
+      type: 'CONTRACT',
+      title: 'Their contract',
+      fileId: file.id,
+      uploadedById: world.bStaff.id,
+    },
+  });
+  const property = await db.property.findUniqueOrThrow({ where: { id: propertyId } });
+  await db.property.update({
+    where: { id: propertyId },
+    data: {
+      settings: {
+        ...((property.settings ?? {}) as object),
+        staffDocuments: {
+          retention: { CONTRACT: 99, GUARANTOR: 72, ID: 12, CERTIFICATE: 24, OTHER: 24 },
+        },
+      } as never,
+    },
+  });
+  // retention: B's own value, which must never show to A.
+  return { staffId: staff.id, documentId: doc.id, fileId: file.id, retention: '99' };
+}
+
+async function bStaffDocsUnchanged(db: Db, world: TenantWorld) {
+  const docs = await db.staffDocument.findMany({ where: { propertyId: world.b1.id } });
+  expect(docs.map((d) => d.title)).toEqual(['Their contract']);
+  expect(await db.fileObject.count({ where: { id: docs[0]?.fileId ?? '' } })).toBe(1);
+  const property = await db.property.findUniqueOrThrow({ where: { id: world.b1.id } });
+  const settings = (property.settings ?? {}) as {
+    staffDocuments?: { retention?: { CONTRACT?: number } };
+  };
+  expect(settings.staffDocuments?.retention?.CONTRACT).toBe(99);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -3147,6 +3209,26 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bStaffUnchanged,
   },
   removeCertification: { seed: bStaff, untouched: bStaffUnchanged },
+  listStaffDocuments: { seed: bStaffDocs },
+  addStaffDocument: {
+    seed: bStaffDocs,
+    body: (theirs) => ({ type: 'ID', title: 'Leak', fileId: theirs['fileId'] }),
+    untouched: bStaffDocsUnchanged,
+  },
+  getStaffDocumentLink: { seed: bStaffDocs },
+  removeStaffDocument: { seed: bStaffDocs, untouched: bStaffDocsUnchanged },
+  getStaffDocumentSettings: {
+    seed: bStaffDocs,
+    // The retention answered is A's: B's 99 months never shows.
+    listIds: (body) =>
+      Object.values((body as { retention: Record<string, number> }).retention).map(String),
+  },
+  updateStaffDocumentSettings: {
+    seed: bStaffDocs,
+    creates: true,
+    body: () => ({ retention: { CONTRACT: 1, GUARANTOR: 1, ID: 1, CERTIFICATE: 1, OTHER: 1 } }),
+    untouched: bStaffDocsUnchanged,
+  },
   listTimesheets: {
     seed: bPayroll,
     query: () => ({ month: '2026-11' }),

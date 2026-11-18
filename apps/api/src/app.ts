@@ -55,6 +55,7 @@ import { utilitiesRoutes } from './modules/utilities/routes.ts';
 import { lostFoundRoutes } from './modules/lostfound/routes.ts';
 import { checklistRoutes } from './modules/checklists/routes.ts';
 import { staffRoutes } from './modules/staff/routes.ts';
+import { staffDocumentRoutes } from './modules/staff/document-routes.ts';
 import { workforceRoutes } from './modules/workforce/routes.ts';
 import { attendanceRoutes } from './modules/attendance/routes.ts';
 import { payrollRoutes } from './modules/payroll/routes.ts';
@@ -215,6 +216,7 @@ export function createApp({
   api.use(lostFoundRoutes({ db, tenantDb, clock }));
   api.use(checklistRoutes({ db, tenantDb, clock }));
   api.use(staffRoutes({ db, tenantDb, clock }));
+  api.use(staffDocumentRoutes({ tenantDb, store: files, clock }));
   api.use(workforceRoutes({ tenantDb, clock }));
   api.use(attendanceRoutes({ tenantDb, clock }));
   api.use(payrollRoutes({ tenantDb, clock }));

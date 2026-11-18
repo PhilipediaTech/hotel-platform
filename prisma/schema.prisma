@@ -157,6 +157,7 @@ model Property {
   attendanceEvents     AttendanceEvent[]
   timesheets           Timesheet[]
   payItems             PayItem[]
+  staffDocuments       StaffDocument[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -342,6 +343,7 @@ model User {
   timesheetsApproved   Timesheet[]        @relation("TimesheetApprovedBy")
   payItemsRequested    PayItem[]          @relation("PayItemRequestedBy")
   payItemsDecided      PayItem[]          @relation("PayItemDecidedBy")
+  staffDocumentsAdded  StaffDocument[]    @relation("StaffDocumentUploadedBy")
   lostFoundEvents      LostFoundEvent[]   @relation("LostEventBy")
   lostFoundCustody     LostFoundEvent[]   @relation("LostEventCustodian")
   handoversWritten     HandoverNote[]     @relation("HandoverWriter")
@@ -658,6 +660,7 @@ model FileObject {
   visitors       Visitor[]
   cards          RegistrationCard[]
   onlineCheckIns OnlineCheckIn[]
+  staffDocuments StaffDocument[]
 
   @@index([propertyId, entityType, entityId])
   @@map("files")
@@ -2664,6 +2667,7 @@ model StaffProfile {
   attendance     AttendanceEvent[]
   timesheets     Timesheet[]
   payItems       PayItem[]
+  documents      StaffDocument[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, userId])
@@ -2889,6 +2893,30 @@ model PayItem {
   @@index([propertyId, payMonth])
   @@index([staffId, payMonth])
   @@map("pay_items")
+}
+
+/// A document kept on a staff record (M7-09): contract, guarantor form, ID, certificate.
+/// Restricted to staff.docs; deleted with its file once the type's retention after the
+/// person's last day has passed.
+model StaffDocument {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @map("property_id") @db.Uuid
+  staffId      String   @map("staff_id") @db.Uuid
+  /// CONTRACT | GUARANTOR | ID | CERTIFICATE | OTHER
+  type         String
+  title        String
+  notes        String?
+  fileId       String   @unique @map("file_id") @db.Uuid
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  staff      StaffProfile @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  file       FileObject   @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  uploadedBy User         @relation("StaffDocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([staffId])
+  @@map("staff_documents")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

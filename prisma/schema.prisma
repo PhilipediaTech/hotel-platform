@@ -149,6 +149,7 @@ model Property {
   meterReadings        MeterReading[]
   lostFoundItems       LostFoundItem[]
   checklists           Checklist[]
+  staffProfiles        StaffProfile[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -200,6 +201,7 @@ model Department {
   handoverNotes HandoverNote[]
   eventBriefs   EventBrief[]
   checklists    Checklist[]
+  staffProfiles StaffProfile[]
 
   @@unique([propertyId, code])
   @@unique([propertyId, id])
@@ -324,6 +326,8 @@ model User {
   checklistsCreated    Checklist[]        @relation("ChecklistCreatedBy")
   checklistRunsGiven   ChecklistRun[]     @relation("ChecklistRunAssignee")
   checklistRunsDone    ChecklistRun[]     @relation("ChecklistRunDoneBy")
+  staffProfiles        StaffProfile[]     @relation("StaffLogin")
+  staffManaged         StaffProfile[]     @relation("StaffManager")
   lostFoundEvents      LostFoundEvent[]   @relation("LostEventBy")
   lostFoundCustody     LostFoundEvent[]   @relation("LostEventCustodian")
   handoversWritten     HandoverNote[]     @relation("HandoverWriter")
@@ -2597,6 +2601,73 @@ model ChecklistRun {
   @@unique([checklistId, dueOn])
   @@index([propertyId, dueOn])
   @@map("checklist_runs")
+}
+
+/// A member of staff (PRD M7-01 "As HR or GM, I create staff profiles (department, role,
+/// manager, employment type, start date, pay basis, certifications with expiry, restricted
+/// emergency contact)", staff.manage; tab 3 names staff_profiles for V1.1 without columns;
+/// T-136). A profile may stand alone (no login) or belong to a user who signs in.
+model StaffProfile {
+  id                String    @id @default(uuid()) @db.Uuid
+  propertyId        String    @map("property_id") @db.Uuid
+  /// ST-<number>.
+  number            Int
+  /// The login, if they have one (one profile per user and property).
+  userId            String?   @map("user_id") @db.Uuid
+  name              String
+  phone             String?
+  email             String?
+  departmentId      String?   @map("department_id") @db.Uuid
+  jobTitle          String    @map("job_title")
+  /// The user they report to.
+  managerId         String?   @map("manager_id") @db.Uuid
+  /// MONTHLY_SALARY | DAILY_PAID | HOURLY | CONTRACTOR
+  employmentType    String    @map("employment_type")
+  startDate         DateTime  @map("start_date") @db.Date
+  endDate           DateTime? @map("end_date") @db.Date
+  /// Pay per month, day, hour or contract (by employment type), base currency; optional.
+  payRateMinor      BigInt?   @map("pay_rate_minor")
+  /// Restricted: read through its own audited route.
+  emergencyName     String?   @map("emergency_name")
+  emergencyPhone    String?   @map("emergency_phone")
+  emergencyRelation String?   @map("emergency_relation")
+  /// ACTIVE | LEFT
+  status            String    @default("ACTIVE")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property       Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  user           User?                @relation("StaffLogin", fields: [userId], references: [id], onDelete: Restrict)
+  // Same property is checked by the service.
+  department     Department?          @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  manager        User?                @relation("StaffManager", fields: [managerId], references: [id], onDelete: Restrict)
+  certifications StaffCertification[]
+
+  @@unique([propertyId, number])
+  @@unique([propertyId, userId])
+  @@index([propertyId, status])
+  @@map("staff_profiles")
+}
+
+/// A certification a member of staff holds (M7-01), e.g. food handler or first aid. Reminded
+/// 30 days before it expires (M7-10).
+model StaffCertification {
+  id          String    @id @default(uuid()) @db.Uuid
+  staffId     String    @map("staff_id") @db.Uuid
+  name        String
+  issuer      String?
+  reference   String?
+  issuedOn    DateTime? @map("issued_on") @db.Date
+  expiresOn   DateTime? @map("expires_on") @db.Date
+  /// The expiry date a reminder went out for; a renewal (new date) is reminded again.
+  remindedFor DateTime? @map("reminded_for") @db.Date
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  staff StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+  @@index([expiresOn])
+  @@map("staff_certifications")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

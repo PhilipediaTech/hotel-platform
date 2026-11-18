@@ -77,6 +77,7 @@ export function hotelClient(
         withHeaders(request(app).patch(`/api/v1${path}`)).send(body),
       put: (path: string, body: object) =>
         withHeaders(request(app).put(`/api/v1${path}`)).send(body),
+      delete: (path: string) => withHeaders(request(app).delete(`/api/v1${path}`)),
     };
   };
   const anon = {

@@ -43,6 +43,7 @@ export * from './maintenance.ts';
 export * from './utilities.ts';
 export * from './lost-found.ts';
 export * from './checklists.ts';
+export * from './staff.ts';
 export * from './tasks.ts';
 export * from './handovers.ts';
 export * from './leakage.ts';

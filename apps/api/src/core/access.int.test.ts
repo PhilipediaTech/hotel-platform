@@ -1,7 +1,7 @@
 import { API_ROUTES, type RouteContract } from '@hotel/shared';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { resetDb, testDb } from '../../test/db.ts';
 import { makeOrganisation, makeProperty, makeRole, makeUser } from '../../test/factories.ts';
 import { APP_ORIGIN, buildTestApp, errorOf, TEST_CONFIG } from '../../test/helpers.ts';
@@ -194,6 +194,12 @@ describe('reviewed route lists (T-102)', () => {
 });
 
 describe('route-wide sweeps (T-102)', () => {
+  // Each sweep sends hundreds of requests as one member in under a minute: start each with an
+  // empty per-user window so the rate limit (300/min, tested on its own) doesn't answer 429.
+  beforeEach(async () => {
+    await db.rateLimitHit.deleteMany();
+  });
+
   it('every signed-in route answers 401 without a session', async () => {
     const failures = await sweep(
       ROUTES.filter((r) => r.auth !== 'none'),

@@ -100,6 +100,15 @@ const UtilitiesPage = lazy(() =>
   import('../routes/utilities.tsx').then((m) => ({ default: m.UtilitiesPage })),
 );
 const StaffPage = lazy(() => import('../routes/staff.tsx').then((m) => ({ default: m.StaffPage })));
+const DutiesPage = lazy(() =>
+  import('../routes/workforce.tsx').then((m) => ({ default: m.DutiesPage })),
+);
+const RotaPage = lazy(() =>
+  import('../routes/workforce.tsx').then((m) => ({ default: m.RotaPage })),
+);
+const LeavePage = lazy(() =>
+  import('../routes/workforce.tsx').then((m) => ({ default: m.LeavePage })),
+);
 const ChecklistsPage = lazy(() =>
   import('../routes/checklists.tsx').then((m) => ({ default: m.ChecklistsPage })),
 );
@@ -167,6 +176,9 @@ const SCREENS: Record<string, ReactElement> = {
   '/lost-found': <LostFoundPage />,
   '/checklists': <ChecklistsPage />,
   '/staff': <StaffPage />,
+  '/duties': <DutiesPage />,
+  '/rota': <RotaPage />,
+  '/leave': <LeavePage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

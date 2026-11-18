@@ -150,6 +150,10 @@ model Property {
   lostFoundItems       LostFoundItem[]
   checklists           Checklist[]
   staffProfiles        StaffProfile[]
+  duties               Duty[]
+  rotaPatterns         RotaPattern[]
+  shiftAssignments     ShiftAssignment[]
+  leaveRequests        LeaveRequest[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -202,6 +206,7 @@ model Department {
   eventBriefs   EventBrief[]
   checklists    Checklist[]
   staffProfiles StaffProfile[]
+  rotaPatterns  RotaPattern[]
 
   @@unique([propertyId, code])
   @@unique([propertyId, id])
@@ -328,6 +333,7 @@ model User {
   checklistRunsDone    ChecklistRun[]     @relation("ChecklistRunDoneBy")
   staffProfiles        StaffProfile[]     @relation("StaffLogin")
   staffManaged         StaffProfile[]     @relation("StaffManager")
+  leaveDecided         LeaveRequest[]     @relation("LeaveDecidedBy")
   lostFoundEvents      LostFoundEvent[]   @relation("LostEventBy")
   lostFoundCustody     LostFoundEvent[]   @relation("LostEventCustodian")
   handoversWritten     HandoverNote[]     @relation("HandoverWriter")
@@ -2642,6 +2648,9 @@ model StaffProfile {
   department     Department?          @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   manager        User?                @relation("StaffManager", fields: [managerId], references: [id], onDelete: Restrict)
   certifications StaffCertification[]
+  duties         Duty[]
+  shifts         ShiftAssignment[]
+  leaveRequests  LeaveRequest[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, userId])
@@ -2668,6 +2677,105 @@ model StaffCertification {
   @@index([staffId])
   @@index([expiresOn])
   @@map("staff_certifications")
+}
+
+/// A standing duty a manager gives to a member of staff, with no rota (M7-02), e.g. "Open the
+/// bar store, Monday to Saturday from 08:00".
+model Duty {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  staffId    String   @map("staff_id") @db.Uuid
+  title      String
+  notes      String?
+  /// ISO weekdays (1 Monday ... 7 Sunday); empty means every day.
+  weekdays   Int[]
+  /// "HH:MM", optional.
+  startTime  String?  @map("start_time")
+  endTime    String?  @map("end_time")
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  staff    StaffProfile @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, active])
+  @@index([staffId])
+  @@map("duties")
+}
+
+/// A shift of a department's rota (M7-03), e.g. Morning 07:00-15:00. A department has a rota
+/// when it has active shifts.
+model RotaPattern {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @map("property_id") @db.Uuid
+  departmentId String   @map("department_id") @db.Uuid
+  name         String
+  /// "HH:MM"; an end before the start runs past midnight.
+  startTime    String   @map("start_time")
+  endTime      String   @map("end_time")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property    Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  department  Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  assignments ShiftAssignment[]
+
+  @@unique([departmentId, name])
+  @@index([propertyId])
+  @@map("rota_patterns")
+}
+
+/// A member of staff on a shift on a date (M7-03). Drafts are published by week or month.
+/// Approved leave removes them (REMOVED, with the leave request).
+model ShiftAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  propertyId     String    @map("property_id") @db.Uuid
+  patternId      String    @map("pattern_id") @db.Uuid
+  staffId        String    @map("staff_id") @db.Uuid
+  date           DateTime  @db.Date
+  /// DRAFT | PUBLISHED | REMOVED
+  status         String    @default("DRAFT")
+  leaveRequestId String?   @map("leave_request_id") @db.Uuid
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  pattern      RotaPattern   @relation(fields: [patternId], references: [id], onDelete: Restrict)
+  staff        StaffProfile  @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  leaveRequest LeaveRequest? @relation(fields: [leaveRequestId], references: [id], onDelete: Restrict)
+
+  // One live slot per shift, person and date: a partial unique index in the migration.
+  @@index([propertyId, date])
+  @@index([staffId, date])
+  @@map("shift_assignments")
+}
+
+/// Leave a member of staff asks for (M7-05); a holder of leave.approve decides.
+model LeaveRequest {
+  id           String    @id @default(uuid()) @db.Uuid
+  propertyId   String    @map("property_id") @db.Uuid
+  staffId      String    @map("staff_id") @db.Uuid
+  /// ANNUAL | SICK | UNPAID | COMPASSIONATE | OTHER
+  type         String
+  startDate    DateTime  @map("start_date") @db.Date
+  endDate      DateTime  @map("end_date") @db.Date
+  reason       String?
+  /// PENDING | APPROVED | REJECTED | CANCELLED
+  status       String    @default("PENDING")
+  decidedById  String?   @map("decided_by_id") @db.Uuid
+  decidedAt    DateTime? @map("decided_at") @db.Timestamptz(6)
+  decisionNote String?   @map("decision_note")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property  Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  staff     StaffProfile      @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  decidedBy User?             @relation("LeaveDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  shifts    ShiftAssignment[]
+
+  @@index([propertyId, status])
+  @@index([staffId, startDate])
+  @@map("leave_requests")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

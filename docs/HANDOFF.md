@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-138 (attendance: clock in and out) is pushed on `feat/T-138-attendance` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: timesheets, pay items and payroll export (M7-06–M7-08).
+T-139 (timesheets, advances and deductions, payroll export) is pushed on `feat/T-139-payroll` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: staff documents (M7-09), the last workforce ticket.

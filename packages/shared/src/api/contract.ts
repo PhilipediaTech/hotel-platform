@@ -51,6 +51,8 @@ export interface RouteContract<
    * pdf answer a file and need `report.export` as well as `permission`.
    */
   exports?: true;
+  /** With `exports`: the permission files need instead of `report.export` (payroll, T-139). */
+  exportPermission?: string;
   /** Platform staff only (PLATFORM_ADMIN_EMAILS, MFA on); never property-scoped (T-100). */
   platform?: true;
   /** A change still allowed while the hotel group is suspended for non-payment (M13-06). */

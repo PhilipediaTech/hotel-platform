@@ -155,6 +155,8 @@ model Property {
   shiftAssignments     ShiftAssignment[]
   leaveRequests        LeaveRequest[]
   attendanceEvents     AttendanceEvent[]
+  timesheets           Timesheet[]
+  payItems             PayItem[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -336,6 +338,10 @@ model User {
   staffManaged         StaffProfile[]     @relation("StaffManager")
   leaveDecided         LeaveRequest[]     @relation("LeaveDecidedBy")
   attendanceRecorded   AttendanceEvent[]  @relation("AttendanceRecordedBy")
+  timesheetsCreated    Timesheet[]        @relation("TimesheetCreatedBy")
+  timesheetsApproved   Timesheet[]        @relation("TimesheetApprovedBy")
+  payItemsRequested    PayItem[]          @relation("PayItemRequestedBy")
+  payItemsDecided      PayItem[]          @relation("PayItemDecidedBy")
   lostFoundEvents      LostFoundEvent[]   @relation("LostEventBy")
   lostFoundCustody     LostFoundEvent[]   @relation("LostEventCustodian")
   handoversWritten     HandoverNote[]     @relation("HandoverWriter")
@@ -2656,6 +2662,8 @@ model StaffProfile {
   shifts         ShiftAssignment[]
   leaveRequests  LeaveRequest[]
   attendance     AttendanceEvent[]
+  timesheets     Timesheet[]
+  payItems       PayItem[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, userId])
@@ -2812,6 +2820,75 @@ model AttendanceEvent {
   @@index([propertyId, at])
   @@index([staffId, at])
   @@map("attendance_events")
+}
+
+/// A member's worked time for a period within one month, from their clocks (M7-06). A manager
+/// approves it with the overtime they accept; payroll exports approved timesheets only.
+model Timesheet {
+  id                      String    @id @default(uuid()) @db.Uuid
+  propertyId              String    @map("property_id") @db.Uuid
+  staffId                 String    @map("staff_id") @db.Uuid
+  periodStart             DateTime  @map("period_start") @db.Date
+  periodEnd               DateTime  @map("period_end") @db.Date
+  /// DRAFT | APPROVED
+  status                  String    @default("DRAFT")
+  workedMinutes           Int       @map("worked_minutes")
+  /// Minutes beyond the daily threshold, as calculated.
+  overtimeMinutes         Int       @map("overtime_minutes")
+  /// What the approver accepted (at most overtimeMinutes).
+  approvedOvertimeMinutes Int?      @map("approved_overtime_minutes")
+  daysWorked              Int       @map("days_worked")
+  /// Clock-ins with no clock-out: not counted.
+  openClocks              Int       @map("open_clocks")
+  /// Per day: [{ date, minutes, overtimeMinutes }].
+  days                    Json
+  calculatedAt            DateTime  @map("calculated_at") @db.Timestamptz(6)
+  note                    String?
+  createdById             String    @map("created_by_id") @db.Uuid
+  approvedById            String?   @map("approved_by_id") @db.Uuid
+  approvedAt              DateTime? @map("approved_at") @db.Timestamptz(6)
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  staff      StaffProfile @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  createdBy  User         @relation("TimesheetCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy User?        @relation("TimesheetApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+
+  // No two timesheets of one person overlap: an exclusion constraint in the migration.
+  @@index([propertyId, periodStart])
+  @@index([staffId, periodStart])
+  @@map("timesheets")
+}
+
+/// An advance or a deduction for a member's pay in a month (M7-07), approved by someone other
+/// than the person who recorded it. Payroll exports approved items only.
+model PayItem {
+  id            String    @id @default(uuid()) @db.Uuid
+  propertyId    String    @map("property_id") @db.Uuid
+  staffId       String    @map("staff_id") @db.Uuid
+  /// ADVANCE | DEDUCTION
+  type          String
+  amountMinor   BigInt    @map("amount_minor")
+  currency      String
+  /// The first day of the pay month it belongs to.
+  payMonth      DateTime  @map("pay_month") @db.Date
+  description   String
+  /// PENDING | APPROVED | REJECTED | CANCELLED
+  status        String    @default("PENDING")
+  requestedById String    @map("requested_by_id") @db.Uuid
+  decidedById   String?   @map("decided_by_id") @db.Uuid
+  decidedAt     DateTime? @map("decided_at") @db.Timestamptz(6)
+  decisionNote  String?   @map("decision_note")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  staff       StaffProfile @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  requestedBy User         @relation("PayItemRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  decidedBy   User?        @relation("PayItemDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, payMonth])
+  @@index([staffId, payMonth])
+  @@map("pay_items")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

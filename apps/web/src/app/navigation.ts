@@ -282,6 +282,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-138',
   },
   {
+    id: 'payroll',
+    path: '/payroll',
+    anyOf: ['timesheet.approve', 'staff.payitem', 'payroll.export'],
+    group: 'admin',
+    screen: 'S36',
+    ticket: 'T-139',
+  },
+  {
     id: 'my-jobs',
     path: '/tasks?assignee=me',
     anyOf: ['task.work'],

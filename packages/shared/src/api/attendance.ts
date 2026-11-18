@@ -67,6 +67,8 @@ export const AttendanceSettings = z
       radiusMeters: z.number().int().min(25).max(5000),
     }),
     privacyNotice: z.string().trim().min(20).max(2000),
+    /** Minutes a day before overtime starts on timesheets (M7-06; T-139). */
+    overtimeAfterMinutes: z.number().int().min(60).max(1440).default(480),
   })
   .refine((v) => !v.network.enabled || v.network.addresses.length > 0, {
     path: ['network', 'addresses'],
@@ -88,6 +90,7 @@ export const DEFAULT_ATTENDANCE_SETTINGS: AttendanceSettings = {
   network: { enabled: false, addresses: [] },
   location: { enabled: false, latitude: null, longitude: null, radiusMeters: 200 },
   privacyNotice: DEFAULT_PRIVACY_NOTICE,
+  overtimeAfterMinutes: 480,
 };
 
 /** The stored settings, or the defaults where they are missing or no longer valid. */

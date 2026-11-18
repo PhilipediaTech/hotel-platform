@@ -128,6 +128,8 @@ export const TENANT_MODELS: Record<string, Scope> = {
   ShiftAssignment: { kind: 'property' },
   LeaveRequest: { kind: 'property' },
   AttendanceEvent: { kind: 'property' },
+  Timesheet: { kind: 'property' },
+  PayItem: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

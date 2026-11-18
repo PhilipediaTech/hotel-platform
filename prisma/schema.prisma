@@ -2804,8 +2804,10 @@ model AttendanceEvent {
   /// IN | OUT
   kind           String
   at             DateTime @db.Timestamptz(6)
-  /// TABLET | PHONE
+  /// TABLET | PHONE | MANUAL (a manager adding a missed clock, T-138a)
   channel        String
+  /// Why a manager added it (MANUAL only).
+  note           String?
   ip             String?
   /// Sent by the phone when location is checked (with the member's consent).
   latitude       Decimal? @db.Decimal(9, 6)

@@ -3281,6 +3281,17 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     query: () => ({ month: '2026-11' }),
     listIds: (body) => (body as { rows: { staff: { id: string } }[] }).rows.map((r) => r.staff.id),
   },
+  addMissedClock: {
+    seed: bAttendance,
+    creates: true,
+    body: (theirs) => ({
+      staffId: theirs['staffId'],
+      kind: 'OUT',
+      at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      note: 'Leak attempt',
+    }),
+    untouched: bAttendanceUnchanged,
+  },
   getMyAttendance: {
     seed: bAttendance,
     listIds: (body) => {

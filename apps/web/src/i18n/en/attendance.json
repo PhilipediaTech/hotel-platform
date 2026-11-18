@@ -2,8 +2,15 @@
   "at": {
     "title": "Attendance",
     "mine": "Clock in and out",
-    "channels": { "TABLET": "Shared tablet", "PHONE": "Phone" },
-    "kinds": { "IN": "In", "OUT": "Out" },
+    "channels": {
+      "TABLET": "Shared tablet",
+      "PHONE": "Phone",
+      "MANUAL": "Added by a manager"
+    },
+    "kinds": {
+      "IN": "In",
+      "OUT": "Out"
+    },
     "inSince": "You're clocked in since {{time}}.",
     "out": "You're not clocked in.",
     "clockIn": "Clock in",
@@ -48,6 +55,20 @@
     "notice": "Privacy notice shown before staff agree",
     "overtimeAfter": "Overtime after (hours a day, on timesheets)",
     "save": "Save settings",
-    "saved": "Saved."
+    "saved": "Saved.",
+    "missed": "Add a missed clock",
+    "missedForm": "Missed clock",
+    "missedHint": "For someone who forgot to clock in or out. Use the time it really happened, at the hotel's local time. It can't change an approved timesheet.",
+    "staff": "Staff member",
+    "choose": "Choose…",
+    "kind": "Clock",
+    "kindNames": {
+      "IN": "Clock-in",
+      "OUT": "Clock-out"
+    },
+    "time": "Time",
+    "missedNote": "Why it was missed (kept with the clock)",
+    "addClock": "Add the clock",
+    "cancel": "Cancel"
   }
 }

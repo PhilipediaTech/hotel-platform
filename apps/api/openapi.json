@@ -14602,6 +14602,142 @@
           "decision"
         ]
       },
+      "AttendanceEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "staff": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "number": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "number",
+              "name"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "IN",
+              "OUT"
+            ]
+          },
+          "at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "TABLET",
+              "PHONE",
+              "MANUAL"
+            ]
+          },
+          "deviceLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "located": {
+            "type": "boolean"
+          },
+          "photoFileId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recordedBy": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "staff",
+          "kind",
+          "at",
+          "channel",
+          "deviceLabel",
+          "ip",
+          "located",
+          "photoFileId",
+          "note",
+          "recordedBy"
+        ]
+      },
+      "ClockCorrectionBody": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "IN",
+              "OUT"
+            ]
+          },
+          "at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "staffId",
+          "kind",
+          "at",
+          "note"
+        ]
+      },
       "MyAttendance": {
         "type": "object",
         "properties": {
@@ -14692,89 +14828,6 @@
           "consentGiven",
           "privacyNotice",
           "recent"
-        ]
-      },
-      "AttendanceEvent": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "$ref": "#/components/schemas/Uuid"
-          },
-          "staff": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "$ref": "#/components/schemas/Uuid"
-              },
-              "number": {
-                "type": "integer"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "number",
-              "name"
-            ]
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "IN",
-              "OUT"
-            ]
-          },
-          "at": {
-            "$ref": "#/components/schemas/Instant"
-          },
-          "channel": {
-            "type": "string",
-            "enum": [
-              "TABLET",
-              "PHONE"
-            ]
-          },
-          "deviceLabel": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "ip": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "located": {
-            "type": "boolean"
-          },
-          "photoFileId": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Uuid"
-              },
-              {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "staff",
-          "kind",
-          "at",
-          "channel",
-          "deviceLabel",
-          "ip",
-          "located",
-          "photoFileId"
         ]
       },
       "ClockBody": {
@@ -14874,12 +14927,35 @@
                 "since"
               ]
             }
+          },
+          "staff": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "number": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "number",
+                "name"
+              ]
+            }
           }
         },
         "required": [
           "date",
           "events",
-          "inNow"
+          "inNow",
+          "staff"
         ]
       },
       "AttendanceSettings": {
@@ -62123,6 +62199,129 @@
           },
           "409": {
             "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/corrections": {
+      "post": {
+        "operationId": "addMissedClock",
+        "summary": "Add a clock-in or clock-out someone missed, with a note (T-138a)",
+        "tags": [
+          "Staff"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Added by T-138a: a manager records a missed clock at the time it happened, up to 62 days back. It must keep the clocks alternating, may not fall in an approved timesheet, and is never for your own clocks. Draft timesheets it touches are added up again. Audited.",
+        "x-permission": "timesheet.approve",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClockCorrectionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
             "content": {
               "application/json": {
                 "schema": {

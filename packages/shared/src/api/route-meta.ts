@@ -318,6 +318,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   cancelLeave: {"operationId":"cancelLeave","method":"post","path":"/leave-requests/{leaveId}/cancel","propertyScoped":true},
   listLeave: {"operationId":"listLeave","method":"get","path":"/leave-requests","propertyScoped":true},
   decideLeave: {"operationId":"decideLeave","method":"post","path":"/leave-requests/{leaveId}/decision","body":true,"propertyScoped":true},
+  addMissedClock: {"operationId":"addMissedClock","method":"post","path":"/attendance/corrections","body":true,"propertyScoped":true,"idempotent":true},
   getMyAttendance: {"operationId":"getMyAttendance","method":"get","path":"/attendance/me","propertyScoped":true},
   clockAttendance: {"operationId":"clockAttendance","method":"post","path":"/attendance/clock","body":true,"propertyScoped":true,"idempotent":true},
   setLocationConsent: {"operationId":"setLocationConsent","method":"post","path":"/attendance/consent","body":true,"propertyScoped":true},

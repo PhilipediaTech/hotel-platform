@@ -156,9 +156,10 @@ export function mountRoute<R extends RouteContract>(
     // M12-06: a report as CSV or PDF also needs the export permission.
     const format = (query as { format?: unknown } | undefined)?.format;
     if (route.exports && format !== undefined && format !== 'json') {
-      if (!tenant?.permissions.has(EXPORT_PERMISSION)) {
+      const needed = route.exportPermission ?? EXPORT_PERMISSION;
+      if (!tenant?.permissions.has(needed)) {
         throw new AppError('FORBIDDEN', 'Your role does not allow exports.', {
-          permission: EXPORT_PERMISSION,
+          permission: needed,
         });
       }
     }

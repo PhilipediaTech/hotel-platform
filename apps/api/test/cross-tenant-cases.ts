@@ -1428,6 +1428,58 @@ async function bAttendanceUnchanged(db: Db, world: TenantWorld) {
   expect(settings.attendance?.network).toEqual({ enabled: true, addresses: ['198.51.100.7'] });
 }
 
+/** B's draft timesheet and pending advance for November 2026 (T-139). */
+async function bPayroll(db: Db, world: TenantWorld, propertyId: string) {
+  const staff = await db.staffProfile.create({
+    data: {
+      propertyId,
+      number: 1,
+      name: 'Their cook',
+      jobTitle: 'Cook',
+      employmentType: 'HOURLY',
+      startDate: new Date('2026-01-01T00:00:00Z'),
+    },
+  });
+  const timesheet = await db.timesheet.create({
+    data: {
+      propertyId,
+      staffId: staff.id,
+      periodStart: new Date('2026-11-01T00:00:00Z'),
+      periodEnd: new Date('2026-11-30T00:00:00Z'),
+      workedMinutes: 600,
+      overtimeMinutes: 120,
+      daysWorked: 1,
+      openClocks: 0,
+      days: [{ date: '2026-11-02', minutes: 600, overtimeMinutes: 120 }],
+      calculatedAt: new Date(),
+      createdById: world.bStaff.id,
+    },
+  });
+  const item = await db.payItem.create({
+    data: {
+      propertyId,
+      staffId: staff.id,
+      type: 'ADVANCE',
+      amountMinor: 100000n,
+      currency: 'NGN',
+      payMonth: new Date('2026-11-01T00:00:00Z'),
+      description: 'Their advance',
+      requestedById: world.bStaff.id,
+    },
+  });
+  return { staffId: staff.id, timesheetId: timesheet.id, payItemId: item.id };
+}
+
+async function bPayrollUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.timesheet.findMany({ where })).map((t) => [t.status, t.workedMinutes])).toEqual([
+    ['DRAFT', 600],
+  ]);
+  expect((await db.payItem.findMany({ where })).map((p) => [p.type, p.status])).toEqual([
+    ['ADVANCE', 'PENDING'],
+  ]);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -3095,6 +3147,58 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bStaffUnchanged,
   },
   removeCertification: { seed: bStaff, untouched: bStaffUnchanged },
+  listTimesheets: {
+    seed: bPayroll,
+    query: () => ({ month: '2026-11' }),
+    listIds: (body) => {
+      const b = body as { data: { id: string }[]; staff: { id: string }[] };
+      return [...b.data, ...b.staff].map((x) => x.id);
+    },
+  },
+  createTimesheet: {
+    seed: bPayroll,
+    creates: true,
+    body: (theirs) => ({ staffId: theirs['staffId'], from: '2026-12-01', to: '2026-12-07' }),
+    untouched: bPayrollUnchanged,
+  },
+  recalculateTimesheet: { seed: bPayroll, untouched: bPayrollUnchanged },
+  approveTimesheet: {
+    seed: bPayroll,
+    body: () => ({ approvedOvertimeMinutes: 0, note: 'Leak' }),
+    untouched: bPayrollUnchanged,
+  },
+  deleteTimesheet: { seed: bPayroll, untouched: bPayrollUnchanged },
+  listPayItems: {
+    seed: bPayroll,
+    query: () => ({ month: '2026-11' }),
+    listIds: (body) => {
+      const b = body as { data: { id: string }[]; staff: { id: string }[] };
+      return [...b.data, ...b.staff].map((x) => x.id);
+    },
+  },
+  createPayItem: {
+    seed: bPayroll,
+    creates: true,
+    body: (theirs) => ({
+      staffId: theirs['staffId'],
+      type: 'DEDUCTION',
+      amountMinor: '100',
+      month: '2026-11',
+      description: 'Leak',
+    }),
+    untouched: bPayrollUnchanged,
+  },
+  decidePayItem: {
+    seed: bPayroll,
+    body: () => ({ decision: 'APPROVE' }),
+    untouched: bPayrollUnchanged,
+  },
+  cancelPayItem: { seed: bPayroll, untouched: bPayrollUnchanged },
+  getPayrollExport: {
+    seed: bPayroll,
+    query: () => ({ month: '2026-11' }),
+    listIds: (body) => (body as { rows: { staff: { id: string } }[] }).rows.map((r) => r.staff.id),
+  },
   getMyAttendance: {
     seed: bAttendance,
     listIds: (body) => {

@@ -493,6 +493,21 @@ function SettingsFields(props: { initial: AttendanceSettings; yourAddress: strin
           </div>
         </>
       )}
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="at-overtime">{t('at.overtimeAfter')}</Label>
+        <Input
+          id="at-overtime"
+          type="number"
+          min={1}
+          max={24}
+          step={0.5}
+          className="max-w-32"
+          value={s.overtimeAfterMinutes / 60}
+          onChange={(e) =>
+            setS({ ...s, overtimeAfterMinutes: Math.round(Number(e.target.value) * 60) })
+          }
+        />
+      </div>
       {save.error && <Alert tone="critical">{errorMessage(save.error)}</Alert>}
       {save.isSuccess && <Alert tone="success">{t('at.saved')}</Alert>}
       <div>

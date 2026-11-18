@@ -46,6 +46,7 @@
     "radius": "Radius (metres)",
     "useHere": "Use this device's position",
     "notice": "Privacy notice shown before staff agree",
+    "overtimeAfter": "Overtime after (hours a day, on timesheets)",
     "save": "Save settings",
     "saved": "Saved."
   }

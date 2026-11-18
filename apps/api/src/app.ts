@@ -57,6 +57,7 @@ import { checklistRoutes } from './modules/checklists/routes.ts';
 import { staffRoutes } from './modules/staff/routes.ts';
 import { workforceRoutes } from './modules/workforce/routes.ts';
 import { attendanceRoutes } from './modules/attendance/routes.ts';
+import { payrollRoutes } from './modules/payroll/routes.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
 import { bookingEngineRoutes } from './modules/bookingengine/routes.ts';
@@ -216,6 +217,7 @@ export function createApp({
   api.use(staffRoutes({ db, tenantDb, clock }));
   api.use(workforceRoutes({ tenantDb, clock }));
   api.use(attendanceRoutes({ tenantDb, clock }));
+  api.use(payrollRoutes({ tenantDb, clock }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));

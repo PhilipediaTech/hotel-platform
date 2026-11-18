@@ -1,0 +1,70 @@
+{
+  "pr": {
+    "title": "Timesheets and payroll",
+    "month": "Month",
+    "staff": "Staff member",
+    "choose": "Choose…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "hours": "{{value}} h",
+    "noPayRule": "Nothing here computes pay: the file lists rates and approved figures for your payroll.",
+    "ts": {
+      "title": "Timesheets",
+      "list": "Timesheets this month",
+      "none": "No timesheets this month.",
+      "add": "Add a timesheet",
+      "form": "Timesheet",
+      "from": "From",
+      "to": "To",
+      "create": "Add up the clocks",
+      "statuses": { "DRAFT": "Draft", "APPROVED": "Approved" },
+      "summary": "{{days}} days · {{worked}} worked · {{overtime}} overtime (after {{after}} a day)",
+      "open_one": "{{count}} clock-in without a clock-out is not counted.",
+      "open_other": "{{count}} clock-ins without a clock-out are not counted.",
+      "approvedOvertime": "{{value}} overtime accepted",
+      "accept": "Overtime accepted (minutes)",
+      "note": "Note",
+      "approve": "Approve",
+      "recalculate": "Add up again",
+      "remove": "Remove",
+      "approvedBy": "Approved by {{name}}"
+    },
+    "pi": {
+      "title": "Advances and deductions",
+      "list": "Advances and deductions this month",
+      "none": "None this month.",
+      "add": "Record an advance or deduction",
+      "form": "Advance or deduction",
+      "type": "Type",
+      "types": { "ADVANCE": "Advance", "DEDUCTION": "Deduction" },
+      "amount": "Amount",
+      "description": "Description",
+      "statuses": {
+        "PENDING": "Waiting for approval",
+        "APPROVED": "Approved",
+        "REJECTED": "Rejected",
+        "CANCELLED": "Withdrawn"
+      },
+      "recordedBy": "Recorded by {{name}}",
+      "decidedBy": "{{status}} by {{name}}",
+      "note": "Note (needed to reject)",
+      "approve": "Approve",
+      "reject": "Reject",
+      "withdraw": "Withdraw"
+    },
+    "ex": {
+      "title": "Payroll file",
+      "table": "Payroll for the month",
+      "number": "No.",
+      "name": "Name",
+      "type": "Type",
+      "rate": "Pay rate",
+      "worked": "Hours",
+      "overtime": "Overtime",
+      "advances": "Advances",
+      "deductions": "Deductions",
+      "waiting": "Not in the file until approved: {{timesheets}} draft timesheets, {{items}} advances or deductions waiting.",
+      "download": "Download CSV"
+    }
+  }
+}

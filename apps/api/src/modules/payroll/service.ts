@@ -614,3 +614,32 @@ export function payrollCsv(r: Payroll): Uint8Array {
     ]),
   ]);
 }
+
+// ── Clock corrections (T-138a) ─────────────────────────────────────────────────────────
+
+const covering = (dates: string[]): Prisma.TimesheetWhereInput => ({
+  OR: dates.map((d) => ({ periodStart: { lte: dbDate(d) }, periodEnd: { gte: dbDate(d) } })),
+});
+
+/** An approved timesheet of theirs that covers one of the dates, if any. */
+export async function approvedTimesheetCovering(tx: Client, staffId: string, dates: string[]) {
+  return tx.timesheet.findFirst({ where: { staffId, status: 'APPROVED', ...covering(dates) } });
+}
+
+/** Adds up again the draft timesheets of theirs that cover the dates. */
+export async function recalculateDraftsCovering(
+  tx: Client,
+  propertyId: string,
+  staffId: string,
+  dates: string[],
+  now: Date,
+) {
+  const drafts = await tx.timesheet.findMany({
+    where: { staffId, status: 'DRAFT', ...covering(dates) },
+  });
+  for (const t of drafts) {
+    const figures = await calculate(tx, propertyId, staffId, day(t.periodStart), day(t.periodEnd));
+    await tx.timesheet.update({ where: { id: t.id }, data: { ...figures, calculatedAt: now } });
+  }
+  return drafts.length;
+}

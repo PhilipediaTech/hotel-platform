@@ -38,6 +38,9 @@ export function attendanceRoutes(deps: attendance.AttendanceDeps): Router {
   mountRoute(router, r.updateAttendanceSettings, ({ body }, { tenant, req }) =>
     attendance.updateAttendanceSettings(deps, tenantFrom(tenant), ipOf(req), body),
   );
+  mountRoute(router, r.addMissedClock, ({ body }, { tenant }) =>
+    attendance.addMissedClock(deps, tenantFrom(tenant), body),
+  );
   // After /attendance/me and /attendance/settings.
   mountRoute(router, r.listAttendance, ({ query }, { tenant }) =>
     attendance.listAttendance(deps, tenantFrom(tenant), query),

@@ -1,0 +1,35 @@
+{
+  "pos": {
+    "setup": {
+      "title": "Outlets and menus",
+      "intro": "Prices are in {{currency}} and post to the item's revenue code, with its taxes, like any charge. Nothing is deleted: switch things off instead.",
+      "outlets": "Outlets",
+      "none": "No outlets yet.",
+      "addOutlet": "Add an outlet",
+      "outletForm": "Outlet",
+      "code": "Code",
+      "name": "Name",
+      "save": "Save",
+      "cancel": "Cancel",
+      "off": "switched off",
+      "switchOff": "Switch off",
+      "switchOn": "Switch on",
+      "addCategory": "Add a section",
+      "categoryForm": "Menu section",
+      "categoryName": "Section name",
+      "addItem": "Add an item",
+      "itemForm": "Menu item",
+      "itemName": "Item name",
+      "price": "Price",
+      "revenueCode": "Revenue code",
+      "choose": "Choose…",
+      "newPrice": "New price",
+      "changePrice": "Change price",
+      "options": "Options",
+      "addOption": "Add option",
+      "optionName": "Option",
+      "optionPrice": "Extra price (optional)",
+      "free": "no charge"
+    }
+  }
+}

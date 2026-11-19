@@ -19,6 +19,11 @@ export const ATTENDANCE_KINDS = ['IN', 'OUT'] as const;
 export type AttendanceKind = (typeof ATTENDANCE_KINDS)[number];
 export const ATTENDANCE_CHANNELS = ['TABLET', 'PHONE'] as const;
 export type AttendanceChannel = (typeof ATTENDANCE_CHANNELS)[number];
+/** How a clock was recorded: by the member, or added later by a manager (T-138a). */
+export const ATTENDANCE_EVENT_CHANNELS = ['TABLET', 'PHONE', 'MANUAL'] as const;
+export type AttendanceEventChannel = (typeof ATTENDANCE_EVENT_CHANNELS)[number];
+/** How far back a missed clock can be added. */
+export const MAX_CORRECTION_DAYS = 62;
 export const MAX_ALLOWED_ADDRESSES = 20;
 
 export const DEFAULT_PRIVACY_NOTICE =
@@ -107,12 +112,15 @@ export const AttendanceEventItem = z
     staff: StaffRef,
     kind: z.enum(ATTENDANCE_KINDS),
     at: Instant,
-    channel: z.enum(ATTENDANCE_CHANNELS),
+    channel: z.enum(ATTENDANCE_EVENT_CHANNELS),
     deviceLabel: z.string().nullable(),
     /** Shown only to managers (timesheet.approve). */
     ip: z.string().nullable(),
     located: z.boolean(),
     photoFileId: Uuid.nullable(),
+    /** A manager's reason for a clock they added (MANUAL). */
+    note: z.string().nullable(),
+    recordedBy: z.object({ id: Uuid, name: z.string() }),
   })
   .meta({ id: 'AttendanceEvent' });
 
@@ -160,8 +168,20 @@ export const AttendanceDay = z
     events: z.array(AttendanceEventItem),
     /** Clocked in now (last event IN), oldest first. */
     inNow: z.array(StaffRef.extend({ since: Instant })),
+    /** Staff a missed clock can be added for (T-138a). */
+    staff: z.array(StaffRef),
   })
   .meta({ id: 'AttendanceDay' });
+
+export const ClockCorrectionBody = z
+  .object({
+    staffId: Uuid,
+    kind: z.enum(ATTENDANCE_KINDS),
+    /** When it really happened. */
+    at: Instant,
+    note: z.string().trim().min(3).max(500),
+  })
+  .meta({ id: 'ClockCorrectionBody' });
 
 const ADDED = 'Tab 4 lists /attendance/clock; the request and response are designed in T-138.';
 const CLOCK = { tags: ['Staff'], propertyScoped: true as const, permission: 'attendance.clock' };
@@ -237,7 +257,27 @@ export const updateAttendanceSettings = defineRoute({
   response: z.object({ settings: AttendanceSettings, yourAddress: z.string().nullable() }),
 });
 
+export const addMissedClock = defineRoute({
+  tags: ['Staff'],
+  propertyScoped: true,
+  permission: 'timesheet.approve',
+  operationId: 'addMissedClock',
+  method: 'post',
+  path: '/attendance/corrections',
+  summary: 'Add a clock-in or clock-out someone missed, with a note (T-138a)',
+  description:
+    `Added by T-138a: a manager records a missed clock at the time it happened, up to ${MAX_CORRECTION_DAYS} days back. ` +
+    'It must keep the clocks alternating, may not fall in an approved timesheet, and is never for your own clocks. ' +
+    'Draft timesheets it touches are added up again. Audited.',
+  idempotent: true,
+  status: 201,
+  body: ClockCorrectionBody,
+  response: AttendanceEventItem,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
 export const ATTENDANCE_ROUTES = {
+  addMissedClock,
   getMyAttendance,
   clockAttendance,
   setLocationConsent,

@@ -17,10 +17,13 @@
       "from": "From",
       "to": "To",
       "create": "Add up the clocks",
-      "statuses": { "DRAFT": "Draft", "APPROVED": "Approved" },
+      "statuses": {
+        "DRAFT": "Draft",
+        "APPROVED": "Approved"
+      },
       "summary": "{{days}} days · {{worked}} worked · {{overtime}} overtime (after {{after}} a day)",
-      "open_one": "{{count}} clock-in without a clock-out is not counted.",
-      "open_other": "{{count}} clock-ins without a clock-out are not counted.",
+      "open_one": "{{count}} clock-in without a clock-out is not counted. Add the missing clock under Attendance, then add up again.",
+      "open_other": "{{count}} clock-ins without a clock-out are not counted. Add the missing clocks under Attendance, then add up again.",
       "approvedOvertime": "{{value}} overtime accepted",
       "accept": "Overtime accepted (minutes)",
       "note": "Note",
@@ -36,7 +39,10 @@
       "add": "Record an advance or deduction",
       "form": "Advance or deduction",
       "type": "Type",
-      "types": { "ADVANCE": "Advance", "DEDUCTION": "Deduction" },
+      "types": {
+        "ADVANCE": "Advance",
+        "DEDUCTION": "Deduction"
+      },
       "amount": "Amount",
       "description": "Description",
       "statuses": {

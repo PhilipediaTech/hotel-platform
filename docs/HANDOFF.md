@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-140 (staff documents) is pushed on `feat/T-140-staff-documents` (run `npm run db:deploy` and `npm run db:generate` after merging). Workforce (M7) is complete. Next: lite POS (M8-01–M8-05).
+T-141 (POS outlets and menus) is pushed on `feat/T-141-pos-setup`, built on `feat/T-138a-clock-corrections`: merge T-138a first (run `npm run db:deploy` and `npm run db:generate` after each). Next: POS shifts, orders, settlement and close (M8-02, M8-03, M8-05).

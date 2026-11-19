@@ -4,6 +4,10 @@ import {
   distanceMeters,
   zonedInstant,
   type AttendanceChannel,
+  type AttendanceEventChannel,
+  type ClockCorrectionBody,
+  localDate,
+  MAX_CORRECTION_DAYS,
   type AttendanceEventItem,
   type AttendanceKind,
   type AttendanceSettings,
@@ -19,6 +23,7 @@ import { AppError } from '../../core/errors.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { propertyToday } from '../availability/inventory.ts';
+import { approvedTimesheetCovering, recalculateDraftsCovering } from '../payroll/service.ts';
 import { addressMatches, isAddressEntry } from './ip.ts';
 
 // Attendance (PRD M7-04, M7 rules and acceptance; T-138). Tab 3 names attendance_events for
@@ -51,6 +56,7 @@ const invalid = (path: string, message: string) =>
 
 const EVENT_INCLUDE = {
   staff: { select: { id: true, number: true, name: true } },
+  recordedBy: { select: { id: true, name: true } },
 } as const satisfies Prisma.AttendanceEventInclude;
 type EventRow = Prisma.AttendanceEventGetPayload<{ include: typeof EVENT_INCLUDE }>;
 
@@ -60,11 +66,13 @@ function eventItem(e: EventRow): z.input<typeof AttendanceEventItem> {
     staff: e.staff,
     kind: e.kind as AttendanceKind,
     at: iso(e.at),
-    channel: e.channel as AttendanceChannel,
+    channel: e.channel as AttendanceEventChannel,
     deviceLabel: e.deviceLabel,
     ip: e.ip,
     located: e.latitude !== null,
     photoFileId: e.photoFileId,
+    note: e.note,
+    recordedBy: e.recordedBy,
   };
 }
 
@@ -330,7 +338,7 @@ export async function listAttendance(
   const date = query.date ?? (await propertyToday(db, tenant.propertyId, deps.clock));
   const from = zonedInstant(date, '00:00', property.timeZone);
   const to = zonedInstant(addDays(date, 1), '00:00', property.timeZone);
-  const [events, lastPerStaff] = await Promise.all([
+  const [events, lastPerStaff, staff] = await Promise.all([
     db.attendanceEvent.findMany({
       where: { at: { gte: from, lt: to } },
       include: EVENT_INCLUDE,
@@ -341,6 +349,11 @@ export async function listAttendance(
       orderBy: [{ staffId: 'asc' }, { at: 'desc' }, { createdAt: 'desc' }],
       include: EVENT_INCLUDE,
     }),
+    db.staffProfile.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, number: true, name: true },
+      orderBy: { name: 'asc' },
+    }),
   ]);
   return {
     date,
@@ -349,6 +362,7 @@ export async function listAttendance(
       .filter((e) => e.kind === 'IN')
       .sort((a, b) => a.at.getTime() - b.at.getTime())
       .map((e) => ({ ...e.staff, since: iso(e.at) })),
+    staff,
   };
 }
 
@@ -389,4 +403,96 @@ export async function updateAttendanceSettings(
     });
   });
   return getAttendanceSettings(deps, tenant, ip);
+}
+
+// ── Missed clocks (T-138a) ─────────────────────────────────────────────────────────────
+
+/**
+ * A manager adds a clock-in or clock-out someone missed, at the time it happened (MANUAL,
+ * with a note). The clocks must still alternate around it, it may not fall in an approved
+ * timesheet (approved stays final), and nobody corrects their own clocks. Draft timesheets it
+ * touches are added up again.
+ */
+export async function addMissedClock(
+  deps: AttendanceDeps,
+  tenant: TenantContext,
+  body: z.output<typeof ClockCorrectionBody>,
+) {
+  const at = new Date(body.at);
+  const now = deps.clock();
+  if (at > now) throw invalid('body.at', 'A missed clock cannot be in the future');
+  if (now.getTime() - at.getTime() > MAX_CORRECTION_DAYS * 86_400_000) {
+    throw invalid('body.at', `At most ${MAX_CORRECTION_DAYS} days back`);
+  }
+  return deps.tenantDb.$transaction(async (tx) => {
+    const staff = await tx.staffProfile.findFirst({ where: { id: body.staffId } });
+    if (!staff) throw new AppError('NOT_FOUND', 'Staff member not found.');
+    if (staff.userId === tenant.userId) {
+      throw new AppError('FORBIDDEN', 'Someone else must correct your own clocks.');
+    }
+    await tx.$queryRaw`SELECT id FROM staff_profiles WHERE id = ${staff.id}::uuid FOR UPDATE`;
+    const [before, after] = await Promise.all([
+      tx.attendanceEvent.findFirst({
+        where: { staffId: staff.id, at: { lte: at } },
+        orderBy: [{ at: 'desc' }, { createdAt: 'desc' }],
+      }),
+      tx.attendanceEvent.findFirst({
+        where: { staffId: staff.id, at: { gt: at } },
+        orderBy: [{ at: 'asc' }, { createdAt: 'asc' }],
+      }),
+    ]);
+    const word = (k: string) => (k === 'IN' ? 'clock-in' : 'clock-out');
+    if (body.kind === 'IN' && before?.kind === 'IN') {
+      throw invalid(
+        'body.kind',
+        `They had already clocked in at ${iso(before.at)}: add the clock-out first`,
+      );
+    }
+    if (body.kind === 'OUT' && before?.kind !== 'IN') {
+      throw invalid('body.kind', 'There is no clock-in before this time to close');
+    }
+    if (after && after.kind === body.kind) {
+      throw invalid(
+        'body.at',
+        `Their next clock, at ${iso(after.at)}, is also a ${word(body.kind)}`,
+      );
+    }
+    const { property } = await settingsOf(tx, tenant.propertyId);
+    // Minutes count on the day the shift began: for a clock-out, the clock-in's date too.
+    const dates = [localDate(at, property.timeZone)];
+    if (body.kind === 'OUT' && before) dates.push(localDate(before.at, property.timeZone));
+    const approved = await approvedTimesheetCovering(tx, staff.id, dates);
+    if (approved) {
+      throw new AppError(
+        'STATE_TRANSITION_INVALID',
+        'This falls in an approved timesheet, which stays as approved.',
+        { timesheetId: approved.id },
+      );
+    }
+    const event = await tx.attendanceEvent.create({
+      data: {
+        staffId: staff.id,
+        kind: body.kind,
+        at,
+        channel: 'MANUAL',
+        note: body.note,
+        recordedById: tenant.userId,
+      } as unknown as Prisma.AttendanceEventUncheckedCreateInput, // tenant IDs come from the client
+      include: EVENT_INCLUDE,
+    });
+    const recalculated = await recalculateDraftsCovering(
+      tx,
+      tenant.propertyId,
+      staff.id,
+      dates,
+      now,
+    );
+    await recordAudit(tx, {
+      action: 'attendance.clock_added',
+      entityType: 'staff_profile',
+      entityId: staff.id,
+      after: { eventId: event.id, kind: body.kind, at: iso(at), note: body.note, recalculated },
+    });
+    return eventItem(event);
+  });
 }

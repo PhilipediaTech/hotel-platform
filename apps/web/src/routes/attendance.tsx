@@ -1,5 +1,7 @@
 import {
+  ATTENDANCE_KINDS,
   EMPLOYMENT_TYPES,
+  zonedInstant,
   type AttendanceKind,
   type AttendanceSettings,
   type EmploymentType,
@@ -271,6 +273,8 @@ function Day() {
                         e.deviceLabel,
                         e.ip,
                         e.located ? t('at.located') : null,
+                        e.channel === 'MANUAL' ? e.recordedBy.name : null,
+                        e.note,
                       ]
                         .filter(Boolean)
                         .join(', ')}
@@ -291,7 +295,135 @@ function Day() {
           </div>
         </div>
       )}
+      {data && data.staff.length > 0 && <MissedClockForm staff={data.staff} date={data.date} />}
     </section>
+  );
+}
+
+/** A manager adds a clock someone forgot (T-138a), at the property's local time. */
+function MissedClockForm(props: {
+  staff: { id: string; number: number; name: string }[];
+  date: string;
+}) {
+  const { t } = useTranslation();
+  const root = useRoot();
+  const queryClient = useQueryClient();
+  const session = useSession();
+  const property = session.properties.find((p) => p.id === session.currentPropertyId);
+  const [open, setOpen] = useState(false);
+  const [staffId, setStaffId] = useState('');
+  const [kind, setKind] = useState<AttendanceKind>('OUT');
+  const [date, setDate] = useState(props.date);
+  const [time, setTime] = useState('');
+  const [note, setNote] = useState('');
+  const save = useMutation({
+    mutationFn: () =>
+      api.call('addMissedClock', {
+        body: {
+          staffId,
+          kind,
+          at: zonedInstant(date, time, property?.timeZone ?? 'UTC')
+            .toISOString()
+            .replace(/\.\d{3}Z$/, 'Z'),
+          note,
+        },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: root });
+      setOpen(false);
+      setTime('');
+      setNote('');
+    },
+  });
+  if (!open) {
+    return (
+      <Button variant="secondary" className="mt-3" onClick={() => setOpen(true)}>
+        {t('at.missed')}
+      </Button>
+    );
+  }
+  return (
+    <form
+      aria-label={t('at.missedForm')}
+      className="mt-3 grid gap-3 rounded-md border border-border bg-surface p-3 text-sm sm:grid-cols-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <p className="text-text-muted sm:col-span-3">{t('at.missedHint')}</p>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="mc-staff">{t('at.staff')}</Label>
+        <select
+          id="mc-staff"
+          className="h-11 rounded-md border border-border bg-surface px-3 text-sm"
+          required
+          value={staffId}
+          onChange={(e) => setStaffId(e.target.value)}
+        >
+          <option value="">{t('at.choose')}</option>
+          {props.staff.map((s) => (
+            <option key={s.id} value={s.id}>
+              ST-{s.number} {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="mc-kind">{t('at.kind')}</Label>
+        <select
+          id="mc-kind"
+          className="h-11 rounded-md border border-border bg-surface px-3 text-sm"
+          value={kind}
+          onChange={(e) => setKind(e.target.value as AttendanceKind)}
+        >
+          {ATTENDANCE_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {t(`at.kindNames.${k}`)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex gap-2">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="mc-date">{t('at.date')}</Label>
+          <Input
+            id="mc-date"
+            type="date"
+            required
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="mc-time">{t('at.time')}</Label>
+          <Input
+            id="mc-time"
+            type="time"
+            required
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1 sm:col-span-3">
+        <Label htmlFor="mc-note">{t('at.missedNote')}</Label>
+        <Input id="mc-note" required value={note} onChange={(e) => setNote(e.target.value)} />
+      </div>
+      {save.error && (
+        <Alert tone="critical" className="sm:col-span-3">
+          {errorMessage(save.error)}
+        </Alert>
+      )}
+      <div className="flex gap-2 sm:col-span-3">
+        <Button type="submit" disabled={save.isPending}>
+          {t('at.addClock')}
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+          {t('at.cancel')}
+        </Button>
+      </div>
+    </form>
   );
 }
 

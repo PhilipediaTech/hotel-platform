@@ -42,6 +42,8 @@ const event = {
   ip: null,
   located: false,
   photoFileId: id(30),
+  note: null,
+  recordedBy: { id: BISI.id, name: BISI.name },
 };
 
 const calls: { key: string; body: unknown }[] = [];
@@ -178,6 +180,43 @@ describe('Attendance (S36)', () => {
     expect(sent('PUT /attendance/settings')[0]?.body).toMatchObject({
       phoneAllowed: true,
       network: { enabled: true, addresses: ['102.89.4.10'] },
+    });
+  }, 15_000);
+});
+
+describe('Missed clocks (T-138a)', () => {
+  it("lets a manager add a forgotten clock-out at the hotel's local time", async () => {
+    stub(['timesheet.approve']);
+    handlers['GET /attendance'] = () =>
+      json(200, { date: '2026-11-10', events: [], inNow: [], staff: [BISI] });
+    handlers['POST /attendance/corrections'] = () =>
+      json(201, {
+        ...event,
+        kind: 'OUT',
+        channel: 'MANUAL',
+        photoFileId: null,
+        deviceLabel: null,
+        note: 'Forgot',
+        recordedBy: { id: id(90), name: 'Grace Manager' },
+      });
+    const user = userEvent.setup();
+    renderAt('/attendance');
+    await user.click(await screen.findByRole('button', { name: 'Add a missed clock' }));
+    const form = screen.getByRole('form', { name: 'Missed clock' });
+    await user.selectOptions(within(form).getByLabelText('Staff member'), BISI.id);
+    await user.type(within(form).getByLabelText('Time'), '16:00');
+    await user.type(
+      within(form).getByLabelText('Why it was missed (kept with the clock)'),
+      'Forgot',
+    );
+    await user.click(within(form).getByRole('button', { name: 'Add the clock' }));
+    await waitFor(() => expect(sent('POST /attendance/corrections')).toHaveLength(1));
+    // Lagos is UTC+1.
+    expect(sent('POST /attendance/corrections')[0]?.body).toEqual({
+      staffId: BISI.id,
+      kind: 'OUT',
+      at: '2026-11-10T15:00:00Z',
+      note: 'Forgot',
     });
   }, 15_000);
 });

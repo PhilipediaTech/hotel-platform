@@ -158,6 +158,10 @@ model Property {
   timesheets           Timesheet[]
   payItems             PayItem[]
   staffDocuments       StaffDocument[]
+  outlets              Outlet[]
+  menuCategories       MenuCategory[]
+  menuItems            MenuItem[]
+  menuModifiers        MenuModifier[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -820,6 +824,7 @@ model RevenueCode {
   folioLines        FolioLine[]
   services          Service[]
   routingRules      RoutingRule[]
+  menuItems         MenuItem[]
 
   @@unique([propertyId, code])
   // Target of composite foreign keys: a tax rule posts to a code of its own property.
@@ -2919,6 +2924,76 @@ model StaffDocument {
 
   @@index([staffId])
   @@map("staff_documents")
+}
+
+/// A point of sale: restaurant, bar, pool bar, room service (M8-01).
+model Outlet {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  code       String
+  name       String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property   Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  categories MenuCategory[]
+
+  @@unique([propertyId, code])
+  @@map("outlets")
+}
+
+/// A section of an outlet's menu (M8-01), e.g. Starters, Drinks.
+model MenuCategory {
+  id         String  @id @default(uuid()) @db.Uuid
+  propertyId String  @map("property_id") @db.Uuid
+  outletId   String  @map("outlet_id") @db.Uuid
+  name       String
+  sortOrder  Int     @default(0) @map("sort_order")
+  active     Boolean @default(true)
+
+  property Property   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  outlet   Outlet     @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  items    MenuItem[]
+
+  @@unique([outletId, name])
+  @@map("menu_categories")
+}
+
+/// Something an outlet sells (M8-01), priced in base currency, posting to a revenue code.
+model MenuItem {
+  id            String  @id @default(uuid()) @db.Uuid
+  propertyId    String  @map("property_id") @db.Uuid
+  categoryId    String  @map("category_id") @db.Uuid
+  name          String
+  description   String?
+  priceMinor    BigInt  @map("price_minor")
+  revenueCodeId String  @map("revenue_code_id") @db.Uuid
+  sortOrder     Int     @default(0) @map("sort_order")
+  active        Boolean @default(true)
+
+  property    Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  category    MenuCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  revenueCode RevenueCode    @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
+  modifiers   MenuModifier[]
+
+  @@index([categoryId])
+  @@map("menu_items")
+}
+
+/// An option on an item (M8-01), e.g. "Extra cheese", "No ice"; it may add to the price.
+model MenuModifier {
+  id         String  @id @default(uuid()) @db.Uuid
+  propertyId String  @map("property_id") @db.Uuid
+  itemId     String  @map("item_id") @db.Uuid
+  name       String
+  priceMinor BigInt  @default(0) @map("price_minor")
+  active     Boolean @default(true)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  item     MenuItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([itemId, name])
+  @@map("modifiers")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

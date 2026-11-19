@@ -1542,6 +1542,50 @@ async function bStaffDocsUnchanged(db: Db, world: TenantWorld) {
   expect(settings.staffDocuments?.retention?.CONTRACT).toBe(99);
 }
 
+/** B's outlet with a section, an item on B's revenue code, and an option (T-141). */
+async function bOutlet(db: Db, _world: TenantWorld, propertyId: string) {
+  const code = await db.revenueCode.create({
+    data: { propertyId, code: 'THEIR-FNB', name: 'Their F&B', group: 'FNB', taxRuleIds: [] },
+  });
+  const outlet = await db.outlet.create({
+    data: { propertyId, code: 'THEIRS', name: 'Their bar' },
+  });
+  const category = await db.menuCategory.create({
+    data: { propertyId, outletId: outlet.id, name: 'Their drinks' },
+  });
+  const item = await db.menuItem.create({
+    data: {
+      propertyId,
+      categoryId: category.id,
+      name: 'Their beer',
+      priceMinor: 100000n,
+      revenueCodeId: code.id,
+    },
+  });
+  const modifier = await db.menuModifier.create({
+    data: { propertyId, itemId: item.id, name: 'Their ice' },
+  });
+  return {
+    outletId: outlet.id,
+    categoryId: category.id,
+    itemId: item.id,
+    modifierId: modifier.id,
+    revenueCodeId: code.id,
+  };
+}
+
+async function bOutletUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.outlet.findMany({ where })).map((o) => [o.name, o.active])).toEqual([
+    ['Their bar', true],
+  ]);
+  expect((await db.menuCategory.findMany({ where })).map((c) => c.name)).toEqual(['Their drinks']);
+  expect(
+    (await db.menuItem.findMany({ where })).map((i) => [i.name, i.priceMinor.toString(), i.active]),
+  ).toEqual([['Their beer', '100000', true]]);
+  expect((await db.menuModifier.findMany({ where })).map((m) => m.name)).toEqual(['Their ice']);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -3209,6 +3253,50 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bStaffUnchanged,
   },
   removeCertification: { seed: bStaff, untouched: bStaffUnchanged },
+  listOutlets: {
+    seed: bOutlet,
+    listIds: (body) => {
+      const b = body as {
+        data: { id: string; categories: { id: string; items: { id: string }[] }[] }[];
+        revenueCodes: { id: string }[];
+      };
+      return [
+        ...b.data.map((o) => o.id),
+        ...b.data.flatMap((o) => o.categories.map((c) => c.id)),
+        ...b.data.flatMap((o) => o.categories.flatMap((c) => c.items.map((i) => i.id))),
+        ...b.revenueCodes.map((c) => c.id),
+      ];
+    },
+  },
+  createOutlet: {
+    seed: bOutlet,
+    creates: true,
+    body: () => ({ code: 'THEIRS', name: 'Leak' }),
+    untouched: bOutletUnchanged,
+  },
+  updateOutlet: {
+    seed: bOutlet,
+    body: () => ({ name: 'Leak', active: false }),
+    untouched: bOutletUnchanged,
+  },
+  addMenuCategory: { seed: bOutlet, body: () => ({ name: 'Leak' }), untouched: bOutletUnchanged },
+  updateMenuCategory: {
+    seed: bOutlet,
+    body: () => ({ name: 'Leak' }),
+    untouched: bOutletUnchanged,
+  },
+  addMenuItem: {
+    seed: bOutlet,
+    body: (theirs) => ({ name: 'Leak', priceMinor: '1', revenueCodeId: theirs['revenueCodeId'] }),
+    untouched: bOutletUnchanged,
+  },
+  updateMenuItem: { seed: bOutlet, body: () => ({ priceMinor: '1' }), untouched: bOutletUnchanged },
+  addMenuModifier: { seed: bOutlet, body: () => ({ name: 'Leak' }), untouched: bOutletUnchanged },
+  updateMenuModifier: {
+    seed: bOutlet,
+    body: () => ({ name: 'Leak' }),
+    untouched: bOutletUnchanged,
+  },
   listStaffDocuments: { seed: bStaffDocs },
   addStaffDocument: {
     seed: bStaffDocs,

@@ -176,6 +176,10 @@ model Property {
   purchaseOrders       PurchaseOrder[]
   purchaseOrderLines   PurchaseOrderLine[]
   goodsReceipts        GoodsReceipt[]
+  expenseCategories    ExpenseCategory[]
+  expenses             Expense[]
+  pettyCashFloats      PettyCashFloat[]
+  pettyCashTopUps      PettyCashTopUp[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -230,6 +234,7 @@ model Department {
   staffProfiles StaffProfile[]
   rotaPatterns  RotaPattern[]
   requisitions  Requisition[]
+  expenses      Expense[]
 
   @@unique([propertyId, code])
   @@unique([propertyId, id])
@@ -403,6 +408,11 @@ model User {
   purchaseOrdersApproved PurchaseOrder[]       @relation("PurchaseOrderApprover")
   purchaseOrdersClosed   PurchaseOrder[]       @relation("PurchaseOrderCloser")
   goodsReceived          GoodsReceipt[]        @relation("GoodsReceiver")
+  expensesRecorded       Expense[]             @relation("ExpenseRecorder")
+  expensesApproved       Expense[]             @relation("ExpenseApprover")
+  expensesVoided         Expense[]             @relation("ExpenseVoider")
+  pettyCashHeld          PettyCashFloat[]      @relation("PettyCashCustodian")
+  pettyCashTopUps        PettyCashTopUp[]      @relation("PettyCashToppedUpBy")
 
   @@map("users")
 }
@@ -675,29 +685,30 @@ model ApprovalRequest {
 /// worker scans the uploaded object and marks it CLEAN or INFECTED. Only CLEAN files get
 /// download links. `entityType` is the file kind (FILE_KINDS in @hotel/shared).
 model FileObject {
-  id             String             @id @default(uuid()) @db.Uuid
-  organisationId String             @map("organisation_id") @db.Uuid
-  propertyId     String?            @map("property_id") @db.Uuid
-  storageKey     String             @unique @map("storage_key")
-  contentType    String             @map("content_type")
-  sizeBytes      Int                @map("size_bytes")
-  scan           FileScan           @default(PENDING)
-  entityType     String?            @map("entity_type")
-  entityId       String?            @map("entity_id")
-  retentionClass String             @default("STANDARD") @map("retention_class")
+  id              String             @id @default(uuid()) @db.Uuid
+  organisationId  String             @map("organisation_id") @db.Uuid
+  propertyId      String?            @map("property_id") @db.Uuid
+  storageKey      String             @unique @map("storage_key")
+  contentType     String             @map("content_type")
+  sizeBytes       Int                @map("size_bytes")
+  scan            FileScan           @default(PENDING)
+  entityType      String?            @map("entity_type")
+  entityId        String?            @map("entity_id")
+  retentionClass  String             @default("STANDARD") @map("retention_class")
   /// Null when a guest uploaded it from their link (T-114).
-  uploadedById   String?            @map("uploaded_by_id") @db.Uuid
-  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  organisation   Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  property       Property?          @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
-  uploadedBy     User?              @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
-  importJobs     ImportJob[]
-  idDocuments    IdDocument[]
-  visitors       Visitor[]
-  cards          RegistrationCard[]
-  onlineCheckIns OnlineCheckIn[]
-  staffDocuments StaffDocument[]
-  posSignatures  PosOrder[]
+  uploadedById    String?            @map("uploaded_by_id") @db.Uuid
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  organisation    Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property        Property?          @relation(fields: [organisationId, propertyId], references: [organisationId, id], onDelete: Restrict)
+  uploadedBy      User?              @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  importJobs      ImportJob[]
+  idDocuments     IdDocument[]
+  visitors        Visitor[]
+  cards           RegistrationCard[]
+  onlineCheckIns  OnlineCheckIn[]
+  staffDocuments  StaffDocument[]
+  posSignatures   PosOrder[]
+  expenseReceipts Expense[]
 
   @@index([propertyId, entityType, entityId])
   @@map("files")
@@ -4345,6 +4356,7 @@ model Supplier {
 
   property Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   orders   PurchaseOrder[]
+  expenses Expense[]
 
   @@unique([propertyId, name])
   @@map("suppliers")
@@ -4436,4 +4448,114 @@ model GoodsReceipt {
 
   @@unique([propertyId, number])
   @@map("goods_receipts")
+}
+
+// ---------------------------------------------------------------------------------------
+// Expenses and petty cash (PRD M10-06; T-147). Tab 3 names expense_categories, expenses and
+// petty_cash_floats; the columns are designed here, with petty_cash_top_ups (append-only) for
+// money put into a float. The cost centre is the department. An expense row exists only once
+// it is recorded: within the recorder's expense.manage limit at once, above it after approval
+// (action expense.approve). A mistaken expense is voided with a reason, never deleted.
+
+/// What the money was spent on (M10-06): cleaning supplies, repairs, transport.
+model ExpenseCategory {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  code       String
+  name       String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  expenses Expense[]
+
+  @@unique([propertyId, code])
+  @@map("expense_categories")
+}
+
+/// A cash box kept for small expenses, held by one person (M10-06).
+model PettyCashFloat {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  name        String
+  custodianId String?  @map("custodian_id") @db.Uuid
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property  Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  custodian User?            @relation("PettyCashCustodian", fields: [custodianId], references: [id], onDelete: Restrict)
+  topUps    PettyCashTopUp[]
+  expenses  Expense[]
+
+  @@unique([propertyId, name])
+  @@map("petty_cash_floats")
+}
+
+/// Money put into a float (append-only). Balance = top-ups − expenses paid from it.
+model PettyCashTopUp {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  floatId     String   @map("float_id") @db.Uuid
+  amountMinor BigInt   @map("amount_minor")
+  reference   String?
+  byUserId    String   @map("by_user_id") @db.Uuid
+  at          DateTime @default(now()) @db.Timestamptz(6)
+
+  property Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  float    PettyCashFloat @relation(fields: [floatId], references: [id], onDelete: Restrict)
+  by       User           @relation("PettyCashToppedUpBy", fields: [byUserId], references: [id], onDelete: Restrict)
+
+  @@index([floatId])
+  @@map("petty_cash_top_ups")
+}
+
+enum ExpensePaidFrom {
+  PETTY_CASH
+  BANK_TRANSFER
+  CARD
+  CHEQUE
+}
+
+/// Money spent (M10-06): category, cost centre (department), supplier, receipt photo and
+/// approval above the recorder's limit.
+model Expense {
+  id                String          @id @default(uuid()) @db.Uuid
+  propertyId        String          @map("property_id") @db.Uuid
+  number            Int
+  spentOn           DateTime        @map("spent_on") @db.Date
+  categoryId        String          @map("category_id") @db.Uuid
+  /// The cost centre.
+  departmentId      String          @map("department_id") @db.Uuid
+  supplierId        String?         @map("supplier_id") @db.Uuid
+  /// Who was paid, when not a listed supplier (a market trader, a taxi).
+  payee             String?
+  description       String
+  amountMinor       BigInt          @map("amount_minor")
+  paidFrom          ExpensePaidFrom @map("paid_from")
+  floatId           String?         @map("float_id") @db.Uuid
+  /// The supplier's invoice or receipt number.
+  reference         String?
+  receiptFileId     String?         @map("receipt_file_id") @db.Uuid
+  recordedById      String          @map("recorded_by_id") @db.Uuid
+  recordedAt        DateTime        @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  /// Set when it went through an approval request: the manager who approved it.
+  approvedById      String?         @map("approved_by_id") @db.Uuid
+  approvalRequestId String?         @map("approval_request_id") @db.Uuid
+  voidedAt          DateTime?       @map("voided_at") @db.Timestamptz(6)
+  voidedById        String?         @map("voided_by_id") @db.Uuid
+  voidReason        String?         @map("void_reason")
+
+  property   Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  category   ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  department Department      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  supplier   Supplier?       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  float      PettyCashFloat? @relation(fields: [floatId], references: [id], onDelete: Restrict)
+  receipt    FileObject?     @relation(fields: [receiptFileId], references: [id], onDelete: Restrict)
+  recordedBy User            @relation("ExpenseRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  approvedBy User?           @relation("ExpenseApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  voidedBy   User?           @relation("ExpenseVoider", fields: [voidedById], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, number])
+  @@index([propertyId, spentOn])
+  @@map("expenses")
 }

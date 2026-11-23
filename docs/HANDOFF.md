@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-146 (suppliers, purchase orders and receiving) is pushed on `feat/T-146-purchase-orders-receiving` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: T-147 expenses and accounting exports.
+T-147 (expenses and petty cash) is pushed on `feat/T-147-expenses-accounting-exports` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: T-148 accounting exports (general journal CSV).

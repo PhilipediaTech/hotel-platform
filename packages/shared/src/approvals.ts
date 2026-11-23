@@ -122,6 +122,14 @@ export const APPROVAL_ACTIONS = [
     limitCode: 'po.manage',
     backOffice: true,
   }),
+  // M10 rule: an expense above the recorder's expense.manage amount limit; measured by amount.
+  a({
+    code: 'expense.approve',
+    label: 'Expense above the limit',
+    measure: 'amount',
+    limitCode: 'expense.manage',
+    backOffice: true,
+  }),
   a({
     code: 'ar.over_limit',
     label: 'City-ledger transfer over the credit limit',

@@ -85,6 +85,7 @@
     "pos": "Point of sale",
     "pos-setup": "Outlets and menus",
     "stock": "Stock",
+    "expenses": "Expenses",
     "settings-booking-engine": "Booking page",
     "partner": "Partner account",
     "unmatched-transfers": "Unmatched transfers"
@@ -368,6 +369,9 @@
       },
       "po": {
         "approve": "Purchase order above the limit"
+      },
+      "expense": {
+        "approve": "Expense above the limit"
       }
     },
     "policies": {

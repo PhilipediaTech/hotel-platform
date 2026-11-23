@@ -151,6 +151,11 @@ export const TENANT_MODELS: Record<string, Scope> = {
   PurchaseOrder: { kind: 'property' },
   PurchaseOrderLine: { kind: 'property' },
   GoodsReceipt: { kind: 'property' },
+  // Expenses and petty cash (T-147). Top-ups are append-only.
+  ExpenseCategory: { kind: 'property' },
+  PettyCashFloat: { kind: 'property' },
+  PettyCashTopUp: { kind: 'property' },
+  Expense: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

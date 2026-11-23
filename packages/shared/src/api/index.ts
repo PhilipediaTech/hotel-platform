@@ -51,6 +51,7 @@ export * from './staff-documents.ts';
 export * from './pos.ts';
 export * from './pos-register.ts';
 export * from './stock.ts';
+export * from './expenses.ts';
 export * from './tasks.ts';
 export * from './handovers.ts';
 export * from './leakage.ts';

@@ -75,6 +75,8 @@ export function CheckInPanel({
   const [roomId, setRoomId] = useState('');
   const [reg, setReg] = useState<Registration>({});
   const [scan, setScan] = useState<File | null>(null);
+  // The photo uploaded for the ID scan (M14-14; T-150), reused when checking in.
+  const [scanFileId, setScanFileId] = useState<string | null>(null);
   const [onScreen, setOnScreen] = useState(false);
   const [keys, setKeys] = useState('1');
   const pad = useRef<HTMLCanvasElement | null>(null);
@@ -104,7 +106,7 @@ export function CheckInPanel({
     mutationFn: async () => {
       const idFileId =
         scan && required.some((f) => ID_FIELDS.includes(f))
-          ? await uploadFile('IdDocument', scan)
+          ? (scanFileId ?? (await uploadFile('IdDocument', scan)))
           : undefined;
       let signatureFileId: string | undefined;
       if (onScreen && pad.current) {
@@ -271,8 +273,29 @@ export function CheckInPanel({
                 type="file"
                 accept="image/jpeg,image/png,image/webp,application/pdf"
                 className="text-sm"
-                onChange={(e) => setScan(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  setScan(e.target.files?.[0] ?? null);
+                  setScanFileId(null);
+                }}
               />
+              {scan && (
+                <IdRead
+                  stayId={stay.id}
+                  scan={scan}
+                  fileId={scanFileId}
+                  onUploaded={setScanFileId}
+                  onRead={(fields) =>
+                    setReg((r) => ({
+                      ...r,
+                      ...Object.fromEntries(
+                        Object.entries(fields).filter(
+                          ([k, v]) => v !== null && required.includes(k as RegistrationField),
+                        ),
+                      ),
+                    }))
+                  }
+                />
+              )}
               <p className="text-xs text-text-muted">
                 {property?.dataProtectionNotice ?? t('checkIn.idPrivacy')}
               </p>
@@ -525,4 +548,59 @@ function Choice(props: {
 export function usePropertyToday(): string {
   const property = useProperty();
   return property?.businessDate ?? localDate(new Date(), property?.timeZone ?? 'Africa/Lagos');
+}
+
+/** M14-14: reads the ID photo and fills the registration fields for the desk to check. */
+function IdRead({
+  stayId,
+  scan,
+  fileId,
+  onUploaded,
+  onRead,
+}: {
+  stayId: string;
+  scan: File;
+  fileId: string | null;
+  onUploaded: (id: string) => void;
+  onRead: (fields: Record<string, string | null>) => void;
+}) {
+  const { t } = useTranslation();
+  const photo = ['image/jpeg', 'image/png', 'image/webp'].includes(scan.type);
+  const read = useMutation({
+    mutationFn: async () => {
+      const id = fileId ?? (await uploadFile('IdDocument', scan));
+      onUploaded(id);
+      return api.call('scanIdDocument', { params: { stayId }, body: { fileId: id } });
+    },
+    onSuccess: (r) => onRead(r.fields),
+  });
+  const r = read.data;
+  return (
+    <div className="flex flex-col gap-1" aria-live="polite">
+      <Button
+        variant="secondary"
+        size="sm"
+        className="self-start"
+        disabled={!photo || read.isPending}
+        onClick={() => read.mutate()}
+      >
+        {read.isPending ? t('checkIn.idRead.reading') : t('checkIn.idRead.button')}
+      </Button>
+      {!photo && <p className="text-xs text-text-muted">{t('checkIn.idRead.photoOnly')}</p>}
+      {read.error && <Alert tone="critical">{errorMessage(read.error)}</Alert>}
+      {r && !r.readable && <Alert tone="critical">{t('checkIn.idRead.unreadable')}</Alert>}
+      {r?.readable && <Alert tone="info">{t('checkIn.idRead.filled')}</Alert>}
+      {r?.nameOnId && (
+        <p className="text-sm">
+          {t('checkIn.idRead.nameOnId', {
+            name: `${r.nameOnId.firstName} ${r.nameOnId.lastName}`,
+          })}
+        </p>
+      )}
+      {r?.nameMatchesGuest === false && (
+        <Alert tone="critical">{t('checkIn.idRead.mismatch')}</Alert>
+      )}
+      {r?.expired && <Alert tone="critical">{t('checkIn.idRead.expired')}</Alert>}
+    </div>
+  );
 }

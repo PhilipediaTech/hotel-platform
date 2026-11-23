@@ -18023,6 +18023,108 @@
           "reasons"
         ]
       },
+      "IdScanResult": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "object",
+            "properties": {
+              "nationality": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "idType": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "PASSPORT",
+                  "NATIONAL_ID",
+                  "DRIVERS_LICENCE",
+                  "VOTERS_CARD",
+                  "OTHER",
+                  null
+                ]
+              },
+              "idNumber": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "idExpiry": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                ]
+              },
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "nationality",
+              "idType",
+              "idNumber",
+              "idExpiry",
+              "address"
+            ]
+          },
+          "nameOnId": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "firstName",
+              "lastName"
+            ]
+          },
+          "nameMatchesGuest": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "expired": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "readable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "fields",
+          "nameOnId",
+          "nameMatchesGuest",
+          "expired",
+          "readable"
+        ]
+      },
       "Task": {
         "type": "object",
         "properties": {
@@ -77783,6 +77885,143 @@
           },
           "500": {
             "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stays/{stayId}/id-scan": {
+      "post": {
+        "operationId": "scanIdDocument",
+        "summary": "Read the guest’s ID photo and suggest the registration fields (M14-14)",
+        "tags": [
+          "Reservations"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4: designed in T-150. `fileId` is the uploaded ID photo (IdDocument, JPEG, PNG or WebP). Nothing is saved: the answer only fills the check-in form for the desk to check. Counts against the monthly AI allowance (403 ALLOWANCE_USED_UP); 503 AI_UNAVAILABLE when the AI cannot answer.",
+        "x-permission": "reservation.checkin",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "stayId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fileId": {
+                    "$ref": "#/components/schemas/Uuid"
+                  }
+                },
+                "required": [
+                  "fileId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdScanResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`, `ALLOWANCE_USED_UP`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error: `AI_UNAVAILABLE`",
             "content": {
               "application/json": {
                 "schema": {

@@ -23,6 +23,25 @@ function withReplies(...replies: unknown[]) {
 const REQUEST = { system: 'S', user: 'U' };
 
 describe('Claude adapter', () => {
+  it('sends pictures before the text, for the ID scan (T-150)', async () => {
+    const { ai, create } = withReplies(text('{}'));
+    await ai.generate({
+      ...REQUEST,
+      images: [{ mediaType: 'image/jpeg', data: 'AAAA' }],
+    });
+    expect(create.mock.calls[0]?.[0]).toMatchObject({
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } },
+            { type: 'text', text: 'U' },
+          ],
+        },
+      ],
+    });
+  });
+
   it('sends the model and fallback, and answers the text with its token counts', async () => {
     const { ai, create } = withReplies(text('Hello'));
     await expect(ai.generate(REQUEST)).resolves.toEqual({

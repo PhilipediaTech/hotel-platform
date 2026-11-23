@@ -2505,6 +2505,15 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     },
   },
   getRegistrationCard: { seed: bReservation },
+  // ID scan (T-150): B's stay, with A's own file ID made up; nothing is read or counted.
+  scanIdDocument: {
+    seed: bReservation,
+    body: () => ({ fileId: '00000000-0000-4000-8000-000000000001' }),
+    untouched: async (db, w) => {
+      expect(await db.usageCounter.count()).toBe(0);
+      await bReservationUnchanged(db, w);
+    },
+  },
   listKeys: { seed: bReservation },
   issueKeys: {
     seed: bReservation,

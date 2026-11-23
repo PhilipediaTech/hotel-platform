@@ -175,5 +175,7 @@ export async function inHouse(
     payments: c.payments,
     messages: c.messages,
     ai: c.ai,
+    /** The file store (T-150). */
+    files: c.files,
   };
 }

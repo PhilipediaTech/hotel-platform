@@ -517,6 +517,74 @@ describe('Check-in (M3-08, M3-19; T-051)', () => {
     );
   });
 
+  it('fills the ID fields from a photo of the ID, for the desk to check (M14-14)', async () => {
+    permissions = [...permissions, 'reservation.checkin'];
+    handlers[`GET /reservations/${RES}`] = () => json(200, staying('CONFIRMED'));
+    handlers['POST /files/upload-url'] = () =>
+      json(201, {
+        fileId: '33333333-0000-4000-8000-000000000301',
+        method: 'PUT',
+        url: 'https://storage.test/incoming/id',
+        headers: {},
+        expiresAt: '2026-11-10T14:15:00Z',
+      });
+    handlers['PUT /incoming/id'] = () => new Response(null, { status: 200 });
+    handlers[`POST /stays/${STAY}/id-scan`] = () =>
+      json(200, {
+        fields: {
+          nationality: 'NG',
+          idType: 'PASSPORT',
+          idNumber: 'A12345678',
+          idExpiry: '2031-05-01',
+          address: null,
+        },
+        nameOnId: { firstName: 'NGOZI', lastName: 'OBI' },
+        nameMatchesGuest: false,
+        expired: false,
+        readable: true,
+      });
+    handlers[`POST /stays/${STAY}/check-in`] = () =>
+      json(200, { stayId: STAY, status: 'CHECKED_IN', folioId: null, roomId: R101, version: 1 });
+    const user = userEvent.setup();
+    renderAt(`/reservations/${RES}`);
+    await user.click(await screen.findByRole('button', { name: 'Check in' }));
+    const form = screen.getByRole('form', { name: 'Check in Ada Obi' });
+    await user.upload(
+      within(form).getByLabelText('Photo or scan of the ID (optional)'),
+      new File([new Uint8Array([0xff, 0xd8])], 'passport.jpg', { type: 'image/jpeg' }),
+    );
+    await user.click(within(form).getByRole('button', { name: 'Fill in from the photo' }));
+    expect(
+      await within(form).findByText('Filled in from the ID: check each field before checking in.'),
+    ).toBeInTheDocument();
+    expect(within(form).getByLabelText('Nationality')).toHaveValue('NG');
+    expect(within(form).getByLabelText('ID type')).toHaveValue('PASSPORT');
+    expect(within(form).getByLabelText('ID number')).toHaveValue('A12345678');
+    expect(within(form).getByText('Name on the ID: NGOZI OBI')).toBeInTheDocument();
+    expect(
+      within(form).getByText(
+        'The name on the ID is not the booked guest’s: check who is checking in.',
+      ),
+    ).toBeInTheDocument();
+    expect(sent(`POST /stays/${STAY}/id-scan`)[0]?.body).toEqual({
+      fileId: '33333333-0000-4000-8000-000000000301',
+    });
+    await user.selectOptions(within(form).getByLabelText('Purpose of stay'), 'BUSINESS');
+    await user.click(within(form).getByRole('button', { name: 'Check in now' }));
+    await waitFor(() => expect(sent(`POST /stays/${STAY}/check-in`)).toHaveLength(1));
+    // The photo uploaded for the scan is the one kept with the registration.
+    expect(sent('POST /files/upload-url')).toHaveLength(1);
+    expect(sent(`POST /stays/${STAY}/check-in`)[0]?.body).toMatchObject({
+      registration: {
+        nationality: 'NG',
+        purpose: 'BUSINESS',
+        idType: 'PASSPORT',
+        idNumber: 'A12345678',
+        idFileId: '33333333-0000-4000-8000-000000000301',
+      },
+    });
+  });
+
   it('does not offer check-in before the arrival day or without the permission', async () => {
     handlers[`GET /reservations/${RES}`] = () => json(200, staying('CONFIRMED'));
     renderAt(`/reservations/${RES}`);

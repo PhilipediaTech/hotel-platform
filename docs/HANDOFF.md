@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-149 (price suggestions) is pushed on `feat/T-149-price-suggestions` (no migration; run `git pull` after merging). Next: T-150 ID scan at check-in (M14-14).
+T-150 (ID scan at check-in) is pushed on `feat/T-150-id-scan` (no migration; `git pull` after merging). Before real guests' IDs are scanned, Strategy decision 6 (data residency, with legal advice) should cover sending ID photos to the AI provider. Next: T-151 review requests and drafted replies (M14-15).

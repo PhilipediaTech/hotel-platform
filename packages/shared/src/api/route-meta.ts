@@ -416,6 +416,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   getAccountingExport: {"operationId":"getAccountingExport","method":"get","path":"/accounting-exports/{exportId}","propertyScoped":true,"exports":true},
   listPriceSuggestions: {"operationId":"listPriceSuggestions","method":"get","path":"/price-suggestions","propertyScoped":true},
   acceptPriceSuggestions: {"operationId":"acceptPriceSuggestions","method":"post","path":"/price-suggestions/accept","body":true,"propertyScoped":true,"idempotent":true},
+  scanIdDocument: {"operationId":"scanIdDocument","method":"post","path":"/stays/{stayId}/id-scan","body":true,"propertyScoped":true},
   listTasks: {"operationId":"listTasks","method":"get","path":"/tasks","propertyScoped":true},
   createTask: {"operationId":"createTask","method":"post","path":"/tasks","body":true,"propertyScoped":true,"idempotent":true},
   getTaskFormOptions: {"operationId":"getTaskFormOptions","method":"get","path":"/tasks/form-options","propertyScoped":true},

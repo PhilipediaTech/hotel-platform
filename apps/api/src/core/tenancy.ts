@@ -69,6 +69,16 @@ export function runAsTenant<T>(tenant: TenantContext, fn: () => T | PromiseLike<
   return storage.run(tenant, async () => await fn());
 }
 
+/**
+ * Runs `fn` with no tenant, even inside a request that sent `X-Property-Id`. Routes that
+ * aren't property-scoped (the user's own account, sign-in, platform, public pages) run this
+ * way, so row-level security (T-144) never ties their queries to whatever property the
+ * client happened to send.
+ */
+export function withoutTenant<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  return storage.exit(async () => await fn());
+}
+
 /** The tenant resolved for this request, or null (no `X-Property-Id`, or not signed in). */
 export function tenantOf(req: Request): TenantContext | null {
   return byRequest.get(req) ?? null;

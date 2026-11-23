@@ -1,0 +1,30 @@
+{
+  "accounting": {
+    "title": "Accounting export",
+    "intro": "A general journal for your accounting software (QuickBooks Online, Xero or Sage): one balanced journal per closed business day. Give each item your own account code first.",
+    "accounts": "Account codes",
+    "accountsIntro": "Only items used in the period you export need a code. Leave a code empty to clear it.",
+    "code": "Account code for {{item}}",
+    "name": "Account name for {{item}} (optional)",
+    "save": "Save account codes",
+    "saved": "Account codes saved.",
+    "missing": "These need an account code first: {{items}}",
+    "kinds": {
+      "CONTROL": "Control accounts",
+      "REVENUE_CODE": "Revenue, taxes and fees",
+      "PAY_METHOD": "Money in and out",
+      "EXPENSE_CATEGORY": "Expense categories"
+    },
+    "export": "Export a period",
+    "from": "From",
+    "to": "To",
+    "lastClosed": "Closed business days up to {{date}} can be exported.",
+    "create": "Build journal",
+    "exports": "Exports",
+    "none": "No exports yet.",
+    "exportLine": "Export {{number}} · {{from}} to {{to}}",
+    "exportFacts": "{{journals}} journals, {{lines}} lines, {{total}} each side · by {{name}}, {{when}}",
+    "download": "Download CSV",
+    "downloadOne": "Download CSV of export {{number}}"
+  }
+}

@@ -1743,6 +1743,36 @@ async function bExpensesUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** B's accounting: a mapped account and one kept export. */
+async function bAccounting(db: Db, world: TenantWorld, propertyId: string) {
+  const mapping = await db.accountingMapping.create({
+    data: { propertyId, kind: 'CONTROL', key: 'GUEST_LEDGER', accountCode: '1200' },
+  });
+  const exported = await db.accountingExport.create({
+    data: {
+      propertyId,
+      number: 1,
+      fromDate: new Date('2026-11-01T00:00:00Z'),
+      toDate: new Date('2026-11-01T00:00:00Z'),
+      journalCount: 0,
+      lineCount: 0,
+      debitTotalMinor: 0n,
+      content: 'Journal',
+      sha256: 'theirs',
+      createdById: world.bStaff.id,
+    },
+  });
+  return { mappingId: mapping.id, exportId: exported.id };
+}
+
+async function bAccountingUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.accountingMapping.findMany({ where })).map((m) => m.accountCode)).toEqual([
+    '1200',
+  ]);
+  expect(await db.accountingExport.count({ where })).toBe(1);
+}
+
 async function bStockUnchanged(db: Db, world: TenantWorld) {
   const where = { propertyId: world.b1.id };
   expect((await db.stockItem.findMany({ where })).map((i) => [i.name, i.active])).toEqual([
@@ -3678,6 +3708,30 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   postStocktake: { seed: bStock, body: () => ({ reason: 'Leak' }), untouched: bStockUnchanged },
   cancelStocktake: { seed: bStock, untouched: bStockUnchanged },
+  // Accounting exports (T-148)
+  getAccountingMappings: {
+    seed: bAccounting,
+    listIds: (body) => (body as { data: { key: string }[] }).data.map((x) => x.key),
+  },
+  updateAccountingMappings: {
+    seed: bAccounting,
+    creates: true,
+    body: () => ({
+      mappings: [{ kind: 'CONTROL', key: 'GUEST_LEDGER', accountCode: '9999' }],
+    }),
+    untouched: bAccountingUnchanged,
+  },
+  listAccountingExports: {
+    seed: bAccounting,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((x) => x.id),
+  },
+  createAccountingExport: {
+    seed: bAccounting,
+    creates: true,
+    body: () => ({ from: '2026-11-01', to: '2026-11-01' }),
+    untouched: bAccountingUnchanged,
+  },
+  getAccountingExport: { seed: bAccounting },
   // Expenses (T-147)
   getExpenseSetup: {
     seed: bExpenses,

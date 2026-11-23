@@ -322,6 +322,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-147',
   },
   {
+    id: 'accounting',
+    path: '/accounting',
+    anyOf: ['accounting.export'],
+    group: 'admin',
+    screen: 'S43',
+    ticket: 'T-148',
+  },
+  {
     id: 'my-jobs',
     path: '/tasks?assignee=me',
     anyOf: ['task.work'],

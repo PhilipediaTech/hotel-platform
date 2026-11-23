@@ -156,6 +156,9 @@ export const TENANT_MODELS: Record<string, Scope> = {
   PettyCashFloat: { kind: 'property' },
   PettyCashTopUp: { kind: 'property' },
   Expense: { kind: 'property' },
+  // Accounting exports (T-148). Exports are append-only.
+  AccountingMapping: { kind: 'property' },
+  AccountingExport: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

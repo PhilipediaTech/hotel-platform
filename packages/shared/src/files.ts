@@ -122,6 +122,14 @@ export const FILE_KINDS = [
     maxBytes: 1 * MB,
     retentionClass: 'STANDARD',
   }),
+  // The receipt photo of an expense (M10-06; T-147).
+  k({
+    entityType: 'Expense',
+    permission: 'expense.manage',
+    contentTypes: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+    maxBytes: 10 * MB,
+    retentionClass: 'STANDARD',
+  }),
 ] as const;
 
 export const FILE_ENTITY_TYPES = FILE_KINDS.map((kind) => kind.entityType) as [

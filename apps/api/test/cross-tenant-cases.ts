@@ -1694,6 +1694,55 @@ async function bPurchasingUnchanged(db: Db, world: TenantWorld) {
   expect(await db.stockMovement.count({ where: { ...where, kind: 'RECEIPT' } })).toBe(0);
 }
 
+/** B's books: a category, a float with ₦10 in it, and one expense of ₦4 paid from it. */
+async function bExpenses(db: Db, world: TenantWorld, propertyId: string) {
+  const category = await db.expenseCategory.create({
+    data: { propertyId, code: 'THEIRS', name: 'Their category' },
+  });
+  const department = await db.department.create({
+    data: { organisationId: world.orgB.id, propertyId, code: 'THEIRS', name: 'Their dept' },
+  });
+  const float = await db.pettyCashFloat.create({ data: { propertyId, name: 'Their float' } });
+  await db.pettyCashTopUp.create({
+    data: { propertyId, floatId: float.id, amountMinor: 1000n, byUserId: world.bStaff.id },
+  });
+  const expense = await db.expense.create({
+    data: {
+      propertyId,
+      number: 1,
+      spentOn: new Date('2026-11-01T00:00:00Z'),
+      categoryId: category.id,
+      departmentId: department.id,
+      payee: 'Their payee',
+      description: 'Their expense',
+      amountMinor: 400n,
+      paidFrom: 'PETTY_CASH',
+      floatId: float.id,
+      recordedById: world.bStaff.id,
+    },
+  });
+  return {
+    categoryId: category.id,
+    departmentId: department.id,
+    floatId: float.id,
+    expenseId: expense.id,
+  };
+}
+
+async function bExpensesUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.expenseCategory.findMany({ where })).map((c) => [c.name, c.active])).toEqual([
+    ['Their category', true],
+  ]);
+  expect(
+    (await db.pettyCashFloat.findMany({ where })).map((f) => [f.name, f.active, f.custodianId]),
+  ).toEqual([['Their float', true, null]]);
+  expect((await db.pettyCashTopUp.findMany({ where })).map((t) => t.amountMinor)).toEqual([1000n]);
+  expect((await db.expense.findMany({ where })).map((e) => [e.amountMinor, e.voidedAt])).toEqual([
+    [400n, null],
+  ]);
+}
+
 async function bStockUnchanged(db: Db, world: TenantWorld) {
   const where = { propertyId: world.b1.id };
   expect((await db.stockItem.findMany({ where })).map((i) => [i.name, i.active])).toEqual([
@@ -3629,6 +3678,66 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   postStocktake: { seed: bStock, body: () => ({ reason: 'Leak' }), untouched: bStockUnchanged },
   cancelStocktake: { seed: bStock, untouched: bStockUnchanged },
+  // Expenses (T-147)
+  getExpenseSetup: {
+    seed: bExpenses,
+    listIds: (body) => {
+      const b = body as {
+        categories: { id: string }[];
+        floats: { id: string }[];
+        departments: { id: string }[];
+      };
+      return [...b.categories, ...b.floats, ...b.departments].map((x) => x.id);
+    },
+  },
+  createExpenseCategory: {
+    seed: bExpenses,
+    creates: true,
+    body: () => ({ code: 'LEAK', name: 'Leak' }),
+    untouched: bExpensesUnchanged,
+  },
+  updateExpenseCategory: {
+    seed: bExpenses,
+    body: () => ({ name: 'Leak' }),
+    untouched: bExpensesUnchanged,
+  },
+  createPettyCashFloat: {
+    seed: bExpenses,
+    creates: true,
+    body: () => ({ name: 'Leak', custodianId: null }),
+    untouched: bExpensesUnchanged,
+  },
+  updatePettyCashFloat: {
+    seed: bExpenses,
+    body: () => ({ name: 'Leak' }),
+    untouched: bExpensesUnchanged,
+  },
+  topUpPettyCash: {
+    seed: bExpenses,
+    body: () => ({ amountMinor: '100' }),
+    untouched: bExpensesUnchanged,
+  },
+  listExpenses: {
+    seed: bExpenses,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((x) => x.id),
+  },
+  recordExpense: {
+    seed: bExpenses,
+    creates: true,
+    body: (theirs) => ({
+      spentOn: '2026-11-01',
+      categoryId: theirs['categoryId'],
+      departmentId: theirs['departmentId'],
+      payee: 'Leak',
+      description: 'Leak',
+      amountMinor: '100',
+      paidFrom: 'PETTY_CASH',
+      floatId: theirs['floatId'],
+      reason: 'Leak',
+    }),
+    untouched: bExpensesUnchanged,
+  },
+  voidExpense: { seed: bExpenses, body: () => ({ reason: 'Leak' }), untouched: bExpensesUnchanged },
   // Purchasing (T-146)
   listSuppliers: {
     seed: bPurchasing,

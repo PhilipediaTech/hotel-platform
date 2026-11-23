@@ -1,0 +1,20 @@
+{
+  "priceSuggestions": {
+    "title": "Price suggestions",
+    "intro": "Worked out from your own bookings: how full each date is now, and how the same weekday went last year. Nothing changes until you accept. You can change a price before accepting it.",
+    "days": "Look ahead",
+    "daysOption": "{{count}} days",
+    "none": "No changes to suggest for these dates.",
+    "date": "Date",
+    "roomType": "Room type",
+    "current": "Now",
+    "suggested": "Suggested",
+    "price": "Price to set for {{roomType}} on {{date}}",
+    "select": "Accept {{roomType}} on {{date}}",
+    "why": "Why",
+    "accept": "Accept selected ({{count}})",
+    "accepted": "{{count}} prices changed.",
+    "up": "+{{pct}}%",
+    "down": "−{{pct}}%"
+  }
+}

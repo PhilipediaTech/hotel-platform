@@ -99,7 +99,7 @@ describe('railItems', () => {
     const groups = railItems(['frontdesk.read', 'rate.manage', 'audit.read']);
     expect(groups.map((g) => [g.group, ids(g.items)])).toEqual([
       ['operations', ['front-desk', 'calendar', 'reservations']],
-      ['revenue', ['rates']],
+      ['revenue', ['rates', 'price-suggestions']],
       ['admin', ['audit-log']],
     ]);
   });

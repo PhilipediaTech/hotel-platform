@@ -378,6 +378,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-033',
   },
   {
+    // M14-13: no screen of its own in tab 5; it sits with the rate calendar (S23).
+    id: 'price-suggestions',
+    path: '/price-suggestions',
+    anyOf: ['rate.manage'],
+    group: 'revenue',
+    screen: 'S23',
+    ticket: 'T-149',
+  },
+  {
     id: 'reports',
     path: '/reports',
     anyOf: ['report.dashboard', 'report.audit', 'report.tax', 'report.flash', 'report.ops'],

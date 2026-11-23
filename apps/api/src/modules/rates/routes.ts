@@ -1,8 +1,9 @@
-import { RATE_ROUTES } from '@hotel/shared';
+import { PRICE_SUGGESTION_ROUTES, RATE_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as rates from './service.ts';
+import * as suggestions from './suggestions.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
 function tenantFrom(tenant: TenantContext | null): TenantContext {
@@ -49,5 +50,13 @@ export function rateRoutes(deps: rates.RateDeps): Router {
   }));
   mountRoute(router, r.setPackageComponents, ({ body }) => rates.setPackageComponents(deps, body));
 
+  // M14-13 price suggestions (T-149).
+  const p = PRICE_SUGGESTION_ROUTES;
+  mountRoute(router, p.listPriceSuggestions, ({ query }, { tenant }) =>
+    suggestions.listPriceSuggestions(deps, tenantFrom(tenant), query),
+  );
+  mountRoute(router, p.acceptPriceSuggestions, ({ body }, { tenant }) =>
+    suggestions.acceptPriceSuggestions(deps, tenantFrom(tenant), body),
+  );
   return router;
 }

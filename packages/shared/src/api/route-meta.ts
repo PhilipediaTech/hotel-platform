@@ -414,6 +414,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   listAccountingExports: {"operationId":"listAccountingExports","method":"get","path":"/accounting-exports","propertyScoped":true},
   createAccountingExport: {"operationId":"createAccountingExport","method":"post","path":"/accounting-exports","body":true,"propertyScoped":true,"idempotent":true},
   getAccountingExport: {"operationId":"getAccountingExport","method":"get","path":"/accounting-exports/{exportId}","propertyScoped":true,"exports":true},
+  listPriceSuggestions: {"operationId":"listPriceSuggestions","method":"get","path":"/price-suggestions","propertyScoped":true},
+  acceptPriceSuggestions: {"operationId":"acceptPriceSuggestions","method":"post","path":"/price-suggestions/accept","body":true,"propertyScoped":true,"idempotent":true},
   listTasks: {"operationId":"listTasks","method":"get","path":"/tasks","propertyScoped":true},
   createTask: {"operationId":"createTask","method":"post","path":"/tasks","body":true,"propertyScoped":true,"idempotent":true},
   getTaskFormOptions: {"operationId":"getTaskFormOptions","method":"get","path":"/tasks/form-options","propertyScoped":true},

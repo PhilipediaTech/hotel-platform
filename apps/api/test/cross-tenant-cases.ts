@@ -2357,6 +2357,29 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     }),
     untouched: bRatesUnchanged,
   },
+  // Price suggestions (T-149)
+  listPriceSuggestions: {
+    seed: bPlan,
+    listIds: (body) =>
+      (body as { data: { ratePlan: { id: string }; roomType: { id: string } }[] }).data.flatMap(
+        (x) => [x.ratePlan.id, x.roomType.id],
+      ),
+  },
+  acceptPriceSuggestions: {
+    seed: bPlan,
+    creates: true,
+    body: (theirs) => ({
+      items: [
+        {
+          ratePlanId: theirs['ratePlanId'],
+          roomTypeId: theirs['roomTypeId'],
+          date: '2099-01-01',
+          amountMinor: '5000000',
+        },
+      ],
+    }),
+    untouched: bRatesUnchanged,
+  },
   listPackages: {
     seed: (db, world, propertyId) => bPlan(db, world, propertyId, 'PACKAGE'),
     listIds: ids,

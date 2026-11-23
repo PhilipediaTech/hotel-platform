@@ -362,6 +362,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   settlePosOrder: {"operationId":"settlePosOrder","method":"post","path":"/pos/orders/{orderId}/settle","body":true,"propertyScoped":true,"idempotent":true},
   chargePosOrderToRoom: {"operationId":"chargePosOrderToRoom","method":"post","path":"/pos/orders/{orderId}/charge-to-room","body":true,"propertyScoped":true,"idempotent":true},
   cancelPosOrder: {"operationId":"cancelPosOrder","method":"post","path":"/pos/orders/{orderId}/cancel","propertyScoped":true},
+  voidPosOrderLine: {"operationId":"voidPosOrderLine","method":"post","path":"/pos/orders/{orderId}/lines/{lineId}/void","body":true,"propertyScoped":true,"idempotent":true},
+  discountPosOrderLine: {"operationId":"discountPosOrderLine","method":"post","path":"/pos/orders/{orderId}/lines/{lineId}/discount","body":true,"propertyScoped":true,"idempotent":true},
   listPosRooms: {"operationId":"listPosRooms","method":"get","path":"/pos/rooms","propertyScoped":true},
   getPosSettings: {"operationId":"getPosSettings","method":"get","path":"/pos/settings","propertyScoped":true},
   updatePosSettings: {"operationId":"updatePosSettings","method":"put","path":"/pos/settings","body":true,"propertyScoped":true},

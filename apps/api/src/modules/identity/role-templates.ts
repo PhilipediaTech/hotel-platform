@@ -259,13 +259,14 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
     ],
   },
   {
-    // Lite POS (PRD M8-02, M8-03, M8-05; T-142): outlet shifts, orders and settlement
+    // Lite POS (PRD M8-02 to M8-05; T-142, T-143): outlet shifts, orders and settlement; voids
+    // and discounts, which need a manager's approval until the owner sets a pos.void limit
     name: 'POS Cashier',
     slug: 'pos-cashier',
     requiresMfa: false,
     orgWide: false,
     department: null,
-    permissions: ['pos.shift', 'pos.order', ...SELF_SERVICE],
+    permissions: ['pos.shift', 'pos.order', 'pos.void', ...SELF_SERVICE],
   },
   {
     // Own tasks, attendance, leave, handovers

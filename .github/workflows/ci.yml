@@ -44,6 +44,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Lint
+        # Type-aware lint outgrew Node's default heap at T-143 (exit 134); same as local runs.
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: npm run lint
       - name: Typecheck
         run: npm run typecheck

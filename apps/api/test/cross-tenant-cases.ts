@@ -1603,7 +1603,7 @@ async function bPosOrder(db: Db, world: TenantWorld, propertyId: string) {
       openedById: world.bStaff.id,
     },
   });
-  await db.posOrderLine.create({
+  const line = await db.posOrderLine.create({
     data: {
       propertyId,
       orderId: order.id,
@@ -1625,6 +1625,7 @@ async function bPosOrder(db: Db, world: TenantWorld, propertyId: string) {
     folioId: stay.folioId,
     shiftId: shift.id,
     orderId: order.id,
+    lineId: line.id,
   };
 }
 
@@ -1634,6 +1635,9 @@ async function bPosOrderUnchanged(db: Db, world: TenantWorld) {
   expect(orders.map((o) => [o.label, o.status, o.lines.length])).toEqual([
     ['Their table', 'OPEN', 1],
   ]);
+  // M8-04: their item is neither voided nor discounted, and nothing waits for approval.
+  expect(orders[0]?.lines.map((l) => [l.voidedAt, l.discountMinor])).toEqual([[null, null]]);
+  expect(await db.approvalRequest.count({ where: { action: { startsWith: 'pos.' } } })).toBe(0);
   const shifts = await db.cashierShift.findMany({ where });
   expect(shifts.map((s) => [s.status, s.outletId !== null])).toEqual([['OPEN', true]]);
   expect(await db.folioLine.count({ where: { ...where, sourceType: 'POS_ORDER' } })).toBe(0);
@@ -3353,6 +3357,16 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   settlePosOrder: {
     seed: bPosOrder,
     body: () => ({ payments: [{ method: 'CASH', amountMinor: '100000' }] }),
+    untouched: bPosOrderUnchanged,
+  },
+  voidPosOrderLine: {
+    seed: bPosOrder,
+    body: () => ({ reason: 'Leak' }),
+    untouched: bPosOrderUnchanged,
+  },
+  discountPosOrderLine: {
+    seed: bPosOrder,
+    body: () => ({ amountMinor: '100', reason: 'Leak' }),
     untouched: bPosOrderUnchanged,
   },
   chargePosOrderToRoom: {

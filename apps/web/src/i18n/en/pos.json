@@ -105,7 +105,22 @@
       "reason": "Reason for the variance",
       "saveReason": "Save reason",
       "roomCharges": "{{count}} room charges (not in the drawer)",
-      "openLeft": "{{count}} orders are still open at this outlet."
+      "openLeft": "{{count}} orders are still open at this outlet.",
+      "discount": "Discount",
+      "discountLine": "Discount: {{reason}}",
+      "voidedLine": "Voided by {{by}}: {{reason}}",
+      "adjust": "Void or discount {{item}}",
+      "adjustTitle": "Void or discount: {{item}}",
+      "voidIt": "Void the item",
+      "discountIt": "Give a discount",
+      "discountBy": "Discount by",
+      "percent": "Percent",
+      "adjustAmount": "Amount off",
+      "adjustReason": "Reason",
+      "adjustHint": "Off the item with its taxes. Above your limit a manager approves first.",
+      "confirmVoid": "Void",
+      "confirmDiscount": "Give discount",
+      "sentForApproval": "Sent to a manager for approval. The order changes once it is approved."
     }
   }
 }

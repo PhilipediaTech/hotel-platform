@@ -360,6 +360,10 @@
       },
       "ar": {
         "over_limit": "City-ledger transfer over the credit limit"
+      },
+      "pos": {
+        "void": "Void of a POS item",
+        "discount": "POS discount"
       }
     },
     "policies": {

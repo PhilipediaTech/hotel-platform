@@ -3,13 +3,19 @@ import {
   POS_PAY_METHODS,
   posSettingsOf,
   type CloseShiftBody,
+  type DiscountPosOrderLineBody,
   type PosOrderItem,
   type PosRegister,
   type PosSettings,
   type SettlePosOrderBody,
 } from '@hotel/shared';
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { Prisma } from '../../generated/prisma/client.ts';
+import {
+  performOrRequest,
+  type ApprovalActionHandler,
+  type ExecuteContext,
+} from '../../core/approvals.ts';
 import { recordAudit } from '../../core/audit.ts';
 import { businessDate, postingDate } from '../../core/business-day.ts';
 import type { Clock } from '../../core/clock.ts';
@@ -23,6 +29,7 @@ import {
   enabledMethods,
   folioBalances,
   postChargeLines,
+  postDiscountLines,
   routedWindow,
   taxesFor,
 } from '../folios/service.ts';
@@ -38,7 +45,14 @@ import * as shifts from '../shifts/service.ts';
 // - charged to room: only a CHECKED_IN stay, within the folio's credit limit (its own, else the
 //   POS setting, unlimited by default); the lines post to the guest folio referencing the order
 //   (source POS_ORDER), with the guest's signature drawn on screen.
-// Items are priced when added (item + options). Voids and discounts are M8-04.
+// Items are priced when added (item + options).
+//
+// Voids and discounts (M8-04; T-143) need pos.void and go through the approvals engine: within
+// the caller's pos.void amount limit at once, above it (or with no limit set) a manager
+// approves. Both are measured by what the guest pays less, taxes included. A voided item stays
+// on the order with its reason and is not charged; a discount (one per item, at most what the
+// item charges) posts at settlement as a DISCOUNT line taking its share off the charge and
+// each of its taxes, like a folio discount.
 
 export interface RegisterDeps {
   db: Db;
@@ -266,28 +280,36 @@ const ORDER = {
   stay: { select: { id: true, room: { select: { number: true } } } },
   lines: {
     orderBy: [{ addedAt: 'asc' }, { id: 'asc' }],
-    include: { addedBy: { select: { name: true } } },
+    include: {
+      addedBy: { select: { name: true } },
+      voidedBy: { select: { name: true } },
+      discountedBy: { select: { name: true } },
+    },
   },
 } satisfies Prisma.PosOrderInclude;
 type OrderRow = Prisma.PosOrderGetPayload<{ include: typeof ORDER }>;
+type LineRow = Prisma.PosOrderLineGetPayload<object>;
 
-/** Lines' totals: as posted once settled; worked out for the open day while open. */
-async function totalsOf(db: Client, o: OrderRow, clock: Clock) {
-  if (o.status === 'CANCELLED') return { subtotal: 0n, tax: 0n, total: 0n };
-  if (o.folioId && o.totalMinor !== null) {
-    const charges = await db.folioLine.findMany({
-      where: { folioId: o.folioId, kind: 'CHARGE', sourceType: 'POS_ORDER', sourceId: o.id },
-      select: { id: true, amountMinor: true },
-    });
-    const subtotal = charges.reduce((s, l) => s + l.amountMinor, 0n);
-    return { subtotal, tax: o.totalMinor - subtotal, total: o.totalMinor };
-  }
-  if (o.lines.length === 0) return { subtotal: 0n, tax: 0n, total: 0n };
-  const date = await businessDate(db, o.propertyId, clock);
-  let subtotal = 0n;
-  let total = 0n;
+/** Half-up rounding of a × b ÷ c for non-negative a, b and positive c (as folio discounts). */
+const share = (a: bigint, b: bigint, c: bigint) => (a * b * 2n + c) / (2n * c);
+
+interface LineMath {
+  /** Before tax, after the discount's share off the charge. */
+  net: bigint;
+  /** With taxes, after the discount; 0 when voided. */
+  total: bigint;
+  /** With taxes, before the discount. */
+  gross: bigint;
+}
+
+/**
+ * Each line's amounts on `date`, as settlement would post them: the charge with its taxes,
+ * less the discount split over the charge and each tax the way postDiscountLines splits it.
+ */
+async function lineMath(db: Client, lines: LineRow[], date: string) {
   const codes = new Map<string, Awaited<ReturnType<typeof taxesFor>>['versions']>();
-  for (const l of o.lines) {
+  const out = new Map<string, LineMath>();
+  for (const l of lines) {
     let versions = codes.get(l.revenueCodeId);
     if (!versions) {
       const code = await db.revenueCode.findUniqueOrThrow({ where: { id: l.revenueCodeId } });
@@ -295,10 +317,58 @@ async function totalsOf(db: Client, o: OrderRow, clock: Clock) {
       codes.set(l.revenueCodeId, versions);
     }
     const r = calculateTaxes(l.unitPriceMinor * BigInt(l.quantity), versions);
-    subtotal += r.netMinor;
-    total += r.totalMinor;
+    const gross = r.totalMinor;
+    if (l.voidedAt) {
+      out.set(l.id, { net: 0n, total: 0n, gross });
+      continue;
+    }
+    const off = l.discountMinor !== null && gross > 0n ? l.discountMinor : 0n;
+    const taxOff =
+      off === 0n ? 0n : r.taxes.reduce((s, t) => s + share(t.amountMinor, off, gross), 0n);
+    out.set(l.id, { net: r.netMinor - (off - taxOff), total: gross - off, gross });
   }
-  return { subtotal, tax: total - subtotal, total };
+  return out;
+}
+
+/** The business date an order's lines are worked out on: posted, else the open day. */
+async function dateOf(db: Client, o: OrderRow, clock: Clock) {
+  if (o.folioId && o.totalMinor !== null) {
+    const posted = await db.folioLine.findFirst({
+      where: { folioId: o.folioId, kind: 'CHARGE', sourceType: 'POS_ORDER', sourceId: o.id },
+      select: { businessDate: true },
+    });
+    if (posted) return posted.businessDate.toISOString().slice(0, 10);
+  }
+  return businessDate(db, o.propertyId, clock);
+}
+
+/** Lines' totals: as posted once settled; worked out for the open day while open. */
+async function totalsOf(db: Client, o: OrderRow, math: Map<string, LineMath>) {
+  const discount = o.lines.reduce(
+    (s, l) => s + (l.voidedAt || l.discountMinor === null ? 0n : l.discountMinor),
+    0n,
+  );
+  if (o.status === 'CANCELLED') return { subtotal: 0n, tax: 0n, total: 0n, discount: 0n };
+  if (o.folioId && o.totalMinor !== null) {
+    const posted = await db.folioLine.findMany({
+      where: {
+        folioId: o.folioId,
+        kind: { in: ['CHARGE', 'DISCOUNT'] },
+        sourceType: 'POS_ORDER',
+        sourceId: o.id,
+      },
+      select: { amountMinor: true },
+    });
+    const subtotal = posted.reduce((s, l) => s + l.amountMinor, 0n);
+    return { subtotal, tax: o.totalMinor - subtotal, total: o.totalMinor, discount };
+  }
+  let subtotal = 0n;
+  let total = 0n;
+  for (const m of math.values()) {
+    subtotal += m.net;
+    total += m.total;
+  }
+  return { subtotal, tax: total - subtotal, total, discount };
 }
 
 async function orderItem(
@@ -307,8 +377,12 @@ async function orderItem(
   currency: string,
   clock: Clock,
 ): Promise<z.input<typeof PosOrderItem>> {
+  const math =
+    o.lines.length === 0 || o.status === 'CANCELLED'
+      ? new Map<string, LineMath>()
+      : await lineMath(db, o.lines, await dateOf(db, o, clock));
   const [totals, payments] = await Promise.all([
-    totalsOf(db, o, clock),
+    totalsOf(db, o, math),
     o.status === 'PAID' && o.folioId
       ? db.payment.findMany({
           where: { folioId: o.folioId },
@@ -335,9 +409,24 @@ async function orderItem(
       note: l.note,
       addedBy: l.addedBy.name,
       addedAt: iso(l.addedAt),
+      voided:
+        l.voidedAt && l.voidReason
+          ? { at: iso(l.voidedAt), by: l.voidedBy?.name ?? '', reason: l.voidReason }
+          : null,
+      discount:
+        l.discountMinor !== null && l.discountedAt && l.discountReason
+          ? {
+              amountMinor: l.discountMinor.toString(),
+              at: iso(l.discountedAt),
+              by: l.discountedBy?.name ?? '',
+              reason: l.discountReason,
+            }
+          : null,
+      totalMinor: (math.get(l.id)?.total ?? 0n).toString(),
     })),
     subtotalMinor: totals.subtotal.toString(),
     taxMinor: totals.tax.toString(),
+    discountMinor: totals.discount.toString(),
     totalMinor: totals.total.toString(),
     settledAt: o.settledAt ? iso(o.settledAt) : null,
     settledBy: o.settledBy?.name ?? null,
@@ -512,27 +601,48 @@ async function postLines(
   shiftId: string,
 ) {
   const ids: string[] = [];
-  for (const l of [...order.lines].sort((a, b) => a.addedAt.getTime() - b.addedAt.getTime())) {
+  const ctx = { tx, tenant, approvalRequestId: null, now };
+  const active = order.lines.filter((l) => !l.voidedAt);
+  for (const l of active.sort((a, b) => a.addedAt.getTime() - b.addedAt.getTime())) {
     const code = await tx.revenueCode.findUniqueOrThrow({ where: { id: l.revenueCodeId } });
     const windowId = routedWindow(folio, code);
     if (!windowId) throw new Error('Folio without window 1');
-    ids.push(
-      ...(await postChargeLines(
-        { tx, tenant, approvalRequestId: null, now },
-        {
-          folio,
-          windowId,
-          code,
-          description: `${order.outlet.name}: ${l.name}`,
-          quantity: l.quantity,
-          unitAmountMinor: l.unitPriceMinor,
-          note: l.note,
-          sourceType: 'POS_ORDER',
-          sourceId: order.id,
-          shiftId,
-        },
-      )),
-    );
+    const posted = await postChargeLines(ctx, {
+      folio,
+      windowId,
+      code,
+      description: `${order.outlet.name}: ${l.name}`,
+      quantity: l.quantity,
+      unitAmountMinor: l.unitPriceMinor,
+      note: l.note,
+      sourceType: 'POS_ORDER',
+      sourceId: order.id,
+      shiftId,
+    });
+    ids.push(...posted);
+    if (l.discountMinor === null || !l.discountReason) continue;
+    // M8-04: the item's discount, split over the charge and its taxes.
+    const [chargeId, ...taxIds] = posted;
+    const charge = await tx.folioLine.findUniqueOrThrow({ where: { id: chargeId ?? '' } });
+    const taxes = await tx.folioLine.findMany({ where: { id: { in: taxIds } } });
+    const gross = taxes.reduce((s, t) => s + t.amountMinor, charge.amountMinor);
+    if (gross <= 0n) continue;
+    const discountId = await postDiscountLines(ctx, {
+      charge,
+      taxes,
+      gross,
+      // Taxes changed since it was given: never more than the item now charges.
+      amount: l.discountMinor > gross ? gross : l.discountMinor,
+      reason: l.discountReason,
+      shiftId,
+      sourceType: 'POS_ORDER',
+      sourceId: order.id,
+    });
+    const discountTaxes = await tx.folioLine.findMany({
+      where: { parentLineId: discountId },
+      select: { id: true },
+    });
+    ids.push(discountId, ...discountTaxes.map((t) => t.id));
   }
   const posted = await tx.folioLine.aggregate({
     where: { id: { in: ids } },
@@ -541,8 +651,8 @@ async function postLines(
   return { lineIds: ids, total: posted._sum.amountMinor ?? 0n };
 }
 
-function needsLines(order: { lines: unknown[] }) {
-  if (order.lines.length === 0) {
+function needsLines(order: { lines: { voidedAt: Date | null }[] }) {
+  if (!order.lines.some((l) => !l.voidedAt)) {
     throw new AppError('STATE_TRANSITION_INVALID', 'Add items to the order first');
   }
 }
@@ -748,10 +858,11 @@ export async function chargeToRoom(
 export async function cancelOrder(deps: RegisterDeps, tenant: TenantContext, orderId: string) {
   await deps.tenantDb.$transaction(async (tx) => {
     const order = await lockOpenOrder(tx, orderId);
-    if (order.lines.length > 0) {
+    // Voided items stay on the order with their reasons (M8-04); the rest must be voided first.
+    if (order.lines.some((l) => !l.voidedAt)) {
       throw new AppError(
         'STATE_TRANSITION_INVALID',
-        'Items are on this order: settle it, or void them (M8-04)',
+        'Items are on this order: settle it, or void them first',
       );
     }
     await tx.posOrder.update({
@@ -771,6 +882,184 @@ export async function cancelOrder(deps: RegisterDeps, tenant: TenantContext, ord
       after: { status: 'CANCELLED' },
     });
   });
+  return orderView(deps.tenantDb, orderId, deps.clock);
+}
+
+// ── Voids and discounts (M8-04) ─────────────────────────────────────────────────────────
+
+const LineStored = z.object({
+  orderId: z.string(),
+  lineId: z.string(),
+  /** What the guest pays less, taxes included, minor units (worked out when asked). */
+  amountMinor: z.string(),
+  reason: z.string(),
+});
+type LinePayload = z.output<typeof LineStored>;
+
+/** An item of an open order that is not voided, and what it charges today. */
+async function measureLine(db: Client, clock: Clock, orderId: string, lineId: string) {
+  const order = await db.posOrder.findUnique({ where: { id: orderId }, include: { lines: true } });
+  if (!order) throw new AppError('NOT_FOUND', 'Order not found');
+  if (order.status !== 'OPEN') {
+    throw new AppError('STATE_TRANSITION_INVALID', 'This order is already closed', {
+      status: order.status,
+    });
+  }
+  const line = order.lines.find((l) => l.id === lineId);
+  if (!line) throw new AppError('NOT_FOUND', 'Item not found on this order');
+  if (line.voidedAt) {
+    throw new AppError('STATE_TRANSITION_INVALID', 'This item is already voided');
+  }
+  const date = await businessDate(db, order.propertyId, clock);
+  const math = (await lineMath(db, [line], date)).get(line.id);
+  if (!math) throw new Error('Line without amounts');
+  return { order, line, math };
+}
+
+/** The line, locked with its order, as it is now (approval re-validates here). */
+async function lockLine(tx: Tx, orderId: string, lineId: string) {
+  const order = await lockOpenOrder(tx, orderId);
+  const line = order.lines.find((l) => l.id === lineId);
+  if (!line) throw new AppError('NOT_FOUND', 'Item not found on this order');
+  if (line.voidedAt) {
+    throw new AppError('STATE_TRANSITION_INVALID', 'This item is already voided');
+  }
+  return { order, line };
+}
+
+async function executeVoid(ctx: ExecuteContext & { now: Date }, p: LinePayload) {
+  const { tx } = ctx;
+  const { order, line } = await lockLine(tx, p.orderId, p.lineId);
+  await tx.posOrderLine.update({
+    where: { id: line.id },
+    data: {
+      voidedAt: ctx.now,
+      voidedById: ctx.tenant.userId,
+      voidReason: p.reason,
+      voidApprovalRequestId: ctx.approvalRequestId,
+    },
+  });
+  await tx.posOrder.update({ where: { id: order.id }, data: { version: { increment: 1 } } });
+  const facts = { lineId: line.id, name: line.name, quantity: line.quantity };
+  await recordAudit(tx, {
+    action: 'pos.item_voided',
+    entityType: 'pos_order',
+    entityId: order.id,
+    reason: p.reason,
+    approvalRequestId: ctx.approvalRequestId ?? undefined,
+    after: { ...facts, amountMinor: p.amountMinor },
+  });
+  await recordEvent(tx, {
+    type: 'pos.item_voided',
+    payload: { orderId: order.id, ...facts, amountMinor: p.amountMinor },
+  });
+  return line.id;
+}
+
+async function executeDiscount(ctx: ExecuteContext & { now: Date }, p: LinePayload) {
+  const { tx } = ctx;
+  const { order, line } = await lockLine(tx, p.orderId, p.lineId);
+  if (line.discountMinor !== null) {
+    throw new AppError('STATE_TRANSITION_INVALID', 'This item already has a discount');
+  }
+  const date = await businessDate(tx, order.propertyId, () => ctx.now);
+  const gross = (await lineMath(tx, [line], date)).get(line.id)?.gross ?? 0n;
+  const amount = BigInt(p.amountMinor);
+  if (amount > gross) {
+    throw invalid('body.amountMinor', 'The discount is more than the item charges');
+  }
+  await tx.posOrderLine.update({
+    where: { id: line.id },
+    data: {
+      discountMinor: amount,
+      discountReason: p.reason,
+      discountedById: ctx.tenant.userId,
+      discountedAt: ctx.now,
+      discountApprovalRequestId: ctx.approvalRequestId,
+    },
+  });
+  await tx.posOrder.update({ where: { id: order.id }, data: { version: { increment: 1 } } });
+  const facts = { lineId: line.id, name: line.name, amountMinor: p.amountMinor };
+  await recordAudit(tx, {
+    action: 'pos.discount_given',
+    entityType: 'pos_order',
+    entityId: order.id,
+    reason: p.reason,
+    approvalRequestId: ctx.approvalRequestId ?? undefined,
+    after: facts,
+  });
+  await recordEvent(tx, { type: 'pos.discount_given', payload: { orderId: order.id, ...facts } });
+  return line.id;
+}
+
+const measured = (p: LinePayload) => ({ amountMinor: BigInt(p.amountMinor) });
+
+export function posVoidHandler(deps: RegisterDeps): ApprovalActionHandler<LinePayload> {
+  return {
+    action: 'pos.void',
+    payload: LineStored,
+    measure: measured,
+    execute: (ctx, p) => executeVoid({ ...ctx, now: deps.clock() }, p),
+  };
+}
+
+export function posDiscountHandler(deps: RegisterDeps): ApprovalActionHandler<LinePayload> {
+  return {
+    action: 'pos.discount',
+    payload: LineStored,
+    measure: measured,
+    execute: (ctx, p) => executeDiscount({ ...ctx, now: deps.clock() }, p),
+  };
+}
+
+/** M8-04: void an item; above the caller's pos.void limit it waits for approval (202). */
+export async function voidLine(
+  deps: RegisterDeps,
+  tenant: TenantContext,
+  orderId: string,
+  lineId: string,
+  body: { reason: string },
+) {
+  const { math } = await measureLine(deps.tenantDb, deps.clock, orderId, lineId);
+  const result = await performOrRequest(
+    { db: deps.db, tenantDb: deps.tenantDb, clock: deps.clock, handlers: [] },
+    tenant,
+    posVoidHandler(deps),
+    { orderId, lineId, amountMinor: math.total.toString(), reason: body.reason },
+    body.reason,
+  );
+  if (!('resultRef' in result)) return result;
+  return orderView(deps.tenantDb, orderId, deps.clock);
+}
+
+/** M8-04: a discount on an item; above the caller's pos.void limit it waits for approval. */
+export async function discountLine(
+  deps: RegisterDeps,
+  tenant: TenantContext,
+  orderId: string,
+  lineId: string,
+  body: z.output<typeof DiscountPosOrderLineBody>,
+) {
+  const { line, math } = await measureLine(deps.tenantDb, deps.clock, orderId, lineId);
+  if (line.discountMinor !== null) {
+    throw new AppError('STATE_TRANSITION_INVALID', 'This item already has a discount');
+  }
+  const amount =
+    body.percent !== undefined
+      ? share(math.gross, BigInt(Math.round(body.percent * 100)), 10_000n)
+      : BigInt(body.amountMinor ?? '0');
+  if (amount <= 0n) throw invalid('body.amountMinor', 'The discount is more than nothing');
+  if (amount > math.gross) {
+    throw invalid('body.amountMinor', 'The discount is more than the item charges');
+  }
+  const result = await performOrRequest(
+    { db: deps.db, tenantDb: deps.tenantDb, clock: deps.clock, handlers: [] },
+    tenant,
+    posDiscountHandler(deps),
+    { orderId, lineId, amountMinor: amount.toString(), reason: body.reason },
+    body.reason,
+  );
+  if (!('resultRef' in result)) return result;
   return orderView(deps.tenantDb, orderId, deps.clock);
 }
 

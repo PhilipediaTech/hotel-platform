@@ -9,7 +9,7 @@ import { routes } from '../app/routes.tsx';
 import { setApiPropertyId } from '../lib/api.ts';
 import { LAGOS, makeMe, membership } from '../test/me-fixture.ts';
 
-// S33 Lite POS register (PRD M8-02, M8-03, M8-05; T-142).
+// S33 Lite POS register (PRD M8-02, M8-03, M8-05; T-142; voids and discounts M8-04, T-143).
 
 const json = (status: number, body?: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
@@ -49,6 +49,7 @@ const order = (lines: unknown[], extra: object = {}) => ({
   lines,
   subtotalMinor: lines.length ? '150000' : '0',
   taxMinor: lines.length ? '18750' : '0',
+  discountMinor: '0',
   totalMinor: lines.length ? '168750' : '0',
   settledAt: null,
   settledBy: null,
@@ -76,6 +77,9 @@ const line = {
   note: null,
   addedBy: 'Cashier',
   addedAt: '2026-11-10T09:01:00Z',
+  voided: null,
+  discount: null,
+  totalMinor: '168750',
 };
 
 const calls: { key: string; body: unknown }[] = [];
@@ -223,5 +227,87 @@ describe('POS register (S33)', () => {
       await screen.findByText("Counted: the variance needs a supervisor's sign-off"),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Reason for the variance')).toBeInTheDocument();
+  }, 15_000);
+
+  it('voids an item with a reason; above the limit it waits for a manager (M8-04)', async () => {
+    handlers['GET /me'] = () =>
+      json(
+        200,
+        makeMe({ memberships: [membership(LAGOS, ['pos.order', 'pos.shift', 'pos.void'])] }),
+      );
+    handlers['GET /pos/orders'] = () => json(200, { data: [order([line])] });
+    handlers[`GET /pos/orders/${id(3)}`] = () => json(200, order([line]));
+    handlers[`POST /pos/orders/${id(3)}/lines/${line.id}/void`] = () =>
+      json(202, {
+        approvalRequestId: id(40),
+        status: 'PENDING',
+        expiresAt: '2026-11-10T09:31:00Z',
+        approverRoles: ['General Manager'],
+      });
+    const user = userEvent.setup();
+    renderAt('/pos');
+    const list = await screen.findByRole('list', { name: 'Open orders' });
+    await user.click(await within(list).findByRole('button', { name: /Table 4/ }));
+    await user.click(await screen.findByRole('button', { name: 'Void or discount Zobo' }));
+    const form = screen.getByRole('form', { name: 'Void or discount: Zobo' });
+    const confirm = within(form).getByRole('button', { name: 'Void' });
+    expect(confirm).toBeDisabled(); // a reason first
+    await user.type(within(form).getByLabelText('Reason'), 'Wrong drink');
+    await user.click(confirm);
+    await waitFor(() =>
+      expect(sent(`POST /pos/orders/${id(3)}/lines/${line.id}/void`)).toHaveLength(1),
+    );
+    expect(sent(`POST /pos/orders/${id(3)}/lines/${line.id}/void`)[0]?.body).toEqual({
+      reason: 'Wrong drink',
+    });
+    expect(await screen.findByText(/Sent to a manager for approval/)).toBeInTheDocument();
+  }, 15_000);
+
+  it('gives a discount and shows it on the order (M8-04)', async () => {
+    handlers['GET /me'] = () =>
+      json(
+        200,
+        makeMe({ memberships: [membership(LAGOS, ['pos.order', 'pos.shift', 'pos.void'])] }),
+      );
+    let current = order([line]);
+    handlers['GET /pos/orders'] = () => json(200, { data: [current] });
+    handlers[`GET /pos/orders/${id(3)}`] = () => json(200, current);
+    handlers[`POST /pos/orders/${id(3)}/lines/${line.id}/discount`] = () => {
+      current = order(
+        [
+          {
+            ...line,
+            discount: {
+              amountMinor: '50000',
+              at: '2026-11-10T09:05:00Z',
+              by: 'Cashier',
+              reason: 'Regular guest',
+            },
+            totalMinor: '118750',
+          },
+        ],
+        { discountMinor: '50000', totalMinor: '118750' },
+      );
+      return json(200, current);
+    };
+    const user = userEvent.setup();
+    renderAt('/pos');
+    const list = await screen.findByRole('list', { name: 'Open orders' });
+    await user.click(await within(list).findByRole('button', { name: /Table 4/ }));
+    await user.click(await screen.findByRole('button', { name: 'Void or discount Zobo' }));
+    const form = screen.getByRole('form', { name: 'Void or discount: Zobo' });
+    await user.click(within(form).getByLabelText('Give a discount'));
+    await user.selectOptions(within(form).getByLabelText('Discount by'), 'amount');
+    await user.type(within(form).getByLabelText('Amount off'), '500');
+    await user.type(within(form).getByLabelText('Reason'), 'Regular guest');
+    await user.click(within(form).getByRole('button', { name: 'Give discount' }));
+    await waitFor(() =>
+      expect(sent(`POST /pos/orders/${id(3)}/lines/${line.id}/discount`)).toHaveLength(1),
+    );
+    expect(sent(`POST /pos/orders/${id(3)}/lines/${line.id}/discount`)[0]?.body).toEqual({
+      amountMinor: '50000',
+      reason: 'Regular guest',
+    });
+    expect(await screen.findByText(/Discount: Regular guest/)).toBeInTheDocument();
   }, 15_000);
 });

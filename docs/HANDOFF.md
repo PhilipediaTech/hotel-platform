@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-142 (POS register: outlet shifts, orders, settlement, room charges, shift close) is pushed on `feat/T-142-pos-register` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: POS voids and discounts with approval (M8-04).
+T-143 (POS voids and discounts with approval) is pushed on `feat/T-143-pos-voids-discounts` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: row-level security.

@@ -853,18 +853,31 @@ async function measureDiscount(
   return { charge, taxes, gross, amount, bps };
 }
 
-async function discount(ctx: Ctx, p: DiscountPayload): Promise<string> {
+/**
+ * Posts a discount off a charge: a DISCOUNT line and, under it, each tax's share, so the parts
+ * add up to `amount` (the discount with its taxes, out of `gross`). Folio discounts (M4-04)
+ * and POS discounts at settlement (M8-04) use it. Answers the DISCOUNT line's ID.
+ */
+export async function postDiscountLines(
+  ctx: Ctx,
+  args: {
+    charge: Prisma.FolioLineGetPayload<object>;
+    taxes: Prisma.FolioLineGetPayload<object>[];
+    gross: bigint;
+    amount: bigint;
+    reason: string;
+    shiftId: string | null;
+    sourceType?: string;
+    sourceId?: string;
+  },
+): Promise<string> {
   const { tx } = ctx;
-  const folio = await openFolioFor(tx, p.folioId);
-  const { charge, taxes, gross, amount } = await measureDiscount(tx, p.folioId, {
-    lineId: p.lineId,
-    amountMinor: p.amountMinor,
-  });
-  const date = await postingDate(tx, folio.propertyId, () => ctx.now);
+  const { charge, taxes, gross, amount } = args;
+  const date = await postingDate(tx, charge.propertyId, () => ctx.now);
   // Each tax gives up its share; the charge part takes what is left, so the parts add up.
   const taxParts = taxes.map((t) => ({ t, part: share(t.amountMinor, amount, gross) }));
   const chargePart = amount - taxParts.reduce((s, x) => s + x.part, 0n);
-  const shiftId = await shiftIdOf(tx, ctx.tenant.userId);
+  const shiftId = args.shiftId;
   const common = {
     propertyId: charge.propertyId,
     folioId: charge.folioId,
@@ -876,7 +889,7 @@ async function discount(ctx: Ctx, p: DiscountPayload): Promise<string> {
     shiftId,
     approvalRequestId: ctx.approvalRequestId,
   };
-  const id = await closedDayGuard(async () => {
+  return closedDayGuard(async () => {
     const line = await tx.folioLine.create({
       data: {
         ...common,
@@ -886,7 +899,9 @@ async function discount(ctx: Ctx, p: DiscountPayload): Promise<string> {
         unitAmountMinor: -chargePart,
         amountMinor: -chargePart,
         parentLineId: charge.id,
-        reason: p.reason,
+        reason: args.reason,
+        sourceType: args.sourceType ?? null,
+        sourceId: args.sourceId ?? null,
       },
     });
     for (const { t, part } of taxParts) {
@@ -905,6 +920,23 @@ async function discount(ctx: Ctx, p: DiscountPayload): Promise<string> {
       });
     }
     return line.id;
+  });
+}
+
+async function discount(ctx: Ctx, p: DiscountPayload): Promise<string> {
+  const { tx } = ctx;
+  const folio = await openFolioFor(tx, p.folioId);
+  const { charge, taxes, gross, amount } = await measureDiscount(tx, p.folioId, {
+    lineId: p.lineId,
+    amountMinor: p.amountMinor,
+  });
+  const id = await postDiscountLines(ctx, {
+    charge,
+    taxes,
+    gross,
+    amount,
+    reason: p.reason,
+    shiftId: await shiftIdOf(tx, ctx.tenant.userId),
   });
   await recordAudit(tx, {
     action: 'folio.discount_given',

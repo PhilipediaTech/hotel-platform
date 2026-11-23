@@ -162,6 +162,8 @@ model Property {
   menuCategories       MenuCategory[]
   menuItems            MenuItem[]
   menuModifiers        MenuModifier[]
+  posOrders            PosOrder[]
+  posOrderLines        PosOrderLine[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -371,6 +373,9 @@ model User {
   eventsInspected     EventBooking[]        @relation("EventInspector")
   eventQuoteVersions  EventQuoteVersion[]   @relation("EventQuoteAuthor")
   eventContracts      EventContract[]       @relation("EventContractIssuer")
+  posOrdersOpened     PosOrder[]            @relation("PosOrderOpener")
+  posOrdersSettled    PosOrder[]            @relation("PosOrderSettler")
+  posOrderLinesAdded  PosOrderLine[]        @relation("PosOrderLineAuthor")
 
   @@map("users")
 }
@@ -665,6 +670,7 @@ model FileObject {
   cards          RegistrationCard[]
   onlineCheckIns OnlineCheckIn[]
   staffDocuments StaffDocument[]
+  posSignatures  PosOrder[]
 
   @@index([propertyId, entityType, entityId])
   @@map("files")
@@ -825,6 +831,7 @@ model RevenueCode {
   services          Service[]
   routingRules      RoutingRule[]
   menuItems         MenuItem[]
+  posOrderLines     PosOrderLine[]
 
   @@unique([propertyId, code])
   // Target of composite foreign keys: a tax rule posts to a code of its own property.
@@ -1277,6 +1284,7 @@ model Stay {
   onlineCheckIn OnlineCheckIn?
 
   lostFoundItems LostFoundItem[]
+  posOrders      PosOrder[]
 
   @@unique([propertyId, id])
   @@index([propertyId, arrival])
@@ -1498,6 +1506,7 @@ model Folio {
   eventContracts EventContract[]
   eventBookings  EventBooking[]
   arInvoices     ArInvoice[]
+  posOrders      PosOrder[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, id])
@@ -1632,6 +1641,9 @@ model CashierShift {
   property    Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   user        User?          @relation("ShiftCashier", fields: [userId], references: [id], onDelete: Restrict)
   signedOffBy User?          @relation("ShiftSignedOff", fields: [signedOffById], references: [id], onDelete: SetNull)
+  outlet      Outlet?        @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  posOrders   PosOrder[]     @relation("PosOrderShift")
+  posSettled  PosOrder[]     @relation("PosOrderSettledShift")
   counts      CashCount[]
   handovers   CashHandover[]
   folioLines  FolioLine[]
@@ -2937,6 +2949,8 @@ model Outlet {
 
   property   Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   categories MenuCategory[]
+  shifts     CashierShift[]
+  orders     PosOrder[]
 
   @@unique([propertyId, code])
   @@map("outlets")
@@ -2975,6 +2989,7 @@ model MenuItem {
   category    MenuCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   revenueCode RevenueCode    @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
   modifiers   MenuModifier[]
+  orderLines  PosOrderLine[]
 
   @@index([categoryId])
   @@map("menu_items")
@@ -2994,6 +3009,78 @@ model MenuModifier {
 
   @@unique([itemId, name])
   @@map("modifiers")
+}
+
+/// An order at an outlet (M8-03; T-142): a tab or a table. It is paid at the outlet (its
+/// lines go to a POS folio of its own, settled by the payments) or charged to a checked-in
+/// guest's room, who signs on screen. Nothing is deleted.
+model PosOrder {
+  id              String    @id @default(uuid()) @db.Uuid
+  propertyId      String    @map("property_id") @db.Uuid
+  outletId        String    @map("outlet_id") @db.Uuid
+  /// The outlet shift it was opened on.
+  shiftId         String    @map("shift_id") @db.Uuid
+  number          String
+  /// Table number or tab name.
+  label           String
+  /// OPEN | PAID | ROOM_CHARGED | CANCELLED (CHECK in SQL).
+  status          String    @default("OPEN")
+  openedById      String    @map("opened_by_id") @db.Uuid
+  openedAt        DateTime  @default(now()) @map("opened_at") @db.Timestamptz(6)
+  settledAt       DateTime? @map("settled_at") @db.Timestamptz(6)
+  settledById     String?   @map("settled_by_id") @db.Uuid
+  /// The outlet shift the payments went to (or the room charge was made on).
+  settledShiftId  String?   @map("settled_shift_id") @db.Uuid
+  /// The POS folio (paid) or the guest's folio (charged to room).
+  folioId         String?   @map("folio_id") @db.Uuid
+  stayId          String?   @map("stay_id") @db.Uuid
+  signatureFileId String?   @map("signature_file_id") @db.Uuid
+  /// What was settled, taxes included.
+  totalMinor      BigInt?   @map("total_minor")
+  version         Int       @default(0)
+
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  outlet        Outlet         @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  shift         CashierShift   @relation("PosOrderShift", fields: [shiftId], references: [id], onDelete: Restrict)
+  settledShift  CashierShift?  @relation("PosOrderSettledShift", fields: [settledShiftId], references: [id], onDelete: Restrict)
+  openedBy      User           @relation("PosOrderOpener", fields: [openedById], references: [id], onDelete: Restrict)
+  settledBy     User?          @relation("PosOrderSettler", fields: [settledById], references: [id], onDelete: Restrict)
+  folio         Folio?         @relation(fields: [folioId], references: [id], onDelete: Restrict)
+  stay          Stay?          @relation(fields: [stayId], references: [id], onDelete: Restrict)
+  signatureFile FileObject?    @relation(fields: [signatureFileId], references: [id], onDelete: Restrict)
+  lines         PosOrderLine[]
+
+  @@unique([propertyId, number])
+  @@index([propertyId, outletId, status])
+  @@map("pos_orders")
+}
+
+/// An item on an order (M8-03; T-142), priced when added: the item's price plus its options.
+model PosOrderLine {
+  id             String   @id @default(uuid()) @db.Uuid
+  propertyId     String   @map("property_id") @db.Uuid
+  orderId        String   @map("order_id") @db.Uuid
+  menuItemId     String   @map("menu_item_id") @db.Uuid
+  /// The item's name when added, with its options, e.g. "Chapman (Large, No ice)".
+  name           String
+  quantity       Int
+  /// Item price plus options, before tax.
+  unitPriceMinor BigInt   @map("unit_price_minor")
+  /// [{ id, name, priceMinor }] as chosen.
+  modifiers      Json     @default("[]")
+  revenueCodeId  String   @map("revenue_code_id") @db.Uuid
+  note           String?
+  addedById      String   @map("added_by_id") @db.Uuid
+  addedAt        DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  order       PosOrder    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  menuItem    MenuItem    @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  revenueCode RevenueCode @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
+  addedBy     User        @relation("PosOrderLineAuthor", fields: [addedById], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("pos_order_lines")
 }
 
 /// An organisation's own wording of a message (M11-05). The defaults live in the code

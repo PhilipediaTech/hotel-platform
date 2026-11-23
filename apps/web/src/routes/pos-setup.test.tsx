@@ -56,6 +56,7 @@ beforeEach(() => {
     'GET /me': () => json(200, makeMe({ memberships: [membership(LAGOS, ['pos.setup'])] })),
     'GET /auth/device': () => json(200, { pinSwitchAvailable: false, deviceLabel: null }),
     'GET /outlets': () => json(200, { data: [bar], currency: 'NGN', revenueCodes: [FNB] }),
+    'GET /pos/settings': () => json(200, { roomChargeLimitMinor: null }),
   };
   vi.stubGlobal(
     'fetch',
@@ -116,5 +117,17 @@ describe('POS setup (S33)', () => {
     await user.click(within(outlet).getByRole('button', { name: 'Change price' }));
     await waitFor(() => expect(sent(`PATCH /menu-items/${id(3)}`)).toHaveLength(1));
     expect(sent(`PATCH /menu-items/${id(3)}`)[0]?.body).toEqual({ priceMinor: '400000' });
+  }, 15_000);
+
+  it('sets the room charge limit', async () => {
+    handlers['PUT /pos/settings'] = () => json(200, { roomChargeLimitMinor: '50000000' });
+    const user = userEvent.setup();
+    renderAt('/pos/setup');
+    const form = await screen.findByRole('form', { name: 'Room charges' });
+    expect(within(form).getByText('No limit')).toBeInTheDocument();
+    await user.type(within(form).getByLabelText('Room charge limit'), '500,000');
+    await user.click(within(form).getByRole('button', { name: 'Save limit' }));
+    await waitFor(() => expect(sent('PUT /pos/settings')).toHaveLength(1));
+    expect(sent('PUT /pos/settings')[0]?.body).toEqual({ roomChargeLimitMinor: '50000000' });
   }, 15_000);
 });

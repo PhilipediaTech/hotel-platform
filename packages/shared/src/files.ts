@@ -113,6 +113,15 @@ export const FILE_KINDS = [
     maxBytes: 10 * MB,
     retentionClass: 'STANDARD',
   }),
+  // A guest's signature on a POS room charge (M8-03; T-142), drawn on the outlet's screen.
+  k({
+    entityType: 'PosOrder',
+    permission: 'pos.order',
+    readPermission: 'folio.read',
+    contentTypes: ['image/png'],
+    maxBytes: 1 * MB,
+    retentionClass: 'STANDARD',
+  }),
 ] as const;
 
 export const FILE_ENTITY_TYPES = FILE_KINDS.map((kind) => kind.entityType) as [

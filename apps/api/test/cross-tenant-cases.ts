@@ -1586,6 +1586,62 @@ async function bOutletUnchanged(db: Db, world: TenantWorld) {
   expect((await db.menuModifier.findMany({ where })).map((m) => m.name)).toEqual(['Their ice']);
 }
 
+/** B's in-house guest and Pool bar, with an outlet shift and an open order on it (T-142). */
+async function bPosOrder(db: Db, world: TenantWorld, propertyId: string) {
+  const stay = await bFolio(db, world, propertyId);
+  const menu = await bOutlet(db, world, propertyId);
+  const shift = await db.cashierShift.create({
+    data: { propertyId, userId: world.bStaff.id, outletId: menu.outletId },
+  });
+  const order = await db.posOrder.create({
+    data: {
+      propertyId,
+      outletId: menu.outletId,
+      shiftId: shift.id,
+      number: 'P09999',
+      label: 'Their table',
+      openedById: world.bStaff.id,
+    },
+  });
+  await db.posOrderLine.create({
+    data: {
+      propertyId,
+      orderId: order.id,
+      menuItemId: menu.itemId,
+      name: 'Their beer',
+      quantity: 1,
+      unitPriceMinor: 100000n,
+      revenueCodeId: menu.revenueCodeId,
+      addedById: world.bStaff.id,
+    },
+  });
+  await db.property.update({
+    where: { id: propertyId },
+    data: { settings: { pos: { roomChargeLimitMinor: '5000' } } },
+  });
+  return {
+    ...menu,
+    stayId: stay.stayId,
+    folioId: stay.folioId,
+    shiftId: shift.id,
+    orderId: order.id,
+  };
+}
+
+async function bPosOrderUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  const orders = await db.posOrder.findMany({ where, include: { lines: true } });
+  expect(orders.map((o) => [o.label, o.status, o.lines.length])).toEqual([
+    ['Their table', 'OPEN', 1],
+  ]);
+  const shifts = await db.cashierShift.findMany({ where });
+  expect(shifts.map((s) => [s.status, s.outletId !== null])).toEqual([['OPEN', true]]);
+  expect(await db.folioLine.count({ where: { ...where, sourceType: 'POS_ORDER' } })).toBe(0);
+  const property = await db.property.findUniqueOrThrow({ where: { id: world.b1.id } });
+  expect(property.settings).toEqual({ pos: { roomChargeLimitMinor: '5000' } });
+  await bOutletUnchanged(db, world);
+}
+
 async function bTaskUnchanged(db: Db, world: TenantWorld) {
   const tasks = await db.task.findMany({
     where: { propertyId: world.b1.id },
@@ -3253,6 +3309,69 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bStaffUnchanged,
   },
   removeCertification: { seed: bStaff, untouched: bStaffUnchanged },
+  getPosRegister: {
+    seed: bPosOrder,
+    listIds: (body) => {
+      const b = body as { outlets: { id: string }[]; shifts: { id: string; outletId: string }[] };
+      return [...b.outlets.map((o) => o.id), ...b.shifts.flatMap((s) => [s.id, s.outletId])];
+    },
+  },
+  openOutletShift: {
+    seed: bPosOrder,
+    creates: true,
+    body: (theirs) => ({ outletId: theirs['outletId'], floatMinor: '0' }),
+    untouched: bPosOrderUnchanged,
+  },
+  closeOutletShift: {
+    seed: bPosOrder,
+    body: () => ({ counts: [{ method: 'CASH', currency: 'NGN', countedMinor: '0' }] }),
+    untouched: bPosOrderUnchanged,
+  },
+  addOutletVarianceNote: {
+    seed: bPosOrder,
+    body: () => ({ note: 'Leak' }),
+    untouched: bPosOrderUnchanged,
+  },
+  getOutletMenu: { seed: bPosOrder, query: (theirs) => ({ outletId: theirs['outletId'] ?? '' }) },
+  listPosOrders: {
+    seed: bPosOrder,
+    query: (theirs) => ({ outletId: theirs['outletId'] ?? '' }),
+    listIds: ids,
+  },
+  getPosOrder: { seed: bPosOrder },
+  openPosOrder: {
+    seed: bPosOrder,
+    creates: true,
+    body: (theirs) => ({ outletId: theirs['outletId'], label: 'Leak' }),
+    untouched: bPosOrderUnchanged,
+  },
+  addPosOrderLine: {
+    seed: bPosOrder,
+    body: (theirs) => ({ menuItemId: theirs['itemId'] }),
+    untouched: bPosOrderUnchanged,
+  },
+  settlePosOrder: {
+    seed: bPosOrder,
+    body: () => ({ payments: [{ method: 'CASH', amountMinor: '100000' }] }),
+    untouched: bPosOrderUnchanged,
+  },
+  chargePosOrderToRoom: {
+    seed: bPosOrder,
+    body: (theirs) => ({ stayId: theirs['stayId'], signatureFileId: theirs['orderId'] }),
+    untouched: bPosOrderUnchanged,
+  },
+  cancelPosOrder: { seed: bPosOrder, untouched: bPosOrderUnchanged },
+  listPosRooms: {
+    seed: bPosOrder,
+    listIds: (body) => (body as { data: { stayId: string }[] }).data.map((r) => r.stayId),
+  },
+  getPosSettings: { seed: bPosOrder, listIds: () => [] },
+  updatePosSettings: {
+    seed: bPosOrder,
+    creates: true,
+    body: () => ({ roomChargeLimitMinor: '1' }),
+    untouched: bPosOrderUnchanged,
+  },
   listOutlets: {
     seed: bOutlet,
     listIds: (body) => {

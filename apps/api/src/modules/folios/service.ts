@@ -510,6 +510,8 @@ export async function postChargeLines(
     sourceId: string | null;
     /** Night audit posts on the day it audits; the desk on the open day. */
     businessDate?: string;
+    /** POS posts on the outlet shift (T-142); otherwise the poster's desk shift. */
+    shiftId?: string;
   },
 ): Promise<string[]> {
   const { tx } = ctx;
@@ -518,7 +520,7 @@ export async function postChargeLines(
   const { versions, rules } = await taxesFor(tx, args.code, date);
   const result = calculateTaxes(gross, versions);
   const versionOf = new Map(versions.map((v) => [v.taxRuleId, v.id]));
-  const shiftId = await shiftIdOf(tx, ctx.tenant.userId);
+  const shiftId = args.shiftId ?? (await shiftIdOf(tx, ctx.tenant.userId));
   const common = {
     propertyId: args.folio.propertyId,
     folioId: args.folio.id,

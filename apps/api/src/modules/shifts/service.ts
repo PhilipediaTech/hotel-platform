@@ -39,6 +39,7 @@ const abs = (n: bigint) => (n < 0n ? -n : n);
 const SHIFT = {
   user: { select: { name: true } },
   signedOffBy: { select: { name: true } },
+  outlet: { select: { name: true } },
   counts: { orderBy: [{ method: 'asc' }, { currency: 'asc' }] },
   handovers: { include: { toUser: { select: { name: true } } }, orderBy: { at: 'asc' } },
 } satisfies Prisma.CashierShiftInclude;
@@ -61,11 +62,13 @@ async function baseCurrency(db: Client, propertyId: string): Promise<string> {
 /** Handovers confirmed to the shift's cashier while the shift was open. */
 async function handoversIn(
   db: Client,
-  shift: { userId: string | null; openedAt: Date; closedAt: Date | null },
+  shift: { userId: string | null; outletId: string | null; openedAt: Date; closedAt: Date | null },
 ) {
-  if (!shift.userId) return [];
+  // Handovers are between desk shifts only (T-061); an outlet shift is counted on its own.
+  if (!shift.userId || shift.outletId) return [];
   const shifts = await db.cashierShift.findMany({
     where: {
+      outletId: null,
       handovers: {
         some: {
           toUserId: shift.userId,
@@ -158,6 +161,7 @@ async function shiftItem(db: Client, s: FullShift): Promise<z.input<typeof Shift
     id: s.id,
     userId: s.userId,
     cashier: cashierName(s),
+    outlet: s.outlet?.name ?? null,
     status: s.status,
     openedAt: iso(s.openedAt),
     closedAt: s.closedAt ? iso(s.closedAt) : null,
@@ -471,7 +475,8 @@ export async function signOffShift(
 
 export async function listShifts(deps: ShiftDeps, query: z.output<typeof ShiftQuery>) {
   const shifts = await deps.tenantDb.cashierShift.findMany({
-    where: { status: query.status, outletId: null },
+    // Outlet shifts too (T-142): a supervisor signs them off the same way.
+    where: { status: query.status },
     include: SHIFT,
     orderBy: { openedAt: query.status === 'CLOSED' ? 'desc' : 'asc' },
     take: 200,

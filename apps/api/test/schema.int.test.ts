@@ -105,6 +105,8 @@ describe('migrations', () => {
       'payments',
       'platform_invoice_checkouts',
       'platform_invoices',
+      'pos_order_lines',
+      'pos_orders',
       'preventive_plans',
       'promo_codes',
       'properties',

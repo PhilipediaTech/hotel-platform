@@ -146,6 +146,11 @@ export const TENANT_MODELS: Record<string, Scope> = {
   RequisitionLine: { kind: 'property' },
   Stocktake: { kind: 'property' },
   StocktakeLine: { kind: 'property' },
+  // Purchasing (T-146).
+  Supplier: { kind: 'property' },
+  PurchaseOrder: { kind: 'property' },
+  PurchaseOrderLine: { kind: 'property' },
+  GoodsReceipt: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

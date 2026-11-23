@@ -177,3 +177,110 @@ describe('Stock (S42)', () => {
     expect(screen.queryByRole('button', { name: /^Adjust/ })).toBeNull();
   });
 });
+
+// S42 purchasing (PRD M10-03, M10-04; T-146).
+
+const SUPPLIER = {
+  id: id(20),
+  name: 'Lagos Beverages Ltd',
+  contactName: 'Tunde',
+  phone: null,
+  email: null,
+  note: null,
+  active: true,
+};
+const order = (status: string) => ({
+  id: id(21),
+  number: 4,
+  status,
+  supplier: { id: SUPPLIER.id, name: SUPPLIER.name },
+  note: null,
+  expectedOn: null,
+  totalMinor: '15000000',
+  createdBy: person(22, 'Bola Ade'),
+  createdAt: '2026-11-10T09:00:00.000Z',
+  approvedBy: status === 'DRAFT' ? null : person(22, 'Bola Ade'),
+  approvedAt: status === 'DRAFT' ? null : '2026-11-10T09:05:00.000Z',
+  closedBy: null,
+  closedAt: null,
+  closeReason: null,
+  lines: [
+    {
+      id: id(23),
+      item: { id: gin.id, code: 'GIN', name: gin.name, unit: 'BTL' },
+      quantity: '12',
+      unitPriceMinor: '1250000',
+      amountMinor: '15000000',
+      received: status === 'PARTIAL' ? '10' : '0',
+    },
+  ],
+});
+
+describe('Stock purchasing (S42)', () => {
+  it('asks for approval with a reason and says when it went to a manager', async () => {
+    const user = userEvent.setup();
+    setUp(['po.manage']);
+    handlers['GET /purchase-orders'] = () => json(200, { data: [order('DRAFT')], currency: 'NGN' });
+    handlers['GET /suppliers'] = () => json(200, { data: [SUPPLIER] });
+    handlers[`POST /purchase-orders/${id(21)}/approve`] = () =>
+      json(202, {
+        approvalRequestId: id(30),
+        status: 'PENDING',
+        expiresAt: '2026-11-12T09:00:00Z',
+        approverRoles: ['General Manager'],
+      });
+    renderAt('/stock');
+    const list = await screen.findByRole('list', { name: 'Purchase orders' });
+    await within(list).findByText('PO 4 · Lagos Beverages Ltd');
+    expect(within(list).getByText('Draft')).toBeInTheDocument();
+    await user.click(within(list).getByRole('button', { name: 'Approve' }));
+    const form = within(list).getByRole('form', { name: 'Approve PO 4' });
+    await user.type(within(form).getByLabelText('Reason'), 'Christmas stock');
+    await user.click(within(form).getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(sent(`POST /purchase-orders/${id(21)}/approve`)).toHaveLength(1));
+    expect(sent(`POST /purchase-orders/${id(21)}/approve`)[0]?.body).toEqual({
+      reason: 'Christmas stock',
+    });
+    expect(
+      await screen.findByText(
+        'Sent to a manager for approval. The order stays a draft until it is approved.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('receives what is still to come into a location', async () => {
+    const user = userEvent.setup();
+    setUp(['stock.receive']);
+    handlers['GET /goods-receipts'] = () =>
+      json(200, { awaiting: [order('PARTIAL')], data: [], locations: [MAIN] });
+    handlers['POST /goods-receipts'] = () =>
+      json(201, {
+        id: id(40),
+        number: 2,
+        order: { id: id(21), number: 4, supplier: SUPPLIER.name },
+        location: { id: MAIN.id, code: MAIN.code, name: MAIN.name },
+        supplierRef: 'DN-4471',
+        note: null,
+        receivedBy: person(41, 'Kemi Store'),
+        receivedAt: '2026-11-10T10:00:00.000Z',
+        lines: [],
+        valueMinor: '2500000',
+      });
+    renderAt('/stock');
+    const form = await screen.findByRole('form', { name: 'Receive PO 4' });
+    expect(within(form).getByLabelText('Gordon’s gin (2 BTL to come)')).toHaveValue('2');
+    await user.selectOptions(within(form).getByLabelText('Receive into'), MAIN.id);
+    await user.type(
+      within(form).getByLabelText('Delivery note or invoice number (optional)'),
+      'DN-4471',
+    );
+    await user.click(within(form).getByRole('button', { name: 'Receive goods' }));
+    await waitFor(() => expect(sent('POST /goods-receipts')).toHaveLength(1));
+    expect(sent('POST /goods-receipts')[0]?.body).toEqual({
+      purchaseOrderId: id(21),
+      locationId: MAIN.id,
+      supplierRef: 'DN-4471',
+      lines: [{ lineId: id(23), quantity: '2' }],
+    });
+  });
+});

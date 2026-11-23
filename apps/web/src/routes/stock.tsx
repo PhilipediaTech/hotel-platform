@@ -21,6 +21,7 @@ import { toMinor } from '../lib/money.ts';
 import stockStrings from '../i18n/en/stock.json';
 import { registerStrings } from '../i18n/index.ts';
 import { useFormats } from './reservations.tsx';
+import { PurchaseOrdersTab, ReceivingTab } from './stock-purchasing.tsx';
 
 registerStrings(stockStrings);
 
@@ -36,7 +37,7 @@ type Named = { id: string; code: string; name: string; active: boolean };
 const selectClass = 'h-11 rounded-md border border-border bg-surface px-3 text-sm';
 const card = 'rounded-md border border-border bg-surface p-4';
 
-type Tab = 'items' | 'requisitions' | 'stocktakes' | 'movements';
+type Tab = 'items' | 'requisitions' | 'orders' | 'receiving' | 'stocktakes' | 'movements';
 
 function useRoot() {
   const { currentPropertyId } = useSession();
@@ -70,8 +71,12 @@ export function StockPage() {
   const canManage = permissions.includes('stock.manage');
   const canRequest = permissions.includes('stock.requisition');
   const canCount = permissions.includes('stock.count');
+  const canOrder = permissions.includes('po.manage');
+  const canReceive = permissions.includes('stock.receive');
   const tabs: Tab[] = [
     ...(canRequest ? (['items', 'requisitions'] as const) : []),
+    ...(canOrder ? (['orders'] as const) : []),
+    ...(canReceive ? (['receiving'] as const) : []),
     ...(canCount ? (['stocktakes'] as const) : []),
     ...(canManage ? (['movements'] as const) : []),
   ];
@@ -97,6 +102,8 @@ export function StockPage() {
       <div className="mt-4">
         {tab === 'items' && canRequest && <ItemsTab canManage={canManage} />}
         {tab === 'requisitions' && canRequest && <RequisitionsTab canManage={canManage} />}
+        {tab === 'orders' && canOrder && <PurchaseOrdersTab />}
+        {tab === 'receiving' && canReceive && <ReceivingTab />}
         {tab === 'stocktakes' && canCount && <StocktakesTab canManage={canManage} />}
         {tab === 'movements' && canManage && <MovementsTab />}
       </div>
@@ -1159,6 +1166,8 @@ function MovementsTab() {
                 t('stock.common.by', { name: m.by.name }),
                 m.requisitionNumber !== null &&
                   t('stock.movements.requisition', { number: m.requisitionNumber }),
+                m.receiptNumber !== null &&
+                  t('stock.movements.receipt', { number: m.receiptNumber }),
                 m.requestedBy &&
                   m.approvedBy &&
                   t('stock.movements.issuedTo', {

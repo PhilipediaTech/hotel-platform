@@ -365,6 +365,9 @@
       "pos": {
         "void": "Void of a POS item",
         "discount": "POS discount"
+      },
+      "po": {
+        "approve": "Purchase order above the limit"
       }
     },
     "policies": {

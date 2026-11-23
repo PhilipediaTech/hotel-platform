@@ -114,6 +114,14 @@ export const APPROVAL_ACTIONS = [
     limitCode: 'pos.void',
     backOffice: false,
   }),
+  // M10-03: a purchase order above the raiser's po.manage amount limit; measured by its total.
+  a({
+    code: 'po.approve',
+    label: 'Purchase order above the limit',
+    measure: 'amount',
+    limitCode: 'po.manage',
+    backOffice: true,
+  }),
   a({
     code: 'ar.over_limit',
     label: 'City-ledger transfer over the credit limit',

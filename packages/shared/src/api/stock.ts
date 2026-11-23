@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineRoute } from './contract.ts';
-import { AmountMinor, Instant, page, PageQuery, Uuid } from './primitives.ts';
+import { AmountMinor, Instant, IsoDate, page, PageQuery, Uuid } from './primitives.ts';
 
 // Inventory (PRD M10-01 "As a store keeper, I manage items, units, locations, par levels and
 // reorder points", stock.manage; M10-02 "As a department, I raise a requisition; the store
@@ -230,6 +230,8 @@ export const StockMovementItem = z
     approvedBy: Person.nullable(),
     requisitionNumber: z.number().int().nullable(),
     stocktakeNumber: z.number().int().nullable(),
+    /** The goods receipt a RECEIPT belongs to (T-146). */
+    receiptNumber: z.number().int().nullable(),
   })
   .meta({ id: 'StockMovement' });
 
@@ -525,4 +527,287 @@ export const STOCK_ROUTES = {
   recordStocktakeCounts,
   postStocktake,
   cancelStocktake,
+} as const;
+
+// ---------------------------------------------------------------------------------------
+// Purchasing (PRD M10-03 "As a manager, I raise purchase orders to suppliers with approval
+// limits", po.manage; M10-04 "As a store keeper, I receive goods against a PO (partial
+// receipts allowed)", stock.receive; T-146). Tab 4 names /purchase-orders and
+// /goods-receipts; suppliers (tab 3) get their own routes. An order is a DRAFT until it is
+// approved: within the raiser's po.manage amount limit straight away, above it by a manager
+// (approval action po.approve, 202). Goods are received only against an approved order, never
+// more than ordered; each receipt line is a RECEIPT stock movement at the order's price,
+// which becomes the item's unit cost.
+
+export const SupplierItem = z
+  .object({
+    id: Uuid,
+    name: z.string(),
+    contactName: z.string().nullable(),
+    phone: z.string().nullable(),
+    email: z.string().nullable(),
+    note: z.string().nullable(),
+    active: z.boolean(),
+  })
+  .meta({ id: 'Supplier' });
+
+const PURCHASE = { tags: ['Stock'], propertyScoped: true as const, permission: 'po.manage' };
+const RECEIVE = { tags: ['Stock'], propertyScoped: true as const, permission: 'stock.receive' };
+const ADDED_146 = 'Tab 4 names the resource; the route is designed in T-146.';
+
+const SupplierFields = {
+  name: Name(120),
+  contactName: OptionalText(120),
+  phone: OptionalText(30),
+  email: z
+    .string()
+    .trim()
+    .max(200)
+    .transform((v) => (v === '' ? null : v))
+    .nullable()
+    .refine((v) => v === null || /^[^@\s]+@[^@\s]+$/.test(v), 'An email address'),
+  note: OptionalText(500),
+};
+
+export const listSuppliers = defineRoute({
+  ...PURCHASE,
+  operationId: 'listSuppliers',
+  method: 'get',
+  path: '/suppliers',
+  summary: 'Suppliers, switched-off ones included (M10-03)',
+  description: ADDED_146,
+  response: z.object({ data: z.array(SupplierItem) }),
+});
+
+export const createSupplier = defineRoute({
+  ...PURCHASE,
+  operationId: 'createSupplier',
+  method: 'post',
+  path: '/suppliers',
+  summary: 'Add a supplier (M10-03)',
+  description: ADDED_146,
+  idempotent: true,
+  status: 201,
+  body: z.object(SupplierFields),
+  response: SupplierItem,
+});
+
+export const updateSupplier = defineRoute({
+  ...PURCHASE,
+  operationId: 'updateSupplier',
+  method: 'patch',
+  path: '/suppliers/{supplierId}',
+  summary: 'Change a supplier, or switch it off (M10-03)',
+  description: ADDED_146,
+  params: z.object({ supplierId: Uuid }),
+  body: z.object({
+    name: SupplierFields.name.optional(),
+    contactName: SupplierFields.contactName.optional(),
+    phone: SupplierFields.phone.optional(),
+    email: SupplierFields.email.optional(),
+    note: SupplierFields.note.optional(),
+    active: z.boolean().optional(),
+  }),
+  response: SupplierItem,
+});
+
+export const PurchaseOrderStatus = z.enum([
+  'DRAFT',
+  'APPROVED',
+  'PARTIAL',
+  'RECEIVED',
+  'CLOSED',
+  'CANCELLED',
+]);
+
+const ItemRef = z.object({ id: Uuid, code: z.string(), name: z.string(), unit: z.string() });
+
+export const PurchaseOrderItem = z
+  .object({
+    id: Uuid,
+    number: z.number().int(),
+    status: PurchaseOrderStatus,
+    supplier: z.object({ id: Uuid, name: z.string() }),
+    note: z.string().nullable(),
+    expectedOn: IsoDate.nullable(),
+    totalMinor: AmountMinor,
+    createdBy: Person,
+    createdAt: Instant,
+    approvedBy: Person.nullable(),
+    approvedAt: Instant.nullable(),
+    closedBy: Person.nullable(),
+    closedAt: Instant.nullable(),
+    closeReason: z.string().nullable(),
+    lines: z.array(
+      z.object({
+        id: Uuid,
+        item: ItemRef,
+        quantity: Quantity,
+        unitPriceMinor: AmountMinor,
+        amountMinor: AmountMinor,
+        received: Quantity,
+      }),
+    ),
+  })
+  .meta({ id: 'PurchaseOrder' });
+
+const OrderBody = z.object({
+  supplierId: Uuid,
+  expectedOn: IsoDate.nullable().optional(),
+  note: OptionalText(500).optional(),
+  lines: z
+    .array(z.object({ itemId: Uuid, quantity: Positive, unitPriceMinor: Cost }))
+    .min(1, 'Add at least one item')
+    .max(100)
+    .refine((l) => new Set(l.map((x) => x.itemId)).size === l.length, 'Each item once'),
+});
+
+export const listPurchaseOrders = defineRoute({
+  ...PURCHASE,
+  operationId: 'listPurchaseOrders',
+  method: 'get',
+  path: '/purchase-orders',
+  summary: 'Purchase orders, newest first (M10-03)',
+  description: ADDED_146,
+  query: z.object({ status: PurchaseOrderStatus.optional() }),
+  response: z.object({ data: z.array(PurchaseOrderItem), currency: z.string() }),
+});
+
+export const createPurchaseOrder = defineRoute({
+  ...PURCHASE,
+  operationId: 'createPurchaseOrder',
+  method: 'post',
+  path: '/purchase-orders',
+  summary: 'Prepare a purchase order to a supplier, as a draft (M10-03)',
+  description: ADDED_146,
+  idempotent: true,
+  status: 201,
+  body: OrderBody,
+  response: PurchaseOrderItem,
+});
+
+export const getPurchaseOrder = defineRoute({
+  ...PURCHASE,
+  operationId: 'getPurchaseOrder',
+  method: 'get',
+  path: '/purchase-orders/{orderId}',
+  summary: 'A purchase order with what has been received (M10-03)',
+  description: ADDED_146,
+  params: z.object({ orderId: Uuid }),
+  response: PurchaseOrderItem,
+});
+
+export const updatePurchaseOrder = defineRoute({
+  ...PURCHASE,
+  operationId: 'updatePurchaseOrder',
+  method: 'put',
+  path: '/purchase-orders/{orderId}',
+  summary: 'Replace a draft order: supplier, lines and note (M10-03)',
+  description: ADDED_146,
+  params: z.object({ orderId: Uuid }),
+  body: OrderBody,
+  response: PurchaseOrderItem,
+});
+
+export const approvePurchaseOrder = defineRoute({
+  ...PURCHASE,
+  operationId: 'approvePurchaseOrder',
+  method: 'post',
+  path: '/purchase-orders/{orderId}/approve',
+  summary: 'Approve a draft order: within your limit at once, above it a manager decides (M10-03)',
+  description: `${ADDED_146} Measured by the order total against the caller's po.manage amount limit, else the po.approve policy threshold. Above it, a reason is needed and the answer is 202 with the approval request; the order stays a draft until approved.`,
+  idempotent: true,
+  approval: true,
+  params: z.object({ orderId: Uuid }),
+  body: z.object({ reason: OptionalText(500).optional() }),
+  response: PurchaseOrderItem,
+});
+
+export const closePurchaseOrder = defineRoute({
+  ...PURCHASE,
+  operationId: 'closePurchaseOrder',
+  method: 'post',
+  path: '/purchase-orders/{orderId}/close',
+  summary: 'Stop waiting for the rest of an order, with a reason (M10-04)',
+  description: ADDED_146,
+  params: z.object({ orderId: Uuid }),
+  body: z.object({ reason: Reason }),
+  response: PurchaseOrderItem,
+});
+
+export const cancelPurchaseOrder = defineRoute({
+  ...PURCHASE,
+  operationId: 'cancelPurchaseOrder',
+  method: 'post',
+  path: '/purchase-orders/{orderId}/cancel',
+  summary: 'Cancel an order nothing has been received against (M10-03)',
+  description: ADDED_146,
+  params: z.object({ orderId: Uuid }),
+  response: PurchaseOrderItem,
+});
+
+export const GoodsReceiptItem = z
+  .object({
+    id: Uuid,
+    number: z.number().int(),
+    order: z.object({ id: Uuid, number: z.number().int(), supplier: z.string() }),
+    location: z.object({ id: Uuid, code: z.string(), name: z.string() }),
+    supplierRef: z.string().nullable(),
+    note: z.string().nullable(),
+    receivedBy: Person,
+    receivedAt: Instant,
+    lines: z.array(z.object({ item: ItemRef, quantity: Quantity, unitPriceMinor: AmountMinor })),
+    valueMinor: AmountMinor,
+  })
+  .meta({ id: 'GoodsReceipt' });
+
+export const listGoodsReceipts = defineRoute({
+  ...RECEIVE,
+  operationId: 'listGoodsReceipts',
+  method: 'get',
+  path: '/goods-receipts',
+  summary: 'Orders waiting for goods, and receipts so far, newest first (M10-04)',
+  description: ADDED_146,
+  response: z.object({
+    awaiting: z.array(PurchaseOrderItem),
+    data: z.array(GoodsReceiptItem),
+    locations: z.array(StockLocationItem),
+  }),
+});
+
+export const receiveGoods = defineRoute({
+  ...RECEIVE,
+  operationId: 'receiveGoods',
+  method: 'post',
+  path: '/goods-receipts',
+  summary: 'Receive goods against an approved order, in full or in part (M10-04)',
+  description: `${ADDED_146} Each line receives at most what is still to come. The goods go into one location as RECEIPT movements at the order's price, which becomes the item's unit cost.`,
+  idempotent: true,
+  status: 201,
+  body: z.object({
+    purchaseOrderId: Uuid,
+    locationId: Uuid,
+    supplierRef: OptionalText(60).optional(),
+    note: OptionalText(500).optional(),
+    lines: z
+      .array(z.object({ lineId: Uuid, quantity: Positive }))
+      .min(1, 'Receive at least one item')
+      .refine((l) => new Set(l.map((x) => x.lineId)).size === l.length, 'Each line once'),
+  }),
+  response: GoodsReceiptItem,
+});
+
+export const PURCHASING_ROUTES = {
+  listSuppliers,
+  createSupplier,
+  updateSupplier,
+  listPurchaseOrders,
+  createPurchaseOrder,
+  getPurchaseOrder,
+  updatePurchaseOrder,
+  approvePurchaseOrder,
+  closePurchaseOrder,
+  cancelPurchaseOrder,
+  listGoodsReceipts,
+  receiveGoods,
 } as const;

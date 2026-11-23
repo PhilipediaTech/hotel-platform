@@ -27,37 +27,37 @@ export interface StockDeps {
   tenantDb: TenantDb;
 }
 
-type Tx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
-type Client = TenantDb | Tx;
+export type Tx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
+export type Client = TenantDb | Tx;
 
-const invalid = (path: string, message: string) =>
+export const invalid = (path: string, message: string) =>
   new AppError('VALIDATION_ERROR', message, {
     issues: [{ path, code: 'custom', message }],
   });
 
-const notFound = (what: string) => new AppError('NOT_FOUND', `${what} not found`);
+export const notFound = (what: string) => new AppError('NOT_FOUND', `${what} not found`);
 
-const defined = <T extends object>(o: T) =>
+export const defined = <T extends object>(o: T) =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 
 /** Contract quantities are validated by zod; this only narrows the type. */
-function milli(text: string): bigint {
+export function milli(text: string): bigint {
   const q = parseQuantity(text);
   if (q === null) throw new Error(`Unvalidated quantity ${text}`);
   return q;
 }
-const qty = (m: bigint) => formatQuantity(m);
+export const qty = (m: bigint) => formatQuantity(m);
 const qtyOrNull = (m: bigint | null) => (m === null ? null : formatQuantity(m));
 
 /** Value of `m` thousandths at `costMinor` a unit, rounded half away from zero. */
-function valueMinor(m: bigint, costMinor: bigint): bigint {
+export function valueMinor(m: bigint, costMinor: bigint): bigint {
   const raw = m * costMinor;
   const abs = raw < 0n ? -raw : raw;
   const rounded = (abs + 500n) / 1000n;
   return raw < 0n ? -rounded : rounded;
 }
 
-const person = (u: { id: string; name: string }) => ({ id: u.id, name: u.name });
+export const person = (u: { id: string; name: string }) => ({ id: u.id, name: u.name });
 
 // ---------------------------------------------------------------------------------------
 // On hand
@@ -87,14 +87,14 @@ async function onHandAt(tx: Tx, itemId: string, locationId: string): Promise<big
 }
 
 /** Locks the item so no other movement out of it runs until this transaction ends. */
-async function lockItem(tx: Tx, itemId: string, path: string) {
+export async function lockItem(tx: Tx, itemId: string, path: string) {
   await tx.$queryRaw`SELECT id FROM stock_items WHERE id = ${itemId}::uuid FOR UPDATE`;
   const item = await tx.stockItem.findFirst({ where: { id: itemId }, include: { unit: true } });
   if (!item) throw invalid(path, 'Choose an item of this property');
   return item;
 }
 
-async function activeLocation(db: Client, locationId: string, path: string) {
+export async function activeLocation(db: Client, locationId: string, path: string) {
   const location = await db.stockLocation.findFirst({ where: { id: locationId, active: true } });
   if (!location) throw invalid(path, 'Choose an active location of this property');
   return location;
@@ -345,6 +345,7 @@ const MOVEMENT_INCLUDE = {
   approvedBy: { select: { id: true, name: true } },
   requisition: { select: { number: true } },
   stocktake: { select: { number: true } },
+  goodsReceipt: { select: { number: true } },
 } as const satisfies Prisma.StockMovementInclude;
 type MovementRow = Prisma.StockMovementGetPayload<{ include: typeof MOVEMENT_INCLUDE }>;
 
@@ -363,6 +364,7 @@ function movementItem(m: MovementRow): z.input<typeof StockMovementItem> {
     approvedBy: m.approvedBy ? person(m.approvedBy) : null,
     requisitionNumber: m.requisition?.number ?? null,
     stocktakeNumber: m.stocktake?.number ?? null,
+    receiptNumber: m.goodsReceipt?.number ?? null,
   };
 }
 
@@ -396,7 +398,7 @@ export async function listStockMovements(
   };
 }
 
-async function writeMovement(
+export async function writeMovement(
   tx: Tx,
   data: Omit<Prisma.StockMovementUncheckedCreateInput, 'propertyId'>,
 ): Promise<MovementRow> {

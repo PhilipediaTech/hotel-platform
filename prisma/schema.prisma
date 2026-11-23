@@ -172,6 +172,10 @@ model Property {
   requisitionLines     RequisitionLine[]
   stocktakes           Stocktake[]
   stocktakeLines       StocktakeLine[]
+  suppliers            Supplier[]
+  purchaseOrders       PurchaseOrder[]
+  purchaseOrderLines   PurchaseOrderLine[]
+  goodsReceipts        GoodsReceipt[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -369,32 +373,36 @@ model User {
   partnerPayouts       PartnerPayout[]    @relation("PartnerPayoutBy")
   partnerChanges       PartnerChange[]    @relation("PartnerChangeBy")
 
-  messagesSent        Message[]             @relation("MessageSentBy")
-  eventEnquiries      EventEnquiry[]
-  eventBookings       EventBooking[]
-  eventBriefs         EventBrief[]          @relation("EventBriefAuthor")
-  serviceBookings     ServiceBooking[]      @relation("ServiceBookingAuthor")
-  groupBlocks         GroupBlock[]          @relation("GroupBlockAuthor")
-  arPayments          ArPayment[]           @relation("ArPaymentAuthor")
-  commissionsSettled  Commission[]          @relation("CommissionSettler")
-  bankLinesImported   BankStatementLine[]   @relation("BankLineImporter")
-  reconciliationsMade ReconciliationMatch[] @relation("ReconciliationAuthor")
-  eventsInspected     EventBooking[]        @relation("EventInspector")
-  eventQuoteVersions  EventQuoteVersion[]   @relation("EventQuoteAuthor")
-  eventContracts      EventContract[]       @relation("EventContractIssuer")
-  posOrdersOpened     PosOrder[]            @relation("PosOrderOpener")
-  posOrdersSettled    PosOrder[]            @relation("PosOrderSettler")
-  posOrderLinesAdded  PosOrderLine[]        @relation("PosOrderLineAuthor")
-  posOrderLinesVoided PosOrderLine[]        @relation("PosOrderLineVoider")
-  posLineDiscounts    PosOrderLine[]        @relation("PosOrderLineDiscounter")
-  stockMovementsMade  StockMovement[]       @relation("StockMovementBy")
-  stockIssuesAsked    StockMovement[]       @relation("StockMovementRequester")
-  stockIssuesApproved StockMovement[]       @relation("StockMovementApprover")
-  requisitionsRaised  Requisition[]         @relation("RequisitionRequester")
-  requisitionsClosed  Requisition[]         @relation("RequisitionCloser")
-  stocktakesStarted   Stocktake[]           @relation("StocktakeStarter")
-  stocktakesPosted    Stocktake[]           @relation("StocktakePoster")
-  stocktakeCounts     StocktakeLine[]       @relation("StocktakeCounter")
+  messagesSent           Message[]             @relation("MessageSentBy")
+  eventEnquiries         EventEnquiry[]
+  eventBookings          EventBooking[]
+  eventBriefs            EventBrief[]          @relation("EventBriefAuthor")
+  serviceBookings        ServiceBooking[]      @relation("ServiceBookingAuthor")
+  groupBlocks            GroupBlock[]          @relation("GroupBlockAuthor")
+  arPayments             ArPayment[]           @relation("ArPaymentAuthor")
+  commissionsSettled     Commission[]          @relation("CommissionSettler")
+  bankLinesImported      BankStatementLine[]   @relation("BankLineImporter")
+  reconciliationsMade    ReconciliationMatch[] @relation("ReconciliationAuthor")
+  eventsInspected        EventBooking[]        @relation("EventInspector")
+  eventQuoteVersions     EventQuoteVersion[]   @relation("EventQuoteAuthor")
+  eventContracts         EventContract[]       @relation("EventContractIssuer")
+  posOrdersOpened        PosOrder[]            @relation("PosOrderOpener")
+  posOrdersSettled       PosOrder[]            @relation("PosOrderSettler")
+  posOrderLinesAdded     PosOrderLine[]        @relation("PosOrderLineAuthor")
+  posOrderLinesVoided    PosOrderLine[]        @relation("PosOrderLineVoider")
+  posLineDiscounts       PosOrderLine[]        @relation("PosOrderLineDiscounter")
+  stockMovementsMade     StockMovement[]       @relation("StockMovementBy")
+  stockIssuesAsked       StockMovement[]       @relation("StockMovementRequester")
+  stockIssuesApproved    StockMovement[]       @relation("StockMovementApprover")
+  requisitionsRaised     Requisition[]         @relation("RequisitionRequester")
+  requisitionsClosed     Requisition[]         @relation("RequisitionCloser")
+  stocktakesStarted      Stocktake[]           @relation("StocktakeStarter")
+  stocktakesPosted       Stocktake[]           @relation("StocktakePoster")
+  stocktakeCounts        StocktakeLine[]       @relation("StocktakeCounter")
+  purchaseOrdersRaised   PurchaseOrder[]       @relation("PurchaseOrderCreator")
+  purchaseOrdersApproved PurchaseOrder[]       @relation("PurchaseOrderApprover")
+  purchaseOrdersClosed   PurchaseOrder[]       @relation("PurchaseOrderCloser")
+  goodsReceived          GoodsReceipt[]        @relation("GoodsReceiver")
 
   @@map("users")
 }
@@ -4128,6 +4136,7 @@ model StockLocation {
   property   Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   movements  StockMovement[]
   stocktakes Stocktake[]
+  receipts   GoodsReceipt[]
 
   @@unique([propertyId, code])
   @@map("stock_locations")
@@ -4150,11 +4159,12 @@ model StockItem {
   active        Boolean  @default(true)
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  property         Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  unit             StockUnit         @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  property         Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  unit             StockUnit           @relation(fields: [unitId], references: [id], onDelete: Restrict)
   movements        StockMovement[]
   requisitionLines RequisitionLine[]
   stocktakeLines   StocktakeLine[]
+  orderLines       PurchaseOrderLine[]
 
   @@unique([propertyId, code])
   @@map("stock_items")
@@ -4187,21 +4197,25 @@ model StockMovement {
   requisitionId     String?           @map("requisition_id") @db.Uuid
   requisitionLineId String?           @map("requisition_line_id") @db.Uuid
   stocktakeId       String?           @map("stocktake_id") @db.Uuid
+  goodsReceiptId    String?           @map("goods_receipt_id") @db.Uuid
+  orderLineId       String?           @map("purchase_order_line_id") @db.Uuid
   byUserId          String            @map("by_user_id") @db.Uuid
   /// M10 rule: every issue has a requester and an approver.
   requestedById     String?           @map("requested_by_id") @db.Uuid
   approvedById      String?           @map("approved_by_id") @db.Uuid
   at                DateTime          @default(now()) @db.Timestamptz(6)
 
-  property        Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  item            StockItem        @relation(fields: [itemId], references: [id], onDelete: Restrict)
-  location        StockLocation    @relation(fields: [locationId], references: [id], onDelete: Restrict)
-  requisition     Requisition?     @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
-  requisitionLine RequisitionLine? @relation(fields: [requisitionLineId], references: [id], onDelete: Restrict)
-  stocktake       Stocktake?       @relation(fields: [stocktakeId], references: [id], onDelete: Restrict)
-  by              User             @relation("StockMovementBy", fields: [byUserId], references: [id], onDelete: Restrict)
-  requestedBy     User?            @relation("StockMovementRequester", fields: [requestedById], references: [id], onDelete: Restrict)
-  approvedBy      User?            @relation("StockMovementApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  property        Property           @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  item            StockItem          @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location        StockLocation      @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  requisition     Requisition?       @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
+  requisitionLine RequisitionLine?   @relation(fields: [requisitionLineId], references: [id], onDelete: Restrict)
+  stocktake       Stocktake?         @relation(fields: [stocktakeId], references: [id], onDelete: Restrict)
+  goodsReceipt    GoodsReceipt?      @relation(fields: [goodsReceiptId], references: [id], onDelete: Restrict)
+  orderLine       PurchaseOrderLine? @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+  by              User               @relation("StockMovementBy", fields: [byUserId], references: [id], onDelete: Restrict)
+  requestedBy     User?              @relation("StockMovementRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  approvedBy      User?              @relation("StockMovementApprover", fields: [approvedById], references: [id], onDelete: Restrict)
 
   @@index([propertyId, itemId, locationId])
   @@index([propertyId, at])
@@ -4310,4 +4324,116 @@ model StocktakeLine {
 
   @@unique([stocktakeId, itemId])
   @@map("stocktake_lines")
+}
+
+// ---------------------------------------------------------------------------------------
+// Purchasing (PRD M10-03, M10-04; T-146). Tab 3 names suppliers, purchase_orders,
+// purchase_order_lines and goods_receipts; the columns are designed here. A receipt's lines
+// are its RECEIPT stock movements.
+
+/// Who the hotel buys from (M10-03).
+model Supplier {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  name        String
+  contactName String?  @map("contact_name")
+  phone       String?
+  email       String?
+  note        String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  orders   PurchaseOrder[]
+
+  @@unique([propertyId, name])
+  @@map("suppliers")
+}
+
+enum PurchaseOrderStatus {
+  /// Being prepared; approval is asked from here, and a refusal leaves it here.
+  DRAFT
+  APPROVED
+  /// Some goods received.
+  PARTIAL
+  RECEIVED
+  /// The rest won't come: closed short, with a reason.
+  CLOSED
+  CANCELLED
+}
+
+/// An order to a supplier (M10-03), approved within the raiser's po.manage limit or by a
+/// manager (approval action po.approve).
+model PurchaseOrder {
+  id                String              @id @default(uuid()) @db.Uuid
+  propertyId        String              @map("property_id") @db.Uuid
+  number            Int
+  supplierId        String              @map("supplier_id") @db.Uuid
+  status            PurchaseOrderStatus @default(DRAFT)
+  note              String?
+  expectedOn        DateTime?           @map("expected_on") @db.Date
+  /// Sum of the lines, minor units of the base currency.
+  totalMinor        BigInt              @default(0) @map("total_minor")
+  createdById       String              @map("created_by_id") @db.Uuid
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  approvedById      String?             @map("approved_by_id") @db.Uuid
+  approvedAt        DateTime?           @map("approved_at") @db.Timestamptz(6)
+  approvalRequestId String?             @map("approval_request_id") @db.Uuid
+  closedById        String?             @map("closed_by_id") @db.Uuid
+  closedAt          DateTime?           @map("closed_at") @db.Timestamptz(6)
+  closeReason       String?             @map("close_reason")
+
+  property   Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  supplier   Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  createdBy  User                @relation("PurchaseOrderCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy User?               @relation("PurchaseOrderApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  closedBy   User?               @relation("PurchaseOrderCloser", fields: [closedById], references: [id], onDelete: Restrict)
+  lines      PurchaseOrderLine[]
+  receipts   GoodsReceipt[]
+
+  @@unique([propertyId, number])
+  @@index([propertyId, status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id              String @id @default(uuid()) @db.Uuid
+  propertyId      String @map("property_id") @db.Uuid
+  purchaseOrderId String @map("purchase_order_id") @db.Uuid
+  itemId          String @map("item_id") @db.Uuid
+  quantityMilli   BigInt @map("quantity_milli")
+  /// Price of one unit of the item.
+  unitPriceMinor  BigInt @map("unit_price_minor")
+  receivedMilli   BigInt @default(0) @map("received_milli")
+
+  property  Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  order     PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  item      StockItem       @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  movements StockMovement[]
+
+  @@unique([purchaseOrderId, itemId])
+  @@map("purchase_order_lines")
+}
+
+/// Goods received against a purchase order (M10-04): one delivery into one location.
+model GoodsReceipt {
+  id              String   @id @default(uuid()) @db.Uuid
+  propertyId      String   @map("property_id") @db.Uuid
+  number          Int
+  purchaseOrderId String   @map("purchase_order_id") @db.Uuid
+  locationId      String   @map("location_id") @db.Uuid
+  /// The supplier's delivery note or invoice number.
+  supplierRef     String?  @map("supplier_ref")
+  note            String?
+  receivedById    String   @map("received_by_id") @db.Uuid
+  receivedAt      DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+
+  property   Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  order      PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  location   StockLocation   @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  receivedBy User            @relation("GoodsReceiver", fields: [receivedById], references: [id], onDelete: Restrict)
+  movements  StockMovement[]
+
+  @@unique([propertyId, number])
+  @@map("goods_receipts")
 }

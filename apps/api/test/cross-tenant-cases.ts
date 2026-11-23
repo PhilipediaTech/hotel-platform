@@ -1635,6 +1635,65 @@ async function bStock(db: Db, world: TenantWorld, propertyId: string) {
   };
 }
 
+/** B's purchasing: a supplier, an approved order for 3 of their gin, and one receipt of 1. */
+async function bPurchasing(db: Db, world: TenantWorld, propertyId: string) {
+  const stock = await bStock(db, world, propertyId);
+  const supplier = await db.supplier.create({ data: { propertyId, name: 'Their supplier' } });
+  const order = await db.purchaseOrder.create({
+    data: {
+      propertyId,
+      number: 1,
+      supplierId: supplier.id,
+      status: 'PARTIAL',
+      totalMinor: 300n,
+      createdById: world.bStaff.id,
+      approvedById: world.bStaff.id,
+      approvedAt: new Date(),
+    },
+  });
+  const line = await db.purchaseOrderLine.create({
+    data: {
+      propertyId,
+      purchaseOrderId: order.id,
+      itemId: stock.itemId,
+      quantityMilli: 3000n,
+      unitPriceMinor: 100n,
+      receivedMilli: 1000n,
+    },
+  });
+  const receipt = await db.goodsReceipt.create({
+    data: {
+      propertyId,
+      number: 1,
+      purchaseOrderId: order.id,
+      locationId: stock.locationId,
+      receivedById: world.bStaff.id,
+    },
+  });
+  return {
+    ...stock,
+    supplierId: supplier.id,
+    orderId: order.id,
+    orderLineId: line.id,
+    receiptId: receipt.id,
+  };
+}
+
+async function bPurchasingUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.supplier.findMany({ where })).map((x) => [x.name, x.active])).toEqual([
+    ['Their supplier', true],
+  ]);
+  expect(
+    (await db.purchaseOrder.findMany({ where, include: { lines: true } })).map((o) => [
+      o.status,
+      o.lines.map((l) => [l.quantityMilli, l.receivedMilli]),
+    ]),
+  ).toEqual([['PARTIAL', [[3000n, 1000n]]]]);
+  expect(await db.goodsReceipt.count({ where })).toBe(1);
+  expect(await db.stockMovement.count({ where: { ...where, kind: 'RECEIPT' } })).toBe(0);
+}
+
 async function bStockUnchanged(db: Db, world: TenantWorld) {
   const where = { propertyId: world.b1.id };
   expect((await db.stockItem.findMany({ where })).map((i) => [i.name, i.active])).toEqual([
@@ -3570,6 +3629,76 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   postStocktake: { seed: bStock, body: () => ({ reason: 'Leak' }), untouched: bStockUnchanged },
   cancelStocktake: { seed: bStock, untouched: bStockUnchanged },
+  // Purchasing (T-146)
+  listSuppliers: {
+    seed: bPurchasing,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((x) => x.id),
+  },
+  createSupplier: {
+    seed: bPurchasing,
+    creates: true,
+    body: () => ({ name: 'Leak', contactName: null, phone: null, email: null, note: null }),
+    untouched: bPurchasingUnchanged,
+  },
+  updateSupplier: {
+    seed: bPurchasing,
+    body: () => ({ name: 'Leak' }),
+    untouched: bPurchasingUnchanged,
+  },
+  listPurchaseOrders: {
+    seed: bPurchasing,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((x) => x.id),
+  },
+  createPurchaseOrder: {
+    seed: bPurchasing,
+    creates: true,
+    body: (theirs) => ({
+      supplierId: theirs['supplierId'],
+      lines: [{ itemId: theirs['itemId'], quantity: '1', unitPriceMinor: '100' }],
+    }),
+    untouched: bPurchasingUnchanged,
+  },
+  getPurchaseOrder: { seed: bPurchasing },
+  updatePurchaseOrder: {
+    seed: bPurchasing,
+    body: (theirs) => ({
+      supplierId: theirs['supplierId'],
+      lines: [{ itemId: theirs['itemId'], quantity: '1', unitPriceMinor: '100' }],
+    }),
+    untouched: bPurchasingUnchanged,
+  },
+  approvePurchaseOrder: {
+    seed: bPurchasing,
+    body: () => ({ reason: 'Leak' }),
+    untouched: bPurchasingUnchanged,
+  },
+  closePurchaseOrder: {
+    seed: bPurchasing,
+    body: () => ({ reason: 'Leak' }),
+    untouched: bPurchasingUnchanged,
+  },
+  cancelPurchaseOrder: { seed: bPurchasing, untouched: bPurchasingUnchanged },
+  listGoodsReceipts: {
+    seed: bPurchasing,
+    listIds: (body) => {
+      const b = body as {
+        awaiting: { id: string }[];
+        data: { id: string }[];
+        locations: { id: string }[];
+      };
+      return [...b.awaiting, ...b.data, ...b.locations].map((x) => x.id);
+    },
+  },
+  receiveGoods: {
+    seed: bPurchasing,
+    creates: true,
+    body: (theirs) => ({
+      purchaseOrderId: theirs['orderId'],
+      locationId: theirs['locationId'],
+      lines: [{ lineId: theirs['orderLineId'], quantity: '1' }],
+    }),
+    untouched: bPurchasingUnchanged,
+  },
   getPosSettings: { seed: bPosOrder, listIds: () => [] },
   updatePosSettings: {
     seed: bPosOrder,

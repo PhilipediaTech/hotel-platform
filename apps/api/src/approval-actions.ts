@@ -10,6 +10,7 @@ import { refundHandler } from './modules/payments/refunds.ts';
 import { roomMoveHandler, roomNotReadyHandler } from './modules/reservations/rooms.ts';
 import { doNotRentHandler } from './modules/reservations/service.ts';
 import { posDiscountHandler, posVoidHandler } from './modules/pos/register.ts';
+import { poApproveHandler } from './modules/stock/purchasing.ts';
 
 // Every protected action the approvals engine can execute (core/approvals.ts). Modules add
 // their handler here when they build the action (folio discounts and voids in T-04x, refunds
@@ -32,5 +33,6 @@ export function approvalHandlers(deps: {
     arTransferHandler(deps),
     posVoidHandler(deps),
     posDiscountHandler(deps),
+    poApproveHandler(deps),
   ].map((h) => h as unknown as ApprovalActionHandler<never>);
 }

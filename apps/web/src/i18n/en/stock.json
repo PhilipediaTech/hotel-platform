@@ -6,7 +6,9 @@
       "items": "Items",
       "requisitions": "Requisitions",
       "stocktakes": "Stocktakes",
-      "movements": "Movements"
+      "movements": "Movements",
+      "orders": "Purchase orders",
+      "receiving": "Receiving"
     },
     "common": {
       "save": "Save",
@@ -111,6 +113,7 @@
       "more": "Show more",
       "requisition": "Requisition {{number}}",
       "stocktake": "Stocktake {{number}}",
+      "receipt": "Goods receipt {{number}}",
       "issuedTo": "Asked by {{requester}}, approved by {{approver}}",
       "kind": {
         "RECEIPT": "Received",
@@ -118,6 +121,50 @@
         "TRANSFER": "Moved",
         "ADJUSTMENT": "Adjusted"
       }
+    },
+    "orders": {
+      "new": "New purchase order",
+      "none": "No purchase orders yet.",
+      "supplier": "Supplier",
+      "expected": "Expected on (optional)",
+      "unitPrice": "Unit price",
+      "saveDraft": "Save as draft",
+      "title": "PO {{number}} · {{supplier}}",
+      "expectedOn": "expected {{date}}",
+      "approvedBy": "approved by {{name}}",
+      "line": "{{item}}: {{quantity}} {{unit}} at {{price}}, {{received}} received",
+      "approve": "Approve",
+      "approveTitle": "Approve PO {{number}}",
+      "closeTitle": "Close PO {{number}}",
+      "cancel": "Cancel order",
+      "approveHint": "Within your limit it is approved now. Above it, a manager decides: give the reason they will see.",
+      "sentForApproval": "Sent to a manager for approval. The order stays a draft until it is approved.",
+      "status": {
+        "DRAFT": "Draft",
+        "APPROVED": "Approved",
+        "PARTIAL": "Part received",
+        "RECEIVED": "Received",
+        "CLOSED": "Closed",
+        "CANCELLED": "Cancelled"
+      }
+    },
+    "suppliers": {
+      "title": "Suppliers",
+      "add": "Add supplier",
+      "contact": "Contact (optional)",
+      "phone": "Phone (optional)",
+      "email": "Email (optional)"
+    },
+    "receiving": {
+      "awaiting": "Waiting for goods",
+      "nothing": "No approved orders are waiting for goods.",
+      "done": "Goods received",
+      "receipt": "Receipt {{number}} · PO {{order}} · {{supplier}}",
+      "formTitle": "Receive PO {{number}}",
+      "into": "Receive into",
+      "ref": "Delivery note or invoice number (optional)",
+      "qty": "{{item}} ({{left}} {{unit}} to come)",
+      "receive": "Receive goods"
     }
   }
 }

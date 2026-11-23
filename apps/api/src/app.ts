@@ -223,7 +223,7 @@ export function createApp({
   api.use(attendanceRoutes({ tenantDb, clock }));
   api.use(payrollRoutes({ tenantDb, clock }));
   api.use(posRoutes({ db, tenantDb, clock }));
-  api.use(stockRoutes({ tenantDb }));
+  api.use(stockRoutes({ db, tenantDb, clock }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));

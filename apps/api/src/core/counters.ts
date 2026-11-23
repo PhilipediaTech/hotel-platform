@@ -15,6 +15,8 @@ export const COUNTER = {
   POS_ORDER: 'pos_order',
   REQUISITION: 'requisition',
   STOCKTAKE: 'stocktake',
+  PURCHASE_ORDER: 'purchase_order',
+  GOODS_RECEIPT: 'goods_receipt',
 } as const;
 export type CounterName = (typeof COUNTER)[keyof typeof COUNTER];
 

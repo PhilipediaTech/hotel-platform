@@ -943,6 +943,16 @@
       "OTHER": "Other"
     },
     "scan": "Photo or scan of the ID (optional)",
+    "idRead": {
+      "button": "Fill in from the photo",
+      "reading": "Reading the ID…",
+      "filled": "Filled in from the ID: check each field before checking in.",
+      "nameOnId": "Name on the ID: {{name}}",
+      "mismatch": "The name on the ID is not the booked guest’s: check who is checking in.",
+      "expired": "This ID has expired.",
+      "unreadable": "Nothing could be read from this photo: take a clearer one, or type the details in.",
+      "photoOnly": "Only a photo (JPEG, PNG or WebP) can be read."
+    },
     "idPrivacy": "ID details are stored encrypted and deleted after the hotel’s retention period.",
     "signature": "Registration card",
     "signPaper": "The guest signs the printed card",

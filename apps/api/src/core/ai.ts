@@ -18,10 +18,18 @@ export interface AiRequest {
   /** Fixed instructions: nothing that varies per call goes here. */
   system: string;
   user: string;
+  /** Pictures to read with the text (the ID scan, T-150). Never logged, never stored here. */
+  images?: readonly AiImage[];
   tools?: readonly AiTool[];
   /** Runs a tool the model asked for and answers its result as text. */
   runTool?: (name: string, input: unknown) => Promise<string>;
   effort?: 'low' | 'medium' | 'high';
+}
+
+export interface AiImage {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
+  /** Base64 of the picture. */
+  data: string;
 }
 
 export interface AiResult {
@@ -62,7 +70,16 @@ export function createClaudeProvider(options: {
         input_schema: { type: 'object' as const, ...t.inputSchema },
         strict: true,
       }));
-      const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: request.user }];
+      const content: Anthropic.Beta.BetaMessageParam['content'] = request.images?.length
+        ? [
+            ...request.images.map((image) => ({
+              type: 'image' as const,
+              source: { type: 'base64' as const, media_type: image.mediaType, data: image.data },
+            })),
+            { type: 'text' as const, text: request.user },
+          ]
+        : request.user;
+      const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content }];
       let inputTokens = 0;
       let outputTokens = 0;
       try {
@@ -157,6 +174,9 @@ export function createFakeAiProvider(logger?: Logger): FakeAiProvider {
             `From the ${tool.name.replace('get_', '').replace('_', ' ')}: ${result.slice(0, 300)}`,
           () => 'Thank you. (The local stand-in for the AI has no real answer to give.)',
         );
+      } else if (request.images?.length) {
+        // Reads nothing from the picture: every field is left for the desk to type.
+        text = '{}';
       } else {
         text = request.user.slice(0, 300);
       }

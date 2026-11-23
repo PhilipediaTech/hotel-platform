@@ -74,6 +74,7 @@ import { RAW_BODY, webhookRoutes } from './modules/payments/webhook-routes.ts';
 import type { AiProvider } from './core/ai.ts';
 import type { PaymentProvider } from './core/payments.ts';
 import { reservationRoutes } from './modules/reservations/routes.ts';
+import { idScanRoutes } from './modules/reservations/id-scan.ts';
 import { roomRoutes } from './modules/rooms/routes.ts';
 import { setupRoutes } from './modules/setup/routes.ts';
 import { taxRoutes } from './modules/tax/routes.ts';
@@ -200,6 +201,7 @@ export function createApp({
   api.use(availabilityRoutes({ db, tenantDb, clock }));
   api.use(guestRoutes({ tenantDb, clock }));
   api.use(reservationRoutes({ db, tenantDb, clock, idKey: config.idKey }));
+  api.use(idScanRoutes({ db, tenantDb, clock, ai, files }));
   api.use(folioRoutes({ db, tenantDb, clock }));
   api.use(shiftRoutes({ db, tenantDb, clock }));
   api.use(paymentRoutes({ db, tenantDb, clock }));

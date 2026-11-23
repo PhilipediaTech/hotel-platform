@@ -98,6 +98,22 @@ export const APPROVAL_ACTIONS = [
     measure: 'none',
     backOffice: true,
   }),
+  // M8-04: a POS cashier voids an item or gives a discount; above their limit (the pos.void
+  // amount limit, for both) a manager approves. Measured by what the guest pays less.
+  a({
+    code: 'pos.void',
+    label: 'Void of a POS item',
+    measure: 'amount',
+    limitCode: 'pos.void',
+    backOffice: false,
+  }),
+  a({
+    code: 'pos.discount',
+    label: 'POS discount',
+    measure: 'amount',
+    limitCode: 'pos.void',
+    backOffice: false,
+  }),
   a({
     code: 'ar.over_limit',
     label: 'City-ledger transfer over the credit limit',

@@ -24,9 +24,14 @@ registerStrings(posStrings);
 // an outlet with a counted float, opens tabs or tables, adds items from the menu, and settles
 // by cash, transfer or POS terminal (split if needed) or charges a checked-in room with the
 // guest's signature drawn on screen. The shift closes with a blind count per method.
+// Items are voided or discounted with a reason (M8-04; T-143); above the cashier's limit a
+// manager approves first, and the order changes once they do.
 
 type Shift = z.output<typeof OutletShiftItem>;
 type Order = z.output<typeof PosOrderItem>;
+type Line = Order['lines'][number];
+
+const isPending = (r: unknown) => typeof r === 'object' && r !== null && 'approvalRequestId' in r;
 type Method = (typeof POS_PAY_METHODS)[number];
 type Closed = z.output<typeof ShiftItem>;
 
@@ -296,7 +301,11 @@ function OrderPanel({
   const { t } = useTranslation();
   const f = useFormats();
   const root = useRoot();
-  const [mode, setMode] = useState<'menu' | 'pay' | 'room'>('menu');
+  const { permissions } = useSession();
+  const canAdjust = permissions.includes('pos.void');
+  const [mode, setMode] = useState<'menu' | 'pay' | 'room' | 'adjust'>('menu');
+  const [adjusting, setAdjusting] = useState<Line | null>(null);
+  const [pending, setPending] = useState(false);
   const order = useQuery({
     queryKey: [...root, 'order', orderId],
     queryFn: () => api.call('getPosOrder', { params: { orderId } }),
@@ -305,14 +314,32 @@ function OrderPanel({
   const o = order.data;
   if (!o) return null;
   if (o.status !== 'OPEN') return <Settled order={o} onDone={onClosed} />;
+  const active = o.lines.filter((l) => !l.voided);
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
       <div>
+        {pending && (
+          <Alert tone="info" className="mb-3">
+            {t('pos.register.sentForApproval')}
+          </Alert>
+        )}
         {mode === 'menu' && <Menu outletId={shift.outletId} orderId={orderId} />}
         {mode === 'pay' && (
           <PaymentForm order={o} methods={methods} onCancel={() => setMode('menu')} />
         )}
         {mode === 'room' && <RoomCharge order={o} onCancel={() => setMode('menu')} />}
+        {mode === 'adjust' && adjusting && (
+          <AdjustForm
+            key={adjusting.id}
+            orderId={orderId}
+            line={adjusting}
+            onDone={(wasPending) => {
+              setPending(wasPending);
+              setAdjusting(null);
+              setMode('menu');
+            }}
+          />
+        )}
       </div>
       <aside
         aria-label={t('pos.register.order', { number: o.number, label: o.label })}
@@ -327,16 +354,51 @@ function OrderPanel({
           <ul className="mt-2 flex flex-col gap-1 text-sm">
             {o.lines.map((l) => (
               <li key={l.id} className="flex justify-between gap-2">
-                <span>
-                  {t('pos.register.qty', { count: l.quantity })} {l.name}
+                <span className={cn(l.voided && 'text-text-muted')}>
+                  <span className={cn(l.voided && 'line-through')}>
+                    {t('pos.register.qty', { count: l.quantity })} {l.name}
+                  </span>
                   {l.note && <span className="block text-xs text-text-muted">{l.note}</span>}
+                  {l.voided && (
+                    <span className="block text-xs">
+                      {t('pos.register.voidedLine', { by: l.voided.by, reason: l.voided.reason })}
+                    </span>
+                  )}
+                  {l.discount && (
+                    <span className="block text-xs text-text-muted">
+                      {t('pos.register.discountLine', { reason: l.discount.reason })} −
+                      {f.money(l.discount.amountMinor)}
+                    </span>
+                  )}
+                  {canAdjust && !l.voided && (
+                    <button
+                      type="button"
+                      className="block text-xs text-accent underline"
+                      aria-label={t('pos.register.adjust', { item: l.name })}
+                      onClick={() => {
+                        setPending(false);
+                        setAdjusting(l);
+                        setMode('adjust');
+                      }}
+                    >
+                      {t('pos.register.voidIt')} / {t('pos.register.discount')}
+                    </button>
+                  )}
                 </span>
-                <span>{f.money(l.amountMinor)}</span>
+                <span className={cn(l.voided && 'text-text-muted line-through')}>
+                  {f.money(l.amountMinor)}
+                </span>
               </li>
             ))}
           </ul>
         )}
         <dl className="mt-3 grid grid-cols-2 gap-1 border-t border-border pt-2 text-sm">
+          {o.discountMinor !== '0' && (
+            <>
+              <dt>{t('pos.register.discount')}</dt>
+              <dd className="text-right">−{f.money(o.discountMinor)}</dd>
+            </>
+          )}
           <dt>{t('pos.register.subtotal')}</dt>
           <dd className="text-right">{f.money(o.subtotalMinor)}</dd>
           <dt>{t('pos.register.tax')}</dt>
@@ -347,7 +409,7 @@ function OrderPanel({
         <div className="mt-3 flex flex-col gap-2">
           <Button
             className="h-11"
-            disabled={o.lines.length === 0 || methods.length === 0}
+            disabled={active.length === 0 || methods.length === 0}
             onClick={() => setMode('pay')}
           >
             {t('pos.register.pay')}
@@ -355,12 +417,12 @@ function OrderPanel({
           <Button
             variant="secondary"
             className="h-11"
-            disabled={o.lines.length === 0}
+            disabled={active.length === 0}
             onClick={() => setMode('room')}
           >
             {t('pos.register.room')}
           </Button>
-          {o.lines.length === 0 && (
+          {active.length === 0 && (
             <Button variant="ghost" className="h-11" onClick={() => drop.mutate(undefined)}>
               {t('pos.register.drop')}
             </Button>
@@ -373,6 +435,114 @@ function OrderPanel({
         )}
       </aside>
     </div>
+  );
+}
+
+/** M8-04: void an item or give a discount, with a reason; above the limit it waits (202). */
+function AdjustForm({
+  orderId,
+  line,
+  onDone,
+}: {
+  orderId: string;
+  line: Line;
+  onDone: (pending: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const [kind, setKind] = useState<'void' | 'discount'>('void');
+  const [byPercent, setByPercent] = useState(true);
+  const [value, setValue] = useState('');
+  const [reason, setReason] = useState('');
+  const amount = byPercent ? null : toMinor(value);
+  const percent = byPercent ? Number(value) : NaN;
+  const ready =
+    reason.trim() !== '' &&
+    (kind === 'void' || (byPercent ? percent > 0 && percent <= 100 : amount !== null));
+  const params = { orderId, lineId: line.id };
+  const change = useChange(
+    () =>
+      kind === 'void'
+        ? api.call('voidPosOrderLine', { params, body: { reason: reason.trim() } })
+        : api.call('discountPosOrderLine', {
+            params,
+            body: {
+              ...(byPercent ? { percent } : { amountMinor: amount ?? '0' }),
+              reason: reason.trim(),
+            },
+          }),
+    (r) => onDone(isPending(r)),
+  );
+  return (
+    <form
+      aria-label={t('pos.register.adjustTitle', { item: line.name })}
+      className="flex flex-col gap-3 rounded-md border border-border bg-surface p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ready) change.mutate(undefined);
+      }}
+    >
+      <h2 className="font-semibold">{t('pos.register.adjustTitle', { item: line.name })}</h2>
+      <fieldset className="flex flex-wrap gap-4 text-sm">
+        {(['void', 'discount'] as const).map((k) => (
+          <label key={k} className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="adjust-kind"
+              checked={kind === k}
+              onChange={() => setKind(k)}
+            />
+            {k === 'void' ? t('pos.register.voidIt') : t('pos.register.discountIt')}
+          </label>
+        ))}
+      </fieldset>
+      {kind === 'discount' && (
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="adjust-by">{t('pos.register.discountBy')}</Label>
+            <select
+              id="adjust-by"
+              className={selectClass}
+              value={byPercent ? 'percent' : 'amount'}
+              onChange={(e) => setByPercent(e.target.value === 'percent')}
+            >
+              <option value="percent">{t('pos.register.percent')}</option>
+              <option value="amount">{t('pos.register.adjustAmount')}</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="adjust-value">
+              {byPercent ? t('pos.register.percent') : t('pos.register.adjustAmount')}
+            </Label>
+            <Input
+              id="adjust-value"
+              className="w-32"
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="adjust-reason">{t('pos.register.adjustReason')}</Label>
+        <Input
+          id="adjust-reason"
+          value={reason}
+          maxLength={500}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </div>
+      <p className="text-xs text-text-muted">{t('pos.register.adjustHint')}</p>
+      <div className="flex gap-2">
+        <Button type="submit" className="h-11" disabled={!ready || change.isPending}>
+          {kind === 'void' ? t('pos.register.confirmVoid') : t('pos.register.confirmDiscount')}
+        </Button>
+        <Button variant="ghost" className="h-11" onClick={() => onDone(false)}>
+          {t('pos.register.cancel')}
+        </Button>
+      </div>
+      {change.error && <Alert tone="critical">{errorMessage(change.error)}</Alert>}
+    </form>
   );
 }
 

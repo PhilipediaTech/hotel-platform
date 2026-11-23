@@ -73,6 +73,12 @@ export function posRoutes(deps: reg.RegisterDeps): Router {
   mountRoute(router, p.cancelPosOrder, ({ params }, { tenant }) =>
     reg.cancelOrder(deps, tenantFrom(tenant), params.orderId),
   );
+  mountRoute(router, p.voidPosOrderLine, ({ params, body }, { tenant }) =>
+    reg.voidLine(deps, tenantFrom(tenant), params.orderId, params.lineId, body),
+  );
+  mountRoute(router, p.discountPosOrderLine, ({ params, body }, { tenant }) =>
+    reg.discountLine(deps, tenantFrom(tenant), params.orderId, params.lineId, body),
+  );
   mountRoute(router, p.listPosRooms, () => reg.listRooms(deps));
   mountRoute(router, p.getPosSettings, (_in, { tenant }) =>
     reg.getSettings(deps, tenantFrom(tenant)),

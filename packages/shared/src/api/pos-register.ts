@@ -80,6 +80,14 @@ export const PosOrderLineItem = z
     note: z.string().nullable(),
     addedBy: z.string(),
     addedAt: Instant,
+    /** M8-04: a voided item stays on the order with its reason, and is not charged. */
+    voided: z.object({ at: Instant, by: z.string(), reason: z.string() }).nullable(),
+    /** M8-04: what the guest pays less for this line, taxes included. */
+    discount: z
+      .object({ amountMinor: AmountMinor, at: Instant, by: z.string(), reason: z.string() })
+      .nullable(),
+    /** What the line charges with its taxes, after its discount; 0 when voided. */
+    totalMinor: AmountMinor,
   })
   .meta({ id: 'PosOrderLine' });
 
@@ -98,6 +106,8 @@ export const PosOrderItem = z
     /** Before tax. */
     subtotalMinor: AmountMinor,
     taxMinor: AmountMinor,
+    /** Discounts given on the lines, taxes included (M8-04). */
+    discountMinor: AmountMinor,
     /** What the guest pays: settled total once settled, else worked out for today. */
     totalMinor: AmountMinor,
     settledAt: Instant.nullable(),
@@ -318,9 +328,59 @@ export const cancelPosOrder = defineRoute({
   method: 'post',
   path: '/pos/orders/{orderId}/cancel',
   summary: 'Close an order opened by mistake, before anything is on it (M8-03)',
-  description: `${ADDED} Items already added are voided instead (M8-04).`,
+  description: `${ADDED} Once items are on it, void them all first (M8-04).`,
   permission: 'pos.order',
   params: OrderParams,
+  response: PosOrderItem,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+const LineParams = z.object({ orderId: Uuid, lineId: Uuid });
+const Reason = z.string().trim().min(1).max(500);
+const M804 =
+  'Tab 4 row POS; the paths and bodies are designed in T-143. Needs pos.void; within your pos.void amount limit it happens at once, above it (or with no limit set) the answer is 202 and a manager approves (M8-04). Measured by what the guest pays less, taxes included.';
+
+export const voidPosOrderLine = defineRoute({
+  ...POS,
+  operationId: 'voidPosOrderLine',
+  method: 'post',
+  path: '/pos/orders/{orderId}/lines/{lineId}/void',
+  summary: 'Void an item on an open order, with a reason (M8-04)',
+  description: `${M804} The voided item stays on the order with its reason, and is not charged.`,
+  permission: 'pos.void',
+  idempotent: true,
+  approval: true,
+  params: LineParams,
+  body: z.object({ reason: Reason }),
+  response: PosOrderItem,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const DiscountPosOrderLineBody = z
+  .object({
+    /** Percent off the line with its taxes, up to 100. */
+    percent: z.number().gt(0).max(100).optional(),
+    /** Or an amount off the line with its taxes, minor units. */
+    amountMinor: PositiveMinor.optional(),
+    reason: Reason,
+  })
+  .refine((b) => (b.percent === undefined) !== (b.amountMinor === undefined), {
+    message: 'Give a percent or an amount',
+    path: ['percent'],
+  });
+
+export const discountPosOrderLine = defineRoute({
+  ...POS,
+  operationId: 'discountPosOrderLine',
+  method: 'post',
+  path: '/pos/orders/{orderId}/lines/{lineId}/discount',
+  summary: 'Give a discount on an item of an open order, with a reason (M8-04)',
+  description: `${M804} One discount per item, at most what the item charges. When the order is settled it posts as a discount line taking its share off the charge and each of its taxes.`,
+  permission: 'pos.void',
+  idempotent: true,
+  approval: true,
+  params: LineParams,
+  body: DiscountPosOrderLineBody,
   response: PosOrderItem,
   errors: ['STATE_TRANSITION_INVALID'],
 });
@@ -374,6 +434,8 @@ export const POS_REGISTER_ROUTES = {
   settlePosOrder,
   chargePosOrderToRoom,
   cancelPosOrder,
+  voidPosOrderLine,
+  discountPosOrderLine,
   listPosRooms,
   getPosSettings,
   updatePosSettings,

@@ -376,6 +376,8 @@ model User {
   posOrdersOpened     PosOrder[]            @relation("PosOrderOpener")
   posOrdersSettled    PosOrder[]            @relation("PosOrderSettler")
   posOrderLinesAdded  PosOrderLine[]        @relation("PosOrderLineAuthor")
+  posOrderLinesVoided PosOrderLine[]        @relation("PosOrderLineVoider")
+  posLineDiscounts    PosOrderLine[]        @relation("PosOrderLineDiscounter")
 
   @@map("users")
 }
@@ -3057,27 +3059,40 @@ model PosOrder {
 
 /// An item on an order (M8-03; T-142), priced when added: the item's price plus its options.
 model PosOrderLine {
-  id             String   @id @default(uuid()) @db.Uuid
-  propertyId     String   @map("property_id") @db.Uuid
-  orderId        String   @map("order_id") @db.Uuid
-  menuItemId     String   @map("menu_item_id") @db.Uuid
+  id                        String    @id @default(uuid()) @db.Uuid
+  propertyId                String    @map("property_id") @db.Uuid
+  orderId                   String    @map("order_id") @db.Uuid
+  menuItemId                String    @map("menu_item_id") @db.Uuid
   /// The item's name when added, with its options, e.g. "Chapman (Large, No ice)".
-  name           String
-  quantity       Int
+  name                      String
+  quantity                  Int
   /// Item price plus options, before tax.
-  unitPriceMinor BigInt   @map("unit_price_minor")
+  unitPriceMinor            BigInt    @map("unit_price_minor")
   /// [{ id, name, priceMinor }] as chosen.
-  modifiers      Json     @default("[]")
-  revenueCodeId  String   @map("revenue_code_id") @db.Uuid
-  note           String?
-  addedById      String   @map("added_by_id") @db.Uuid
-  addedAt        DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+  modifiers                 Json      @default("[]")
+  revenueCodeId             String    @map("revenue_code_id") @db.Uuid
+  note                      String?
+  addedById                 String    @map("added_by_id") @db.Uuid
+  addedAt                   DateTime  @default(now()) @map("added_at") @db.Timestamptz(6)
+  /// M8-04: a voided item stays on the order with its reason; it is not charged.
+  voidedAt                  DateTime? @map("voided_at") @db.Timestamptz(6)
+  voidedById                String?   @map("voided_by_id") @db.Uuid
+  voidReason                String?   @map("void_reason")
+  voidApprovalRequestId     String?   @map("void_approval_request_id") @db.Uuid
+  /// M8-04: the discount off the line with its taxes (what the guest pays less), minor units.
+  discountMinor             BigInt?   @map("discount_minor")
+  discountReason            String?   @map("discount_reason")
+  discountedById            String?   @map("discounted_by_id") @db.Uuid
+  discountedAt              DateTime? @map("discounted_at") @db.Timestamptz(6)
+  discountApprovalRequestId String?   @map("discount_approval_request_id") @db.Uuid
 
-  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  order       PosOrder    @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  menuItem    MenuItem    @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
-  revenueCode RevenueCode @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
-  addedBy     User        @relation("PosOrderLineAuthor", fields: [addedById], references: [id], onDelete: Restrict)
+  property     Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  order        PosOrder    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  menuItem     MenuItem    @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  revenueCode  RevenueCode @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
+  addedBy      User        @relation("PosOrderLineAuthor", fields: [addedById], references: [id], onDelete: Restrict)
+  voidedBy     User?       @relation("PosOrderLineVoider", fields: [voidedById], references: [id], onDelete: Restrict)
+  discountedBy User?       @relation("PosOrderLineDiscounter", fields: [discountedById], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@map("pos_order_lines")

@@ -9,7 +9,7 @@ import { inHouse } from '../../../test/in-house.ts';
 // counts and variance; rules: charge to room only for CHECKED_IN stays, within the folio's
 // credit limit; the room charge's folio lines reference the order. AC: a room-charged order
 // appears on the folio once; the outlet shift close equals the sum of settlements by method.
-// T-142.)
+// T-142.) Voids and discounts (M8-04; T-143) are at the end.
 
 const db = testDb();
 let now: Date;
@@ -358,5 +358,205 @@ describe('POS register (M8-02, M8-03, M8-05)', () => {
     );
     const signed = await h.ok<Shift>(h.gm.send(`/shifts/${shiftId}/sign-off`, { note: null }));
     expect(signed.status).toBe('CLOSED');
+  }, 60_000);
+});
+
+// M8-04 (T-143): "As a POS cashier, I void an item or apply a discount; above limit needs
+// approval" (pos.void, amount limit). Rule: voided items stay on the order with reason.
+type Adjusted = Omit<Order, 'lines'> & {
+  discountMinor: string;
+  lines: (Order['lines'][number] & {
+    id: string;
+    voided: { by: string; reason: string } | null;
+    discount: { amountMinor: string; reason: string } | null;
+    totalMinor: string;
+  })[];
+};
+
+/** Sets the POS Cashier role's pos.void amount limit (null = none). */
+async function cashierLimit(orgId: string, maxAmountMinor: string | null) {
+  const role = await db.role.findFirstOrThrow({
+    where: { organisationId: orgId, name: 'POS Cashier' },
+  });
+  await db.role.update({
+    where: { id: role.id },
+    data: { limits: maxAmountMinor ? { 'pos.void': { maxAmountMinor } } : {} },
+  });
+}
+
+describe('POS voids and discounts (M8-04)', () => {
+  it('voids an item with its reason, at once within the limit and after approval above it', async () => {
+    const h = await bar();
+    await h.openShift();
+    const o = await h.order();
+    await h.ok(h.add(o.id, {}));
+    now = new Date(now.getTime() + 60_000);
+    const both = await h.ok<Adjusted>(h.add(o.id, { menuItemId: h.zobo.id }));
+    const [chapman, zobo] = both.lines;
+    if (!chapman || !zobo) throw new Error('lines');
+    const voidOf = (lineId: string, body: object, as = h.cashier) =>
+      as.send(`/pos/orders/${o.id}/lines/${lineId}/void`, body);
+
+    // pos.void is needed, and a reason.
+    expect((await voidOf(zobo.id, { reason: 'Wrong drink' }, h.fd)).status).toBe(403);
+    expect(errorOf(await voidOf(zobo.id, { reason: ' ' })).code).toBe('VALIDATION_ERROR');
+
+    // No limit set: every void waits for a manager.
+    const asked = await voidOf(zobo.id, { reason: 'Wrong drink' });
+    expect(asked.status).toBe(202);
+    const { approvalRequestId } = asked.body as { approvalRequestId: string };
+    const request = await db.approvalRequest.findUniqueOrThrow({
+      where: { id: approvalRequestId },
+    });
+    expect(request).toMatchObject({ action: 'pos.void', amountMinor: BigInt(zobo.totalMinor) });
+    let order = await h.ok<Adjusted>(h.cashier.get(`/pos/orders/${o.id}`));
+    expect(order.lines.every((l) => l.voided === null)).toBe(true);
+    // The cashier cannot approve their own request.
+    expect((await h.cashier.send(`/approvals/${approvalRequestId}/approve`, {})).status).toBe(403);
+    await h.ok(h.gm.send(`/approvals/${approvalRequestId}/approve`, {}));
+
+    // Rule: the voided item stays on the order with its reason, and is not charged.
+    order = await h.ok<Adjusted>(h.cashier.get(`/pos/orders/${o.id}`));
+    expect(order.lines).toHaveLength(2);
+    expect(order.lines[1]).toMatchObject({
+      name: 'Zobo',
+      voided: { reason: 'Wrong drink' },
+      totalMinor: '0',
+    });
+    expect(order.totalMinor).toBe(chapman.totalMinor);
+    const audit = await db.auditEvent.findFirstOrThrow({ where: { action: 'pos.item_voided' } });
+    expect(audit).toMatchObject({ reason: 'Wrong drink', approvalRequestId });
+    expect(errorOf(await voidOf(zobo.id, { reason: 'Again' })).code).toBe(
+      'STATE_TRANSITION_INVALID',
+    );
+
+    // Within the cashier's limit it happens at once.
+    await cashierLimit(h.org.id, '1000000');
+    order = await h.ok<Adjusted>(voidOf(chapman.id, { reason: 'Guest left' }));
+    expect(order.lines.every((l) => l.voided !== null)).toBe(true);
+    expect(order.totalMinor).toBe('0');
+    // Nothing left to charge: it cannot be settled, only closed, and the voids stay on it.
+    expect(
+      errorOf(
+        await h.cashier.send(`/pos/orders/${o.id}/settle`, {
+          payments: [{ method: 'CASH', amountMinor: '1' }],
+        }),
+      ).code,
+    ).toBe('STATE_TRANSITION_INVALID');
+    const closed = await h.ok<Adjusted>(h.cashier.send(`/pos/orders/${o.id}/cancel`));
+    expect(closed.status).toBe('CANCELLED');
+    expect(closed.lines.map((l) => l.voided?.reason)).toEqual(['Guest left', 'Wrong drink']);
+  }, 60_000);
+
+  it('discounts an item; settlement posts it off the charge and its taxes', async () => {
+    const h = await bar();
+    await cashierLimit(h.org.id, '100000'); // NGN 1,000
+    const shiftId = await h.openShift();
+    const o = await h.order();
+    await h.ok(h.add(o.id, { quantity: 2, modifierIds: [h.large] }));
+    now = new Date(now.getTime() + 60_000);
+    const start = await h.ok<Adjusted>(h.add(o.id, { menuItemId: h.zobo.id }));
+    const [chapman, zobo] = start.lines;
+    if (!chapman || !zobo) throw new Error('lines');
+    const discount = (lineId: string, body: object) =>
+      h.cashier.send(`/pos/orders/${o.id}/lines/${lineId}/discount`, body);
+
+    // A percent or an amount, never both, never more than the item charges.
+    expect(
+      errorOf(await discount(zobo.id, { percent: 10, amountMinor: '100', reason: 'x' })).code,
+    ).toBe('VALIDATION_ERROR');
+    const tooMuch = String(BigInt(zobo.totalMinor) + 1n);
+    expect(errorOf(await discount(zobo.id, { amountMinor: tooMuch, reason: 'x' })).code).toBe(
+      'VALIDATION_ERROR',
+    );
+
+    // NGN 500 is within the NGN 1,000 limit: at once.
+    let order = await h.ok<Adjusted>(
+      discount(zobo.id, { amountMinor: '50000', reason: 'Regular guest' }),
+    );
+    expect(order.lines[1]?.discount).toMatchObject({
+      amountMinor: '50000',
+      reason: 'Regular guest',
+    });
+    expect(order.lines[1]?.totalMinor).toBe(String(BigInt(zobo.totalMinor) - 50000n));
+    expect(errorOf(await discount(zobo.id, { percent: 5, reason: 'Again' })).code).toBe(
+      'STATE_TRANSITION_INVALID',
+    );
+
+    // 10% of the Chapmans is over NGN 1,000: a manager approves.
+    const asked = await discount(chapman.id, { percent: 10, reason: 'Slow service' });
+    expect(asked.status).toBe(202);
+    const { approvalRequestId } = asked.body as { approvalRequestId: string };
+    const tenth = (BigInt(chapman.totalMinor) * 1000n * 2n + 10_000n) / 20_000n;
+    const request = await db.approvalRequest.findUniqueOrThrow({
+      where: { id: approvalRequestId },
+    });
+    expect(request).toMatchObject({ action: 'pos.discount', amountMinor: tenth });
+    await h.ok(h.gm.send(`/approvals/${approvalRequestId}/approve`, {}));
+    order = await h.ok<Adjusted>(h.cashier.get(`/pos/orders/${o.id}`));
+    expect(order.discountMinor).toBe(String(50000n + tenth));
+    const gross = BigInt(chapman.totalMinor) + BigInt(zobo.totalMinor);
+    expect(order.totalMinor).toBe(String(gross - 50000n - tenth));
+    expect(BigInt(order.subtotalMinor) + BigInt(order.taxMinor)).toBe(BigInt(order.totalMinor));
+
+    // Settled: the discount lines take their share off the charge and each tax.
+    const paid = await h.ok<Adjusted>(
+      h.cashier.send(`/pos/orders/${o.id}/settle`, {
+        payments: [{ method: 'CASH', amountMinor: order.totalMinor }],
+      }),
+    );
+    expect(paid).toMatchObject({
+      status: 'PAID',
+      totalMinor: order.totalMinor,
+      subtotalMinor: order.subtotalMinor,
+      taxMinor: order.taxMinor,
+      discountMinor: order.discountMinor,
+    });
+    const folio = await db.folio.findFirstOrThrow({
+      where: { kind: 'POS' },
+      include: { lines: true },
+    });
+    expect(folio.lines.reduce((s, l) => s + l.amountMinor, 0n)).toBe(BigInt(order.totalMinor));
+    const discounts = folio.lines.filter((l) => l.kind === 'DISCOUNT');
+    expect(discounts).toHaveLength(2);
+    expect(
+      discounts.every(
+        (d) =>
+          d.amountMinor < 0n &&
+          d.sourceType === 'POS_ORDER' &&
+          d.sourceId === o.id &&
+          d.shiftId === shiftId,
+      ),
+    ).toBe(true);
+    const zoboDiscount = discounts.find((d) => d.reason === 'Regular guest');
+    const parts = folio.lines.filter(
+      (l) => l.id === zoboDiscount?.id || l.parentLineId === zoboDiscount?.id,
+    );
+    expect(parts.length).toBeGreaterThan(1); // the taxes give up their share
+    expect(parts.reduce((s, l) => s + l.amountMinor, 0n)).toBe(-50000n);
+  }, 60_000);
+
+  it('an approval for an order settled meanwhile no longer applies', async () => {
+    const h = await bar();
+    await h.openShift();
+    const o = await h.order();
+    const added = await h.ok<Adjusted>(h.add(o.id, {}));
+    const asked = await h.cashier.send(`/pos/orders/${o.id}/lines/${added.lines[0]?.id}/void`, {
+      reason: 'Spilled',
+    });
+    expect(asked.status).toBe(202);
+    const { approvalRequestId } = asked.body as { approvalRequestId: string };
+    await h.ok(
+      h.cashier.send(`/pos/orders/${o.id}/settle`, {
+        payments: [{ method: 'CASH', amountMinor: added.totalMinor }],
+      }),
+    );
+    const late = await h.gm.send(`/approvals/${approvalRequestId}/approve`, {});
+    expect(errorOf(late).code).toBe('STATE_TRANSITION_INVALID');
+    const request = await db.approvalRequest.findUniqueOrThrow({
+      where: { id: approvalRequestId },
+    });
+    expect(request.status).toBe('FAILED');
+    expect(await db.posOrderLine.count({ where: { voidedAt: { not: null } } })).toBe(0);
   }, 60_000);
 });

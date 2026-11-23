@@ -1,0 +1,123 @@
+{
+  "stock": {
+    "title": "Stock",
+    "intro": "Stock on hand is always the sum of what came in and went out: nothing is typed over. Quantities are in each item's unit, up to 3 decimals.",
+    "tabs": {
+      "items": "Items",
+      "requisitions": "Requisitions",
+      "stocktakes": "Stocktakes",
+      "movements": "Movements"
+    },
+    "common": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "code": "Code",
+      "name": "Name",
+      "choose": "Choose…",
+      "reason": "Reason",
+      "quantity": "Quantity",
+      "location": "Location",
+      "item": "Item",
+      "unit": "Unit",
+      "off": "switched off",
+      "switchOff": "Switch off",
+      "switchOn": "Switch on",
+      "by": "By {{name}}"
+    },
+    "items": {
+      "none": "No stock items yet.",
+      "add": "Add an item",
+      "form": "Stock item",
+      "category": "Category (optional)",
+      "par": "Par level (optional)",
+      "reorder": "Reorder point (optional)",
+      "cost": "Unit cost",
+      "onHand": "On hand",
+      "levels": "Par {{par}} · reorder at {{reorder}}",
+      "noLevels": "No par level",
+      "reorderNow": "Reorder",
+      "toPar": "{{qty}} to par",
+      "adjust": "Adjust",
+      "move": "Move",
+      "adjustTitle": "Adjust {{item}}",
+      "adjustHint": "Positive adds stock (opening stock, found), negative takes it away (breakage, spoilage).",
+      "moveTitle": "Move {{item}}",
+      "from": "From",
+      "to": "To",
+      "edit": "Edit",
+      "units": "Units",
+      "locations": "Locations",
+      "addUnit": "Add unit",
+      "addLocation": "Add location",
+      "byLocation": "{{location}}: {{qty}}"
+    },
+    "requisitions": {
+      "none": "No requisitions.",
+      "new": "New requisition",
+      "department": "Department",
+      "note": "Note (optional)",
+      "addLine": "Add another item",
+      "remove": "Remove",
+      "submit": "Send to the store",
+      "title": "Requisition {{number}} · {{department}}",
+      "raisedBy": "Raised by {{name}}, {{when}}",
+      "line": "{{item}}: {{issued}} of {{quantity}} {{unit}} issued",
+      "issue": "Issue",
+      "issueTitle": "Issue requisition {{number}}",
+      "issueFrom": "Issue from",
+      "issueQty": "Issue now: {{item}}",
+      "confirmIssue": "Issue stock",
+      "close": "Close",
+      "closeTitle": "Close requisition {{number}}",
+      "confirmClose": "Close it",
+      "withdraw": "Withdraw",
+      "closed": "Closed by {{name}}: {{reason}}",
+      "ownIssue": "You raised this requisition, so another store keeper issues it.",
+      "status": {
+        "SUBMITTED": "Waiting",
+        "PARTIAL": "Part issued",
+        "ISSUED": "Issued",
+        "CLOSED": "Closed",
+        "CANCELLED": "Withdrawn"
+      }
+    },
+    "stocktakes": {
+      "none": "No stocktakes yet.",
+      "start": "Start a stocktake",
+      "startNow": "Start counting",
+      "title": "Stocktake {{number}} · {{location}}",
+      "progress": "{{counted}} of {{total}} items counted",
+      "blind": "Count what is on the shelf. What the books expect shows once the stocktake is posted.",
+      "counted": "Counted",
+      "saveCounts": "Save counts",
+      "post": "Post stocktake",
+      "postHint": "Each counted item that differs from the books gets an adjustment with this reason. Items not counted are left as they are.",
+      "postReason": "Reason for the differences",
+      "abandon": "Abandon count",
+      "expected": "Books",
+      "variance": "Variance",
+      "value": "Value",
+      "total": "Variance value: {{value}}",
+      "notCounted": "not counted",
+      "open": "Open",
+      "status": {
+        "COUNTING": "Counting",
+        "POSTED": "Posted",
+        "CANCELLED": "Abandoned"
+      }
+    },
+    "movements": {
+      "none": "No movements yet.",
+      "more": "Show more",
+      "requisition": "Requisition {{number}}",
+      "stocktake": "Stocktake {{number}}",
+      "issuedTo": "Asked by {{requester}}, approved by {{approver}}",
+      "kind": {
+        "RECEIPT": "Received",
+        "ISSUE": "Issued",
+        "TRANSFER": "Moved",
+        "ADJUSTMENT": "Adjusted"
+      }
+    }
+  }
+}

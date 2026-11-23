@@ -187,6 +187,7 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
       'room.block',
       'lostfound.manage',
       'checklist.manage',
+      'stock.requisition',
       'task.create',
       'task.assign',
       'task.verify',
@@ -216,6 +217,7 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
       'asset.manage',
       'pm.manage',
       'utility.log',
+      'stock.requisition',
       ...SELF_SERVICE,
     ],
   },
@@ -236,6 +238,7 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
       'leave.approve',
       'timesheet.approve',
       'report.ops',
+      'stock.requisition',
       ...SELF_SERVICE,
     ],
   },
@@ -267,6 +270,22 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
     orgWide: false,
     department: null,
     permissions: ['pos.shift', 'pos.order', 'pos.void', ...SELF_SERVICE],
+  },
+  {
+    // Inventory (PRD M10-01, M10-02, M10-05; T-145): items, issues against requisitions,
+    // adjustments, transfers and stocktakes; receiving goods arrives with purchasing (M10-04)
+    name: 'Store Keeper',
+    slug: 'store-keeper',
+    requiresMfa: false,
+    orgWide: false,
+    department: 'FIN',
+    permissions: [
+      'stock.manage',
+      'stock.requisition',
+      'stock.receive',
+      'stock.count',
+      ...SELF_SERVICE,
+    ],
   },
   {
     // Own tasks, attendance, leave, handovers

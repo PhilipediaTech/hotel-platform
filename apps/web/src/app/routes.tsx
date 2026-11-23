@@ -112,6 +112,7 @@ const AttendancePage = lazy(() =>
 const PosSetupPage = lazy(() =>
   import('../routes/pos-setup.tsx').then((m) => ({ default: m.PosSetupPage })),
 );
+const StockPage = lazy(() => import('../routes/stock.tsx').then((m) => ({ default: m.StockPage })));
 const PosPage = lazy(() => import('../routes/pos.tsx').then((m) => ({ default: m.PosPage })));
 const PayrollPage = lazy(() =>
   import('../routes/payroll.tsx').then((m) => ({ default: m.PayrollPage })),
@@ -193,6 +194,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/payroll': <PayrollPage />,
   '/pos': <PosPage />,
   '/pos/setup': <PosSetupPage />,
+  '/stock': <StockPage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

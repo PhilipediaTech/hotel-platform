@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-144 (row-level security) is pushed on `feat/T-144-row-level-security` (run `npm run db:deploy` after merging). Next: V1.3 inventory, purchasing and stocktake (M10-01–M10-05).
+T-145 (stock items, requisitions and stocktakes) is pushed on `feat/T-145-stock-requisitions-stocktakes` (run `npm run db:deploy`, `npm run db:generate` and `npm run seed` after merging). Next: T-146 suppliers, purchase orders and receiving.

@@ -23,6 +23,8 @@ export const MODULES = [
   { code: 'leakage', label: 'Revenue Leakage Guard' },
   { code: 'owner', label: 'Owner Remote Control' },
   { code: 'events', label: 'Events and spaces' },
+  // M14-13 (T-149): Professional and Group plans (Strategy plan table).
+  { code: 'pricing', label: 'Price suggestions' },
 ] as const;
 export type ModuleCode = (typeof MODULES)[number]['code'];
 
@@ -40,6 +42,9 @@ export const MODULE_PERMISSIONS: Record<ModuleCode, readonly string[]> = {
     'event.brief',
     'event.close',
   ],
+  // Its screen needs rate.manage, which the rates screens need too: the route answers
+  // MODULE_DISABLED instead.
+  pricing: [],
 };
 
 /** Platform staff hold every platform code (T-100: PLATFORM_ADMIN_EMAILS, MFA on). */

@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-148 (accounting exports, general journal CSV) is pushed on `feat/T-148-accounting-exports` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: V1.3 AI features (M14-13 to M14-15).
+T-149 (price suggestions) is pushed on `feat/T-149-price-suggestions` (no migration; run `git pull` after merging). Next: T-150 ID scan at check-in (M14-14).

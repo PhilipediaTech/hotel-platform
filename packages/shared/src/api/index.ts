@@ -53,6 +53,7 @@ export * from './pos-register.ts';
 export * from './stock.ts';
 export * from './expenses.ts';
 export * from './accounting.ts';
+export * from './price-suggestions.ts';
 export * from './tasks.ts';
 export * from './handovers.ts';
 export * from './leakage.ts';

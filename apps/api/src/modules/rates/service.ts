@@ -370,7 +370,7 @@ export async function updateRatePlan(
 // ── Calendar ───────────────────────────────────────────────────────────────────────────
 
 /** Room types a plan sells: its list, or every active type of the property. */
-async function planRoomTypes(db: TenantDb | Tx, plan: RatePlan): Promise<string[]> {
+export async function planRoomTypes(db: TenantDb | Tx, plan: RatePlan): Promise<string[]> {
   const types = await db.roomType.findMany({
     where: plan.roomTypeIds.length > 0 ? { id: { in: plan.roomTypeIds } } : { active: true },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],

@@ -17914,6 +17914,115 @@
           "lines"
         ]
       },
+      "PriceSuggestion": {
+        "type": "object",
+        "properties": {
+          "ratePlan": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ]
+          },
+          "roomType": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ]
+          },
+          "date": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "currentMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "suggestedMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "changeBps": {
+            "type": "integer"
+          },
+          "sold": {
+            "type": "integer"
+          },
+          "capacity": {
+            "type": "integer"
+          },
+          "daysOut": {
+            "type": "integer"
+          },
+          "lastYear": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "date": {
+                "$ref": "#/components/schemas/IsoDate"
+              },
+              "soldThen": {
+                "type": "integer"
+              },
+              "soldFinal": {
+                "type": "integer"
+              },
+              "capacity": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "date",
+              "soldThen",
+              "soldFinal",
+              "capacity"
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ratePlan",
+          "roomType",
+          "date",
+          "currentMinor",
+          "suggestedMinor",
+          "changeBps",
+          "sold",
+          "capacity",
+          "daysOut",
+          "lastYear",
+          "reasons"
+        ]
+      },
       "Task": {
         "type": "object",
         "properties": {
@@ -20050,7 +20159,8 @@
                   "enum": [
                     "leakage",
                     "owner",
-                    "events"
+                    "events",
+                    "pricing"
                   ]
                 },
                 "label": {
@@ -77398,6 +77508,292 @@
         }
       }
     },
+    "/price-suggestions": {
+      "get": {
+        "operationId": "listPriceSuggestions",
+        "summary": "Suggested price changes per room type and date, with their reasons (M14-13)",
+        "tags": [
+          "Rates"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4: designed in T-149 for M14-13. From the business date for `days` days (default 30, at most 90). Only dates with a price and a change to suggest are listed.",
+        "x-permission": "rate.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 30
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PriceSuggestion"
+                      }
+                    },
+                    "currency": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "currency"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/price-suggestions/accept": {
+      "post": {
+        "operationId": "acceptPriceSuggestions",
+        "summary": "Accept suggestions, as suggested or changed: they become the prices (M14-13)",
+        "tags": [
+          "Rates"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4: designed in T-149 for M14-13. Each item sets one room type's price on one date of a BAR plan, from today on, as a rate calendar change (audited, with the suggestion alongside).",
+        "x-permission": "rate.manage",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ratePlanId": {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        "roomTypeId": {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        "date": {
+                          "$ref": "#/components/schemas/IsoDate"
+                        },
+                        "amountMinor": {
+                          "type": "string",
+                          "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                          "example": "4500000"
+                        },
+                        "suggestedMinor": {
+                          "$ref": "#/components/schemas/AmountMinor"
+                        }
+                      },
+                      "required": [
+                        "ratePlanId",
+                        "roomTypeId",
+                        "date",
+                        "amountMinor"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 200
+                  }
+                },
+                "required": [
+                  "items"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "changedDays": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "changedDays"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks": {
       "get": {
         "operationId": "listTasks",
@@ -83412,7 +83808,8 @@
                           "enum": [
                             "leakage",
                             "owner",
-                            "events"
+                            "events",
+                            "pricing"
                           ]
                         },
                         "enabled": {
@@ -83425,7 +83822,7 @@
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 3
+                    "maxItems": 4
                   }
                 },
                 "required": [
@@ -83453,7 +83850,8 @@
                             "enum": [
                               "leakage",
                               "owner",
-                              "events"
+                              "events",
+                              "pricing"
                             ]
                           },
                           "label": {

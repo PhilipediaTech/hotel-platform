@@ -135,6 +135,8 @@ export const TENANT_MODELS: Record<string, Scope> = {
   MenuCategory: { kind: 'property' },
   MenuItem: { kind: 'property' },
   MenuModifier: { kind: 'property' },
+  PosOrder: { kind: 'property' },
+  PosOrderLine: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

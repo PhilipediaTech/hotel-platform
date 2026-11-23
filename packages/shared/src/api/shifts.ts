@@ -60,6 +60,8 @@ export const ShiftItem = z
     id: Uuid,
     userId: Uuid.nullable(),
     cashier: z.string(),
+    /** An outlet shift's outlet (POS, T-142); null at the front desk. */
+    outlet: z.string().nullable(),
     status: z.enum(SHIFT_STATUSES),
     openedAt: Instant,
     closedAt: Instant.nullable(),

@@ -575,8 +575,11 @@ function Supervisor() {
       {list.data?.data.map((s) => (
         <article key={s.id} className="mt-3 rounded-md border border-border bg-surface p-4">
           <p className="text-sm">
-            <span className="font-semibold">{s.cashier}</span> ·{' '}
-            {t('shift.openedLine', { when: f.when(s.openedAt), float: f.money(s.floatMinor) })}
+            <span className="font-semibold">
+              {s.cashier}
+              {s.outlet && ` (${s.outlet})`}
+            </span>{' '}
+            · {t('shift.openedLine', { when: f.when(s.openedAt), float: f.money(s.floatMinor) })}
           </p>
           <CountLines shift={s} />
           {s.varianceNote && (

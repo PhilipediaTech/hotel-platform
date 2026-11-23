@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-141 (POS outlets and menus) is pushed on `feat/T-141-pos-setup`, built on `feat/T-138a-clock-corrections`: merge T-138a first (run `npm run db:deploy` and `npm run db:generate` after each). Next: POS shifts, orders, settlement and close (M8-02, M8-03, M8-05).
+T-142 (POS register: outlet shifts, orders, settlement, room charges, shift close) is pushed on `feat/T-142-pos-register` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: POS voids and discounts with approval (M8-04).

@@ -290,6 +290,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-139',
   },
   {
+    id: 'pos',
+    path: '/pos',
+    anyOf: ['pos.order', 'pos.shift'],
+    group: 'operations',
+    screen: 'S33',
+    ticket: 'T-142',
+  },
+  {
     id: 'pos-setup',
     path: '/pos/setup',
     anyOf: ['pos.setup'],

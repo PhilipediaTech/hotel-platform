@@ -76,7 +76,55 @@ export function PosSetupPage() {
           <OutletCard key={o.id} outlet={o} codes={data.revenueCodes} />
         ))}
       </ul>
+      <RoomChargeLimit />
     </section>
+  );
+}
+
+/** M8-03 rule: room charges stay within the folio's credit limit; this one when it has none. */
+function RoomChargeLimit() {
+  const { t } = useTranslation();
+  const f = useFormats();
+  const root = useRoot();
+  const key = [...root, 'settings'];
+  const settings = useQuery({ queryKey: key, queryFn: () => api.call('getPosSettings', {}) });
+  const [limit, setLimit] = useState<string | null>(null);
+  const current = settings.data?.roomChargeLimitMinor ?? null;
+  const save = useChange(() =>
+    api.call('updatePosSettings', {
+      body: { roomChargeLimitMinor: limit?.trim() ? toMinor(limit) : null },
+    }),
+  );
+  return (
+    <form
+      aria-label={t('pos.setup.limitTitle')}
+      className="mt-6 flex flex-col gap-2 rounded-md border border-border bg-surface p-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate(undefined, { onSuccess: () => setLimit(null) });
+      }}
+    >
+      <h2 className="font-semibold">{t('pos.setup.limitTitle')}</h2>
+      <p className="text-sm text-text-muted">{t('pos.setup.limitIntro')}</p>
+      <p className="text-sm">{current ? f.money(current) : t('pos.setup.noLimit')}</p>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="room-limit">{t('pos.setup.limit')}</Label>
+          <Input
+            id="room-limit"
+            inputMode="decimal"
+            value={limit ?? (current ? (Number(current) / 100).toFixed(2) : '')}
+            onChange={(e) => setLimit(e.target.value)}
+          />
+        </div>
+        <Button type="submit" className="h-11" disabled={save.isPending}>
+          {t('pos.setup.saveLimit')}
+        </Button>
+      </div>
+      {(save.error ?? settings.error) && (
+        <Alert tone="critical">{errorMessage(save.error ?? settings.error)}</Alert>
+      )}
+    </form>
   );
 }
 

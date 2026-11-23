@@ -80,11 +80,12 @@ const guestName = (g: { firstName: string; lastName: string }) =>
 async function openShifts({ deps }: Env): Promise<Outcome> {
   const shifts = await deps.tenantDb.cashierShift.findMany({
     where: { status: { in: ['OPEN', 'CLOSING'] }, userId: { not: null } },
-    include: { user: true },
+    include: { user: true, outlet: true },
     orderBy: { openedAt: 'asc' },
   });
   const exceptions: Exception[] = shifts.map((s) => {
-    const who = s.user?.name ?? 'A cashier';
+    // Outlet shifts (POS, T-142) close before the audit too.
+    const who = `${s.user?.name ?? 'A cashier'}${s.outlet ? ` (${s.outlet.name})` : ''}`;
     return s.status === 'OPEN'
       ? {
           type: 'SHIFT_OPEN',

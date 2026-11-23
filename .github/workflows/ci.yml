@@ -20,7 +20,8 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Room for a slow runner: the tests alone took 11–15 minutes by T-142.
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:18

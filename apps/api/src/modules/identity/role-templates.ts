@@ -259,6 +259,15 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
     ],
   },
   {
+    // Lite POS (PRD M8-02, M8-03, M8-05; T-142): outlet shifts, orders and settlement
+    name: 'POS Cashier',
+    slug: 'pos-cashier',
+    requiresMfa: false,
+    orgWide: false,
+    department: null,
+    permissions: ['pos.shift', 'pos.order', ...SELF_SERVICE],
+  },
+  {
     // Own tasks, attendance, leave, handovers
     name: 'Staff Member',
     slug: 'staff',

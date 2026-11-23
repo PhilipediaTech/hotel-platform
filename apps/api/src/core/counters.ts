@@ -13,6 +13,8 @@ export const COUNTER = {
   LOST_FOUND: 'lost_found',
   STAFF: 'staff',
   POS_ORDER: 'pos_order',
+  REQUISITION: 'requisition',
+  STOCKTAKE: 'stocktake',
 } as const;
 export type CounterName = (typeof COUNTER)[keyof typeof COUNTER];
 

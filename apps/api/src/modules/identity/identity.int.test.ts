@@ -68,7 +68,7 @@ describe('sign-up (M1-01)', () => {
       include: { roles: true, properties: true },
     });
     expect(org).toMatchObject({ name: 'Obi Hotels', country: 'NG' });
-    expect(org.roles).toHaveLength(14);
+    expect(org.roles).toHaveLength(15);
     expect(org.properties).toEqual([
       expect.objectContaining({
         name: 'Obi Lagos Suites',

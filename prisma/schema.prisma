@@ -164,6 +164,14 @@ model Property {
   menuModifiers        MenuModifier[]
   posOrders            PosOrder[]
   posOrderLines        PosOrderLine[]
+  stockUnits           StockUnit[]
+  stockLocations       StockLocation[]
+  stockItems           StockItem[]
+  stockMovements       StockMovement[]
+  requisitions         Requisition[]
+  requisitionLines     RequisitionLine[]
+  stocktakes           Stocktake[]
+  stocktakeLines       StocktakeLine[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -217,6 +225,7 @@ model Department {
   checklists    Checklist[]
   staffProfiles StaffProfile[]
   rotaPatterns  RotaPattern[]
+  requisitions  Requisition[]
 
   @@unique([propertyId, code])
   @@unique([propertyId, id])
@@ -378,6 +387,14 @@ model User {
   posOrderLinesAdded  PosOrderLine[]        @relation("PosOrderLineAuthor")
   posOrderLinesVoided PosOrderLine[]        @relation("PosOrderLineVoider")
   posLineDiscounts    PosOrderLine[]        @relation("PosOrderLineDiscounter")
+  stockMovementsMade  StockMovement[]       @relation("StockMovementBy")
+  stockIssuesAsked    StockMovement[]       @relation("StockMovementRequester")
+  stockIssuesApproved StockMovement[]       @relation("StockMovementApprover")
+  requisitionsRaised  Requisition[]         @relation("RequisitionRequester")
+  requisitionsClosed  Requisition[]         @relation("RequisitionCloser")
+  stocktakesStarted   Stocktake[]           @relation("StocktakeStarter")
+  stocktakesPosted    Stocktake[]           @relation("StocktakePoster")
+  stocktakeCounts     StocktakeLine[]       @relation("StocktakeCounter")
 
   @@map("users")
 }
@@ -4075,4 +4092,222 @@ model ReconciliationMatch {
 
   @@index([propertyId, statementLineId])
   @@map("reconciliation_matches")
+}
+
+// ---------------------------------------------------------------------------------------
+// Inventory (PRD M10-01, M10-02, M10-05; T-145). Tab 3 names stock_items, stock_units,
+// stock_locations, stock_movements (append-only), requisitions and stocktakes; the columns
+// are designed here. Quantities are thousandths of the item's unit (like fuel litres), so
+// 1.5 kg is 1500. Stock on hand is the sum of movements, never stored or edited (M10 rule).
+
+/// What stock is counted in (M10-01): bottle, kg, litre, carton.
+model StockUnit {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  code       String
+  name       String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  items    StockItem[]
+
+  @@unique([propertyId, code])
+  @@map("stock_units")
+}
+
+/// Where stock is kept (M10-01): main store, bar store, kitchen.
+model StockLocation {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  code       String
+  name       String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property   Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  movements  StockMovement[]
+  stocktakes Stocktake[]
+
+  @@unique([propertyId, code])
+  @@map("stock_locations")
+}
+
+/// A stock item with its par level and reorder point (M10-01), across all locations.
+model StockItem {
+  id            String   @id @default(uuid()) @db.Uuid
+  propertyId    String   @map("property_id") @db.Uuid
+  code          String
+  name          String
+  category      String?
+  unitId        String   @map("unit_id") @db.Uuid
+  /// The level to restock up to, in thousandths of the unit.
+  parMilli      BigInt?  @map("par_milli")
+  /// At or below this on hand, the item needs reordering.
+  reorderMilli  BigInt?  @map("reorder_milli")
+  /// Cost of one unit, minor units of the base currency: values movements and variances.
+  unitCostMinor BigInt   @default(0) @map("unit_cost_minor")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property         Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  unit             StockUnit         @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  movements        StockMovement[]
+  requisitionLines RequisitionLine[]
+  stocktakeLines   StocktakeLine[]
+
+  @@unique([propertyId, code])
+  @@map("stock_items")
+}
+
+enum StockMovementKind {
+  /// Goods received (from purchase orders, T-146).
+  RECEIPT
+  /// Issued to a department against a requisition (M10-02).
+  ISSUE
+  /// One of the two rows of a move between locations, sharing transfer_id.
+  TRANSFER
+  /// Opening stock, breakage, a stocktake variance: always with a reason.
+  ADJUSTMENT
+}
+
+/// Append-only (tab 3): on hand = the sum of quantity_milli per item and location.
+model StockMovement {
+  id                String            @id @default(uuid()) @db.Uuid
+  propertyId        String            @map("property_id") @db.Uuid
+  itemId            String            @map("item_id") @db.Uuid
+  locationId        String            @map("location_id") @db.Uuid
+  kind              StockMovementKind
+  /// Signed: in is positive, out negative.
+  quantityMilli     BigInt            @map("quantity_milli")
+  /// The item's unit cost at the time.
+  unitCostMinor     BigInt            @map("unit_cost_minor")
+  reason            String?
+  transferId        String?           @map("transfer_id") @db.Uuid
+  requisitionId     String?           @map("requisition_id") @db.Uuid
+  requisitionLineId String?           @map("requisition_line_id") @db.Uuid
+  stocktakeId       String?           @map("stocktake_id") @db.Uuid
+  byUserId          String            @map("by_user_id") @db.Uuid
+  /// M10 rule: every issue has a requester and an approver.
+  requestedById     String?           @map("requested_by_id") @db.Uuid
+  approvedById      String?           @map("approved_by_id") @db.Uuid
+  at                DateTime          @default(now()) @db.Timestamptz(6)
+
+  property        Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  item            StockItem        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location        StockLocation    @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  requisition     Requisition?     @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
+  requisitionLine RequisitionLine? @relation(fields: [requisitionLineId], references: [id], onDelete: Restrict)
+  stocktake       Stocktake?       @relation(fields: [stocktakeId], references: [id], onDelete: Restrict)
+  by              User             @relation("StockMovementBy", fields: [byUserId], references: [id], onDelete: Restrict)
+  requestedBy     User?            @relation("StockMovementRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  approvedBy      User?            @relation("StockMovementApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, itemId, locationId])
+  @@index([propertyId, at])
+  @@map("stock_movements")
+}
+
+enum RequisitionStatus {
+  SUBMITTED
+  PARTIAL
+  ISSUED
+  /// The store keeper refused it, or closed what was left of it.
+  CLOSED
+  /// Withdrawn by the requester before anything was issued.
+  CANCELLED
+}
+
+/// A department asks the store for items (M10-02).
+model Requisition {
+  id            String            @id @default(uuid()) @db.Uuid
+  propertyId    String            @map("property_id") @db.Uuid
+  number        Int
+  departmentId  String            @map("department_id") @db.Uuid
+  requestedById String            @map("requested_by_id") @db.Uuid
+  status        RequisitionStatus @default(SUBMITTED)
+  note          String?
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  closedById    String?           @map("closed_by_id") @db.Uuid
+  closedAt      DateTime?         @map("closed_at") @db.Timestamptz(6)
+  closeReason   String?           @map("close_reason")
+
+  property    Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  department  Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  requestedBy User              @relation("RequisitionRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  closedBy    User?             @relation("RequisitionCloser", fields: [closedById], references: [id], onDelete: Restrict)
+  lines       RequisitionLine[]
+  movements   StockMovement[]
+
+  @@unique([propertyId, number])
+  @@index([propertyId, status])
+  @@map("requisitions")
+}
+
+model RequisitionLine {
+  id            String @id @default(uuid()) @db.Uuid
+  propertyId    String @map("property_id") @db.Uuid
+  requisitionId String @map("requisition_id") @db.Uuid
+  itemId        String @map("item_id") @db.Uuid
+  quantityMilli BigInt @map("quantity_milli")
+  issuedMilli   BigInt @default(0) @map("issued_milli")
+
+  property    Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  requisition Requisition     @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
+  item        StockItem       @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  movements   StockMovement[]
+
+  @@unique([requisitionId, itemId])
+  @@map("requisition_lines")
+}
+
+enum StocktakeStatus {
+  COUNTING
+  POSTED
+  CANCELLED
+}
+
+/// A count of one location (M10-05): blind while counting, variances posted as adjustments.
+model Stocktake {
+  id          String          @id @default(uuid()) @db.Uuid
+  propertyId  String          @map("property_id") @db.Uuid
+  number      Int
+  locationId  String          @map("location_id") @db.Uuid
+  status      StocktakeStatus @default(COUNTING)
+  startedById String          @map("started_by_id") @db.Uuid
+  startedAt   DateTime        @default(now()) @map("started_at") @db.Timestamptz(6)
+  postedById  String?         @map("posted_by_id") @db.Uuid
+  postedAt    DateTime?       @map("posted_at") @db.Timestamptz(6)
+  /// Why the counts differ from the books: the reason on every adjustment posted.
+  reason      String?
+
+  property  Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  location  StockLocation   @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  startedBy User            @relation("StocktakeStarter", fields: [startedById], references: [id], onDelete: Restrict)
+  postedBy  User?           @relation("StocktakePoster", fields: [postedById], references: [id], onDelete: Restrict)
+  lines     StocktakeLine[]
+  movements StockMovement[]
+
+  @@unique([propertyId, number])
+  @@map("stocktakes")
+}
+
+model StocktakeLine {
+  id            String    @id @default(uuid()) @db.Uuid
+  propertyId    String    @map("property_id") @db.Uuid
+  stocktakeId   String    @map("stocktake_id") @db.Uuid
+  itemId        String    @map("item_id") @db.Uuid
+  countedMilli  BigInt?   @map("counted_milli")
+  countedById   String?   @map("counted_by_id") @db.Uuid
+  countedAt     DateTime? @map("counted_at") @db.Timestamptz(6)
+  /// On hand by the books when the stocktake was posted (kept hidden until then).
+  expectedMilli BigInt?   @map("expected_milli")
+
+  property  Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  stocktake Stocktake @relation(fields: [stocktakeId], references: [id], onDelete: Restrict)
+  item      StockItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  countedBy User?     @relation("StocktakeCounter", fields: [countedById], references: [id], onDelete: Restrict)
+
+  @@unique([stocktakeId, itemId])
+  @@map("stocktake_lines")
 }

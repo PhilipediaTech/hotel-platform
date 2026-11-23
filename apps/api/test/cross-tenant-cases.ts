@@ -1587,6 +1587,82 @@ async function bOutletUnchanged(db: Db, world: TenantWorld) {
 }
 
 /** B's in-house guest and Pool bar, with an outlet shift and an open order on it (T-142). */
+/** B's store: a unit, a location, an item with 5 on hand, a requisition and an open count. */
+async function bStock(db: Db, world: TenantWorld, propertyId: string) {
+  const unit = await db.stockUnit.create({ data: { propertyId, code: 'BTL', name: 'Bottle' } });
+  const location = await db.stockLocation.create({
+    data: { propertyId, code: 'THEIRS', name: 'Their store' },
+  });
+  const item = await db.stockItem.create({
+    data: { propertyId, code: 'THEIR-GIN', name: 'Their gin', unitId: unit.id },
+  });
+  const movement = await db.stockMovement.create({
+    data: {
+      propertyId,
+      itemId: item.id,
+      locationId: location.id,
+      kind: 'ADJUSTMENT',
+      quantityMilli: 5000n,
+      unitCostMinor: 0n,
+      reason: 'Opening',
+      byUserId: world.bStaff.id,
+    },
+  });
+  const department = await db.department.create({
+    data: { organisationId: world.orgB.id, propertyId, code: 'THEIRS', name: 'Their bar' },
+  });
+  const requisition = await db.requisition.create({
+    data: { propertyId, number: 1, departmentId: department.id, requestedById: world.bStaff.id },
+  });
+  const line = await db.requisitionLine.create({
+    data: { propertyId, requisitionId: requisition.id, itemId: item.id, quantityMilli: 2000n },
+  });
+  const stocktake = await db.stocktake.create({
+    data: { propertyId, number: 1, locationId: location.id, startedById: world.bStaff.id },
+  });
+  await db.stocktakeLine.create({
+    data: { propertyId, stocktakeId: stocktake.id, itemId: item.id },
+  });
+  return {
+    unitId: unit.id,
+    locationId: location.id,
+    itemId: item.id,
+    movementId: movement.id,
+    departmentId: department.id,
+    requisitionId: requisition.id,
+    lineId: line.id,
+    stocktakeId: stocktake.id,
+  };
+}
+
+async function bStockUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.stockItem.findMany({ where })).map((i) => [i.name, i.active])).toEqual([
+    ['Their gin', true],
+  ]);
+  expect((await db.stockUnit.findMany({ where })).map((u) => [u.name, u.active])).toEqual([
+    ['Bottle', true],
+  ]);
+  expect((await db.stockLocation.findMany({ where })).map((l) => [l.name, l.active])).toEqual([
+    ['Their store', true],
+  ]);
+  expect(
+    (await db.stockMovement.findMany({ where })).map((m) => [m.kind, m.quantityMilli]),
+  ).toEqual([['ADJUSTMENT', 5000n]]);
+  expect(
+    (await db.requisition.findMany({ where, include: { lines: true } })).map((r) => [
+      r.status,
+      r.lines.map((l) => l.issuedMilli),
+    ]),
+  ).toEqual([['SUBMITTED', [0n]]]);
+  expect(
+    (await db.stocktake.findMany({ where, include: { lines: true } })).map((t) => [
+      t.status,
+      t.lines.map((l) => l.countedMilli),
+    ]),
+  ).toEqual([['COUNTING', [null]]]);
+}
+
 async function bPosOrder(db: Db, world: TenantWorld, propertyId: string) {
   const stay = await bFolio(db, world, propertyId);
   const menu = await bOutlet(db, world, propertyId);
@@ -3379,6 +3455,121 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bPosOrder,
     listIds: (body) => (body as { data: { stayId: string }[] }).data.map((r) => r.stayId),
   },
+  // Inventory (T-145)
+  listStockItems: {
+    seed: bStock,
+    listIds: (body) => {
+      const b = body as {
+        items: { id: string }[];
+        units: { id: string }[];
+        locations: { id: string }[];
+      };
+      return [...b.items, ...b.units, ...b.locations].map((x) => x.id);
+    },
+  },
+  createStockItem: {
+    seed: bStock,
+    creates: true,
+    body: (theirs) => ({
+      code: 'LEAK',
+      name: 'Leak',
+      category: null,
+      unitId: theirs['unitId'],
+      par: null,
+      reorderPoint: null,
+      unitCostMinor: '0',
+    }),
+    untouched: bStockUnchanged,
+  },
+  updateStockItem: { seed: bStock, body: () => ({ name: 'Leak' }), untouched: bStockUnchanged },
+  createStockUnit: {
+    seed: bStock,
+    creates: true,
+    body: () => ({ code: 'LK', name: 'Leak' }),
+    untouched: bStockUnchanged,
+  },
+  updateStockUnit: { seed: bStock, body: () => ({ name: 'Leak' }), untouched: bStockUnchanged },
+  createStockLocation: {
+    seed: bStock,
+    creates: true,
+    body: () => ({ code: 'LEAK', name: 'Leak' }),
+    untouched: bStockUnchanged,
+  },
+  updateStockLocation: {
+    seed: bStock,
+    body: () => ({ name: 'Leak' }),
+    untouched: bStockUnchanged,
+  },
+  listStockMovements: {
+    seed: bStock,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((m) => m.id),
+  },
+  adjustStock: {
+    seed: bStock,
+    creates: true,
+    body: (theirs) => ({
+      itemId: theirs['itemId'],
+      locationId: theirs['locationId'],
+      quantity: '-5',
+      reason: 'Leak',
+    }),
+    untouched: bStockUnchanged,
+  },
+  transferStock: {
+    seed: bStock,
+    creates: true,
+    body: (theirs) => ({
+      itemId: theirs['itemId'],
+      fromLocationId: theirs['locationId'],
+      toLocationId: theirs['unitId'],
+      quantity: '1',
+    }),
+    untouched: bStockUnchanged,
+  },
+  listRequisitions: {
+    seed: bStock,
+    listIds: (body) => {
+      const b = body as { data: { id: string }[]; departments: { id: string }[] };
+      return [...b.data, ...b.departments].map((x) => x.id);
+    },
+  },
+  createRequisition: {
+    seed: bStock,
+    creates: true,
+    body: (theirs) => ({
+      departmentId: theirs['departmentId'],
+      lines: [{ itemId: theirs['itemId'], quantity: '1' }],
+    }),
+    untouched: bStockUnchanged,
+  },
+  cancelRequisition: { seed: bStock, untouched: bStockUnchanged },
+  issueRequisition: {
+    seed: bStock,
+    body: (theirs) => ({
+      locationId: theirs['locationId'],
+      lines: [{ lineId: theirs['lineId'], quantity: '1' }],
+    }),
+    untouched: bStockUnchanged,
+  },
+  closeRequisition: { seed: bStock, body: () => ({ reason: 'Leak' }), untouched: bStockUnchanged },
+  listStocktakes: {
+    seed: bStock,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((t) => t.id),
+  },
+  startStocktake: {
+    seed: bStock,
+    creates: true,
+    body: (theirs) => ({ locationId: theirs['locationId'] }),
+    untouched: bStockUnchanged,
+  },
+  getStocktake: { seed: bStock },
+  recordStocktakeCounts: {
+    seed: bStock,
+    body: (theirs) => ({ counts: [{ itemId: theirs['itemId'], counted: '1' }] }),
+    untouched: bStockUnchanged,
+  },
+  postStocktake: { seed: bStock, body: () => ({ reason: 'Leak' }), untouched: bStockUnchanged },
+  cancelStocktake: { seed: bStock, untouched: bStockUnchanged },
   getPosSettings: { seed: bPosOrder, listIds: () => [] },
   updatePosSettings: {
     seed: bPosOrder,

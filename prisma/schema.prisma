@@ -180,6 +180,8 @@ model Property {
   expenses             Expense[]
   pettyCashFloats      PettyCashFloat[]
   pettyCashTopUps      PettyCashTopUp[]
+  accountingMappings   AccountingMapping[]
+  accountingExports    AccountingExport[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -413,6 +415,7 @@ model User {
   expensesVoided         Expense[]             @relation("ExpenseVoider")
   pettyCashHeld          PettyCashFloat[]      @relation("PettyCashCustodian")
   pettyCashTopUps        PettyCashTopUp[]      @relation("PettyCashToppedUpBy")
+  accountingExports      AccountingExport[]    @relation("AccountingExporter")
 
   @@map("users")
 }
@@ -4558,4 +4561,70 @@ model Expense {
   @@unique([propertyId, number])
   @@index([propertyId, spentOn])
   @@map("expenses")
+}
+
+// ---------------------------------------------------------------------------------------
+// Accounting exports (PRD M10-07; T-148). Strategy decision 9, chosen by Philip 2026-11-23: a
+// general journal CSV, one balanced journal per closed business day, for QuickBooks Online,
+// Xero or Sage to import. Tab 3 names accounting_exports; accounting_mappings holds the hotel's
+// own account codes for what the journal posts (revenue codes, payment methods, expense
+// categories and three control accounts).
+
+enum AccountingMappingKind {
+  /**
+   * key: revenue code ID (taxes and fees post to revenue codes too).
+   */
+  REVENUE_CODE
+  /**
+   * key: a payment method, shared by guest payments, city-ledger receipts and expenses.
+   */
+  PAY_METHOD
+  /**
+   * key: expense category ID.
+   */
+  EXPENSE_CATEGORY
+  /**
+   * key: GUEST_LEDGER, ADVANCE_DEPOSITS or CITY_LEDGER.
+   */
+  CONTROL
+}
+
+/// The hotel's account code for one thing the journal posts to.
+model AccountingMapping {
+  id          String                @id @default(uuid()) @db.Uuid
+  propertyId  String                @map("property_id") @db.Uuid
+  kind        AccountingMappingKind
+  key         String
+  accountCode String                @map("account_code")
+  accountName String?               @map("account_name")
+  updatedAt   DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, kind, key])
+  @@map("accounting_mappings")
+}
+
+/// One export of the journal for a period, kept as it was sent (append-only).
+model AccountingExport {
+  id              String   @id @default(uuid()) @db.Uuid
+  propertyId      String   @map("property_id") @db.Uuid
+  number          Int
+  fromDate        DateTime @map("from_date") @db.Date
+  toDate          DateTime @map("to_date") @db.Date
+  journalCount    Int      @map("journal_count")
+  lineCount       Int      @map("line_count")
+  /// Sum of the debits (equal to the credits), minor units of the base currency.
+  debitTotalMinor BigInt   @map("debit_total_minor")
+  /// The CSV as sent, without the byte-order mark.
+  content         String
+  sha256          String
+  createdById     String   @map("created_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property  Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  createdBy User     @relation("AccountingExporter", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, number])
+  @@map("accounting_exports")
 }

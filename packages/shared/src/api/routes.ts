@@ -41,6 +41,7 @@ import { POS_ROUTES } from './pos.ts';
 import { POS_REGISTER_ROUTES } from './pos-register.ts';
 import { PURCHASING_ROUTES, STOCK_ROUTES } from './stock.ts';
 import { EXPENSE_ROUTES } from './expenses.ts';
+import { ACCOUNTING_ROUTES } from './accounting.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
 import { NIGHT_AUDIT_ROUTES } from './night-audit.ts';
@@ -123,6 +124,7 @@ export const API_ROUTES = {
   ...STOCK_ROUTES,
   ...PURCHASING_ROUTES,
   ...EXPENSE_ROUTES,
+  ...ACCOUNTING_ROUTES,
   ...TASK_ROUTES,
   ...HANDOVER_ROUTES,
   ...LEAKAGE_ROUTES,

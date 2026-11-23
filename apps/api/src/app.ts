@@ -62,6 +62,7 @@ import { payrollRoutes } from './modules/payroll/routes.ts';
 import { posRoutes } from './modules/pos/routes.ts';
 import { stockRoutes } from './modules/stock/routes.ts';
 import { expenseRoutes } from './modules/expenses/routes.ts';
+import { accountingRoutes } from './modules/accounting/routes.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
 import { bookingEngineRoutes } from './modules/bookingengine/routes.ts';
@@ -226,6 +227,7 @@ export function createApp({
   api.use(posRoutes({ db, tenantDb, clock }));
   api.use(stockRoutes({ db, tenantDb, clock }));
   api.use(expenseRoutes({ db, tenantDb, clock }));
+  api.use(accountingRoutes({ tenantDb, clock }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));

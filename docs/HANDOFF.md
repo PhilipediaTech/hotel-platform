@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-147 (expenses and petty cash) is pushed on `feat/T-147-expenses-accounting-exports` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: T-148 accounting exports (general journal CSV).
+T-148 (accounting exports, general journal CSV) is pushed on `feat/T-148-accounting-exports` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: V1.3 AI features (M14-13 to M14-15).

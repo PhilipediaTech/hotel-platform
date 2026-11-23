@@ -6,7 +6,7 @@ import { getAuth, requireAuth, type AuthContext } from './auth.ts';
 import { isApprovalPending, type ApprovalPendingResult } from './approvals.ts';
 import { AppError } from './errors.ts';
 import { withIdempotency } from './idempotency.ts';
-import { tenantOf, type TenantContext } from './tenancy.ts';
+import { tenantOf, withoutTenant, type TenantContext } from './tenancy.ts';
 
 export interface RouteContext {
   req: Request;
@@ -188,8 +188,12 @@ export function mountRoute<R extends RouteContract>(
       }
       return { status, body: parsed.data };
     };
-    const { status, body: out } =
-      route.idempotent && auth ? await withIdempotency(req, res, auth.user.id, run) : await run();
+    const respond = () =>
+      route.idempotent && auth ? withIdempotency(req, res, auth.user.id, run) : run();
+    // Only property-scoped routes run as the tenant (T-144: row-level security follows it).
+    const { status, body: out } = route.propertyScoped
+      ? await respond()
+      : await withoutTenant(respond);
     if (status === 204) {
       res.status(204).end();
       return;

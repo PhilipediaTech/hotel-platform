@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-143 (POS voids and discounts with approval) is pushed on `feat/T-143-pos-voids-discounts` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: row-level security.
+T-144 (row-level security) is pushed on `feat/T-144-row-level-security` (run `npm run db:deploy` after merging). Next: V1.3 inventory, purchasing and stocktake (M10-01–M10-05).

@@ -15,6 +15,7 @@ import {
   type SetupStepId,
   type StayAlertSettings,
 } from '@hotel/shared';
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import type { Prisma, Property } from '../../generated/prisma/client.ts';
 import { recordAudit } from '../../core/audit.ts';
@@ -22,7 +23,7 @@ import type { Clock } from '../../core/clock.ts';
 import { pgErrorInfo, type Db, type DbClient } from '../../core/db.ts';
 import { AppError } from '../../core/errors.ts';
 import { businessDay } from '../../core/business-day.ts';
-import type { TenantContext } from '../../core/tenancy.ts';
+import { runAsTenant, type TenantContext } from '../../core/tenancy.ts';
 import { createDefaultApprovalPolicies } from '../approvals/defaults.ts';
 import { createDefaultTaxes, taxSettingsOf } from '../tax/defaults.ts';
 import { DEPARTMENT_TEMPLATES } from '../identity/role-templates.ts';
@@ -294,49 +295,55 @@ export async function createProperty(
   tenant: TenantContext,
   body: z.output<typeof PropertyCreateBody>,
 ): Promise<Detail> {
+  // The new property's rows are written as that property: row-level security (T-144) keeps
+  // the current property's connection to its own rows.
+  const id = randomUUID();
   try {
-    return await deps.db.$transaction(async (tx) => {
-      const organisation = await tx.organisation.findUniqueOrThrow({
-        where: { id: tenant.organisationId },
-      });
-      const defaults =
-        SIGN_UP_COUNTRIES[organisation.country as keyof typeof SIGN_UP_COUNTRIES] ?? null;
-      const property = await tx.property.create({
-        data: {
-          organisationId: organisation.id,
-          code: body.code ?? (await freeCode(tx, organisation.id, body.name)),
-          name: body.name,
-          ...(defaults && {
-            timeZone: defaults.timeZone,
-            baseCurrency: defaults.currency,
-            locale: defaults.locale,
-          }),
-          address: { country: organisation.country },
-        },
-      });
-      await tx.department.createMany({
-        data: DEPARTMENT_TEMPLATES.map((d) => ({
-          organisationId: organisation.id,
+    return await runAsTenant({ ...tenant, propertyId: id }, () =>
+      deps.db.$transaction(async (tx) => {
+        const organisation = await tx.organisation.findUniqueOrThrow({
+          where: { id: tenant.organisationId },
+        });
+        const defaults =
+          SIGN_UP_COUNTRIES[organisation.country as keyof typeof SIGN_UP_COUNTRIES] ?? null;
+        const property = await tx.property.create({
+          data: {
+            id,
+            organisationId: organisation.id,
+            code: body.code ?? (await freeCode(tx, organisation.id, body.name)),
+            name: body.name,
+            ...(defaults && {
+              timeZone: defaults.timeZone,
+              baseCurrency: defaults.currency,
+              locale: defaults.locale,
+            }),
+            address: { country: organisation.country },
+          },
+        });
+        await tx.department.createMany({
+          data: DEPARTMENT_TEMPLATES.map((d) => ({
+            organisationId: organisation.id,
+            propertyId: property.id,
+            ...d,
+          })),
+        });
+        await createDefaultApprovalPolicies(tx, organisation.id, property.id);
+        await createDefaultTaxes(
+          tx,
+          { id: property.id, country: organisation.country, settings: property.settings },
+          localDate(deps.clock(), property.timeZone),
+        );
+        await recordAudit(tx, {
+          action: 'property.created',
+          entityType: 'property',
+          entityId: property.id,
           propertyId: property.id,
-          ...d,
-        })),
-      });
-      await createDefaultApprovalPolicies(tx, organisation.id, property.id);
-      await createDefaultTaxes(
-        tx,
-        { id: property.id, country: organisation.country, settings: property.settings },
-        localDate(deps.clock(), property.timeZone),
-      );
-      await recordAudit(tx, {
-        action: 'property.created',
-        entityType: 'property',
-        entityId: property.id,
-        propertyId: property.id,
-        // `code` is a secret key name in audit rows (MFA codes), so it is spelled out.
-        after: { name: property.name, propertyCode: property.code, status: property.status },
-      });
-      return toDetail(tx, property, deps.clock());
-    });
+          // `code` is a secret key name in audit rows (MFA codes), so it is spelled out.
+          after: { name: property.name, propertyCode: property.code, status: property.status },
+        });
+        return toDetail(tx, property, deps.clock());
+      }),
+    );
   } catch (err) {
     if (codeTaken(err)) throw codeInUse();
     throw err;

@@ -41,11 +41,17 @@ export function testDatabaseUrl(): string {
   return url;
 }
 
+/**
+ * The role tests run as (created by global-setup.ts). Not a superuser and not the tables'
+ * owner, so row-level security applies to every test query as it does in production (T-144).
+ */
+export const TEST_DB_ROLE = 'hotel_app_test';
+
 let shared: Db | undefined;
 
 /** One client per test worker. */
 export function testDb(): Db {
-  shared ??= createDb(testDatabaseUrl());
+  shared ??= createDb(testDatabaseUrl(), { role: TEST_DB_ROLE });
   return shared;
 }
 
@@ -56,5 +62,10 @@ export async function resetDb(db: Db): Promise<void> {
     WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
   if (tables.length === 0) return;
   const list = tables.map((t) => `"${t.tablename}"`).join(', ');
-  await db.$executeRawUnsafe(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
+  // Restarting sequences takes their owner: the session's own user, just for this transaction.
+  await db.$transaction([
+    db.$executeRawUnsafe('RESET ROLE'),
+    db.$executeRawUnsafe(`TRUNCATE ${list} RESTART IDENTITY CASCADE`),
+    db.$executeRawUnsafe(`SET ROLE ${TEST_DB_ROLE}`),
+  ]);
 }

@@ -235,7 +235,15 @@ export function createApp({
   api.use(stockRoutes({ db, tenantDb, clock }));
   api.use(expenseRoutes({ db, tenantDb, clock }));
   api.use(accountingRoutes({ tenantDb, clock }));
-  api.use(channelRoutes({ tenantDb, clock, channel }));
+  api.use(
+    channelRoutes({
+      db,
+      tenantDb,
+      clock,
+      channel,
+      webhookSecrets: config.channel.webhookSecrets,
+    }),
+  );
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));

@@ -5,7 +5,7 @@ import {
   MODIFIABLE_STATUSES,
   type CalendarQuery,
   type CalendarStay,
-  type CancelBody,
+  type CancelReason,
   type FeeRule,
   type ReservationBody,
   type ReservationItem,
@@ -474,6 +474,7 @@ async function book(
   tenant: TenantContext,
   body: Body,
   approvalRequestId: string | null,
+  channelRef: string | null = null,
 ): Promise<string> {
   const property = await tx.property.findUniqueOrThrow({ where: { id: tenant.propertyId } });
   if (property.status !== 'LIVE') {
@@ -546,6 +547,7 @@ async function book(
       companyId: body.companyId ?? block?.companyId ?? null,
       groupBlockId: block?.id ?? null,
       source: body.source,
+      channelRef,
       status,
       guarantee: body.guarantee,
       holdExpiresAt: body.holdUntil ? new Date(body.holdUntil) : null,
@@ -609,6 +611,21 @@ async function book(
     payload: { reservationId: reservation.id, confirmationNo, status },
   });
   return reservation.id;
+}
+
+/**
+ * Books an OTA booking taken from the channel manager (T-153) inside the caller's
+ * transaction, keyed by the channel manager's booking ID: a second try for the same booking
+ * fails on the unique (property, source, channelRef) instead of booking it twice.
+ */
+export function bookFromChannel(
+  deps: ReservationDeps,
+  tx: Tx,
+  tenant: TenantContext,
+  body: Body,
+  channelRef: string,
+): Promise<string> {
+  return book(deps, tx, tenant, body, null, channelRef);
 }
 
 /** The do-not-rent approval (M3 rule 8): the booking runs when a manager approves it. */
@@ -888,13 +905,14 @@ const summary = (r: Full) => ({
 // ── Cancel and reinstate (M3-04) ────────────────────────────────────────────────────────
 
 /** Reasons where the hotel, not the guest, ends the booking: no fee. */
-const NO_FEE_REASONS = new Set(['DUPLICATE', 'HOTEL_REQUEST']);
+const NO_FEE_REASONS = new Set<CancelReason>(['DUPLICATE', 'HOTEL_REQUEST', 'OTA_CANCELLED']);
 
 export async function cancelReservation(
   deps: ReservationDeps,
   tenant: TenantContext,
   reservationId: string,
-  body: z.output<typeof CancelBody>,
+  /** OTA_CANCELLED only when the OTA cancelled it (T-153): the OTA handles any fee. */
+  body: { reason: CancelReason; note: string | null },
 ) {
   return deps.tenantDb.$transaction(async (tx) => {
     const before = await loadFull(tx, reservationId);

@@ -42,6 +42,7 @@ describe('migrations', () => {
       'cashier_shifts',
       'channel_ari_changes',
       'channel_ari_sent',
+      'channel_booking_revisions',
       'channel_connections',
       'channel_mappings',
       'channel_sync_logs',

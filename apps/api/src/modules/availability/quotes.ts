@@ -18,6 +18,7 @@ import {
 import type { z } from 'zod';
 import type {
   PackageComponent,
+  Quote,
   RateDay,
   RatePlan,
   RevenueCode,
@@ -95,7 +96,13 @@ interface Context {
   left: Map<string, number>;
 }
 
-async function load(db: TenantDb, stay: { arrival: string; departure: string }): Promise<Context> {
+/** A tenant transaction (quotes made while booking, T-153). */
+type QuoteTx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
+
+async function load(
+  db: TenantDb | QuoteTx,
+  stay: { arrival: string; departure: string },
+): Promise<Context> {
   const range = { gte: dbDate(stay.arrival), lte: dbDate(stay.departure) };
   const [types, plans, days, codes, rules, inventory] = await Promise.all([
     db.roomType.findMany({
@@ -187,6 +194,8 @@ function price(
   stay: { arrival: string; departure: string },
   guests: number,
   discountBps = 0,
+  /** The price of each night when it is already set (an OTA booking, T-153). */
+  amountFor?: (date: string) => bigint | null,
 ): Pricing {
   const dates = stayDates(stay.arrival, stay.departure);
   const own = (date: string) => ctx.days.get(key(plan.id, roomTypeId, date));
@@ -219,7 +228,7 @@ function price(
     const parent = plan.parentRatePlanId
       ? ctx.days.get(key(plan.parentRatePlanId, roomTypeId, date))
       : undefined;
-    const listed = sellingPrice(plan, mine, parent);
+    const listed = amountFor ? amountFor(date) : sellingPrice(plan, mine, parent);
     // A booking-page promo code comes off each night before tax (T-112).
     const amount = listed === null ? null : listed - (listed * BigInt(discountBps)) / 10_000n;
     if (amount === null) {
@@ -443,6 +452,51 @@ export async function createQuote(
     createdAt: iso(quote.createdAt),
     expiresAt: iso(quote.expiresAt),
   };
+}
+
+/**
+ * A quote at prices already agreed elsewhere: an OTA booking's nightly amounts (T-153). The
+ * OTA has sold the stay, so restrictions and rooms left are not checked here (taking the
+ * inventory is); taxes and posting lines are worked out as for any quote. Null when a night
+ * has no amount, the plan is not active, or the property has no room revenue code.
+ */
+export async function channelQuote(
+  db: TenantDb | QuoteTx,
+  args: {
+    roomTypeId: string;
+    ratePlanId: string;
+    arrival: string;
+    departure: string;
+    guests: number;
+    amounts: ReadonlyMap<string, bigint>;
+    currency: string;
+    now: Date;
+  },
+): Promise<Quote | null> {
+  const ctx = await load(db, args);
+  const plan = ctx.plans.get(args.ratePlanId);
+  if (!plan || !ctx.roomCode) return null;
+  const p = price(ctx, plan, args.roomTypeId, args, args.guests, 0, (date) => {
+    return args.amounts.get(date) ?? null;
+  });
+  if (!p.nights) return null;
+  return db.quote.create({
+    data: {
+      ratePlanId: plan.id,
+      roomTypeId: args.roomTypeId,
+      arrival: dbDate(args.arrival),
+      departure: dbDate(args.departure),
+      nights: p.nights.map((n) => ({ ...n, guests: args.guests })) as unknown as object,
+      taxes: [...p.taxes.entries()].map(([codeId, amount]) => {
+        const code = ctx.codes.get(codeId);
+        return { code: code?.code ?? '', name: code?.name ?? '', amountMinor: amount.toString() };
+      }),
+      totalMinor: p.totalMinor,
+      currency: args.currency,
+      expiresAt: new Date(args.now.getTime() + QUOTE_MINUTES * 60_000),
+      createdAt: args.now,
+    } as never,
+  });
 }
 
 // ── Day-use (M3-10; T-052) ──────────────────────────────────────────────────────────────

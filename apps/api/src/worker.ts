@@ -38,6 +38,8 @@ const files = createLocalFileStore({
 });
 
 let worker: Awaited<ReturnType<typeof startWorker>>;
+// One channel manager for the sync job and the booking handler (T-152, T-153).
+const channel = createChannelManager(config);
 try {
   worker = await startWorker({
     databaseUrl: config.databaseUrl,
@@ -51,7 +53,7 @@ try {
       ai: createAiProvider(config, logger),
       email: createFakeEmailProvider(logger),
       config,
-      channel: createChannelManager(config),
+      channel,
     }),
     // Email: the fake logs messages until the SES adapter (AWS account; production stops above).
     handlers: eventHandlers({
@@ -64,6 +66,7 @@ try {
       ai: createAiProvider(config, logger),
       payments: createPaymentProvider(config, logger),
       files,
+      channel,
     }),
   });
 } catch (err) {

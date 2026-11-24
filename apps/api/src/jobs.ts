@@ -39,6 +39,7 @@ import { groupBlockReleaseJob } from './modules/groups/routes.ts';
 import { platformBillingJob } from './modules/platform/billing.ts';
 import type { ChannelManager } from './core/channel-manager.ts';
 import { channelSyncJob } from './modules/channels/sync.ts';
+import { channelBookingsHandler, channelBookingsJob } from './modules/channels/bookings.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
 
@@ -76,7 +77,9 @@ export function workerJobs(deps: {
     checklistsJob,
     certificationRemindersJob,
     // No channel manager on the platform: nothing to send.
-    ...(deps.channel.name === 'OFF' ? [] : [channelSyncJob({ channel: deps.channel })]),
+    ...(deps.channel.name === 'OFF'
+      ? []
+      : [channelSyncJob({ channel: deps.channel }), channelBookingsJob({ channel: deps.channel })]),
   ];
 }
 
@@ -91,6 +94,8 @@ export function eventHandlers(deps: {
   ai: AiProvider;
   payments: PaymentProvider;
   files: FileStore;
+  /** OTA bookings, read at once when the channel manager's webhook says one waits (T-153). */
+  channel: ChannelManager;
 }): EventHandler[] {
   const send = {
     db: deps.db,
@@ -123,5 +128,15 @@ export function eventHandlers(deps: {
       messages: deps.messages,
       logger: deps.logger,
     }),
+    ...(deps.channel.name === 'OFF'
+      ? []
+      : [
+          channelBookingsHandler({
+            db: deps.db,
+            clock: deps.clock,
+            channel: deps.channel,
+            logger: deps.logger,
+          }),
+        ]),
   ];
 }

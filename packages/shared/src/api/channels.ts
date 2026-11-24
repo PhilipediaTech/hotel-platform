@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineRoute } from './contract.ts';
-import { Instant, Uuid } from './primitives.ts';
+import { Instant, IsoDate, Uuid } from './primitives.ts';
 
 // Channel manager connection (PRD M11-07 "As the system, I sync availability, rates and
 // restrictions to OTAs through the channel manager and import OTA bookings as reservations";
@@ -10,6 +10,9 @@ import { Instant, Uuid } from './primitives.ts';
 // creates what is missing, so a setup that failed half-way finishes on the next try. Syncing
 // prices and availability (T-152) and taking in bookings (T-153) build on these mappings.
 // T-152: a worker sends what changed every minute and everything once a day.
+// T-153: OTA bookings come in from the channel manager's booking feed (read every minute, and
+// at once when its signed webhook says a booking is waiting) and become reservations with
+// source OTA_CHANNEL; what cannot be booked safely waits here for staff.
 
 export const ChannelConnectionStatus = z.enum(['CONNECTING', 'ACTIVE', 'PAUSED']);
 
@@ -36,6 +39,12 @@ export const ChannelConnectionView = z
         syncError: z.string().nullable(),
         /** After a problem: the next try. */
         retryAt: Instant.nullable(),
+        /** Bookings (T-153): last time the booking feed was read to the end. */
+        bookingsCheckedAt: Instant.nullable(),
+        /** The last problem reading the booking feed, until a read goes through. */
+        bookingsError: z.string().nullable(),
+        /** OTA bookings waiting for staff. */
+        heldBookings: z.number().int(),
       })
       .nullable(),
     roomTypes: z.array(
@@ -131,9 +140,103 @@ export const requestChannelFullSync = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+export const CHANNEL_HOLD_REASONS = [
+  'UNMAPPED_ROOM',
+  'UNMAPPED_RATE',
+  'NO_ROOM',
+  'CURRENCY',
+  'IN_HOUSE',
+  'CANCELLED_HERE',
+  'ROOMS_CHANGED',
+  'INVALID',
+  'REFUSED',
+] as const;
+
+/** One revision of an OTA booking as taken in (T-153), and what became of it. */
+export const ChannelBookingItem = z
+  .object({
+    id: Uuid,
+    /** The channel manager's booking ID (the reservation's channel reference). */
+    externalBookingId: z.string(),
+    kind: z.enum(['NEW', 'MODIFIED', 'CANCELLED']),
+    otaName: z.string().nullable(),
+    /** The OTA's own reservation number. */
+    otaCode: z.string().nullable(),
+    guestName: z.string(),
+    arrival: IsoDate.nullable(),
+    departure: IsoDate.nullable(),
+    receivedAt: Instant,
+    outcome: z.enum(['PENDING', 'APPLIED', 'HELD', 'SUPERSEDED', 'DISMISSED']),
+    holdReason: z.enum(CHANNEL_HOLD_REASONS).nullable(),
+    message: z.string().nullable(),
+    reservationId: Uuid.nullable(),
+    confirmationNo: z.string().nullable(),
+  })
+  .meta({ id: 'ChannelBooking' });
+
+const BOOKINGS = 'Not in tab 4 (tab 4 lists only the channel webhook): designed in T-153.';
+
+export const listChannelBookings = defineRoute({
+  ...MANAGE,
+  operationId: 'listChannelBookings',
+  method: 'get',
+  path: '/channel-bookings',
+  summary: 'OTA bookings taken in: those waiting for staff, or the latest 50',
+  description: BOOKINGS,
+  query: z.object({ held: z.stringbool().optional() }),
+  response: z.array(ChannelBookingItem),
+});
+
+const ChannelBookingParams = z.object({ channelBookingId: Uuid });
+
+export const retryChannelBooking = defineRoute({
+  ...MANAGE,
+  operationId: 'retryChannelBooking',
+  method: 'post',
+  path: '/channel-bookings/{channelBookingId}/retry',
+  summary: 'Try a held OTA booking again (after setting up the room or plan, making room…)',
+  description: `${BOOKINGS} Answers what became of it: applied, or held again with the reason. 409 unless it is held.`,
+  idempotent: true,
+  params: ChannelBookingParams,
+  response: ChannelBookingItem,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const dismissChannelBooking = defineRoute({
+  ...MANAGE,
+  operationId: 'dismissChannelBooking',
+  method: 'post',
+  path: '/channel-bookings/{channelBookingId}/dismiss',
+  summary: 'Mark a held OTA booking as handled by hand',
+  description: `${BOOKINGS} 409 unless it is held.`,
+  idempotent: true,
+  params: ChannelBookingParams,
+  body: z.object({ note: z.string().trim().min(1, 'Say how it was handled').max(500) }),
+  response: ChannelBookingItem,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const channelWebhook = defineRoute({
+  operationId: 'channelWebhook',
+  method: 'post',
+  path: '/webhooks/channel/{provider}',
+  summary: 'Channel manager webhook',
+  description:
+    'Signed by Channex: `x-hmac-signature-256` is lowercase hex HMAC-SHA256 of "<x-hmac-timestamp>.<raw body>" (a call more than 5 minutes old is refused). A bad signature answers 401 and stores nothing; a call already received answers 200. A booking event makes the worker read the booking feed at once (T-153).',
+  tags: ['Webhooks'],
+  auth: 'none',
+  params: z.object({ provider: z.string().regex(/^[a-z]+$/) }),
+  body: z.record(z.string(), z.unknown()),
+  response: z.object({ received: z.literal(true) }),
+});
+
 export const CHANNEL_ROUTES = {
   getChannelConnection,
   connectChannel,
   pauseChannel,
   requestChannelFullSync,
+  listChannelBookings,
+  retryChannelBooking,
+  dismissChannelBooking,
+  channelWebhook,
 } as const;

@@ -166,6 +166,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   // What was last sent, and signs of change for the sync (T-152).
   ChannelAriSent: { kind: 'property' },
   ChannelAriChange: { kind: 'property' },
+  ChannelBookingRevision: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

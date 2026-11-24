@@ -1807,6 +1807,36 @@ async function bChannelUnchanged(db: Db, world: TenantWorld) {
   expect(await db.channelSyncLog.count({ where })).toBe(0);
 }
 
+/** B's connection with an OTA booking held for their staff (T-153). */
+async function bChannelBooking(db: Db, world: TenantWorld, propertyId: string) {
+  const channel = await bChannel(db, world, propertyId);
+  const held = await db.channelBookingRevision.create({
+    data: {
+      propertyId,
+      connectionId: channel.connectionId,
+      externalId: 'their-revision',
+      externalBookingId: 'their-booking',
+      kind: 'NEW',
+      guestName: 'Their guest',
+      payload: { booking_id: 'their-booking', status: 'new', currency: 'USD' },
+      receivedAt: new Date('2026-11-10T08:00:00Z'),
+      outcome: 'HELD',
+      holdReason: 'CURRENCY',
+      message: 'The booking is in USD',
+    },
+  });
+  return { ...channel, channelBookingId: held.id };
+}
+
+async function bChannelBookingUnchanged(db: Db, world: TenantWorld) {
+  await bChannelUnchanged(db, world);
+  const where = { propertyId: world.b1.id };
+  expect(
+    (await db.channelBookingRevision.findMany({ where })).map((r) => [r.outcome, r.message]),
+  ).toEqual([['HELD', 'The booking is in USD']]);
+  expect(await db.reservation.count({ where: { ...where, source: 'OTA_CHANNEL' } })).toBe(0);
+}
+
 async function bStockUnchanged(db: Db, world: TenantWorld) {
   const where = { propertyId: world.b1.id };
   expect((await db.stockItem.findMany({ where })).map((i) => [i.name, i.active])).toEqual([
@@ -3796,6 +3826,17 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   // T-152: A has no connection, so B's is never asked to send everything again.
   requestChannelFullSync: { seed: bChannel, creates: true, untouched: bChannelUnchanged },
+  // T-153: B's held OTA bookings are neither listed nor tried again nor dismissed from A.
+  listChannelBookings: {
+    seed: bChannelBooking,
+    listIds: (body) => (body as { id: string }[]).map((b) => b.id),
+  },
+  retryChannelBooking: { seed: bChannelBooking, untouched: bChannelBookingUnchanged },
+  dismissChannelBooking: {
+    seed: bChannelBooking,
+    body: () => ({ note: 'Handled' }),
+    untouched: bChannelBookingUnchanged,
+  },
   // Accounting exports (T-148)
   getAccountingMappings: {
     seed: bAccounting,

@@ -52,6 +52,8 @@ envVarGroups:
         value: https://staging.channex.io/api/v1
       - key: CHANNEX_API_KEY
         sync: false
+      - key: CHANNEX_WEBHOOK_SECRETS
+        sync: false
       - key: PASSWORD_BREACH_CHECK
         value: hibp
       - key: WHATSAPP_PROVIDER

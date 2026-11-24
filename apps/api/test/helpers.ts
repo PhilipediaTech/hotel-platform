@@ -32,7 +32,13 @@ export const TEST_CONFIG: Config = {
   localFilesDir: path.join(os.tmpdir(), 'hotel-test-files'),
   payments: { provider: 'fake', secretKey: null, webhookSecret: null },
   ai: { provider: 'fake', apiKey: null, model: 'claude-opus-5-5' },
-  channel: { provider: 'fake', apiKey: null, baseUrl: 'https://staging.channex.io/api/v1' },
+  channel: {
+    provider: 'fake',
+    apiKey: null,
+    baseUrl: 'https://staging.channex.io/api/v1',
+    // A test-only signing secret for the booking webhook tests (T-153).
+    webhookSecrets: ['test-channex-webhook-secret-0001'],
+  },
   platformAdminEmails: ['platform-admin@example.test'],
   passwordBreachCheck: 'fake',
   whatsapp: {

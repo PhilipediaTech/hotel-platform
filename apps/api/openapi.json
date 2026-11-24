@@ -18354,6 +18354,12 @@
                 "items": {
                   "type": "integer"
                 },
+                "taskId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "message": {
                   "type": [
                     "string",
@@ -18366,6 +18372,7 @@
                 "kind",
                 "status",
                 "items",
+                "taskId",
                 "message"
               ]
             }

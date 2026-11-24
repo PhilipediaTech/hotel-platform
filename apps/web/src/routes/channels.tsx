@@ -18,6 +18,7 @@ registerStrings(channelStrings);
 // plans are sold online, see what is set up and the recent activity, pause or resume.
 // T-152: how prices and availability are being sent, and sending everything again.
 // T-153: OTA bookings taken in, and those waiting for staff.
+// T-154: each send's task ID, which Channex's certification form asks for.
 
 const card = 'rounded-md border border-border bg-surface p-4';
 
@@ -226,6 +227,12 @@ export function ChannelsPage() {
                     {t(`channels.logStatus.${l.status}`)}
                   </span>
                   {l.message && <span className="text-text-muted"> · {l.message}</span>}
+                  {l.taskId && (
+                    <span className="text-text-muted">
+                      {' '}
+                      · {t('channels.taskId')} <code className="select-all">{l.taskId}</code>
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

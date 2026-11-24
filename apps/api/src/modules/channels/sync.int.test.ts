@@ -70,7 +70,9 @@ async function hotel(options: { derived?: boolean } = {}) {
     nrf: mappings.find((m) => nrf && m.ratePlanId === nrf.id)?.externalId ?? '',
   };
   const setupCalls = h.channel.calls.length;
-  const run = (opts = {}) => syncConnection(db, h.channel, clock, connection.id, opts);
+  // No quiet period here: each test sends what it changed straight away (T-154 tests it).
+  const run = (opts = {}) =>
+    syncConnection(db, h.channel, clock, connection.id, { quietMs: 0, ...opts });
   /** ARI calls since setup (or since `clear`). */
   let from = setupCalls;
   const pushes = (method: 'updateAvailability' | 'updateRestrictions') =>
@@ -269,7 +271,7 @@ describe('sending availability, prices and restrictions (M11-07)', () => {
     h.clear();
     later(MINUTE);
     expect(await h.run()).toBe('SKIPPED');
-    await syncAll(db, h.channel, clock, silent);
+    await syncAll(db, h.channel, clock, silent, { quietMs: 0 });
     expect(h.pushes('updateAvailability')).toEqual([]);
     later(MINUTE);
     expect(await h.run()).toBe('SENT');
@@ -434,7 +436,7 @@ describe('sending availability, prices and restrictions (M11-07)', () => {
     await syncAll(db, createOffChannelManager(), clock, silent);
     expect(h.pushes('updateAvailability')).toEqual([]);
     later(2 * MINUTE);
-    await syncAll(db, h.channel, clock, silent);
+    await syncAll(db, h.channel, clock, silent, { quietMs: 0 });
     expect(h.pushes('updateAvailability')).toHaveLength(1);
   });
 });

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { addDays, INVENTORY_DAYS, localDate } from '@hotel/shared';
 import type { Logger } from 'pino';
 import type { Prisma, RateDay } from '../../generated/prisma/client.ts';
@@ -32,6 +33,10 @@ import { sellingPrice } from '../rates/service.ts';
 // - A 200 with warnings is logged as WARNING and counts as sent.
 // - Once a day (and on request) everything is sent again: what was sent is forgotten, and
 //   the same comparison then sends it all, over as many runs as the rate limit needs.
+// - T-154 (Channex certification): changes are sent once they have been quiet for two minutes
+//   (at the latest ten minutes after the first), so edits made one after another go in one
+//   call, as Channex requires; the daily full send runs off-peak, at a time between 02:00
+//   and 05:00 hotel time fixed per property, so properties are spread out.
 // - A night with no price is sent as stop-sell; a plan taken off (unticked, deactivated) is
 //   closed on every date once. OTAs get rooms left without the overbooking allowance.
 
@@ -39,7 +44,13 @@ const CHUNK = 2000;
 const CALLS_PER_RUN = 4;
 const LEASE_MS = 5 * 60_000;
 const CHECK_EVERY_MS = 15 * 60_000;
-const FULL_EVERY_MS = 24 * 60 * 60_000;
+/** Changes wait for this much quiet, so edits made one after another go in one call. */
+const QUIET_MS = 2 * 60_000;
+/** …but never longer than this after the first change. */
+const BATCH_MAX_MS = 10 * 60_000;
+/** The daily full send starts between 02:00 and 04:59 hotel time (off-peak, per Channex). */
+const SLOT_FROM_MINUTES = 2 * 60;
+const SLOT_SPREAD_MINUTES = 3 * 60;
 const MAX_WAIT_MS = 30 * 60_000;
 
 export interface SyncOptions {
@@ -47,6 +58,8 @@ export interface SyncOptions {
   chunk?: number;
   /** Calls per endpoint per run (4). */
   callsPerRun?: number;
+  /** Quiet needed after the last change before sending (2 minutes). */
+  quietMs?: number;
 }
 
 type Kind = 'AVAILABILITY' | 'RESTRICTIONS';
@@ -312,7 +325,28 @@ export function retryDelayMs(failures: number, retryAfterSeconds: number | null)
   return Math.max(backoff, (retryAfterSeconds ?? 0) * 1000);
 }
 
-export type SyncOutcome = 'SKIPPED' | 'UP_TO_DATE' | 'SENT' | 'MORE_TO_SEND' | 'FAILED';
+/** Minutes after local midnight of this property's daily full send: 02:00–04:59, spread. */
+export function fullSyncSlot(propertyId: string): number {
+  const n = createHash('sha256').update(propertyId).digest().readUInt16BE(0);
+  return SLOT_FROM_MINUTES + (n % SLOT_SPREAD_MINUTES);
+}
+
+/** The latest time the property's daily slot came round (now, if it is that minute). */
+export function lastFullSyncSlot(now: Date, timeZone: string, slot: number): Date {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const minutes = part('hour') * 60 + part('minute');
+  const since = (minutes - slot + 1440) % 1440;
+  const intoMinute = now.getUTCSeconds() * 1000 + now.getUTCMilliseconds();
+  return new Date(now.getTime() - since * 60_000 - intoMinute);
+}
+
+export type SyncOutcome = 'SKIPPED' | 'WAITING' | 'UP_TO_DATE' | 'SENT' | 'MORE_TO_SEND' | 'FAILED';
 
 /** One run for one connection: claim it, compare, send what differs. */
 export async function syncConnection(
@@ -324,6 +358,7 @@ export async function syncConnection(
 ): Promise<SyncOutcome> {
   const chunk = options.chunk ?? CHUNK;
   const calls = options.callsPerRun ?? CALLS_PER_RUN;
+  const quietMs = options.quietMs ?? QUIET_MS;
   const now = clock();
   const claimed = await db.channelConnection.updateMany({
     where: {
@@ -350,10 +385,14 @@ export async function syncConnection(
     });
 
   try {
-    // Daily: forget what was sent, so everything goes again.
+    const property = await db.property.findUniqueOrThrow({
+      where: { id: connection.propertyId },
+      select: { timeZone: true },
+    });
+    // Daily, off-peak: forget what was sent, so everything goes again.
+    const slot = lastFullSyncSlot(now, property.timeZone, fullSyncSlot(connection.propertyId));
     const fullDue =
-      !connection.fullSyncPending &&
-      (!connection.fullSyncAt || now.getTime() - connection.fullSyncAt.getTime() >= FULL_EVERY_MS);
+      !connection.fullSyncPending && (!connection.fullSyncAt || connection.fullSyncAt < slot);
     if (fullDue) {
       await db.$transaction([
         db.channelAriSent.deleteMany({ where: { connectionId } }),
@@ -378,11 +417,19 @@ export async function syncConnection(
       await release({});
       return 'SKIPPED';
     }
+    // Edits still coming: wait for them all, so they go in one call (database time: the
+    // triggers stamp changes with it).
+    if (lastChange && !connection.fullSyncPending && quietMs > 0) {
+      const [w] = await db.$queryRaw<{ recent: boolean | null; overdue: boolean | null }[]>`
+        SELECT bool_or(at > now() - ${quietMs} * interval '1 millisecond') AS recent,
+               bool_or(at <= now() - ${BATCH_MAX_MS} * interval '1 millisecond') AS overdue
+        FROM channel_ari_changes WHERE property_id = ${connection.propertyId}::uuid`;
+      if (w?.recent && !w.overdue) {
+        await release({});
+        return 'WAITING';
+      }
+    }
 
-    const property = await db.property.findUniqueOrThrow({
-      where: { id: connection.propertyId },
-      select: { timeZone: true },
-    });
     const today = localDate(now, property.timeZone);
     const dates = Array.from({ length: INVENTORY_DAYS }, (_, i) => addDays(today, i));
     const wanted = await wantedValues(db, connection, dates);
@@ -496,7 +543,7 @@ export async function syncAll(
   for (const c of connections) {
     try {
       const outcome = await syncConnection(db, channel, clock, c.id, options);
-      if (outcome !== 'SKIPPED' && outcome !== 'UP_TO_DATE') {
+      if (outcome !== 'SKIPPED' && outcome !== 'WAITING' && outcome !== 'UP_TO_DATE') {
         logger.info({ propertyId: c.propertyId, outcome }, 'Channel sync');
       }
     } catch (err) {

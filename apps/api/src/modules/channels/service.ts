@@ -110,6 +110,7 @@ async function view(deps: ChannelDeps): Promise<z.input<typeof ChannelConnection
       kind: l.kind,
       status: l.status as 'OK' | 'WARNING' | 'FAILED',
       items: l.items,
+      taskId: l.taskId,
       message: l.message,
     })),
   };

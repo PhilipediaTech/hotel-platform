@@ -19,5 +19,6 @@ export function channelRoutes(deps: channels.ChannelDeps): Router {
     channels.connectChannel(deps, tenantFrom(tenant), body),
   );
   mountRoute(router, r.pauseChannel, ({ body }) => channels.pauseChannel(deps, body));
+  mountRoute(router, r.requestChannelFullSync, () => channels.requestFullSync(deps));
   return router;
 }

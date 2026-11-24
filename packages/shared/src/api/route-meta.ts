@@ -420,6 +420,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   getChannelConnection: {"operationId":"getChannelConnection","method":"get","path":"/channel-connection","propertyScoped":true},
   connectChannel: {"operationId":"connectChannel","method":"post","path":"/channel-connection","body":true,"propertyScoped":true,"idempotent":true},
   pauseChannel: {"operationId":"pauseChannel","method":"patch","path":"/channel-connection","body":true,"propertyScoped":true},
+  requestChannelFullSync: {"operationId":"requestChannelFullSync","method":"post","path":"/channel-connection/full-sync","propertyScoped":true,"idempotent":true},
   listTasks: {"operationId":"listTasks","method":"get","path":"/tasks","propertyScoped":true},
   createTask: {"operationId":"createTask","method":"post","path":"/tasks","body":true,"propertyScoped":true,"idempotent":true},
   getTaskFormOptions: {"operationId":"getTaskFormOptions","method":"get","path":"/tasks/form-options","propertyScoped":true},

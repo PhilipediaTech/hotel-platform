@@ -29,6 +29,11 @@ const view = (connected: boolean) => ({
         lastError: 'Channex answered 422: Validation Error',
         connectedBy: { id: id(9), name: 'Grace GM' },
         createdAt: '2026-11-10T09:00:00.000Z',
+        checkedAt: null,
+        fullSyncAt: null,
+        fullSyncPending: true,
+        syncError: null,
+        retryAt: null,
       }
     : null,
   roomTypes: [{ id: id(3), code: 'STD', name: 'Standard', rooms: 12, mapped: connected }],
@@ -113,5 +118,35 @@ describe('Channel manager (S41)', () => {
     const log = screen.getByRole('list', { name: 'Activity' });
     expect(within(log).getByText(/SETUP · 2 items · failed/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save and finish setup' })).toBeInTheDocument();
+  });
+
+  it('shows how prices and availability are sent, and sends everything again', async () => {
+    const user = userEvent.setup();
+    const active = view(true);
+    const connected = {
+      ...active,
+      connection: {
+        ...active.connection,
+        status: 'ACTIVE',
+        lastError: null,
+        checkedAt: '2026-11-10T09:05:00.000Z',
+        fullSyncAt: '2026-11-10T09:01:00.000Z',
+        fullSyncPending: false,
+        syncError: 'Channex answered 429: Too Many Requests',
+        retryAt: '2026-11-10T09:07:00.000Z',
+      },
+    };
+    handlers['GET /channel-connection'] = () => json(200, connected);
+    handlers['POST /channel-connection/full-sync'] = () =>
+      json(200, { ...connected, connection: { ...connected.connection, fullSyncPending: true } });
+    renderAt('/channels');
+    const sync = await screen.findByRole('list', { name: 'Prices and availability' });
+    expect(within(sync).getByText(/^Up to date at/)).toBeInTheDocument();
+    expect(within(sync).getByText(/^Everything last sent again at/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/^Sending stopped: Channex answered 429: Too Many Requests. Next try at/),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Send everything again' }));
+    await waitFor(() => expect(sent('POST /channel-connection/full-sync')).toHaveLength(1));
   });
 });

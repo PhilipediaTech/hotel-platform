@@ -172,4 +172,84 @@ describe('Channex client', () => {
     expect(err.message).toBe('Channex answered 401: Unauthorized');
     expect(JSON.stringify(err)).not.toContain('kkkk');
   });
+
+  it('sends availability and restrictions as Channex value lists, with task ID and warnings (T-152)', async () => {
+    const task = (id: string, warnings?: unknown[]) =>
+      json(200, {
+        data: [{ id, type: 'task' }],
+        meta: { message: 'Success', ...(warnings ? { warnings } : {}) },
+      });
+    const { fetch, channex } = withAnswers(
+      task('task-1'),
+      task('task-2', [{ date: '2026-11-10', warning: 'Rate is less than min rate' }]),
+    );
+    await expect(
+      channex.updateAvailability([
+        {
+          propertyId: 'p',
+          roomTypeId: 'rt',
+          dateFrom: '2026-11-10',
+          dateTo: '2026-11-12',
+          availability: 3,
+        },
+      ]),
+    ).resolves.toEqual({ taskId: 'task-1', warnings: [] });
+    expect(sent(fetch, 0)).toMatchObject({
+      url: `${BASE}/availability`,
+      method: 'POST',
+      body: {
+        values: [
+          {
+            property_id: 'p',
+            room_type_id: 'rt',
+            date_from: '2026-11-10',
+            date_to: '2026-11-12',
+            availability: 3,
+          },
+        ],
+      },
+    });
+    const restriction = {
+      propertyId: 'p',
+      ratePlanId: 'rp',
+      dateFrom: '2026-11-10',
+      dateTo: '2026-11-10',
+      minStayArrival: 2,
+      maxStay: 0,
+      closedToArrival: true,
+      closedToDeparture: false,
+      stopSell: false,
+    };
+    await expect(
+      channex.updateRestrictions([
+        { ...restriction, rate: '12500.00' },
+        { ...restriction, dateFrom: '2027-01-01', dateTo: '2027-01-05', stopSell: true },
+      ]),
+    ).resolves.toEqual({
+      taskId: 'task-2',
+      warnings: [{ date: '2026-11-10', warning: 'Rate is less than min rate' }],
+    });
+    const wire = {
+      property_id: 'p',
+      rate_plan_id: 'rp',
+      date_from: '2026-11-10',
+      date_to: '2026-11-10',
+      min_stay_arrival: 2,
+      max_stay: 0,
+      closed_to_arrival: true,
+      closed_to_departure: false,
+      stop_sell: false,
+    };
+    // No price: the rate is left out, never sent as zero.
+    expect(sent(fetch, 1)).toMatchObject({
+      url: `${BASE}/restrictions`,
+      body: {
+        values: [
+          { ...wire, rate: '12500.00' },
+          { ...wire, date_from: '2027-01-01', date_to: '2027-01-05', stop_sell: true },
+        ],
+      },
+    });
+    expect((sent(fetch, 1).body as { values: object[] }).values[1]).not.toHaveProperty('rate');
+  });
 });

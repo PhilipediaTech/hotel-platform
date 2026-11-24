@@ -37,6 +37,8 @@ import { certificationRemindersJob } from './modules/staff/service.ts';
 import { eventHoldExpiryJob } from './modules/events/routes.ts';
 import { groupBlockReleaseJob } from './modules/groups/routes.ts';
 import { platformBillingJob } from './modules/platform/billing.ts';
+import type { ChannelManager } from './core/channel-manager.ts';
+import { channelSyncJob } from './modules/channels/sync.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
 
@@ -47,6 +49,8 @@ export function workerJobs(deps: {
   ai: AiProvider;
   email: EmailProvider;
   config: Config;
+  /** Prices and availability to the channel manager (T-152). */
+  channel: ChannelManager;
 }): readonly JobDefinition<never>[] {
   return [
     ownerSummaryJob({ ai: deps.ai }),
@@ -71,6 +75,8 @@ export function workerJobs(deps: {
     preventiveMaintenanceJob,
     checklistsJob,
     certificationRemindersJob,
+    // No channel manager on the platform: nothing to send.
+    ...(deps.channel.name === 'OFF' ? [] : [channelSyncJob({ channel: deps.channel })]),
   ];
 }
 

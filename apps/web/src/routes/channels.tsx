@@ -15,6 +15,7 @@ registerStrings(channelStrings);
 
 // S41 Channel manager (PRD M11-07; T-151): connect the property to Channex, choose which rate
 // plans are sold online, see what is set up and the recent activity, pause or resume.
+// T-152: how prices and availability are being sent, and sending everything again.
 
 const card = 'rounded-md border border-border bg-surface p-4';
 
@@ -42,7 +43,12 @@ export function ChannelsPage() {
     mutationFn: (paused: boolean) => api.call('pauseChannel', { body: { paused } }),
     onSuccess: refresh,
   });
+  const fullSync = useMutation({
+    mutationFn: () => api.call('requestChannelFullSync', {}),
+    onSuccess: refresh,
+  });
   const status = data?.connection?.status ?? 'NONE';
+  const c = data?.connection;
   return (
     <section className="max-w-4xl">
       <h1 className="text-xl font-semibold">{t('channels.title')}</h1>
@@ -81,6 +87,52 @@ export function ChannelsPage() {
               </Alert>
             )}
           </div>
+
+          {c && status !== 'CONNECTING' && (
+            <div className={card}>
+              <h2 className="font-semibold">{t('channels.sync.title')}</h2>
+              <ul
+                aria-label={t('channels.sync.title')}
+                className="mt-2 flex flex-col gap-1 text-sm"
+              >
+                <li>
+                  {c.checkedAt
+                    ? t('channels.sync.checked', { when: f.when(c.checkedAt) })
+                    : t('channels.sync.notYet')}
+                </li>
+                <li>
+                  {c.fullSyncPending
+                    ? t('channels.sync.fullPending')
+                    : c.fullSyncAt
+                      ? t('channels.sync.fullAt', { when: f.when(c.fullSyncAt) })
+                      : null}
+                </li>
+              </ul>
+              {c.syncError && (
+                <Alert tone="critical" className="mt-2">
+                  {c.retryAt
+                    ? t('channels.sync.errorRetry', {
+                        message: c.syncError,
+                        when: f.when(c.retryAt),
+                      })
+                    : t('channels.sync.error', { message: c.syncError })}
+                </Alert>
+              )}
+              {fullSync.error && (
+                <Alert tone="critical" className="mt-2">
+                  {errorMessage(fullSync.error)}
+                </Alert>
+              )}
+              <Button
+                variant="secondary"
+                className="mt-3"
+                disabled={fullSync.isPending || c.fullSyncPending || status !== 'ACTIVE'}
+                onClick={() => fullSync.mutate()}
+              >
+                {t('channels.sync.full')}
+              </Button>
+            </div>
+          )}
 
           <div className={card}>
             <h2 className="font-semibold">{t('channels.roomTypes')}</h2>

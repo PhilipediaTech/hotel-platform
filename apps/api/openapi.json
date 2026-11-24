@@ -18180,6 +18180,54 @@
               },
               "createdAt": {
                 "$ref": "#/components/schemas/Instant"
+              },
+              "checkedAt": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Instant"
+                  },
+                  {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                ]
+              },
+              "fullSyncAt": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Instant"
+                  },
+                  {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                ]
+              },
+              "fullSyncPending": {
+                "type": "boolean"
+              },
+              "syncError": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "retryAt": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Instant"
+                  },
+                  {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                ]
               }
             },
             "required": [
@@ -18187,7 +18235,12 @@
               "externalPropertyId",
               "lastError",
               "connectedBy",
-              "createdAt"
+              "createdAt",
+              "checkedAt",
+              "fullSyncAt",
+              "fullSyncPending",
+              "syncError",
+              "retryAt"
             ]
           },
           "roomTypes": {
@@ -78520,6 +78573,119 @@
           },
           "409": {
             "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/channel-connection/full-sync": {
+      "post": {
+        "operationId": "requestChannelFullSync",
+        "summary": "Send all prices, availability and restrictions again (within a few minutes)",
+        "tags": [
+          "Channels"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4 (tab 4 lists only the channel webhook): designed in T-151. Designed in T-152. Also runs by itself once a day. 409 unless connected and not paused.",
+        "x-permission": "channel.manage",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelConnection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
             "content": {
               "application/json": {
                 "schema": {

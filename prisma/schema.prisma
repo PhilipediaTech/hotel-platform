@@ -185,6 +185,8 @@ model Property {
   channelConnection    ChannelConnection?
   channelMappings      ChannelMapping[]
   channelSyncLogs      ChannelSyncLog[]
+  channelAriSent       ChannelAriSent[]
+  channelAriChanges    ChannelAriChange[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -4673,6 +4675,19 @@ model ChannelConnection {
    * Set while a setup runs, so two never run at once; expires if a run dies.
    */
   setupLockedUntil   DateTime?               @map("setup_locked_until") @db.Timestamptz(6)
+  /// Set while prices and availability are being sent (T-152), so two runs never overlap.
+  syncLockedUntil    DateTime?               @map("sync_locked_until") @db.Timestamptz(6)
+  /// After a failed send: wait until then (Retry-After, or doubling up to 30 minutes).
+  syncRetryAt        DateTime?               @map("sync_retry_at") @db.Timestamptz(6)
+  syncFailures       Int                     @default(0) @map("sync_failures")
+  /// The last sending problem, cleared by the next good send.
+  syncError          String?                 @map("sync_error")
+  /// Last time everything was compared with what was sent.
+  ariCheckedAt       DateTime?               @map("ari_checked_at") @db.Timestamptz(6)
+  /// Last completed full sync (everything sent again, daily).
+  fullSyncAt         DateTime?               @map("full_sync_at") @db.Timestamptz(6)
+  /// A full sync is under way: what was sent is forgotten and sent again.
+  fullSyncPending    Boolean                 @default(true) @map("full_sync_pending")
   connectedById      String                  @map("connected_by_id") @db.Uuid
   createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -4681,6 +4696,7 @@ model ChannelConnection {
   connectedBy User             @relation("ChannelConnector", fields: [connectedById], references: [id], onDelete: Restrict)
   mappings    ChannelMapping[]
   logs        ChannelSyncLog[]
+  sent        ChannelAriSent[]
 
   @@map("channel_connections")
 }
@@ -4712,6 +4728,7 @@ model ChannelMapping {
   connection ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
   roomType   RoomType          @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
   ratePlan   RatePlan?         @relation(fields: [ratePlanId], references: [id], onDelete: Restrict)
+  sent       ChannelAriSent?
 
   @@unique([connectionId, externalId])
   @@index([propertyId, kind])
@@ -4745,4 +4762,36 @@ model ChannelSyncLog {
 
   @@index([connectionId, at])
   @@map("channel_sync_logs")
+}
+
+/// What the channel manager last accepted for one mapping (T-152): date → value, for the
+/// dates from today on. Only dates whose value differs from this are sent; a full sync
+/// forgets it, so everything is sent again.
+model ChannelAriSent {
+  mappingId    String   @id @map("mapping_id") @db.Uuid
+  propertyId   String   @map("property_id") @db.Uuid
+  connectionId String   @map("connection_id") @db.Uuid
+  values       Json
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  connection ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  mapping    ChannelMapping    @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId])
+  @@map("channel_ari_sent")
+}
+
+/// A sign that availability, prices or restrictions of a connected property changed (T-152).
+/// Written by database triggers on inventory, rate days and rate plans, so no write path is
+/// missed; plain inserts, so bookings never wait on each other. The sync removes what it saw.
+model ChannelAriChange {
+  id         BigInt   @id @default(autoincrement())
+  propertyId String   @map("property_id") @db.Uuid
+  at         DateTime @default(now()) @db.Timestamptz(6)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, id])
+  @@map("channel_ari_changes")
 }

@@ -40,6 +40,8 @@ describe('migrations', () => {
       'cash_counts',
       'cash_handovers',
       'cashier_shifts',
+      'channel_ari_changes',
+      'channel_ari_sent',
       'channel_connections',
       'channel_mappings',
       'channel_sync_logs',

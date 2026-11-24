@@ -39,12 +39,48 @@ export interface ChannelRatePlanInput {
   mealType: 'room_only' | 'breakfast' | 'half_board' | 'full_board' | 'all_inclusive' | 'none';
 }
 
+/** Rooms left to sell of one room type over a range of dates (both included). */
+export interface ChannelAvailabilityValue {
+  propertyId: string;
+  roomTypeId: string;
+  dateFrom: string;
+  dateTo: string;
+  availability: number;
+}
+
+/** Price and restrictions of one rate plan over a range of dates (both included). */
+export interface ChannelRestrictionValue {
+  propertyId: string;
+  ratePlanId: string;
+  dateFrom: string;
+  dateTo: string;
+  /** Decimal string ("12500.00"); left out when there is no price (then stop-sell). */
+  rate?: string | undefined;
+  /** Nights, counted from arrival; 1 = no minimum. */
+  minStayArrival: number;
+  /** Nights, counted from arrival; 0 = no maximum. */
+  maxStay: number;
+  closedToArrival: boolean;
+  closedToDeparture: boolean;
+  stopSell: boolean;
+}
+
+/** What the channel manager said about a batch it accepted. */
+export interface ChannelPushResult {
+  taskId: string | null;
+  /** Values it accepted but warned about (e.g. a date it ignored). */
+  warnings: unknown[];
+}
+
 export interface ChannelManager {
   readonly name: 'OFF' | 'FAKE' | 'CHANNEX';
   createProperty(input: ChannelPropertyInput): Promise<{ id: string }>;
   createRoomType(input: ChannelRoomTypeInput): Promise<{ id: string }>;
   updateRoomType(id: string, input: Omit<ChannelRoomTypeInput, 'propertyId'>): Promise<void>;
   createRatePlan(input: ChannelRatePlanInput): Promise<{ id: string }>;
+  /** T-152. Channex allows 10 calls a minute per property for each of these two. */
+  updateAvailability(values: ChannelAvailabilityValue[]): Promise<ChannelPushResult>;
+  updateRestrictions(values: ChannelRestrictionValue[]): Promise<ChannelPushResult>;
 }
 
 /** The channel manager refused or could not be reached; safe to show `message`. */
@@ -121,6 +157,15 @@ export function createChannexManager(options: {
     return { id: r.data.id };
   };
 
+  /** ARI answers: {"data": [{"id": task, "type": "task"}], "meta": {"warnings": [...]}}. */
+  const pushed = (r: {
+    data?: { id?: string }[] | null;
+    meta?: { warnings?: unknown[] } | null;
+  }): ChannelPushResult => ({
+    taskId: (Array.isArray(r.data) ? r.data[0]?.id : undefined) ?? null,
+    warnings: Array.isArray(r.meta?.warnings) ? r.meta.warnings : [],
+  });
+
   return {
     name: 'CHANNEX',
     async createProperty(p) {
@@ -183,6 +228,37 @@ export function createChannexManager(options: {
         }),
       );
     },
+    async updateAvailability(values) {
+      return pushed(
+        await request('POST', '/availability', {
+          values: values.map((v) => ({
+            property_id: v.propertyId,
+            room_type_id: v.roomTypeId,
+            date_from: v.dateFrom,
+            date_to: v.dateTo,
+            availability: v.availability,
+          })),
+        }),
+      );
+    },
+    async updateRestrictions(values) {
+      return pushed(
+        await request('POST', '/restrictions', {
+          values: values.map((v) => ({
+            property_id: v.propertyId,
+            rate_plan_id: v.ratePlanId,
+            date_from: v.dateFrom,
+            date_to: v.dateTo,
+            ...(v.rate !== undefined ? { rate: v.rate } : {}),
+            min_stay_arrival: v.minStayArrival,
+            max_stay: v.maxStay,
+            closed_to_arrival: v.closedToArrival,
+            closed_to_departure: v.closedToDeparture,
+            stop_sell: v.stopSell,
+          })),
+        }),
+      );
+    },
   };
 }
 
@@ -194,6 +270,8 @@ export function createOffChannelManager(): ChannelManager {
     createRoomType: off,
     updateRoomType: off,
     createRatePlan: off,
+    updateAvailability: off,
+    updateRestrictions: off,
   };
 }
 
@@ -202,6 +280,8 @@ export interface FakeChannelManager extends ChannelManager {
   readonly calls: { method: string; input: unknown }[];
   /** Makes the next call of `method` throw this error (once). */
   failNext: { method: string; error: ChannelError } | null;
+  /** Warnings the next ARI call answers with (once). */
+  warnNext: unknown[] | null;
 }
 
 /** Answers with new IDs and records every call; no network. */
@@ -210,13 +290,22 @@ export function createFakeChannelManager(): FakeChannelManager {
     name: 'FAKE',
     calls: [],
     failNext: null,
+    warnNext: null,
     createProperty: (input) => record('createProperty', input),
     createRoomType: (input) => record('createRoomType', input),
     updateRoomType: async (id, input) => {
       await record('updateRoomType', { id, ...input });
     },
     createRatePlan: (input) => record('createRatePlan', input),
+    updateAvailability: (values) => push('updateAvailability', values),
+    updateRestrictions: (values) => push('updateRestrictions', values),
   };
+  async function push(method: string, values: unknown): Promise<ChannelPushResult> {
+    const { id } = await record(method, values);
+    const warnings = fake.warnNext ?? [];
+    fake.warnNext = null;
+    return { taskId: id, warnings };
+  }
   async function record(method: string, input: unknown) {
     fake.calls.push({ method, input });
     if (fake.failNext?.method === method) {

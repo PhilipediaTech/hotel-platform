@@ -1783,6 +1783,7 @@ async function bChannel(db: Db, world: TenantWorld, propertyId: string) {
       externalPropertyId: 'their-property',
       status: 'ACTIVE',
       connectedById: world.bStaff.id,
+      fullSyncPending: false,
     },
   });
   await db.channelMapping.create({
@@ -1799,7 +1800,9 @@ async function bChannel(db: Db, world: TenantWorld, propertyId: string) {
 
 async function bChannelUnchanged(db: Db, world: TenantWorld) {
   const where = { propertyId: world.b1.id };
-  expect((await db.channelConnection.findMany({ where })).map((c) => c.status)).toEqual(['ACTIVE']);
+  expect(
+    (await db.channelConnection.findMany({ where })).map((c) => [c.status, c.fullSyncPending]),
+  ).toEqual([['ACTIVE', false]]);
   expect(await db.channelMapping.count({ where })).toBe(1);
   expect(await db.channelSyncLog.count({ where })).toBe(0);
 }
@@ -3791,6 +3794,8 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({ paused: true }),
     untouched: bChannelUnchanged,
   },
+  // T-152: A has no connection, so B's is never asked to send everything again.
+  requestChannelFullSync: { seed: bChannel, creates: true, untouched: bChannelUnchanged },
   // Accounting exports (T-148)
   getAccountingMappings: {
     seed: bAccounting,

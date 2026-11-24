@@ -31,6 +31,16 @@
       "OK": "done",
       "WARNING": "done with warnings",
       "FAILED": "failed"
+    },
+    "sync": {
+      "title": "Prices and availability",
+      "checked": "Up to date at {{when}}: changes go within about a minute.",
+      "notYet": "Nothing sent yet: the first send starts within a minute.",
+      "fullPending": "Sending everything again: this takes a few minutes.",
+      "fullAt": "Everything last sent again at {{when}} (this runs daily).",
+      "error": "Sending stopped: {{message}}",
+      "errorRetry": "Sending stopped: {{message}}. Next try at {{when}}.",
+      "full": "Send everything again"
     }
   }
 }

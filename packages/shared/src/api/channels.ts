@@ -9,6 +9,7 @@ import { Instant, Uuid } from './primitives.ts';
 // type the hotel chooses to sell online, and keeps their IDs. Setup can be run again: it only
 // creates what is missing, so a setup that failed half-way finishes on the next try. Syncing
 // prices and availability (T-152) and taking in bookings (T-153) build on these mappings.
+// T-152: a worker sends what changed every minute and everything once a day.
 
 export const ChannelConnectionStatus = z.enum(['CONNECTING', 'ACTIVE', 'PAUSED']);
 
@@ -26,6 +27,15 @@ export const ChannelConnectionView = z
         lastError: z.string().nullable(),
         connectedBy: z.object({ id: Uuid, name: z.string() }),
         createdAt: Instant,
+        /** Prices and availability (T-152): last time all was compared and up to date. */
+        checkedAt: Instant.nullable(),
+        /** Last completed full sync; one runs daily and on request. */
+        fullSyncAt: Instant.nullable(),
+        fullSyncPending: z.boolean(),
+        /** The last sending problem, until a send goes through. */
+        syncError: z.string().nullable(),
+        /** After a problem: the next try. */
+        retryAt: Instant.nullable(),
       })
       .nullable(),
     roomTypes: z.array(
@@ -109,4 +119,21 @@ export const pauseChannel = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
-export const CHANNEL_ROUTES = { getChannelConnection, connectChannel, pauseChannel } as const;
+export const requestChannelFullSync = defineRoute({
+  ...MANAGE,
+  operationId: 'requestChannelFullSync',
+  method: 'post',
+  path: '/channel-connection/full-sync',
+  summary: 'Send all prices, availability and restrictions again (within a few minutes)',
+  description: `${ADDED} Designed in T-152. Also runs by itself once a day. 409 unless connected and not paused.`,
+  idempotent: true,
+  response: ChannelConnectionView,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
+export const CHANNEL_ROUTES = {
+  getChannelConnection,
+  connectChannel,
+  pauseChannel,
+  requestChannelFullSync,
+} as const;

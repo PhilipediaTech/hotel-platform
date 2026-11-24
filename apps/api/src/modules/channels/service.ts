@@ -74,6 +74,11 @@ async function view(deps: ChannelDeps): Promise<z.input<typeof ChannelConnection
           lastError: connection.lastError,
           connectedBy: connection.connectedBy,
           createdAt: connection.createdAt.toISOString(),
+          checkedAt: connection.ariCheckedAt?.toISOString() ?? null,
+          fullSyncAt: connection.fullSyncAt?.toISOString() ?? null,
+          fullSyncPending: connection.fullSyncPending,
+          syncError: connection.syncError,
+          retryAt: connection.syncRetryAt?.toISOString() ?? null,
         }
       : null,
     roomTypes: types.map((t) => ({
@@ -134,6 +139,7 @@ export async function connectChannel(
   }
   const plans = await db.ratePlan.findMany({
     where: { id: { in: body.ratePlanIds }, active: true, kind: { in: [...CHANNEL_PLAN_KINDS] } },
+    orderBy: { code: 'asc' },
   });
   body.ratePlanIds.forEach((id, i) => {
     if (!plans.some((p) => p.id === id)) {
@@ -279,6 +285,8 @@ export async function connectChannel(
         status: connection.status === 'PAUSED' ? 'PAUSED' : 'ACTIVE',
         lastError: null,
         setupLockedUntil: null,
+        // Plans may have been added or taken off: the next sync compares everything (T-152).
+        ariCheckedAt: null,
       },
     });
     await log(deps, connection.id, { status: 'OK', items: made, message: null });
@@ -316,7 +324,11 @@ export async function pauseChannel(deps: ChannelDeps, body: { paused: boolean })
   }
   const status = body.paused ? 'PAUSED' : 'ACTIVE';
   if (connection.status !== status) {
-    await db.channelConnection.update({ where: { id: connection.id }, data: { status } });
+    // On resume, the next run compares everything at once (changes made while paused).
+    await db.channelConnection.update({
+      where: { id: connection.id },
+      data: { status, ...(body.paused ? {} : { ariCheckedAt: null }) },
+    });
     await recordAudit(db, {
       action: body.paused ? 'channel.paused' : 'channel.resumed',
       entityType: 'channel_connection',
@@ -325,5 +337,35 @@ export async function pauseChannel(deps: ChannelDeps, body: { paused: boolean })
       after: { status },
     });
   }
+  return view(deps);
+}
+
+/**
+ * T-152: send everything again. What was sent is forgotten, so the next runs send all of it
+ * (as fast as the channel manager's rate limit allows); a failed send waits no longer.
+ */
+export async function requestFullSync(deps: ChannelDeps) {
+  const db = deps.tenantDb;
+  const connection = await db.channelConnection.findFirst();
+  if (connection?.status !== 'ACTIVE') {
+    throw new AppError(
+      'STATE_TRANSITION_INVALID',
+      connection?.status === 'PAUSED'
+        ? 'The connection is paused: resume it first'
+        : 'Connect the channel manager first',
+    );
+  }
+  await db.$transaction(async (tx) => {
+    await tx.channelAriSent.deleteMany({ where: { connectionId: connection.id } });
+    await tx.channelConnection.update({
+      where: { id: connection.id },
+      data: { fullSyncPending: true, syncRetryAt: null },
+    });
+    await recordAudit(tx, {
+      action: 'channel.full_sync_requested',
+      entityType: 'channel_connection',
+      entityId: connection.id,
+    });
+  });
   return view(deps);
 }

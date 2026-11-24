@@ -9,7 +9,7 @@ import { routes } from '../app/routes.tsx';
 import { setApiPropertyId } from '../lib/api.ts';
 import { LAGOS, makeMe, membership } from '../test/me-fixture.ts';
 
-// S41 Channel manager (PRD M11-07; T-151).
+// S41 Channel manager (PRD M11-07; T-151; T-152 sync; T-153 OTA bookings).
 
 const json = (status: number, body?: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
@@ -34,6 +34,9 @@ const view = (connected: boolean) => ({
         fullSyncPending: true,
         syncError: null,
         retryAt: null,
+        bookingsCheckedAt: null,
+        bookingsError: null,
+        heldBookings: 0,
       }
     : null,
   roomTypes: [{ id: id(3), code: 'STD', name: 'Standard', rooms: 12, mapped: connected }],
@@ -64,6 +67,7 @@ beforeEach(() => {
     'GET /me': () => json(200, makeMe({ memberships: [membership(LAGOS, ['channel.manage'])] })),
     'GET /auth/device': () => json(200, { pinSwitchAvailable: false, deviceLabel: null }),
     'GET /channel-connection': () => json(200, view(false)),
+    'GET /channel-bookings': () => json(200, []),
   };
   vi.stubGlobal(
     'fetch',
@@ -148,5 +152,71 @@ describe('Channel manager (S41)', () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Send everything again' }));
     await waitFor(() => expect(sent('POST /channel-connection/full-sync')).toHaveLength(1));
+  });
+
+  it('shows OTA bookings waiting for staff: try again, or mark as handled with a note', async () => {
+    const user = userEvent.setup();
+    const active = view(true);
+    handlers['GET /channel-connection'] = () =>
+      json(200, {
+        ...active,
+        connection: {
+          ...active.connection,
+          status: 'ACTIVE',
+          lastError: null,
+          bookingsCheckedAt: '2026-11-10T09:05:00.000Z',
+          heldBookings: 2,
+        },
+      });
+    const held = (n: number, over: object) => ({
+      id: id(20 + n),
+      externalBookingId: `bk-${n}`,
+      kind: 'NEW',
+      otaName: 'Booking.com',
+      otaCode: `99960138${n}`,
+      guestName: n === 1 ? 'John Doe' : 'Amina Bello',
+      arrival: '2026-11-12',
+      departure: '2026-11-14',
+      receivedAt: '2026-11-10T09:00:00.000Z',
+      outcome: 'HELD',
+      message: null,
+      reservationId: null,
+      confirmationNo: null,
+      ...over,
+    });
+    handlers['GET /channel-bookings'] = () =>
+      json(200, [
+        held(1, { holdReason: 'NO_ROOM', message: 'No room of this type is left on some nights' }),
+        held(2, {
+          holdReason: 'CURRENCY',
+          message: 'The booking is in USD; the hotel sells in NGN',
+        }),
+      ]);
+    handlers[`POST /channel-bookings/${id(21)}/retry`] = () =>
+      json(200, held(1, { outcome: 'APPLIED', holdReason: null, confirmationNo: 'LAG-00002' }));
+    handlers[`POST /channel-bookings/${id(22)}/dismiss`] = () =>
+      json(200, held(2, { outcome: 'DISMISSED' }));
+    renderAt('/channels');
+    expect(await screen.findByText(/^Bookings checked at/)).toBeInTheDocument();
+    const list = await screen.findByRole('list', { name: 'Bookings that need you' });
+    expect(screen.getByText('2 bookings need you')).toBeInTheDocument();
+    const items = within(list).getAllByRole('listitem');
+    expect(within(items[0] as HTMLElement).getByText('No room left')).toBeInTheDocument();
+    expect(within(items[1] as HTMLElement).getByText(/Booking.com 999601382/)).toBeInTheDocument();
+
+    await user.click(within(items[0] as HTMLElement).getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(sent(`POST /channel-bookings/${id(21)}/retry`)).toHaveLength(1));
+
+    const second = items[1] as HTMLElement;
+    await user.click(within(second).getByRole('button', { name: 'Mark as handled' }));
+    const confirm = within(second).getByRole('button', { name: 'Mark as handled' });
+    expect(confirm).toBeDisabled();
+    await user.type(within(second).getByLabelText('How was it handled?'), 'Rebooked in NGN');
+    await user.click(confirm);
+    await waitFor(() =>
+      expect(sent(`POST /channel-bookings/${id(22)}/dismiss`)[0]?.body).toEqual({
+        note: 'Rebooked in NGN',
+      }),
+    );
   });
 });

@@ -101,7 +101,7 @@ model Property {
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organisation         Organisation           @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  organisation         Organisation             @relation(fields: [organisationId], references: [id], onDelete: Restrict)
   departments          Department[]
   memberships          Membership[]
   invitations          Invitation[]
@@ -187,6 +187,7 @@ model Property {
   channelSyncLogs      ChannelSyncLog[]
   channelAriSent       ChannelAriSent[]
   channelAriChanges    ChannelAriChange[]
+  channelBookings      ChannelBookingRevision[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -1275,7 +1276,8 @@ model Reservation {
 
   guestLinks GuestLink[]
 
-  messageThreads MessageThread[]
+  messageThreads          MessageThread[]
+  channelBookingRevisions ChannelBookingRevision[]
 
   @@unique([propertyId, confirmationNo])
   @@unique([propertyId, source, channelRef])
@@ -4656,47 +4658,54 @@ enum ChannelConnectionStatus {
 }
 
 model ChannelConnection {
-  id                 String                  @id @default(uuid()) @db.Uuid
-  propertyId         String                  @unique @map("property_id") @db.Uuid
+  id                  String                  @id @default(uuid()) @db.Uuid
+  propertyId          String                  @unique @map("property_id") @db.Uuid
   /**
    * CHANNEX.
    */
-  provider           String
+  provider            String
   /**
    * The property's ID at the channel manager, once created.
    */
-  externalPropertyId String?                 @map("external_property_id")
-  status             ChannelConnectionStatus @default(CONNECTING)
+  externalPropertyId  String?                 @map("external_property_id")
+  status              ChannelConnectionStatus @default(CONNECTING)
   /**
    * Last setup problem, shown to the hotel until a setup succeeds.
    */
-  lastError          String?                 @map("last_error")
+  lastError           String?                 @map("last_error")
   /**
    * Set while a setup runs, so two never run at once; expires if a run dies.
    */
-  setupLockedUntil   DateTime?               @map("setup_locked_until") @db.Timestamptz(6)
+  setupLockedUntil    DateTime?               @map("setup_locked_until") @db.Timestamptz(6)
   /// Set while prices and availability are being sent (T-152), so two runs never overlap.
-  syncLockedUntil    DateTime?               @map("sync_locked_until") @db.Timestamptz(6)
+  syncLockedUntil     DateTime?               @map("sync_locked_until") @db.Timestamptz(6)
   /// After a failed send: wait until then (Retry-After, or doubling up to 30 minutes).
-  syncRetryAt        DateTime?               @map("sync_retry_at") @db.Timestamptz(6)
-  syncFailures       Int                     @default(0) @map("sync_failures")
+  syncRetryAt         DateTime?               @map("sync_retry_at") @db.Timestamptz(6)
+  syncFailures        Int                     @default(0) @map("sync_failures")
   /// The last sending problem, cleared by the next good send.
-  syncError          String?                 @map("sync_error")
+  syncError           String?                 @map("sync_error")
   /// Last time everything was compared with what was sent.
-  ariCheckedAt       DateTime?               @map("ari_checked_at") @db.Timestamptz(6)
+  ariCheckedAt        DateTime?               @map("ari_checked_at") @db.Timestamptz(6)
   /// Last completed full sync (everything sent again, daily).
-  fullSyncAt         DateTime?               @map("full_sync_at") @db.Timestamptz(6)
+  fullSyncAt          DateTime?               @map("full_sync_at") @db.Timestamptz(6)
   /// A full sync is under way: what was sent is forgotten and sent again.
-  fullSyncPending    Boolean                 @default(true) @map("full_sync_pending")
-  connectedById      String                  @map("connected_by_id") @db.Uuid
-  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  fullSyncPending     Boolean                 @default(true) @map("full_sync_pending")
+  /// Set while bookings are being taken in (T-153), so two pulls never overlap.
+  bookingsLockedUntil DateTime?               @map("bookings_locked_until") @db.Timestamptz(6)
+  /// Last time the booking feed was read to the end.
+  bookingsCheckedAt   DateTime?               @map("bookings_checked_at") @db.Timestamptz(6)
+  /// The last problem reading the feed, cleared by the next good read.
+  bookingsError       String?                 @map("bookings_error")
+  connectedById       String                  @map("connected_by_id") @db.Uuid
+  createdAt           DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  property    Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  connectedBy User             @relation("ChannelConnector", fields: [connectedById], references: [id], onDelete: Restrict)
+  property    Property                 @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  connectedBy User                     @relation("ChannelConnector", fields: [connectedById], references: [id], onDelete: Restrict)
   mappings    ChannelMapping[]
   logs        ChannelSyncLog[]
   sent        ChannelAriSent[]
+  bookings    ChannelBookingRevision[]
 
   @@map("channel_connections")
 }
@@ -4794,4 +4803,63 @@ model ChannelAriChange {
 
   @@index([propertyId, id])
   @@map("channel_ari_changes")
+}
+
+enum ChannelBookingOutcome {
+  /// Saved and acknowledged; not applied yet.
+  PENDING
+  /// The reservation now matches it (made, changed or cancelled; or already matched).
+  APPLIED
+  /// Could not be applied safely: waits for staff (try again, or mark as handled).
+  HELD
+  /// A later revision of the same booking came in: that one counts.
+  SUPERSEDED
+  /// Staff handled it by hand.
+  DISMISSED
+}
+
+/// One revision of an OTA booking taken from the channel manager (T-153): the whole booking
+/// as the OTA sent it (card details left out), saved before it is acknowledged, since the
+/// channel manager then removes the guest's contact details. Each revision is a full
+/// picture of the booking; only the latest of a booking is applied.
+model ChannelBookingRevision {
+  id                String                @id @default(uuid()) @db.Uuid
+  propertyId        String                @map("property_id") @db.Uuid
+  connectionId      String                @map("connection_id") @db.Uuid
+  /// The revision's ID at the channel manager.
+  externalId        String                @map("external_id")
+  /// The booking's ID at the channel manager (the reservation's channelRef).
+  externalBookingId String                @map("external_booking_id")
+  /// NEW | MODIFIED | CANCELLED
+  kind              String
+  otaName           String?               @map("ota_name")
+  /// The OTA's own reservation number.
+  otaCode           String?               @map("ota_code")
+  guestName         String                @map("guest_name")
+  arrival           DateTime?             @db.Date
+  departure         DateTime?             @db.Date
+  payload           Json
+  /// When the channel manager received it (revisions of a booking apply in this order).
+  receivedAt        DateTime              @map("received_at") @db.Timestamptz(6)
+  takenAt           DateTime              @default(now()) @map("taken_at") @db.Timestamptz(6)
+  ackedAt           DateTime?             @map("acked_at") @db.Timestamptz(6)
+  outcome           ChannelBookingOutcome @default(PENDING)
+  /// Why it is held: UNMAPPED_ROOM | UNMAPPED_RATE | NO_ROOM | CURRENCY | IN_HOUSE |
+  /// CANCELLED_HERE | ROOMS_CHANGED | INVALID | REFUSED
+  holdReason        String?               @map("hold_reason")
+  message           String?
+  reservationId     String?               @map("reservation_id") @db.Uuid
+  /// Staff who marked it as handled.
+  resolvedById      String?               @map("resolved_by_id") @db.Uuid
+  resolvedAt        DateTime?             @map("resolved_at") @db.Timestamptz(6)
+  updatedAt         DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property    Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  connection  ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  reservation Reservation?      @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+
+  @@unique([connectionId, externalId])
+  @@index([connectionId, externalBookingId])
+  @@index([propertyId, outcome])
+  @@map("channel_booking_revisions")
 }

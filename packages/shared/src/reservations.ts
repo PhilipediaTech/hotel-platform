@@ -65,7 +65,10 @@ export const MODIFIABLE_STATUSES: readonly ReservationStatus[] = [
   'CONFIRMED',
 ];
 
-/** Why a reservation was cancelled (M3-04). HOLD_EXPIRED is set only by the expiry job. */
+/**
+ * Why a reservation was cancelled (M3-04). HOLD_EXPIRED is set only by the expiry job, and
+ * OTA_CANCELLED only when an OTA booking is cancelled through the channel manager (T-153).
+ */
 export const CANCEL_REASONS = [
   'GUEST_REQUEST',
   'CHANGE_OF_PLANS',
@@ -74,7 +77,7 @@ export const CANCEL_REASONS = [
   'HOTEL_REQUEST',
   'OTHER',
 ] as const;
-export type CancelReason = (typeof CANCEL_REASONS)[number] | 'HOLD_EXPIRED';
+export type CancelReason = (typeof CANCEL_REASONS)[number] | 'HOLD_EXPIRED' | 'OTA_CANCELLED';
 
 export interface FeeRule {
   daysBefore: number;

@@ -36,7 +36,12 @@ describe('loadConfig', () => {
       localFilesDir: path.resolve(import.meta.dirname, '../../../../.data/files'),
       payments: { provider: 'fake', secretKey: null, webhookSecret: null },
       ai: { provider: 'fake', apiKey: null, model: 'claude-opus-5-5' },
-      channel: { provider: 'fake', apiKey: null, baseUrl: 'https://staging.channex.io/api/v1' },
+      channel: {
+        provider: 'fake',
+        apiKey: null,
+        baseUrl: 'https://staging.channex.io/api/v1',
+        webhookSecrets: [],
+      },
       platformAdminEmails: [],
       passwordBreachCheck: 'hibp',
       whatsapp: {
@@ -175,7 +180,19 @@ describe('loadConfig', () => {
     const key = 'c'.repeat(64);
     expect(
       loadConfig({ ...ORIGINS, CHANNEL_PROVIDER: 'channex', CHANNEX_API_KEY: key }).channel,
-    ).toEqual({ provider: 'channex', apiKey: key, baseUrl: 'https://staging.channex.io/api/v1' });
+    ).toEqual({
+      provider: 'channex',
+      apiKey: key,
+      baseUrl: 'https://staging.channex.io/api/v1',
+      webhookSecrets: [],
+    });
+    expect(
+      loadConfig({ ...ORIGINS, CHANNEX_WEBHOOK_SECRETS: `${'a'.repeat(32)},${'b'.repeat(32)}` })
+        .channel.webhookSecrets,
+    ).toEqual(['a'.repeat(32), 'b'.repeat(32)]);
+    expect(() => loadConfig({ ...ORIGINS, CHANNEX_WEBHOOK_SECRETS: 'short' })).toThrow(
+      /One or two secrets/,
+    );
     expect(
       loadConfig({
         ...ORIGINS,

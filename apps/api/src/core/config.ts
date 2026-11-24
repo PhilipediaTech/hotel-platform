@@ -46,6 +46,13 @@ const envSchema = z.object({
     .url()
     .regex(/^https:\/\/(staging|app|secure)\.channex\.io\/api\/v1\/?$/, 'A Channex API v1 base URL')
     .default('https://staging.channex.io/api/v1'),
+  // T-153: the booking webhook's signing secret, from a Channex signing key; two, comma
+  // separated, while one is being rotated. Without one the webhook answers 401 and bookings
+  // still come in from the feed every minute.
+  CHANNEX_WEBHOOK_SECRETS: z
+    .string()
+    .regex(/^[^,\s]{16,}(,[^,\s]{16,})?$/, 'One or two secrets of 16+ characters, comma separated')
+    .optional(),
   PAYMENT_SECRET_KEY: z
     .string()
     .regex(
@@ -120,7 +127,13 @@ export interface Config {
   /** The AI provider, its key (null unless anthropic) and model (T-116). */
   ai: { provider: 'off' | 'fake' | 'anthropic'; apiKey: string | null; model: string };
   /** The channel manager, its key (null unless channex) and API base URL (T-151). */
-  channel: { provider: 'off' | 'fake' | 'channex'; apiKey: string | null; baseUrl: string };
+  channel: {
+    provider: 'off' | 'fake' | 'channex';
+    apiKey: string | null;
+    baseUrl: string;
+    /** Booking webhook signing secrets (T-153); none: the webhook refuses every call. */
+    webhookSecrets: readonly string[];
+  };
   /** The WhatsApp provider and its Meta settings (null for the fake). */
   whatsapp: {
     provider: 'fake' | 'meta';
@@ -213,6 +226,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       provider: channelProvider,
       apiKey: e.CHANNEX_API_KEY ?? null,
       baseUrl: e.CHANNEX_BASE_URL.replace(/\/$/, ''),
+      webhookSecrets: e.CHANNEX_WEBHOOK_SECRETS?.split(',') ?? [],
     },
     databaseUrl: e.DATABASE_URL,
     sessionSecret: e.SESSION_SECRET,

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Config } from './config.ts';
 
 // Channel manager (PRD M11-07; tab 2: each provider behind an interface in core/ with a fake;
@@ -72,6 +72,15 @@ export interface ChannelPushResult {
   warnings: unknown[];
 }
 
+/**
+ * One booking revision as the channel manager sent it (T-153): its ID and its attributes,
+ * unread (the bookings module reads and keeps them).
+ */
+export interface ChannelBookingRevisionData {
+  id: string;
+  attributes: Record<string, unknown>;
+}
+
 export interface ChannelManager {
   readonly name: 'OFF' | 'FAKE' | 'CHANNEX';
   createProperty(input: ChannelPropertyInput): Promise<{ id: string }>;
@@ -81,6 +90,13 @@ export interface ChannelManager {
   /** T-152. Channex allows 10 calls a minute per property for each of these two. */
   updateAvailability(values: ChannelAvailabilityValue[]): Promise<ChannelPushResult>;
   updateRestrictions(values: ChannelRestrictionValue[]): Promise<ChannelPushResult>;
+  /**
+   * T-153. Booking revisions not acknowledged yet, oldest first (one page). Each stays in
+   * the feed until acknowledged.
+   */
+  bookingFeed(propertyId: string): Promise<ChannelBookingRevisionData[]>;
+  /** T-153. Taken: the revision leaves the feed (and its guest contact details go). */
+  ackBookingRevision(revisionId: string): Promise<void>;
 }
 
 /** The channel manager refused or could not be reached; safe to show `message`. */
@@ -241,6 +257,21 @@ export function createChannexManager(options: {
         }),
       );
     },
+    async bookingFeed(propertyId) {
+      const q = `filter[property_id]=${encodeURIComponent(propertyId)}&order[inserted_at]=asc`;
+      const r = await request<{ data?: unknown }>('GET', `/booking_revisions/feed?${q}`);
+      if (!Array.isArray(r.data)) throw new ChannelError('Channex answered without a feed', 200);
+      return r.data.flatMap((item: unknown) => {
+        const row = item as { id?: unknown; attributes?: unknown } | null;
+        const attributes = row?.attributes;
+        return typeof row?.id === 'string' && attributes && typeof attributes === 'object'
+          ? [{ id: row.id, attributes: attributes as Record<string, unknown> }]
+          : [];
+      });
+    },
+    async ackBookingRevision(revisionId) {
+      await request('POST', `/booking_revisions/${encodeURIComponent(revisionId)}/ack`);
+    },
     async updateRestrictions(values) {
       return pushed(
         await request('POST', '/restrictions', {
@@ -272,6 +303,8 @@ export function createOffChannelManager(): ChannelManager {
     createRatePlan: off,
     updateAvailability: off,
     updateRestrictions: off,
+    bookingFeed: off,
+    ackBookingRevision: off,
   };
 }
 
@@ -282,6 +315,10 @@ export interface FakeChannelManager extends ChannelManager {
   failNext: { method: string; error: ChannelError } | null;
   /** Warnings the next ARI call answers with (once). */
   warnNext: unknown[] | null;
+  /** Booking revisions waiting in the feed, by channel manager property ID (tests add them). */
+  readonly feed: Map<string, ChannelBookingRevisionData[]>;
+  /** Revision IDs acknowledged, in order. */
+  readonly acked: string[];
 }
 
 /** Answers with new IDs and records every call; no network. */
@@ -291,6 +328,8 @@ export function createFakeChannelManager(): FakeChannelManager {
     calls: [],
     failNext: null,
     warnNext: null,
+    feed: new Map(),
+    acked: [],
     createProperty: (input) => record('createProperty', input),
     createRoomType: (input) => record('createRoomType', input),
     updateRoomType: async (id, input) => {
@@ -299,6 +338,20 @@ export function createFakeChannelManager(): FakeChannelManager {
     createRatePlan: (input) => record('createRatePlan', input),
     updateAvailability: (values) => push('updateAvailability', values),
     updateRestrictions: (values) => push('updateRestrictions', values),
+    bookingFeed: async (propertyId) => {
+      await record('bookingFeed', { propertyId });
+      return [...(fake.feed.get(propertyId) ?? [])];
+    },
+    ackBookingRevision: async (revisionId) => {
+      await record('ackBookingRevision', { revisionId });
+      fake.acked.push(revisionId);
+      for (const [key, rows] of fake.feed) {
+        fake.feed.set(
+          key,
+          rows.filter((r) => r.id !== revisionId),
+        );
+      }
+    },
   };
   async function push(method: string, values: unknown): Promise<ChannelPushResult> {
     const { id } = await record(method, values);
@@ -316,6 +369,36 @@ export function createFakeChannelManager(): FakeChannelManager {
     return Promise.resolve({ id: randomUUID() });
   }
   return fake;
+}
+
+/** Webhook calls older or newer than this are refused (a replayed old call). */
+const SIGNATURE_TOLERANCE_S = 300;
+
+/**
+ * Channex's webhook signature (T-153): `x-hmac-signature-256` holds lowercase hex
+ * HMAC-SHA256(secret, "<x-hmac-timestamp>.<raw body>"), one per key (two while a key is
+ * being rotated); any one matching is enough. Compared in constant time.
+ */
+export function channexSignatureOk(
+  raw: Buffer,
+  headers: Record<string, string | string[] | undefined>,
+  secrets: readonly string[],
+  nowSeconds: number,
+): boolean {
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const timestamp = one(headers['x-hmac-timestamp']);
+  const given = one(headers['x-hmac-signature-256']);
+  if (!timestamp || !given || !/^\d{1,12}$/.test(timestamp) || secrets.length === 0) return false;
+  if (Math.abs(nowSeconds - Number(timestamp)) > SIGNATURE_TOLERANCE_S) return false;
+  const signatures = given
+    .split(',')
+    .map((v) => v.trim().toLowerCase())
+    .filter((v) => /^[0-9a-f]{64}$/.test(v))
+    .map((v) => Buffer.from(v, 'hex'));
+  return secrets.some((secret) => {
+    const mac = createHmac('sha256', secret).update(`${timestamp}.`).update(raw).digest();
+    return signatures.some((sig) => timingSafeEqual(sig, mac));
+  });
 }
 
 /** The channel manager the configuration names (CHANNEL_PROVIDER). */

@@ -780,7 +780,8 @@
       "NO_DEPOSIT": "Deposit not paid",
       "HOTEL_REQUEST": "Hotel cancelled",
       "OTHER": "Other",
-      "HOLD_EXPIRED": "Hold ran out"
+      "HOLD_EXPIRED": "Hold ran out",
+      "OTA_CANCELLED": "Cancelled on the OTA"
     },
     "room": {
       "is": "Room {{room}}",

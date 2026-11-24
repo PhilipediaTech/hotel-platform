@@ -9,6 +9,7 @@ import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
 import channelStrings from '../i18n/en/channels.json';
 import { registerStrings } from '../i18n/index.ts';
+import { ChannelBookings } from './channel-bookings.tsx';
 import { useFormats } from './reservations.tsx';
 
 registerStrings(channelStrings);
@@ -16,6 +17,7 @@ registerStrings(channelStrings);
 // S41 Channel manager (PRD M11-07; T-151): connect the property to Channex, choose which rate
 // plans are sold online, see what is set up and the recent activity, pause or resume.
 // T-152: how prices and availability are being sent, and sending everything again.
+// T-153: OTA bookings taken in, and those waiting for staff.
 
 const card = 'rounded-md border border-border bg-surface p-4';
 
@@ -132,6 +134,14 @@ export function ChannelsPage() {
                 {t('channels.sync.full')}
               </Button>
             </div>
+          )}
+
+          {c && status !== 'CONNECTING' && (
+            <ChannelBookings
+              checkedAt={c.bookingsCheckedAt}
+              error={c.bookingsError}
+              onChange={refresh}
+            />
           )}
 
           <div className={card}>

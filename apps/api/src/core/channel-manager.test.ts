@@ -1,5 +1,6 @@
+import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { ChannelError, createChannexManager } from './channel-manager.ts';
+import { ChannelError, channexSignatureOk, createChannexManager } from './channel-manager.ts';
 
 // The Channex client (M11-07; T-151) against a stand-in fetch: no network.
 
@@ -251,5 +252,83 @@ describe('Channex client', () => {
       },
     });
     expect((sent(fetch, 1).body as { values: object[] }).values[1]).not.toHaveProperty('rate');
+  });
+
+  it('reads the booking feed oldest first for one property, and acknowledges a revision (T-153)', async () => {
+    const revision = {
+      type: 'booking_revision',
+      id: 'rev-1',
+      attributes: { booking_id: 'bk-1', status: 'new' },
+    };
+    const { fetch, channex } = withAnswers(
+      json(200, { meta: { total: 1, page: 1, limit: 10 }, data: [revision, { id: 7 }] }),
+      json(200, { meta: { message: 'Success' } }),
+    );
+    await expect(channex.bookingFeed('prop 1')).resolves.toEqual([
+      { id: 'rev-1', attributes: { booking_id: 'bk-1', status: 'new' } },
+    ]);
+    const [url, init] = fetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `${BASE}/booking_revisions/feed?filter[property_id]=prop%201&order[inserted_at]=asc`,
+    );
+    expect(init.method).toBe('GET');
+    await channex.ackBookingRevision('rev-1');
+    const [ackUrl, ackInit] = fetch.mock.calls[1] as [string, RequestInit];
+    expect([ackUrl, ackInit.method, ackInit.body]).toEqual([
+      `${BASE}/booking_revisions/rev-1/ack`,
+      'POST',
+      undefined,
+    ]);
+    // An answer without a list is not taken for an empty feed.
+    const broken = withAnswers(json(200, { meta: {} }));
+    await expect(broken.channex.bookingFeed('prop-1')).rejects.toBeInstanceOf(ChannelError);
+  });
+});
+
+describe('Channex webhook signature (T-153)', () => {
+  const secret = 'webhook-secret-for-tests-0001';
+  const raw = Buffer.from('{"event":"booking","property_id":"p-1"}');
+  const sign = (key: string, timestamp: string, body = raw) =>
+    createHmac('sha256', key).update(`${timestamp}.`).update(body).digest('hex');
+  const at = 1_800_000_000;
+  const headers = (signature: string, timestamp = String(at)) => ({
+    'x-hmac-timestamp': timestamp,
+    'x-hmac-signature-256': signature,
+  });
+
+  it('takes HMAC-SHA256 of "<timestamp>.<raw body>", either signature while rotating', () => {
+    expect(channexSignatureOk(raw, headers(sign(secret, String(at))), [secret], at)).toBe(true);
+    // Two signatures (key rotation): one of ours is enough; two secrets of ours too.
+    const both = `${sign('someone-elses-key-000000', String(at))},${sign(secret, String(at))}`;
+    expect(channexSignatureOk(raw, headers(both), [secret], at)).toBe(true);
+    expect(
+      channexSignatureOk(
+        raw,
+        headers(sign(secret, String(at))),
+        ['old-secret-0000000000', secret],
+        at,
+      ),
+    ).toBe(true);
+  });
+
+  it('refuses a wrong key, a changed body, an old call, and missing headers', () => {
+    expect(
+      channexSignatureOk(raw, headers(sign('wrong-key-0000000000', String(at))), [secret], at),
+    ).toBe(false);
+    expect(
+      channexSignatureOk(
+        Buffer.from('{"event":"booking"}'),
+        headers(sign(secret, String(at))),
+        [secret],
+        at,
+      ),
+    ).toBe(false);
+    // More than 5 minutes off, either way.
+    const old = String(at - 301);
+    expect(channexSignatureOk(raw, headers(sign(secret, old), old), [secret], at)).toBe(false);
+    expect(channexSignatureOk(raw, {}, [secret], at)).toBe(false);
+    expect(channexSignatureOk(raw, headers('zz'), [secret], at)).toBe(false);
+    // No secret set up: nothing passes.
+    expect(channexSignatureOk(raw, headers(sign(secret, String(at))), [], at)).toBe(false);
   });
 });

@@ -58,13 +58,16 @@ async function view(deps: ChannelDeps): Promise<z.input<typeof ChannelConnection
     }),
     db.channelMapping.findMany(),
   ]);
-  const logs = connection
-    ? await db.channelSyncLog.findMany({
-        where: { connectionId: connection.id },
-        orderBy: { id: 'desc' },
-        take: 20,
-      })
-    : [];
+  const [logs, heldBookings] = connection
+    ? await Promise.all([
+        db.channelSyncLog.findMany({
+          where: { connectionId: connection.id },
+          orderBy: { id: 'desc' },
+          take: 20,
+        }),
+        db.channelBookingRevision.count({ where: { outcome: 'HELD' } }),
+      ])
+    : [[], 0];
   return {
     provider: deps.channel.name,
     connection: connection
@@ -79,6 +82,9 @@ async function view(deps: ChannelDeps): Promise<z.input<typeof ChannelConnection
           fullSyncPending: connection.fullSyncPending,
           syncError: connection.syncError,
           retryAt: connection.syncRetryAt?.toISOString() ?? null,
+          bookingsCheckedAt: connection.bookingsCheckedAt?.toISOString() ?? null,
+          bookingsError: connection.bookingsError,
+          heldBookings,
         }
       : null,
     roomTypes: types.map((t) => ({

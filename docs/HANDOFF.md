@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-152 (Channex availability, prices and restrictions sync) is pushed on `feat/T-152-channex-ari-sync` (run `npm run db:deploy` and `npm run db:generate` after merging; the worker sends to the real staging account when `.env` has `CHANNEL_PROVIDER=channex`). Next: T-153 OTA bookings in.
+T-153 (Channex OTA bookings in) is pushed on `feat/T-153-channex-bookings-in` (run `npm run db:deploy` and `npm run db:generate` after merging). Bookings come in from the Channex feed every minute when `.env` has `CHANNEL_PROVIDER=channex`; the webhook needs `CHANNEX_WEBHOOK_SECRETS` and a public HTTPS address (staging, T-005). Next: the Channex certification scenarios.

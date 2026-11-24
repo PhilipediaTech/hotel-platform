@@ -41,6 +41,37 @@
       "error": "Sending stopped: {{message}}",
       "errorRetry": "Sending stopped: {{message}}. Next try at {{when}}.",
       "full": "Send everything again"
+    },
+    "bookings": {
+      "title": "OTA bookings",
+      "checked": "Bookings checked at {{when}}: new ones come in within about a minute.",
+      "notYet": "No bookings checked yet: the first check runs within a minute.",
+      "error": "Taking bookings in stopped: {{message}}. It tries again every minute.",
+      "none": "Every booking from the OTAs is on the calendar.",
+      "held_one": "{{count}} booking needs you",
+      "held_other": "{{count}} bookings need you",
+      "heldList": "Bookings that need you",
+      "kind": {
+        "NEW": "New booking",
+        "MODIFIED": "Changed booking",
+        "CANCELLED": "Cancelled booking"
+      },
+      "reason": {
+        "UNMAPPED_ROOM": "Room type not set up",
+        "UNMAPPED_RATE": "Rate plan not set up",
+        "NO_ROOM": "No room left",
+        "CURRENCY": "Another currency",
+        "IN_HOUSE": "Guest already arrived",
+        "CANCELLED_HERE": "Cancelled here",
+        "ROOMS_CHANGED": "Number of rooms changed",
+        "INVALID": "Could not be read",
+        "REFUSED": "Could not be booked"
+      },
+      "retry": "Try again",
+      "dismiss": "Mark as handled",
+      "note": "How was it handled?",
+      "dismissConfirm": "Mark as handled",
+      "cancel": "Cancel"
     }
   }
 }

@@ -34,7 +34,13 @@
       "limitIntro": "Most a guest's folio may owe after a POS room charge, when the folio has no limit of its own. Leave it empty for no limit.",
       "limit": "Room charge limit",
       "noLimit": "No limit",
-      "saveLimit": "Save limit"
+      "saveLimit": "Save limit",
+      "kitchenStation": "Kitchen display (optional)",
+      "kitchenStationHint": "e.g. Kitchen, Grill",
+      "goesTo": "goes to {{station}}",
+      "noStation": "not sent to a kitchen",
+      "stationForm": "Kitchen display for {{section}}",
+      "saveStation": "Save display"
     },
     "register": {
       "title": "Point of sale",
@@ -120,7 +126,11 @@
       "adjustHint": "Off the item with its taxes. Above your limit a manager approves first.",
       "confirmVoid": "Void",
       "confirmDiscount": "Give discount",
-      "sentForApproval": "Sent to a manager for approval. The order changes once it is approved."
+      "sentForApproval": "Sent to a manager for approval. The order changes once it is approved.",
+      "sendKitchen_one": "Send {{count}} item to the kitchen",
+      "sendKitchen_other": "Send {{count}} items to the kitchen",
+      "forKitchen": "for {{station}}, not sent yet",
+      "sentKitchen": "sent to {{station}}"
     }
   }
 }

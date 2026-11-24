@@ -1948,6 +1948,55 @@ async function bPosOrder(db: Db, world: TenantWorld, propertyId: string) {
   };
 }
 
+/** B's order with a kitchen item sent to their Kitchen display, waiting (T-156). */
+async function bKitchen(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bPosOrder(db, world, propertyId);
+  await db.menuCategory.updateMany({ where: { propertyId }, data: { kitchenStation: 'Kitchen' } });
+  const ticket = await db.kitchenTicket.create({
+    data: {
+      propertyId,
+      outletId: theirs.outletId,
+      orderId: theirs.orderId,
+      station: 'Kitchen',
+      number: 1,
+      sentAt: new Date('2026-11-10T09:00:00Z'),
+      sentById: world.bStaff.id,
+    },
+  });
+  // A second item, for the kitchen and not sent yet.
+  await db.posOrderLine.create({
+    data: {
+      propertyId,
+      orderId: theirs.orderId,
+      menuItemId: theirs.itemId,
+      name: 'Their suya',
+      quantity: 1,
+      unitPriceMinor: 100000n,
+      revenueCodeId: theirs.revenueCodeId,
+      addedById: world.bStaff.id,
+      kitchenStation: 'Kitchen',
+    },
+  });
+  await db.posOrderLine.updateMany({
+    where: { id: theirs.lineId },
+    data: { kitchenStation: 'Kitchen', kitchenTicketId: ticket.id },
+  });
+  return { ...theirs, ticketId: ticket.id };
+}
+
+async function bKitchenUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.kitchenTicket.findMany({ where })).map((t) => [t.number, t.bumpedAt])).toEqual([
+    [1, null],
+  ]);
+  // Their unsent item is still unsent.
+  expect(
+    await db.posOrderLine.count({
+      where: { ...where, kitchenStation: 'Kitchen', kitchenTicketId: null },
+    }),
+  ).toBe(1);
+}
+
 async function bPosOrderUnchanged(db: Db, world: TenantWorld) {
   const where = { propertyId: world.b1.id };
   const orders = await db.posOrder.findMany({ where, include: { lines: true } });
@@ -3726,6 +3775,17 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bPosOrderUnchanged,
   },
   cancelPosOrder: { seed: bPosOrder, untouched: bPosOrderUnchanged },
+  // Kitchen display (T-156)
+  sendPosOrderToKitchen: { seed: bKitchen, untouched: bKitchenUnchanged },
+  getKitchenBoard: {
+    seed: bKitchen,
+    listIds: (body) => {
+      const b = body as { outlets: { id: string }[]; waiting: { id: string }[] };
+      return [...b.outlets.map((o) => o.id), ...b.waiting.map((t) => t.id)];
+    },
+  },
+  bumpKitchenTicket: { seed: bKitchen, untouched: bKitchenUnchanged },
+  recallKitchenTicket: { seed: bKitchen, untouched: bKitchenUnchanged },
   listPosRooms: {
     seed: bPosOrder,
     listIds: (body) => (body as { data: { stayId: string }[] }).data.map((r) => r.stayId),

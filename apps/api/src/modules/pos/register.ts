@@ -252,6 +252,7 @@ export async function outletMenu(deps: RegisterDeps, tenant: TenantContext, outl
         name: c.name,
         sortOrder: c.sortOrder,
         active: c.active,
+        kitchenStation: c.kitchenStation,
         items: c.items.map((i) => ({
           id: i.id,
           name: i.name,
@@ -284,6 +285,7 @@ const ORDER = {
       addedBy: { select: { name: true } },
       voidedBy: { select: { name: true } },
       discountedBy: { select: { name: true } },
+      kitchenTicket: { select: { sentAt: true } },
     },
   },
 } satisfies Prisma.PosOrderInclude;
@@ -423,6 +425,12 @@ async function orderItem(
             }
           : null,
       totalMinor: (math.get(l.id)?.total ?? 0n).toString(),
+      kitchen: l.kitchenStation
+        ? {
+            station: l.kitchenStation,
+            sentAt: l.kitchenTicket ? iso(l.kitchenTicket.sentAt) : null,
+          }
+        : null,
     })),
     subtotalMinor: totals.subtotal.toString(),
     taxMinor: totals.tax.toString(),
@@ -439,8 +447,73 @@ async function orderItem(
       o.status === 'ROOM_CHARGED' && o.stay && o.folioId
         ? { stayId: o.stay.id, roomNumber: o.stay.room?.number ?? null, folioId: o.folioId }
         : null,
+    unsentKitchenLines: o.lines.filter(unsent).length,
     version: o.version,
   };
+}
+
+// ── Kitchen (M8-06; T-156) ──────────────────────────────────────────────────────────────
+
+/** A kitchen item not sent yet (and not voided: nothing to make). */
+const unsent = (l: Pick<LineRow, 'kitchenStation' | 'kitchenTicketId' | 'voidedAt'>) =>
+  l.kitchenStation !== null && l.kitchenTicketId === null && l.voidedAt === null;
+
+/** Sends the order's unsent kitchen items, one ticket per station; answers how many tickets. */
+async function sendKitchenLines(
+  tx: Tx,
+  tenant: TenantContext,
+  order: { id: string; outletId: string; lines: LineRow[] },
+  now: Date,
+): Promise<number> {
+  const waiting = order.lines.filter(unsent);
+  if (waiting.length === 0) return 0;
+  const byStation = new Map<string, string[]>();
+  for (const l of waiting) {
+    const station = l.kitchenStation ?? '';
+    byStation.set(station, [...(byStation.get(station) ?? []), l.id]);
+  }
+  const last = await tx.kitchenTicket.aggregate({
+    where: { orderId: order.id },
+    _max: { number: true },
+  });
+  let number = last._max.number ?? 0;
+  for (const [station, lineIds] of [...byStation].sort(([a], [b]) => a.localeCompare(b))) {
+    number += 1;
+    const ticket = await tx.kitchenTicket.create({
+      data: {
+        outletId: order.outletId,
+        orderId: order.id,
+        station,
+        number,
+        sentAt: now,
+        sentById: tenant.userId,
+      } as unknown as Prisma.KitchenTicketUncheckedCreateInput, // tenant IDs come from the client
+    });
+    await tx.posOrderLine.updateMany({
+      where: { id: { in: lineIds }, kitchenTicketId: null },
+      data: { kitchenTicketId: ticket.id },
+    });
+  }
+  return byStation.size;
+}
+
+/** The cashier sends what is waiting to the kitchen displays (M8-06). */
+export async function sendToKitchen(deps: RegisterDeps, tenant: TenantContext, orderId: string) {
+  await deps.tenantDb.$transaction(async (tx) => {
+    const order = await lockOpenOrder(tx, orderId);
+    await myShiftAt(tx, tenant, order.outletId);
+    const tickets = await sendKitchenLines(tx, tenant, order, deps.clock());
+    if (tickets > 0) {
+      await tx.posOrder.update({ where: { id: order.id }, data: { version: { increment: 1 } } });
+      await recordAudit(tx, {
+        action: 'pos.sent_to_kitchen',
+        entityType: 'pos_order',
+        entityId: order.id,
+        after: { tickets },
+      });
+    }
+  });
+  return orderView(deps.tenantDb, orderId, deps.clock);
 }
 
 async function baseCurrency(db: Client, propertyId: string) {
@@ -538,7 +611,7 @@ export async function addLine(
         active: true,
         category: { active: true, outletId: order.outletId },
       },
-      include: { modifiers: { where: { active: true } } },
+      include: { modifiers: { where: { active: true } }, category: true },
     });
     if (!item) throw invalid('body.menuItemId', 'Choose an item on this outlet’s menu');
     const ids = [...new Set(body.modifierIds)];
@@ -565,6 +638,7 @@ export async function addLine(
         })),
         revenueCodeId: item.revenueCodeId,
         note: body.note,
+        kitchenStation: item.category.kitchenStation,
         addedById: tenant.userId,
         addedAt: deps.clock(),
       } as unknown as Prisma.PosOrderLineUncheckedCreateInput,
@@ -670,6 +744,8 @@ export async function settleOrder(
       const order = await lockOpenOrder(tx, orderId);
       needsLines(order);
       const shift = await myShiftAt(tx, tenant, order.outletId);
+      // Paid before cooking (counter service): the kitchen gets it now (T-156).
+      await sendKitchenLines(tx, tenant, order, now);
       const property = await tx.property.findUniqueOrThrow({ where: { id: tenant.propertyId } });
       const allowed = posMethods(property.settings);
       const off = body.payments.find((p) => !allowed.includes(p.method));
@@ -779,6 +855,7 @@ export async function chargeToRoom(
     const order = await lockOpenOrder(tx, orderId);
     needsLines(order);
     const shift = await myShiftAt(tx, tenant, order.outletId);
+    await sendKitchenLines(tx, tenant, order, now);
     const stay = await tx.stay.findUnique({ where: { id: body.stayId } });
     if (!stay) throw invalid('body.stayId', 'Choose a checked-in room');
     if (stay.status !== 'CHECKED_IN' || !stay.folioId) {

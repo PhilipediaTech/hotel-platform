@@ -55,6 +55,7 @@ const order = (lines: unknown[], extra: object = {}) => ({
   settledBy: null,
   payments: [],
   room: null,
+  unsentKitchenLines: 0,
   version: 0,
   ...extra,
 });
@@ -261,6 +262,33 @@ describe('POS register (S33)', () => {
       reason: 'Wrong drink',
     });
     expect(await screen.findByText(/Sent to a manager for approval/)).toBeInTheDocument();
+  }, 15_000);
+
+  it('sends kitchen items to the kitchen display (M8-06; T-156)', async () => {
+    const jollof = {
+      ...line,
+      id: id(12),
+      name: 'Jollof rice',
+      kitchen: { station: 'Kitchen', sentAt: null },
+    };
+    handlers['GET /pos/orders'] = () => json(200, { data: [order([jollof])] });
+    let current = order([jollof], { unsentKitchenLines: 1 });
+    handlers[`GET /pos/orders/${id(3)}`] = () => json(200, current);
+    handlers[`POST /pos/orders/${id(3)}/send-to-kitchen`] = () => {
+      current = order([
+        { ...jollof, kitchen: { station: 'Kitchen', sentAt: '2026-11-10T09:02:00Z' } },
+      ]);
+      return json(200, current);
+    };
+    const user = userEvent.setup();
+    renderAt('/pos');
+    const list = await screen.findByRole('list', { name: 'Open orders' });
+    await user.click(await within(list).findByRole('button', { name: /Table 4/ }));
+    expect(await screen.findByText('for Kitchen, not sent yet')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Send 1 item to the kitchen' }));
+    await waitFor(() => expect(sent(`POST /pos/orders/${id(3)}/send-to-kitchen`)).toHaveLength(1));
+    expect(await screen.findByText('sent to Kitchen')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /to the kitchen/ })).toBeNull();
   }, 15_000);
 
   it('gives a discount and shows it on the order (M8-04)', async () => {

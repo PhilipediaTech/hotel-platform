@@ -1,0 +1,21 @@
+{
+  "kitchen": {
+    "title": "Kitchen display",
+    "titleAt": "{{station}}",
+    "choose": "Display",
+    "noStations": "No kitchen display is set up yet. In Outlets and menus, give a menu section a kitchen display (for example Kitchen or Grill): its items then come here.",
+    "clear": "All done: no tickets waiting.",
+    "waiting": "Tickets waiting",
+    "ticketName": "{{label}}, ticket {{number}}",
+    "minutes_one": "{{count}} min",
+    "minutes_other": "{{count}} min",
+    "round": "round {{number}}",
+    "cancelled": "Order cancelled: do not make",
+    "voided": "(cancelled)",
+    "bump": "Done",
+    "bumped_one": "{{count}} ticket done recently",
+    "bumped_other": "{{count}} tickets done recently",
+    "bumpedList": "Tickets done recently",
+    "recall": "Bring back"
+  }
+}

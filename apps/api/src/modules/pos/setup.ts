@@ -50,6 +50,7 @@ function outletItem(o: OutletRow): z.input<typeof OutletItem> {
       name: c.name,
       sortOrder: c.sortOrder,
       active: c.active,
+      kitchenStation: c.kitchenStation,
       items: c.items.map((i) => ({
         id: i.id,
         name: i.name,

@@ -311,6 +311,7 @@ function OrderPanel({
     queryFn: () => api.call('getPosOrder', { params: { orderId } }),
   });
   const drop = useChange(() => api.call('cancelPosOrder', { params: { orderId } }), onClosed);
+  const toKitchen = useChange(() => api.call('sendPosOrderToKitchen', { params: { orderId } }));
   const o = order.data;
   if (!o) return null;
   if (o.status !== 'OPEN') return <Settled order={o} onDone={onClosed} />;
@@ -359,6 +360,13 @@ function OrderPanel({
                     {t('pos.register.qty', { count: l.quantity })} {l.name}
                   </span>
                   {l.note && <span className="block text-xs text-text-muted">{l.note}</span>}
+                  {l.kitchen && !l.voided && (
+                    <span className="block text-xs text-text-muted">
+                      {l.kitchen.sentAt
+                        ? t('pos.register.sentKitchen', { station: l.kitchen.station })
+                        : t('pos.register.forKitchen', { station: l.kitchen.station })}
+                    </span>
+                  )}
                   {l.voided && (
                     <span className="block text-xs">
                       {t('pos.register.voidedLine', { by: l.voided.by, reason: l.voided.reason })}
@@ -407,6 +415,16 @@ function OrderPanel({
           <dd className="text-right font-semibold">{f.money(o.totalMinor)}</dd>
         </dl>
         <div className="mt-3 flex flex-col gap-2">
+          {o.unsentKitchenLines > 0 && (
+            <Button
+              variant="secondary"
+              className="h-11"
+              disabled={toKitchen.isPending}
+              onClick={() => toKitchen.mutate(undefined)}
+            >
+              {t('pos.register.sendKitchen', { count: o.unsentKitchenLines })}
+            </Button>
+          )}
           <Button
             className="h-11"
             disabled={active.length === 0 || methods.length === 0}
@@ -428,9 +446,9 @@ function OrderPanel({
             </Button>
           )}
         </div>
-        {drop.error && (
+        {(drop.error ?? toKitchen.error) && (
           <Alert tone="critical" className="mt-2">
-            {errorMessage(drop.error)}
+            {errorMessage(drop.error ?? toKitchen.error)}
           </Alert>
         )}
       </aside>

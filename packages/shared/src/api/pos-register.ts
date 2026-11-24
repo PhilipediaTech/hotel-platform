@@ -88,6 +88,8 @@ export const PosOrderLineItem = z
       .nullable(),
     /** What the line charges with its taxes, after its discount; 0 when voided. */
     totalMinor: AmountMinor,
+    /** T-156: the kitchen station it goes to, and when it was sent; null: not a kitchen item. */
+    kitchen: z.object({ station: z.string(), sentAt: Instant.nullable() }).nullable(),
   })
   .meta({ id: 'PosOrderLine' });
 
@@ -121,6 +123,8 @@ export const PosOrderItem = z
     ),
     /** Charged to room: the room and the folio the lines went to. */
     room: z.object({ stayId: Uuid, roomNumber: z.string().nullable(), folioId: Uuid }).nullable(),
+    /** T-156: kitchen items not sent yet (they go when sent, or when the order is settled). */
+    unsentKitchenLines: z.number().int(),
     version: z.number().int(),
   })
   .meta({ id: 'PosOrder' });
@@ -335,6 +339,21 @@ export const cancelPosOrder = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+export const sendPosOrderToKitchen = defineRoute({
+  ...POS,
+  operationId: 'sendPosOrderToKitchen',
+  method: 'post',
+  path: '/pos/orders/{orderId}/send-to-kitchen',
+  summary: 'Send the items not sent yet to their kitchen displays (M8-06)',
+  description:
+    'Not in tab 4: designed in T-156. One ticket per kitchen station; items of categories without a station never go. Settling or charging the order sends what is left. Nothing to send: the order as it is.',
+  permission: 'pos.order',
+  idempotent: true,
+  params: OrderParams,
+  response: PosOrderItem,
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
 const LineParams = z.object({ orderId: Uuid, lineId: Uuid });
 const Reason = z.string().trim().min(1).max(500);
 const M804 =
@@ -434,6 +453,7 @@ export const POS_REGISTER_ROUTES = {
   settlePosOrder,
   chargePosOrderToRoom,
   cancelPosOrder,
+  sendPosOrderToKitchen,
   voidPosOrderLine,
   discountPosOrderLine,
   listPosRooms,

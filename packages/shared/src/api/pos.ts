@@ -19,6 +19,9 @@ const Optional = (max: number) =>
     .transform((v) => (v === '' ? null : v))
     .nullable();
 
+/** A kitchen display's name (T-156); empty means none. */
+const KitchenStation = Optional(30);
+
 export const MenuModifierItem = z
   .object({ id: Uuid, name: z.string(), priceMinor: AmountMinor, active: z.boolean() })
   .meta({ id: 'MenuModifier' });
@@ -42,6 +45,8 @@ export const MenuCategoryItem = z
     name: z.string(),
     sortOrder: z.number().int(),
     active: z.boolean(),
+    /** T-156: the kitchen display its items go to; null: not sent to a kitchen. */
+    kitchenStation: z.string().nullable(),
     items: z.array(MenuItemItem),
   })
   .meta({ id: 'MenuCategory' });
@@ -120,7 +125,12 @@ export const addMenuCategory = defineRoute({
   idempotent: true,
   status: 201,
   params: z.object({ outletId: Uuid }),
-  body: z.object({ name: Name, sortOrder: z.number().int().min(0).max(999).default(0) }),
+  body: z.object({
+    name: Name,
+    sortOrder: z.number().int().min(0).max(999).default(0),
+    /** T-156: e.g. "Kitchen", "Grill"; empty or null: not sent to a kitchen. */
+    kitchenStation: KitchenStation.default(null),
+  }),
   response: OutletItem,
 });
 
@@ -136,6 +146,7 @@ export const updateMenuCategory = defineRoute({
     name: Name.optional(),
     sortOrder: z.number().int().min(0).max(999).optional(),
     active: z.boolean().optional(),
+    kitchenStation: KitchenStation.optional(),
   }),
   response: OutletItem,
 });

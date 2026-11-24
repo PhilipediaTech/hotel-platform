@@ -189,6 +189,7 @@ model Property {
   channelAriChanges    ChannelAriChange[]
   channelBookings      ChannelBookingRevision[]
   guestReviews         GuestReview[]
+  kitchenTickets       KitchenTicket[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -330,6 +331,8 @@ model User {
   approvalsDecided     ApprovalRequest[]  @relation("DecidedBy")
   invitationsSent      Invitation[]       @relation("InvitedBy")
   reviewsReplied       GuestReview[]      @relation("ReviewReplier")
+  kitchenTicketsSent   KitchenTicket[]    @relation("KitchenTicketSender")
+  kitchenTicketsBumped KitchenTicket[]    @relation("KitchenTicketBumper")
   filesUploaded        FileObject[]
   roomBlocksCreated    RoomBlock[]
   importJobs           ImportJob[]
@@ -3003,10 +3006,11 @@ model Outlet {
   active     Boolean  @default(true)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  property   Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  categories MenuCategory[]
-  shifts     CashierShift[]
-  orders     PosOrder[]
+  property       Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  categories     MenuCategory[]
+  shifts         CashierShift[]
+  orders         PosOrder[]
+  kitchenTickets KitchenTicket[]
 
   @@unique([propertyId, code])
   @@map("outlets")
@@ -3014,12 +3018,14 @@ model Outlet {
 
 /// A section of an outlet's menu (M8-01), e.g. Starters, Drinks.
 model MenuCategory {
-  id         String  @id @default(uuid()) @db.Uuid
-  propertyId String  @map("property_id") @db.Uuid
-  outletId   String  @map("outlet_id") @db.Uuid
-  name       String
-  sortOrder  Int     @default(0) @map("sort_order")
-  active     Boolean @default(true)
+  id             String  @id @default(uuid()) @db.Uuid
+  propertyId     String  @map("property_id") @db.Uuid
+  outletId       String  @map("outlet_id") @db.Uuid
+  name           String
+  sortOrder      Int     @default(0) @map("sort_order")
+  active         Boolean @default(true)
+  /// T-156: the kitchen display its items go to (e.g. "Kitchen", "Grill"); null: not sent.
+  kitchenStation String? @map("kitchen_station")
 
   property Property   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   outlet   Outlet     @relation(fields: [outletId], references: [id], onDelete: Restrict)
@@ -3095,16 +3101,17 @@ model PosOrder {
   totalMinor      BigInt?   @map("total_minor")
   version         Int       @default(0)
 
-  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  outlet        Outlet         @relation(fields: [outletId], references: [id], onDelete: Restrict)
-  shift         CashierShift   @relation("PosOrderShift", fields: [shiftId], references: [id], onDelete: Restrict)
-  settledShift  CashierShift?  @relation("PosOrderSettledShift", fields: [settledShiftId], references: [id], onDelete: Restrict)
-  openedBy      User           @relation("PosOrderOpener", fields: [openedById], references: [id], onDelete: Restrict)
-  settledBy     User?          @relation("PosOrderSettler", fields: [settledById], references: [id], onDelete: Restrict)
-  folio         Folio?         @relation(fields: [folioId], references: [id], onDelete: Restrict)
-  stay          Stay?          @relation(fields: [stayId], references: [id], onDelete: Restrict)
-  signatureFile FileObject?    @relation(fields: [signatureFileId], references: [id], onDelete: Restrict)
-  lines         PosOrderLine[]
+  property       Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  outlet         Outlet          @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  shift          CashierShift    @relation("PosOrderShift", fields: [shiftId], references: [id], onDelete: Restrict)
+  settledShift   CashierShift?   @relation("PosOrderSettledShift", fields: [settledShiftId], references: [id], onDelete: Restrict)
+  openedBy       User            @relation("PosOrderOpener", fields: [openedById], references: [id], onDelete: Restrict)
+  settledBy      User?           @relation("PosOrderSettler", fields: [settledById], references: [id], onDelete: Restrict)
+  folio          Folio?          @relation(fields: [folioId], references: [id], onDelete: Restrict)
+  stay           Stay?           @relation(fields: [stayId], references: [id], onDelete: Restrict)
+  signatureFile  FileObject?     @relation(fields: [signatureFileId], references: [id], onDelete: Restrict)
+  lines          PosOrderLine[]
+  kitchenTickets KitchenTicket[]
 
   @@unique([propertyId, number])
   @@index([propertyId, outletId, status])
@@ -3139,14 +3146,19 @@ model PosOrderLine {
   discountedById            String?   @map("discounted_by_id") @db.Uuid
   discountedAt              DateTime? @map("discounted_at") @db.Timestamptz(6)
   discountApprovalRequestId String?   @map("discount_approval_request_id") @db.Uuid
+  /// T-156: the kitchen station it goes to (from its category when added); null: not sent.
+  kitchenStation            String?   @map("kitchen_station")
+  /// The ticket it went to the kitchen on; null until sent.
+  kitchenTicketId           String?   @map("kitchen_ticket_id") @db.Uuid
 
-  property     Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  order        PosOrder    @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  menuItem     MenuItem    @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
-  revenueCode  RevenueCode @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
-  addedBy      User        @relation("PosOrderLineAuthor", fields: [addedById], references: [id], onDelete: Restrict)
-  voidedBy     User?       @relation("PosOrderLineVoider", fields: [voidedById], references: [id], onDelete: Restrict)
-  discountedBy User?       @relation("PosOrderLineDiscounter", fields: [discountedById], references: [id], onDelete: Restrict)
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  order         PosOrder       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  kitchenTicket KitchenTicket? @relation(fields: [kitchenTicketId], references: [id], onDelete: Restrict)
+  menuItem      MenuItem       @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  revenueCode   RevenueCode    @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
+  addedBy       User           @relation("PosOrderLineAuthor", fields: [addedById], references: [id], onDelete: Restrict)
+  voidedBy      User?          @relation("PosOrderLineVoider", fields: [voidedById], references: [id], onDelete: Restrict)
+  discountedBy  User?          @relation("PosOrderLineDiscounter", fields: [discountedById], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@map("pos_order_lines")
@@ -4905,4 +4917,34 @@ model GuestReview {
   @@index([propertyId, requestedAt])
   @@index([reservationId, guestId])
   @@map("guest_reviews")
+}
+
+// ───────────────────────── Kitchen display (M8-06; T-156) ─────────────────────────
+
+/// What an order sends one kitchen station at a time (M8-06; T-156): the items not yet sent,
+/// when the cashier sends them or the order is settled. The kitchen bumps it when done, and
+/// can recall it.
+model KitchenTicket {
+  id         String    @id @default(uuid()) @db.Uuid
+  propertyId String    @map("property_id") @db.Uuid
+  outletId   String    @map("outlet_id") @db.Uuid
+  orderId    String    @map("order_id") @db.Uuid
+  station    String
+  /// 1, 2, … per order: the order's rounds.
+  number     Int
+  sentAt     DateTime  @map("sent_at") @db.Timestamptz(6)
+  sentById   String    @map("sent_by_id") @db.Uuid
+  bumpedAt   DateTime? @map("bumped_at") @db.Timestamptz(6)
+  bumpedById String?   @map("bumped_by_id") @db.Uuid
+
+  property Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  outlet   Outlet         @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  order    PosOrder       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  sentBy   User           @relation("KitchenTicketSender", fields: [sentById], references: [id], onDelete: Restrict)
+  bumpedBy User?          @relation("KitchenTicketBumper", fields: [bumpedById], references: [id], onDelete: Restrict)
+  lines    PosOrderLine[]
+
+  @@unique([orderId, number])
+  @@index([propertyId, outletId, station, bumpedAt])
+  @@map("kitchen_tickets")
 }

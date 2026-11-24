@@ -1,7 +1,8 @@
-import { POS_REGISTER_ROUTES, POS_ROUTES } from '@hotel/shared';
+import { KITCHEN_ROUTES, POS_REGISTER_ROUTES, POS_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as kitchen from './kitchen.ts';
 import * as reg from './register.ts';
 import * as setup from './setup.ts';
 
@@ -11,10 +12,21 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
   return tenant;
 }
 
-/** Lite POS: outlets and menus (M8-01; T-141), the register (M8-02, M8-03, M8-05; T-142). */
+/**
+ * Lite POS: outlets and menus (M8-01; T-141), the register (M8-02, M8-03, M8-05; T-142), the
+ * kitchen display (M8-06; T-156).
+ */
 export function posRoutes(deps: reg.RegisterDeps): Router {
   const router = express.Router();
   const r = POS_ROUTES;
+  const k = KITCHEN_ROUTES;
+  mountRoute(router, k.getKitchenBoard, ({ query }) => kitchen.getKitchenBoard(deps, query));
+  mountRoute(router, k.bumpKitchenTicket, ({ params }, { tenant }) =>
+    kitchen.bumpKitchenTicket(deps, tenantFrom(tenant), params.ticketId),
+  );
+  mountRoute(router, k.recallKitchenTicket, ({ params }, { tenant }) =>
+    kitchen.recallKitchenTicket(deps, tenantFrom(tenant), params.ticketId),
+  );
   mountRoute(router, r.listOutlets, (_in, { tenant }) =>
     setup.listOutlets(deps, tenantFrom(tenant)),
   );
@@ -69,6 +81,9 @@ export function posRoutes(deps: reg.RegisterDeps): Router {
   );
   mountRoute(router, p.chargePosOrderToRoom, ({ params, body }, { tenant }) =>
     reg.chargeToRoom(deps, tenantFrom(tenant), params.orderId, body),
+  );
+  mountRoute(router, p.sendPosOrderToKitchen, ({ params }, { tenant }) =>
+    reg.sendToKitchen(deps, tenantFrom(tenant), params.orderId),
   );
   mountRoute(router, p.cancelPosOrder, ({ params }, { tenant }) =>
     reg.cancelOrder(deps, tenantFrom(tenant), params.orderId),

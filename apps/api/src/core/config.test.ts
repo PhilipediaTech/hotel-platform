@@ -36,6 +36,7 @@ describe('loadConfig', () => {
       localFilesDir: path.resolve(import.meta.dirname, '../../../../.data/files'),
       payments: { provider: 'fake', secretKey: null, webhookSecret: null },
       ai: { provider: 'fake', apiKey: null, model: 'claude-opus-5-5' },
+      channel: { provider: 'fake', apiKey: null, baseUrl: 'https://staging.channex.io/api/v1' },
       platformAdminEmails: [],
       passwordBreachCheck: 'hibp',
       whatsapp: {
@@ -168,6 +169,30 @@ describe('loadConfig', () => {
         PAYMENT_SECRET_KEY: 'sk_live_abc123',
       }),
     ).toThrow(/WHATSAPP_PROVIDER=fake in production/);
+  });
+
+  it('takes Channex with its key on a Channex API URL, never the fake in production (T-151)', () => {
+    const key = 'c'.repeat(64);
+    expect(
+      loadConfig({ ...ORIGINS, CHANNEL_PROVIDER: 'channex', CHANNEX_API_KEY: key }).channel,
+    ).toEqual({ provider: 'channex', apiKey: key, baseUrl: 'https://staging.channex.io/api/v1' });
+    expect(
+      loadConfig({
+        ...ORIGINS,
+        CHANNEL_PROVIDER: 'channex',
+        CHANNEX_API_KEY: key,
+        CHANNEX_BASE_URL: 'https://app.channex.io/api/v1/',
+      }).channel.baseUrl,
+    ).toBe('https://app.channex.io/api/v1');
+    expect(() => loadConfig({ ...ORIGINS, CHANNEL_PROVIDER: 'channex' })).toThrow(
+      /CHANNEX_API_KEY is required/,
+    );
+    expect(() =>
+      loadConfig({ ...ORIGINS, CHANNEX_BASE_URL: 'https://evil.example/api/v1' }),
+    ).toThrow(/Channex API v1 base URL/);
+    expect(() =>
+      loadConfig({ ...ORIGINS, NODE_ENV: 'production', CHANNEL_PROVIDER: 'fake' }),
+    ).toThrow(/CHANNEL_PROVIDER=fake in production/);
   });
 
   it('requires a PostgreSQL DATABASE_URL', () => {

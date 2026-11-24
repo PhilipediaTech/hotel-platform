@@ -47,6 +47,8 @@ export const ERROR_HTTP_STATUS = {
   AI_UNAVAILABLE: 503,
   // Not in tab 4 (T-091b): WhatsApp could not be reached; trying again may work.
   MESSAGE_PROVIDER_UNAVAILABLE: 502,
+  // Not in tab 4 (T-151): the channel manager refused the call or could not be reached.
+  CHANNEL_UNAVAILABLE: 502,
 
   // Never carries details.
   INTERNAL: 500,

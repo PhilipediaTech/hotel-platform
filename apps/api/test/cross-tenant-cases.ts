@@ -1773,6 +1773,37 @@ async function bAccountingUnchanged(db: Db, world: TenantWorld) {
   expect(await db.accountingExport.count({ where })).toBe(1);
 }
 
+/** B's channel connection, active, with its room type mapped. */
+async function bChannel(db: Db, world: TenantWorld, propertyId: string) {
+  const plan = await bPlan(db, world, propertyId);
+  const connection = await db.channelConnection.create({
+    data: {
+      propertyId,
+      provider: 'CHANNEX',
+      externalPropertyId: 'their-property',
+      status: 'ACTIVE',
+      connectedById: world.bStaff.id,
+    },
+  });
+  await db.channelMapping.create({
+    data: {
+      propertyId,
+      connectionId: connection.id,
+      kind: 'ROOM_TYPE',
+      roomTypeId: plan.roomTypeId,
+      externalId: 'their-room-type',
+    },
+  });
+  return { ...plan, connectionId: connection.id };
+}
+
+async function bChannelUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.channelConnection.findMany({ where })).map((c) => c.status)).toEqual(['ACTIVE']);
+  expect(await db.channelMapping.count({ where })).toBe(1);
+  expect(await db.channelSyncLog.count({ where })).toBe(0);
+}
+
 async function bStockUnchanged(db: Db, world: TenantWorld) {
   const where = { propertyId: world.b1.id };
   expect((await db.stockItem.findMany({ where })).map((i) => [i.name, i.active])).toEqual([
@@ -3740,6 +3771,26 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   postStocktake: { seed: bStock, body: () => ({ reason: 'Leak' }), untouched: bStockUnchanged },
   cancelStocktake: { seed: bStock, untouched: bStockUnchanged },
+  // Channel manager (T-151)
+  getChannelConnection: {
+    seed: bChannel,
+    listIds: (body) => {
+      const b = body as { roomTypes: { id: string }[]; ratePlans: { id: string }[] };
+      return [...b.roomTypes, ...b.ratePlans].map((x) => x.id);
+    },
+  },
+  connectChannel: {
+    seed: bChannel,
+    creates: true,
+    body: (theirs) => ({ ratePlanIds: [theirs['ratePlanId']] }),
+    untouched: bChannelUnchanged,
+  },
+  pauseChannel: {
+    seed: bChannel,
+    creates: true,
+    body: () => ({ paused: true }),
+    untouched: bChannelUnchanged,
+  },
   // Accounting exports (T-148)
   getAccountingMappings: {
     seed: bAccounting,

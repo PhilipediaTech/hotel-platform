@@ -63,6 +63,8 @@ import { posRoutes } from './modules/pos/routes.ts';
 import { stockRoutes } from './modules/stock/routes.ts';
 import { expenseRoutes } from './modules/expenses/routes.ts';
 import { accountingRoutes } from './modules/accounting/routes.ts';
+import { channelRoutes } from './modules/channels/routes.ts';
+import { createChannelManager, type ChannelManager } from './core/channel-manager.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
 import { bookingEngineRoutes } from './modules/bookingengine/routes.ts';
@@ -89,6 +91,8 @@ export interface AppOptions {
   /** Payment links (ADR-021: Paystack; the fake locally and in tests). */
   payments: PaymentProvider;
   ai: AiProvider;
+  /** The channel manager (M11-07: Channex; the fake locally and in tests; T-151). */
+  channel?: ChannelManager;
   /** WhatsApp (ADR-016: Meta Cloud API; the fake locally and in tests). */
   messages: MessageProvider;
   /** File storage (R2 in production); the local store also serves its signed links. */
@@ -112,6 +116,7 @@ export function createApp({
   ai,
   messages,
   files,
+  channel = createChannelManager(config),
   clock = systemClock,
   routes,
   approvalHandlers,
@@ -230,6 +235,7 @@ export function createApp({
   api.use(stockRoutes({ db, tenantDb, clock }));
   api.use(expenseRoutes({ db, tenantDb, clock }));
   api.use(accountingRoutes({ tenantDb, clock }));
+  api.use(channelRoutes({ tenantDb, clock, channel }));
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));

@@ -330,6 +330,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-148',
   },
   {
+    id: 'channels',
+    path: '/channels',
+    anyOf: ['channel.manage'],
+    group: 'admin',
+    screen: 'S41',
+    ticket: 'T-151',
+  },
+  {
     id: 'my-jobs',
     path: '/tasks?assignee=me',
     anyOf: ['task.work'],

@@ -44,6 +44,14 @@ envVarGroups:
         value: claude-opus-5-5
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Channel manager (T-151): off until the Channex key (production, after Channex certifies the integration) is added and this
+      # is set to channex.
+      - key: CHANNEL_PROVIDER
+        value: 'off'
+      - key: CHANNEX_BASE_URL
+        value: https://app.channex.io/api/v1
+      - key: CHANNEX_API_KEY
+        sync: false
       - key: PASSWORD_BREACH_CHECK
         value: hibp
       - key: WHATSAPP_PROVIDER

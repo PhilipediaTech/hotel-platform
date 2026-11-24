@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-150 (ID scan at check-in) is pushed on `feat/T-150-id-scan` (no migration; `git pull` after merging). Before real guests' IDs are scanned, Strategy decision 6 (data residency, with legal advice) should cover sending ID photos to the AI provider. Next: T-151 review requests and drafted replies (M14-15).
+T-151 (Channex connection and mapping) is pushed on `feat/T-151-channex-connect` (run `npm run db:deploy` and `npm run db:generate` after merging; add `CHANNEL_PROVIDER=channex` to .env to use the real staging account locally). Next: T-152 ARI sync to Channex.

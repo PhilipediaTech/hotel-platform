@@ -39,6 +39,13 @@ const envSchema = z.object({
   AI_PROVIDER: z.enum(['off', 'fake', 'anthropic']).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   AI_MODEL: z.string().min(1).default('claude-opus-5-5'),
+  // Channel manager (M11-07; T-151): `fake` locally and in tests, `channex` with its API key.
+  CHANNEL_PROVIDER: z.enum(['off', 'fake', 'channex']).optional(),
+  CHANNEX_API_KEY: z.string().min(20).optional(),
+  CHANNEX_BASE_URL: z
+    .url()
+    .regex(/^https:\/\/(staging|app|secure)\.channex\.io\/api\/v1\/?$/, 'A Channex API v1 base URL')
+    .default('https://staging.channex.io/api/v1'),
   PAYMENT_SECRET_KEY: z
     .string()
     .regex(
@@ -112,6 +119,8 @@ export interface Config {
   passwordBreachCheck: 'hibp' | 'fake';
   /** The AI provider, its key (null unless anthropic) and model (T-116). */
   ai: { provider: 'off' | 'fake' | 'anthropic'; apiKey: string | null; model: string };
+  /** The channel manager, its key (null unless channex) and API base URL (T-151). */
+  channel: { provider: 'off' | 'fake' | 'channex'; apiKey: string | null; baseUrl: string };
   /** The WhatsApp provider and its Meta settings (null for the fake). */
   whatsapp: {
     provider: 'fake' | 'meta';
@@ -158,6 +167,15 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   if (e.NODE_ENV === 'production' && aiProvider === 'fake') {
     throw new Error('Invalid environment configuration:\n✖ AI_PROVIDER=fake in production');
   }
+  const channelProvider = e.CHANNEL_PROVIDER ?? (e.NODE_ENV === 'production' ? 'off' : 'fake');
+  if (channelProvider === 'channex' && !e.CHANNEX_API_KEY) {
+    throw new Error(
+      'Invalid environment configuration:\n✖ CHANNEX_API_KEY is required with CHANNEL_PROVIDER=channex',
+    );
+  }
+  if (e.NODE_ENV === 'production' && channelProvider === 'fake') {
+    throw new Error('Invalid environment configuration:\n✖ CHANNEL_PROVIDER=fake in production');
+  }
   if (e.PAYMENT_PROVIDER === 'paystack' && !e.PAYMENT_SECRET_KEY) {
     throw new Error(
       'Invalid environment configuration:\n✖ PAYMENT_SECRET_KEY is required with PAYMENT_PROVIDER=paystack',
@@ -191,6 +209,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     appOrigin: e.APP_ORIGIN,
     siteOrigin: e.SITE_ORIGIN,
     ai: { provider: aiProvider, apiKey: e.ANTHROPIC_API_KEY ?? null, model: e.AI_MODEL },
+    channel: {
+      provider: channelProvider,
+      apiKey: e.CHANNEX_API_KEY ?? null,
+      baseUrl: e.CHANNEX_BASE_URL.replace(/\/$/, ''),
+    },
     databaseUrl: e.DATABASE_URL,
     sessionSecret: e.SESSION_SECRET,
     mfaKey,

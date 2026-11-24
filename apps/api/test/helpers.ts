@@ -11,6 +11,7 @@ import { createFakeEmailProvider } from '../src/core/email.ts';
 import { createLocalFileStore } from '../src/core/files.ts';
 import { createLogger } from '../src/core/logger.ts';
 import { createFakeAiProvider } from '../src/core/ai.ts';
+import { createFakeChannelManager } from '../src/core/channel-manager.ts';
 import { createFakePaymentProvider } from '../src/core/payments.ts';
 import { createFakeMessageProvider } from '../src/core/messaging.ts';
 import type { ApprovalActionHandler } from '../src/core/approvals.ts';
@@ -31,6 +32,7 @@ export const TEST_CONFIG: Config = {
   localFilesDir: path.join(os.tmpdir(), 'hotel-test-files'),
   payments: { provider: 'fake', secretKey: null, webhookSecret: null },
   ai: { provider: 'fake', apiKey: null, model: 'claude-opus-5-5' },
+  channel: { provider: 'fake', apiKey: null, baseUrl: 'https://staging.channex.io/api/v1' },
   platformAdminEmails: ['platform-admin@example.test'],
   passwordBreachCheck: 'fake',
   whatsapp: {
@@ -79,6 +81,7 @@ export function buildTestApp(routes?: Router, options: TestAppOptions = {}) {
   });
   const messages = createFakeMessageProvider();
   const ai = createFakeAiProvider();
+  const channel = createFakeChannelManager();
   const app = createApp({
     config: TEST_CONFIG,
     logger,
@@ -88,11 +91,12 @@ export function buildTestApp(routes?: Router, options: TestAppOptions = {}) {
     messages,
     ai,
     files,
+    channel,
     ...(options.clock ? { clock: options.clock } : {}),
     ...(routes ? { routes } : {}),
     ...(options.approvalHandlers ? { approvalHandlers: options.approvalHandlers } : {}),
   });
-  return { app, logLines, logger, email, payments, messages, files, ai };
+  return { app, logLines, logger, email, payments, messages, files, ai, channel };
 }
 
 /** Typed access to an error envelope in a Supertest response. */

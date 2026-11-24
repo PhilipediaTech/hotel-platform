@@ -112,6 +112,9 @@ const AttendancePage = lazy(() =>
 const PosSetupPage = lazy(() =>
   import('../routes/pos-setup.tsx').then((m) => ({ default: m.PosSetupPage })),
 );
+const ChannelsPage = lazy(() =>
+  import('../routes/channels.tsx').then((m) => ({ default: m.ChannelsPage })),
+);
 const PriceSuggestionsPage = lazy(() =>
   import('../routes/price-suggestions.tsx').then((m) => ({ default: m.PriceSuggestionsPage })),
 );
@@ -207,6 +210,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/expenses': <ExpensesPage />,
   '/accounting': <AccountingPage />,
   '/price-suggestions': <PriceSuggestionsPage />,
+  '/channels': <ChannelsPage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

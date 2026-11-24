@@ -6,8 +6,11 @@ import { IsoDate, Uuid } from './primitives.ts';
 // how many rooms of each type are left per date, and the overbooking limit. Not in tab 4: the
 // rate screen shows it, and GM set overbooking limits (M2-09) here.
 
-/** Days ahead the inventory is kept for (today included); a daily job extends it. */
-export const INVENTORY_DAYS = 400;
+/**
+ * Days ahead the inventory is kept for (today included); a daily job extends it. 500 since
+ * T-154: the channel manager is sent this far ahead, and Channex expects 500 days.
+ */
+export const INVENTORY_DAYS = 500;
 /** Most rooms a hotel may sell above capacity, per type and date. */
 export const MAX_OVERBOOK_LIMIT = 50;
 const MAX_READ_DAYS = 62;

@@ -32,6 +32,7 @@
       "WARNING": "done with warnings",
       "FAILED": "failed"
     },
+    "taskId": "task",
     "sync": {
       "title": "Prices and availability",
       "checked": "Up to date at {{when}}: changes go within about a minute.",

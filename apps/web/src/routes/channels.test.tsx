@@ -51,6 +51,7 @@ const view = (connected: boolean) => ({
           kind: 'SETUP',
           status: 'FAILED',
           items: 2,
+          taskId: null,
           message: 'Channex answered 422: Validation Error',
         },
       ]
@@ -139,6 +140,17 @@ describe('Channel manager (S41)', () => {
         syncError: 'Channex answered 429: Too Many Requests',
         retryAt: '2026-11-10T09:07:00.000Z',
       },
+      // T-154: each send's task ID, for Channex's certification form.
+      logs: [
+        {
+          at: '2026-11-10T09:05:00.000Z',
+          kind: 'RESTRICTIONS',
+          status: 'OK',
+          items: 3,
+          taskId: '03854d5e-3a3b-4a52-9cb9-5e4d2b6fa8a1',
+          message: null,
+        },
+      ],
     };
     handlers['GET /channel-connection'] = () => json(200, connected);
     handlers['POST /channel-connection/full-sync'] = () =>
@@ -150,6 +162,8 @@ describe('Channel manager (S41)', () => {
     expect(
       screen.getByText(/^Sending stopped: Channex answered 429: Too Many Requests. Next try at/),
     ).toBeInTheDocument();
+    const log = screen.getByRole('list', { name: 'Activity' });
+    expect(within(log).getByText('03854d5e-3a3b-4a52-9cb9-5e4d2b6fa8a1')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Send everything again' }));
     await waitFor(() => expect(sent('POST /channel-connection/full-sync')).toHaveLength(1));
   });

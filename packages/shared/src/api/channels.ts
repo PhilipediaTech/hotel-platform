@@ -74,6 +74,8 @@ export const ChannelConnectionView = z
         kind: z.string(),
         status: z.enum(['OK', 'WARNING', 'FAILED']),
         items: z.number().int(),
+        /** The channel manager's task ID for a send (Channex certification asks for it). */
+        taskId: z.string().nullable(),
         message: z.string().nullable(),
       }),
     ),

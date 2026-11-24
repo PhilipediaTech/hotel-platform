@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-153 (Channex OTA bookings in) is pushed on `feat/T-153-channex-bookings-in` (run `npm run db:deploy` and `npm run db:generate` after merging). Bookings come in from the Channex feed every minute when `.env` has `CHANNEL_PROVIDER=channex`; the webhook needs `CHANNEX_WEBHOOK_SECRETS` and a public HTTPS address (staging, T-005). Next: the Channex certification scenarios.
+T-154 (Channex certification readiness) is pushed on `feat/T-154-channex-certification` (no migration). The certification itself is done by Philip through the PMS screens with docs/CHANNEX-CERTIFICATION.md, from 18 December 2026, with `CHANNEL_PROVIDER=channex` in `.env`. Next: review requests (M14-15).

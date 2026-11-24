@@ -182,6 +182,9 @@ model Property {
   pettyCashTopUps      PettyCashTopUp[]
   accountingMappings   AccountingMapping[]
   accountingExports    AccountingExport[]
+  channelConnection    ChannelConnection?
+  channelMappings      ChannelMapping[]
+  channelSyncLogs      ChannelSyncLog[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -416,6 +419,7 @@ model User {
   pettyCashHeld          PettyCashFloat[]      @relation("PettyCashCustodian")
   pettyCashTopUps        PettyCashTopUp[]      @relation("PettyCashToppedUpBy")
   accountingExports      AccountingExport[]    @relation("AccountingExporter")
+  channelsConnected      ChannelConnection[]   @relation("ChannelConnector")
 
   @@map("users")
 }
@@ -760,6 +764,7 @@ model RoomType {
   inventory    RoomTypeInventory[]
   quotes       Quote[]
   stays        Stay[]
+  channelMaps  ChannelMapping[]
 
   @@unique([propertyId, code])
   // Target of composite foreign keys: a room can only have a type of its own property.
@@ -998,6 +1003,7 @@ model RatePlan {
   components         PackageComponent[]
   quotes             Quote[]
   stays              Stay[]
+  channelMaps        ChannelMapping[]
 
   @@unique([propertyId, code])
   @@unique([propertyId, id])
@@ -4627,4 +4633,116 @@ model AccountingExport {
 
   @@unique([propertyId, number])
   @@map("accounting_exports")
+}
+
+// ---------------------------------------------------------------------------------------
+// Channel manager (PRD M11-07; tab 2 ChannelManager; T-151). Tab 3 names channel_connections,
+// channel_mappings and channel_sync_logs; the columns are designed here. One connection per
+// property; each room type and each (rate plan, room type) the hotel sells online has the
+// channel manager's ID for it.
+
+enum ChannelConnectionStatus {
+  /**
+   * Created in our database; the channel manager's records are being made.
+   */
+  CONNECTING
+  ACTIVE
+  /**
+   * Nothing is sent or taken in until it is resumed.
+   */
+  PAUSED
+}
+
+model ChannelConnection {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  propertyId         String                  @unique @map("property_id") @db.Uuid
+  /**
+   * CHANNEX.
+   */
+  provider           String
+  /**
+   * The property's ID at the channel manager, once created.
+   */
+  externalPropertyId String?                 @map("external_property_id")
+  status             ChannelConnectionStatus @default(CONNECTING)
+  /**
+   * Last setup problem, shown to the hotel until a setup succeeds.
+   */
+  lastError          String?                 @map("last_error")
+  /**
+   * Set while a setup runs, so two never run at once; expires if a run dies.
+   */
+  setupLockedUntil   DateTime?               @map("setup_locked_until") @db.Timestamptz(6)
+  connectedById      String                  @map("connected_by_id") @db.Uuid
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property    Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  connectedBy User             @relation("ChannelConnector", fields: [connectedById], references: [id], onDelete: Restrict)
+  mappings    ChannelMapping[]
+  logs        ChannelSyncLog[]
+
+  @@map("channel_connections")
+}
+
+enum ChannelMappingKind {
+  ROOM_TYPE
+  RATE_PLAN
+}
+
+/// Our room type, or our rate plan for one room type, and the channel manager's ID for it.
+model ChannelMapping {
+  id           String             @id @default(uuid()) @db.Uuid
+  propertyId   String             @map("property_id") @db.Uuid
+  connectionId String             @map("connection_id") @db.Uuid
+  kind         ChannelMappingKind
+  roomTypeId   String             @map("room_type_id") @db.Uuid
+  /**
+   * Set for RATE_PLAN mappings only.
+   */
+  ratePlanId   String?            @map("rate_plan_id") @db.Uuid
+  externalId   String             @map("external_id")
+  /**
+   * Switched off: no longer sent (the channel manager keeps its record).
+   */
+  active       Boolean            @default(true)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  connection ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  roomType   RoomType          @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  ratePlan   RatePlan?         @relation(fields: [ratePlanId], references: [id], onDelete: Restrict)
+
+  @@unique([connectionId, externalId])
+  @@index([propertyId, kind])
+  @@map("channel_mappings")
+}
+
+/// What was sent to or taken from the channel manager, and how it went (append-only).
+model ChannelSyncLog {
+  id           BigInt   @id @default(autoincrement())
+  propertyId   String   @map("property_id") @db.Uuid
+  connectionId String   @map("connection_id") @db.Uuid
+  /**
+   * SETUP | AVAILABILITY | RESTRICTIONS | FULL_SYNC | BOOKING
+   */
+  kind         String
+  /**
+   * OK | WARNING | FAILED
+   */
+  status       String
+  items        Int      @default(0)
+  /**
+   * The channel manager's task ID, when it gave one.
+   */
+  taskId       String?  @map("task_id")
+  message      String?
+  details      Json?
+  at           DateTime @default(now()) @db.Timestamptz(6)
+
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  connection ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+
+  @@index([connectionId, at])
+  @@map("channel_sync_logs")
 }

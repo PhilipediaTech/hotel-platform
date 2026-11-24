@@ -163,6 +163,7 @@ export const PERMISSIONS: readonly PermissionDef[] = [
   p('channels', 'bookingengine.manage', 'Manage the booking engine'),
   p('channels', 'message.send', 'Send guest messages'),
   p('channels', 'template.manage', 'Manage message templates'),
+  p('channels', 'channel.manage', 'Connect and manage the channel manager (OTAs)'),
   // Reports (M12)
   p('reports', 'report.dashboard', 'View the manager dashboard'),
   p('reports', 'report.audit', 'View night audit reports'),

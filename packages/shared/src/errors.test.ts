@@ -34,7 +34,8 @@ const SPEC_TABLE: Record<number, string[]> = {
   429: ['RATE_LIMITED'],
   // Added in T-070 (not in tab 4): the payment provider is down or refused the call.
   // T-091b (not in tab 4): WhatsApp could not be reached.
-  502: ['PAYMENT_PROVIDER_UNAVAILABLE', 'MESSAGE_PROVIDER_UNAVAILABLE'],
+  // T-151 (not in tab 4): the channel manager refused the call or could not be reached.
+  502: ['PAYMENT_PROVIDER_UNAVAILABLE', 'MESSAGE_PROVIDER_UNAVAILABLE', 'CHANNEL_UNAVAILABLE'],
   // T-116 (not in tab 4): the AI is switched off or unreachable.
   503: ['AI_UNAVAILABLE'],
   500: ['INTERNAL'],

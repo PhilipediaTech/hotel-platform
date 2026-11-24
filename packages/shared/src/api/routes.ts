@@ -44,6 +44,7 @@ import { EXPENSE_ROUTES } from './expenses.ts';
 import { ACCOUNTING_ROUTES } from './accounting.ts';
 import { PRICE_SUGGESTION_ROUTES } from './price-suggestions.ts';
 import { ID_SCAN_ROUTES } from './id-scan.ts';
+import { CHANNEL_ROUTES } from './channels.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
 import { NIGHT_AUDIT_ROUTES } from './night-audit.ts';
@@ -129,6 +130,7 @@ export const API_ROUTES = {
   ...ACCOUNTING_ROUTES,
   ...PRICE_SUGGESTION_ROUTES,
   ...ID_SCAN_ROUTES,
+  ...CHANNEL_ROUTES,
   ...TASK_ROUTES,
   ...HANDOVER_ROUTES,
   ...LEAKAGE_ROUTES,

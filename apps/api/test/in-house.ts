@@ -175,7 +175,8 @@ export async function inHouse(
     payments: c.payments,
     messages: c.messages,
     ai: c.ai,
-    /** The file store (T-150). */
+    /** The file store (T-150) and the fake channel manager (T-151). */
     files: c.files,
+    channel: c.channel,
   };
 }

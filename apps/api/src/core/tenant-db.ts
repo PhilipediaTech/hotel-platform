@@ -159,6 +159,10 @@ export const TENANT_MODELS: Record<string, Scope> = {
   // Accounting exports (T-148). Exports are append-only.
   AccountingMapping: { kind: 'property' },
   AccountingExport: { kind: 'property' },
+  // Channel manager (T-151). Sync logs are append-only.
+  ChannelConnection: { kind: 'property' },
+  ChannelMapping: { kind: 'property' },
+  ChannelSyncLog: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

@@ -1,0 +1,36 @@
+{
+  "channels": {
+    "title": "Channel manager",
+    "intro": "Sell your rooms on Booking.com, Expedia, Airbnb and other sites through Channex. Connecting creates your property, room types and the rate plans you choose there; prices, availability and bookings then stay in step.",
+    "off": "No channel manager is set up for this platform yet.",
+    "fake": "This is a test setup: nothing is sent to a real channel manager.",
+    "status": {
+      "NONE": "Not connected",
+      "CONNECTING": "Setup not finished",
+      "ACTIVE": "Connected",
+      "PAUSED": "Paused: nothing is sent or taken in"
+    },
+    "lastError": "Last problem: {{message}}",
+    "roomTypes": "Room types",
+    "rooms": "{{count}} rooms",
+    "noRooms": "no rooms: not sold online",
+    "mapped": "set up",
+    "notMapped": "not set up yet",
+    "plans": "Rate plans to sell online",
+    "plansHint": "Each plan is set up once per room type it sells. A plan you leave out stops being sent.",
+    "plan": "{{name}} ({{code}})",
+    "planMapped": "{{count}} room types set up",
+    "connect": "Connect",
+    "save": "Save and finish setup",
+    "pause": "Pause",
+    "resume": "Resume",
+    "log": "Activity",
+    "noLog": "Nothing yet.",
+    "logLine": "{{kind}} · {{items}} items",
+    "logStatus": {
+      "OK": "done",
+      "WARNING": "done with warnings",
+      "FAILED": "failed"
+    }
+  }
+}

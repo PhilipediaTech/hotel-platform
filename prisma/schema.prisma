@@ -188,6 +188,7 @@ model Property {
   channelAriSent       ChannelAriSent[]
   channelAriChanges    ChannelAriChange[]
   channelBookings      ChannelBookingRevision[]
+  guestReviews         GuestReview[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -328,6 +329,7 @@ model User {
   approvalsRequested   ApprovalRequest[]  @relation("RequestedBy")
   approvalsDecided     ApprovalRequest[]  @relation("DecidedBy")
   invitationsSent      Invitation[]       @relation("InvitedBy")
+  reviewsReplied       GuestReview[]      @relation("ReviewReplier")
   filesUploaded        FileObject[]
   roomBlocksCreated    RoomBlock[]
   importJobs           ImportJob[]
@@ -1169,6 +1171,7 @@ model Guest {
   bookings     Reservation[] @relation("ReservationBooker")
   stays        Stay[]
   idDocuments  IdDocument[]
+  reviews      GuestReview[]
   folioWindows FolioWindow[]
   tasks        Task[]
 
@@ -1278,6 +1281,7 @@ model Reservation {
 
   messageThreads          MessageThread[]
   channelBookingRevisions ChannelBookingRevision[]
+  reviews                 GuestReview[]
 
   @@unique([propertyId, confirmationNo])
   @@unique([propertyId, source, channelRef])
@@ -1316,6 +1320,7 @@ model Stay {
   property    Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   reservation Reservation         @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
   guest       Guest               @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  review      GuestReview?
   roomType    RoomType            @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
   room        Room?               @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
   ratePlan    RatePlan            @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
@@ -4862,4 +4867,42 @@ model ChannelBookingRevision {
   @@index([connectionId, externalBookingId])
   @@index([propertyId, outcome])
   @@map("channel_booking_revisions")
+}
+
+// ───────────────────────── Guest reviews (M14-15; T-155) ─────────────────────────
+
+/// A review request after check-out, and the guest's review and the hotel's reply (T-155).
+/// One per stay; the link's token is never stored, only its hash. The comment is the guest's
+/// own words; the draft is the AI's, kept until the GM sends a reply.
+model GuestReview {
+  id            String    @id @db.Uuid
+  propertyId    String    @map("property_id") @db.Uuid
+  reservationId String    @map("reservation_id") @db.Uuid
+  stayId        String    @map("stay_id") @db.Uuid
+  guestId       String    @map("guest_id") @db.Uuid
+  tokenHash     String    @unique @map("token_hash")
+  /// EMAIL | WHATSAPP: how the request went.
+  channel       String
+  requestedAt   DateTime  @map("requested_at") @db.Timestamptz(6)
+  /// The link works until then for giving a review (and always for reading it).
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
+  rating        Int?
+  comment       String?
+  submittedAt   DateTime? @map("submitted_at") @db.Timestamptz(6)
+  draft         String?
+  draftedAt     DateTime? @map("drafted_at") @db.Timestamptz(6)
+  reply         String?
+  repliedAt     DateTime? @map("replied_at") @db.Timestamptz(6)
+  repliedById   String?   @map("replied_by_id") @db.Uuid
+
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation Reservation @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  stay        Stay        @relation(fields: [propertyId, stayId], references: [propertyId, id], onDelete: Restrict)
+  guest       Guest       @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  repliedBy   User?       @relation("ReviewReplier", fields: [repliedById], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, stayId])
+  @@index([propertyId, requestedAt])
+  @@index([reservationId, guestId])
+  @@map("guest_reviews")
 }

@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-154 (Channex certification readiness) is pushed on `feat/T-154-channex-certification` (no migration). The certification itself is done by Philip through the PMS screens with docs/CHANNEX-CERTIFICATION.md, from 18 December 2026, with `CHANNEL_PROVIDER=channex` in `.env`. Next: review requests (M14-15).
+T-155 (review requests and drafted replies) is pushed on `feat/T-155-review-requests` (run `npm run db:deploy` and `npm run db:generate` after merging; add review.manage to existing GM roles). Next: V1.4.

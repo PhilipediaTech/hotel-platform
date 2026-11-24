@@ -1,0 +1,41 @@
+{
+  "reviews": {
+    "title": "Reviews",
+    "intro": "Guests are asked for a short review after they check out. Each review comes with a reply drafted for you: change it as you like, then send it to the guest.",
+    "summaryLabel": "Review summary",
+    "summary": "Average {{average}} stars from {{answered}} reviews ({{requested}} guests asked, last 90 days)",
+    "summaryNone": "No reviews yet ({{requested}} guests asked, last 90 days)",
+    "waitingCount_one": "{{count}} waiting for a reply",
+    "waitingCount_other": "{{count}} waiting for a reply",
+    "filter": "Show",
+    "filters": {
+      "WAITING": "Waiting for a reply",
+      "REPLIED": "Replied",
+      "REQUESTED": "Not answered yet",
+      "ALL": "All"
+    },
+    "list": "Reviews",
+    "none": "Nothing here.",
+    "stars_one": "{{count}} star out of 5",
+    "stars_other": "{{count}} stars out of 5",
+    "asked": "Asked {{when}} by {{channel}}; no review yet.",
+    "channel": {
+      "EMAIL": "email",
+      "WHATSAPP": "WhatsApp"
+    },
+    "noComment": "No comment, only stars.",
+    "repliedBy": "Sent by {{name}}, {{when}}",
+    "reply": "Your reply",
+    "replyDrafted": "Your reply (drafted for you: check and change it)",
+    "send": "Send reply",
+    "redraft": "Draft again",
+    "settings": {
+      "title": "Review requests",
+      "enabled": "Ask guests for a review after check-out",
+      "delay": "Hours after check-out",
+      "publicUrl": "Your public review page (optional)",
+      "publicUrlHint": "Google, TripAdvisor or similar. Every guest is offered it after their review, whatever they gave.",
+      "save": "Save"
+    }
+  }
+}

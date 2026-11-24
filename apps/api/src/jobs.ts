@@ -40,6 +40,7 @@ import { platformBillingJob } from './modules/platform/billing.ts';
 import type { ChannelManager } from './core/channel-manager.ts';
 import { channelSyncJob } from './modules/channels/sync.ts';
 import { channelBookingsHandler, channelBookingsJob } from './modules/channels/bookings.ts';
+import { reviewDraftHandler, reviewRequestJob } from './modules/reviews/service.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
 
@@ -76,6 +77,8 @@ export function workerJobs(deps: {
     preventiveMaintenanceJob,
     checklistsJob,
     certificationRemindersJob,
+    // Review requests after check-out (T-155).
+    reviewRequestJob({ config: deps.config }),
     // No channel manager on the platform: nothing to send.
     ...(deps.channel.name === 'OFF'
       ? []
@@ -128,6 +131,8 @@ export function eventHandlers(deps: {
       messages: deps.messages,
       logger: deps.logger,
     }),
+    // Drafts a reply to each review that comes in (T-155).
+    reviewDraftHandler({ db: deps.db, ai: deps.ai, clock: deps.clock, logger: deps.logger }),
     ...(deps.channel.name === 'OFF'
       ? []
       : [

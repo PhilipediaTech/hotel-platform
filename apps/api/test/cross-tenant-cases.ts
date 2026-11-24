@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { OperationId } from '@hotel/shared';
 import { expect } from 'vitest';
 import type { Db } from '../src/core/db.ts';
@@ -1835,6 +1836,46 @@ async function bChannelBookingUnchanged(db: Db, world: TenantWorld) {
     (await db.channelBookingRevision.findMany({ where })).map((r) => [r.outcome, r.message]),
   ).toEqual([['HELD', 'The booking is in USD']]);
   expect(await db.reservation.count({ where: { ...where, source: 'OTA_CHANNEL' } })).toBe(0);
+}
+
+/** B's guest reviewed their stay and waits for a reply; B's review settings are on (T-155). */
+async function bReview(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bReservation(db, world, propertyId);
+  await db.guest.update({ where: { id: theirs.guestId }, data: { email: 'b-guest@example.test' } });
+  await db.property.update({
+    where: { id: propertyId },
+    data: {
+      settings: { reviews: { enabled: true, delayHours: 5, publicReviewUrl: null } } as never,
+    },
+  });
+  const review = await db.guestReview.create({
+    data: {
+      id: randomUUID(),
+      propertyId,
+      reservationId: theirs.reservationId,
+      stayId: theirs.stayId,
+      guestId: theirs.guestId,
+      tokenHash: 'their-review-token-hash',
+      channel: 'EMAIL',
+      requestedAt: new Date('2026-11-10T08:00:00Z'),
+      expiresAt: new Date('2026-12-10T08:00:00Z'),
+      rating: 3,
+      comment: 'Their comment',
+      submittedAt: new Date('2026-11-10T09:00:00Z'),
+      draft: 'Their draft',
+    },
+  });
+  return { ...theirs, reviewId: review.id };
+}
+
+async function bReviewUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect(
+    (await db.guestReview.findMany({ where })).map((r) => [r.draft, r.reply, r.repliedAt]),
+  ).toEqual([['Their draft', null, null]]);
+  expect(await db.notificationDelivery.count({ where: { templateCode: 'REVIEW_REPLY' } })).toBe(0);
+  const property = await db.property.findUniqueOrThrow({ where: { id: world.b1.id } });
+  expect((property.settings as { reviews: { delayHours: number } }).reviews.delayHours).toBe(5);
 }
 
 async function bStockUnchanged(db: Db, world: TenantWorld) {
@@ -3804,6 +3845,24 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   postStocktake: { seed: bStock, body: () => ({ reason: 'Leak' }), untouched: bStockUnchanged },
   cancelStocktake: { seed: bStock, untouched: bStockUnchanged },
+  // Guest reviews (T-155)
+  getReviewSettings: { seed: bReview, listIds: () => [] },
+  updateReviewSettings: {
+    seed: bReview,
+    creates: true,
+    body: () => ({ enabled: true, delayHours: 2, publicReviewUrl: null }),
+    untouched: bReviewUnchanged,
+  },
+  listReviews: {
+    seed: bReview,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((r) => r.id),
+  },
+  draftReviewReply: { seed: bReview, untouched: bReviewUnchanged },
+  replyToReview: {
+    seed: bReview,
+    body: () => ({ reply: 'Thank you' }),
+    untouched: bReviewUnchanged,
+  },
   // Channel manager (T-151)
   getChannelConnection: {
     seed: bChannel,

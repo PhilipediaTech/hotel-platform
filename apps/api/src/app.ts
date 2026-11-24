@@ -64,6 +64,7 @@ import { stockRoutes } from './modules/stock/routes.ts';
 import { expenseRoutes } from './modules/expenses/routes.ts';
 import { accountingRoutes } from './modules/accounting/routes.ts';
 import { channelRoutes } from './modules/channels/routes.ts';
+import { reviewRoutes } from './modules/reviews/routes.ts';
 import { createChannelManager, type ChannelManager } from './core/channel-manager.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
@@ -245,6 +246,7 @@ export function createApp({
     }),
   );
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
+  api.use(reviewRoutes({ db, tenantDb, clock, config, ai }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));
   api.use(partnerRoutes({ db, clock, config, email }));

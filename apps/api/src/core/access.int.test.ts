@@ -39,6 +39,10 @@ const PUBLIC_ROUTES = [
   'paymentWebhook',
   'whatsappWebhookVerify',
   'whatsappWebhook',
+  // Reviewed in T-153: the Channex webhook. Signature checked on the raw body before anything
+  // is stored; answers nothing but `received`; it can only make a connected property's
+  // booking feed be read sooner (the bookings themselves come from the feed).
+  'channelWebhook',
   // Reviewed in T-112: the booking page. Only switched-on, live hotels; a link is a secret.
   'getPublicProperty',
   'getPublicAvailability',

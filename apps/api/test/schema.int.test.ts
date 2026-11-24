@@ -77,6 +77,7 @@ describe('migrations', () => {
       'group_block_nights',
       'group_blocks',
       'guest_links',
+      'guest_reviews',
       'guests',
       'handover_notes',
       'hk_assignments',

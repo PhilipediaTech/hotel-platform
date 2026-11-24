@@ -164,6 +164,7 @@ export const PERMISSIONS: readonly PermissionDef[] = [
   p('channels', 'message.send', 'Send guest messages'),
   p('channels', 'template.manage', 'Manage message templates'),
   p('channels', 'channel.manage', 'Connect and manage the channel manager (OTAs)'),
+  p('channels', 'review.manage', 'Read guest reviews and reply to them'),
   // Reports (M12)
   p('reports', 'report.dashboard', 'View the manager dashboard'),
   p('reports', 'report.audit', 'View night audit reports'),

@@ -247,6 +247,24 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplateDef[] = [
     },
   },
   {
+    // T-155 (PRD M14-15): the GM's reply to a guest's review, as the GM wrote it.
+    code: 'REVIEW_REPLY',
+    label: 'Reply to a review',
+    audience: 'GUEST',
+    variables: [GUEST, PROPERTY, v('reply', 'The reply', 'Thank you for staying with us…')],
+    email: {
+      subject: '{{property_name}} replied to your review',
+      body: 'Dear {{guest_name}},\n\n{{reply}}\n\n{{property_name}}',
+    },
+    whatsapp: {
+      name: 'review_reply',
+      category: 'UTILITY',
+      body:
+        'Hello {{guest_name}}, {{property_name}} replied to your review: {{reply}} ' +
+        'Thank you for staying with us.',
+    },
+  },
+  {
     code: 'APPROVAL_OTP',
     label: 'Approval code',
     audience: 'STAFF',
@@ -332,6 +350,7 @@ export const MESSAGE_TEMPLATE_CODES = [
   'PAYMENT_REQUEST',
   'FOLIO',
   'FEEDBACK',
+  'REVIEW_REPLY',
   'APPROVAL_OTP',
   'LEAKAGE_ALERT',
   'FLASH_REPORT',

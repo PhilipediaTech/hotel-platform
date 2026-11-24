@@ -6,6 +6,7 @@ import {
   type CheckInInfo,
   type CheckInRequest,
   type Property,
+  type Review,
 } from './api.ts';
 
 // The guest booking site (PRD M11-01, M11-02; S39; T-113): dates, rooms, plans, guest details,
@@ -130,6 +131,12 @@ export function mount(root: HTMLElement, env: Env): void {
     show(plain('Use the booking link your hotel gave you.'));
     return;
   }
+  // The review page (T-155): /r/<token>. Hotel addresses are at least 3 characters.
+  if (slug === 'r') {
+    if (section) void showReview(section);
+    else show(alert('This link is not complete. Please use the link in your message.'));
+    return;
+  }
   if (section === 'manage') {
     const token = new URLSearchParams(env.search).get('token') ?? readToken(slug);
     if (token) void showManage(token);
@@ -137,6 +144,125 @@ export function mount(root: HTMLElement, env: Env): void {
     return;
   }
   void showHotel(slug);
+
+  // ── Review (PRD M14-15; T-155) ────────────────────────────────────────────────────────
+
+  async function showReview(token: string) {
+    let review: Review;
+    try {
+      review = await env.api.review(token);
+    } catch (err) {
+      show(
+        err instanceof ApiError && err.status === 404
+          ? alert('This review link is not valid. Please use the link in your message.')
+          : alert(messageOf(err)),
+      );
+      return;
+    }
+    document.title = `Your stay at ${review.hotelName}`;
+    const stay = plain(`${longDate(review.arrival)} – ${longDate(review.departure)}`);
+    const title = h('h1', {}, `How was your stay at ${review.hotelName}?`);
+    if (review.review) {
+      show(title, stay, ...givenReview(review));
+      return;
+    }
+    if (review.expired) {
+      show(title, stay, plain('This review link has run out. Thank you for staying with us.'));
+      return;
+    }
+    let rating = 0;
+    const error = h('div', { 'aria-live': 'assertive' });
+    const stars = [1, 2, 3, 4, 5].map((n) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'star',
+          'aria-label': `${n} star${n === 1 ? '' : 's'}`,
+          'aria-pressed': 'false',
+          onclick: () => {
+            rating = n;
+            stars.forEach((b, i) => {
+              b.setAttribute('aria-pressed', String(i < n));
+              b.textContent = i < n ? '★' : '☆';
+            });
+          },
+        },
+        '☆',
+      ),
+    );
+    const comment = h('textarea', {
+      id: 'f-comment',
+      name: 'comment',
+      maxlength: '2000',
+      rows: '5',
+    }) as HTMLTextAreaElement;
+    const submit = h('button', { type: 'submit' }, 'Send my review');
+    const form = h(
+      'form',
+      {
+        'aria-label': 'Your review',
+        onsubmit: (e: Event) => {
+          e.preventDefault();
+          if (rating === 0) {
+            error.replaceChildren(alert('Choose 1 to 5 stars.'));
+            return;
+          }
+          submit.toggleAttribute('disabled', true);
+          env.api
+            .submitReview(token, { rating, comment: comment.value.trim() || null })
+            .then((given) => show(title, stay, ...givenReview(given)))
+            .catch((err: unknown) => {
+              submit.toggleAttribute('disabled', false);
+              error.replaceChildren(alert(messageOf(err)));
+            });
+        },
+      },
+      h('fieldset', {}, h('legend', {}, 'Your rating'), h('div', { class: 'stars' }, ...stars)),
+      h(
+        'div',
+        { class: 'field' },
+        h('label', { for: 'f-comment' }, 'Tell us more (optional)'),
+        comment,
+      ),
+      error,
+      submit,
+    );
+    show(title, stay, plain(`Hello ${review.guestFirstName}, it takes a minute.`), form);
+  }
+
+  function givenReview(r: Review): Child[] {
+    const given = r.review;
+    return [
+      plain('Thank you for your review.'),
+      given &&
+        h(
+          'p',
+          { 'aria-label': `${given.rating} out of 5 stars` },
+          '★'.repeat(given.rating) + '☆'.repeat(5 - given.rating),
+        ),
+      given?.comment && h('blockquote', {}, given.comment),
+      r.reply &&
+        h(
+          'section',
+          { 'aria-label': 'Reply from the hotel' },
+          h('h2', {}, `${r.hotelName} replied`),
+          h('p', {}, r.reply),
+        ),
+      // Offered to every guest, whatever they gave.
+      r.publicReviewUrl &&
+        h(
+          'p',
+          {},
+          'You can also share your review publicly: ',
+          h(
+            'a',
+            { href: r.publicReviewUrl, rel: 'noopener noreferrer', target: '_blank' },
+            'post a review',
+          ),
+        ),
+    ];
+  }
 
   // ── The hotel and the search ──────────────────────────────────────────────────────────
 

@@ -7,6 +7,7 @@ import {
   type Booking,
   type CheckInInfo,
   type Property,
+  type Review,
 } from './api.ts';
 import { mount } from './app.ts';
 
@@ -89,6 +90,17 @@ const created = (over: object = {}) => ({
   ...over,
 });
 
+const REVIEW: Review = {
+  hotelName: 'Demo Lagos Hotel',
+  guestFirstName: 'Bisi',
+  arrival: '2026-12-14',
+  departure: '2026-12-16',
+  expired: false,
+  review: null,
+  reply: null,
+  publicReviewUrl: 'https://g.page/r/demo-lagos/review',
+};
+
 let root: HTMLElement;
 let navigate: ReturnType<typeof vi.fn<(url: string) => void>>;
 let api: { [K in keyof Api]: ReturnType<typeof vi.fn<Api[K]>> };
@@ -112,6 +124,13 @@ beforeEach(() => {
     payBalance: vi
       .fn<Api['payBalance']>()
       .mockResolvedValue({ paymentUrl: 'https://pay.test/bal' }),
+    review: vi.fn<Api['review']>().mockResolvedValue(REVIEW),
+    submitReview: vi.fn<Api['submitReview']>().mockImplementation((_token, body) =>
+      Promise.resolve({
+        ...REVIEW,
+        review: { ...body, submittedAt: '2026-12-17T10:00:00Z' },
+      }),
+    ),
   };
 });
 
@@ -428,5 +447,63 @@ describe('online check-in (M3-20, M11-06)', () => {
     });
     buttonNamed('Change my details').click();
     expect(byId('f-nationality')).not.toBeNull();
+  });
+});
+
+describe('the review page (M14-15; T-155)', () => {
+  const TOKEN = 'r'.repeat(43);
+
+  it('asks for stars and a comment, then thanks the guest and offers the public link', async () => {
+    start(`/r/${TOKEN}`);
+    await settle();
+    expect(api.review).toHaveBeenCalledWith(TOKEN);
+    expect(root.querySelector('h1')?.textContent).toBe('How was your stay at Demo Lagos Hotel?');
+    // Stars first.
+    buttonNamed('Send my review').click();
+    await settle();
+    expect(root.textContent).toContain('Choose 1 to 5 stars.');
+    expect(api.submitReview).not.toHaveBeenCalled();
+    buttonNamed('2 stars').click();
+    expect(buttonNamed('2 stars').getAttribute('aria-pressed')).toBe('true');
+    expect(buttonNamed('3 stars').getAttribute('aria-pressed')).toBe('false');
+    const comment = root.querySelector<HTMLTextAreaElement>('#f-comment') as HTMLTextAreaElement;
+    comment.value = '  The shower was cold.  ';
+    buttonNamed('Send my review').click();
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('Thank you for your review.');
+    });
+    expect(api.submitReview).toHaveBeenCalledWith(TOKEN, {
+      rating: 2,
+      comment: 'The shower was cold.',
+    });
+    // A low rating still gets the public link: no gating.
+    const link = root.querySelector('a') as HTMLAnchorElement;
+    expect(link.href).toBe('https://g.page/r/demo-lagos/review');
+    expect(link.rel).toBe('noopener noreferrer');
+  });
+
+  it('shows a review already given with the hotel’s reply, a link that ran out, and a bad link', async () => {
+    api.review.mockResolvedValueOnce({
+      ...REVIEW,
+      review: { rating: 5, comment: 'Perfect.', submittedAt: '2026-12-17T10:00:00Z' },
+      reply: 'Thank you, Bisi!',
+      publicReviewUrl: null,
+    });
+    start(`/r/${TOKEN}`);
+    await settle();
+    expect(root.querySelector('[aria-label="5 out of 5 stars"]')).not.toBeNull();
+    expect(root.textContent).toContain('Demo Lagos Hotel replied');
+    expect(root.textContent).toContain('Thank you, Bisi!');
+    expect(root.querySelector('form')).toBeNull();
+
+    api.review.mockResolvedValueOnce({ ...REVIEW, expired: true });
+    start(`/r/${TOKEN}`);
+    await settle();
+    expect(root.textContent).toContain('This review link has run out.');
+
+    api.review.mockRejectedValueOnce(new ApiError(404, 'Not found', 'NOT_FOUND', {}));
+    start(`/r/${TOKEN}`);
+    await settle();
+    expect(root.textContent).toContain('This review link is not valid.');
   });
 });

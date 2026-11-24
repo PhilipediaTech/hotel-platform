@@ -209,3 +209,25 @@ button.danger {
 .status-cancelled {
   color: var(--critical);
 }
+
+/* Review page (T-155) */
+.stars {
+  display: flex;
+  gap: 0.25rem;
+}
+.star {
+  font-size: 2rem;
+  line-height: 1;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  background: none;
+  border: none;
+  color: #b45309;
+  cursor: pointer;
+}
+blockquote {
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid #d6d3d1;
+  white-space: pre-line;
+}

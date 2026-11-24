@@ -54,6 +54,10 @@ const PUBLIC_ROUTES = [
   'createPublicIdUpload',
   'submitPublicCheckIn',
   'payPublicBalance',
+  // Reviewed in T-155: the guest's review page. Each needs the guest's secret link; a review
+  // is given once, within 30 days.
+  'getPublicReview',
+  'submitPublicReview',
 ];
 
 /** Reviewed in T-102: reachable after the password, before MFA (to get through MFA). */

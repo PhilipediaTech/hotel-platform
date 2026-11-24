@@ -56,6 +56,7 @@ export * from './accounting.ts';
 export * from './price-suggestions.ts';
 export * from './id-scan.ts';
 export * from './channels.ts';
+export * from './reviews.ts';
 export * from './tasks.ts';
 export * from './handovers.ts';
 export * from './leakage.ts';

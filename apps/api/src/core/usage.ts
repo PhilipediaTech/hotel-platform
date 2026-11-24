@@ -8,7 +8,14 @@ import type { Db } from './db.ts';
 type UsageDb = Pick<Db, 'usageCounter'>;
 type AllowanceDb = Pick<Db, 'usageCounter' | 'subscription'>;
 
-const AI_METRICS = ['AI_SUMMARY', 'AI_QUESTION', 'AI_ASSISTANT', 'AI_ID_SCAN'] as const;
+const AI_METRICS = [
+  'AI_SUMMARY',
+  'AI_QUESTION',
+  'AI_ASSISTANT',
+  'AI_ID_SCAN',
+  // T-155: drafting a reply to a guest's review.
+  'AI_REVIEW_REPLY',
+] as const;
 const WHATSAPP_METRIC = 'WHATSAPP';
 
 /** Allowances run per calendar month. */

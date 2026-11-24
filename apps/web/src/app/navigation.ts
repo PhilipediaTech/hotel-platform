@@ -419,6 +419,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-122',
   },
   {
+    // T-155 (PRD M14-15): guest reviews and replies, beside messaging.
+    id: 'reviews',
+    path: '/reviews',
+    anyOf: ['review.manage'],
+    group: 'admin',
+    screen: 'S29',
+    ticket: 'T-155',
+  },
+  {
     id: 'inbox',
     path: '/inbox',
     anyOf: ['message.send'],

@@ -152,9 +152,13 @@ describe('sending or queueing (whitelisted actions only)', () => {
   it('money, check-in and the rest cannot wait: only the whitelist, and only notes on a booking', async () => {
     expect([...QUEUEABLE].sort()).toEqual([
       'acknowledgeTask',
+      'addPosOrderLine',
       'addTaskComment',
       'holdTask',
+      // T-158: POS order taking (M8-08); paying for it still needs the connection.
+      'openPosOrder',
       'resolveTask',
+      'sendPosOrderToKitchen',
       'startTask',
       'submitStatusReport',
       'updateAssignment',
@@ -171,6 +175,13 @@ describe('sending or queueing (whitelisted actions only)', () => {
         { label: 'x' },
       ),
     ).rejects.toThrow('Only notes');
+    // An order opened offline must carry its own ID, so its items can name it.
+    await expect(
+      sendOrQueue(who, 'openPosOrder', { body: { outletId: 'o', label: 'T1' } }, { label: 'x' }),
+    ).rejects.toThrow('needs its own ID');
+    await expect(sendOrQueue(who, 'settlePosOrder' as never, {}, { label: 'x' })).rejects.toThrow(
+      'cannot wait offline',
+    );
   });
 });
 

@@ -131,6 +131,21 @@
       "sendKitchen_other": "Send {{count}} items to the kitchen",
       "forKitchen": "for {{station}}, not sent yet",
       "sentKitchen": "sent to {{station}}"
+    },
+    "offline": {
+      "notice": "Offline: orders and items wait on this device and are sent when you are back. Paying waits for the connection.",
+      "sending_one": "{{count}} change on this order is waiting to be sent.",
+      "sending_other": "{{count}} changes on this order are waiting to be sent.",
+      "waitingItems": "Items waiting to be sent",
+      "notSent": "not sent yet",
+      "refusedShort": "refused",
+      "refused": "Refused when sent: {{reason}}",
+      "order": "{{label}} (on this device)",
+      "estimate": "About {{amount}} before tax; the number and taxes come once it is sent.",
+      "sendKitchen": "Send to the kitchen when back online",
+      "openLabel": "Open order {{label}}",
+      "addLabel": "Add {{item}}",
+      "kitchenLabel": "Send {{label}} to the kitchen"
     }
   }
 }

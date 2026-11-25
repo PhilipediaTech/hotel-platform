@@ -16,6 +16,16 @@ import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
 import posStrings from '../i18n/en/pos.json';
 import { registerStrings } from '../i18n/index.ts';
+import { useOnlineStatus } from '../offline/use-online-status.ts';
+import {
+  OfflineNotice,
+  OfflineOrderPanel,
+  QueuedLines,
+  useOutletMenu,
+  useQueuedPos,
+  useRegisterSend,
+  useSaved,
+} from './pos-offline.tsx';
 import { useFormats } from './reservations.tsx';
 
 registerStrings(posStrings);
@@ -26,6 +36,8 @@ registerStrings(posStrings);
 // guest's signature drawn on screen. The shift closes with a blind count per method.
 // Items are voided or discounted with a reason (M8-04; T-143); above the cashier's limit a
 // manager approves first, and the order changes once they do.
+// Offline (M8-08; T-158, pos-offline.tsx): orders, items and kitchen sends wait on the device
+// and go when the connection is back; paying waits for it.
 
 type Shift = z.output<typeof OutletShiftItem>;
 type Order = z.output<typeof PosOrderItem>;
@@ -61,7 +73,7 @@ export function PosPage() {
   const root = useRoot();
   const reg = useQuery({
     queryKey: [...root, 'register'],
-    queryFn: () => api.call('getPosRegister', {}),
+    queryFn: useSaved('pos-register', () => api.call('getPosRegister', {})),
   });
   const [chosen, setChosen] = useState<string | null>(null);
   const [view, setView] = useState<'orders' | 'close'>('orders');
@@ -215,16 +227,31 @@ function Register({ shift, methods }: { shift: Shift; methods: Method[] }) {
   const [label, setLabel] = useState('');
   const orders = useQuery({
     queryKey: [...root, 'orders', shift.outletId],
-    queryFn: () => api.call('listPosOrders', { query: { outletId: shift.outletId } }),
+    queryFn: useSaved(`pos-orders:${shift.outletId}`, () =>
+      api.call('listPosOrders', { query: { outletId: shift.outletId } }),
+    ),
   });
-  const start = useChange(
-    () => api.call('openPosOrder', { body: { outletId: shift.outletId, label } }),
-    (o) => {
-      setOrderId(o.id);
+  const send = useRegisterSend();
+  // The order's ID is chosen here, so items added offline can name it (T-158).
+  const start = useMutation({
+    mutationFn: async () => {
+      const id = crypto.randomUUID();
+      await send(
+        'openPosOrder',
+        { body: { outletId: shift.outletId, label, id } },
+        t('pos.offline.openLabel', { label }),
+      );
+      return id;
+    },
+    onSuccess: (id) => {
+      setOrderId(id);
       setLabel('');
     },
-  );
+  });
+  const queued = useQueuedPos(shift.outletId);
   const list = orders.data?.data ?? [];
+  const onDevice = queued.newOrders.filter((o) => !list.some((x) => x.id === o.id));
+  const offlineOrder = onDevice.find((o) => o.id === orderId);
   return (
     <div className="mt-4 grid gap-4 md:grid-cols-[16rem_1fr]">
       <div>
@@ -254,7 +281,7 @@ function Register({ shift, methods }: { shift: Shift; methods: Method[] }) {
             {errorMessage(start.error)}
           </Alert>
         )}
-        {list.length === 0 && (
+        {list.length === 0 && onDevice.length === 0 && (
           <p className="mt-2 text-sm text-text-muted">{t('pos.register.noOrders')}</p>
         )}
         <ul aria-label={t('pos.register.openOrders')} className="mt-2 flex flex-col gap-2">
@@ -270,9 +297,29 @@ function Register({ shift, methods }: { shift: Shift; methods: Method[] }) {
               </Button>
             </li>
           ))}
+          {onDevice.map((o) => (
+            <li key={o.id}>
+              <Button
+                variant={o.id === orderId ? 'primary' : 'secondary'}
+                className="h-11 w-full justify-between"
+                onClick={() => setOrderId(o.id)}
+              >
+                <span>{o.label}</span>
+                <span className="text-xs">
+                  {o.conflict ? t('pos.offline.refusedShort') : t('pos.offline.notSent')}
+                </span>
+              </Button>
+            </li>
+          ))}
         </ul>
       </div>
-      {orderId ? (
+      {offlineOrder ? (
+        <OfflineOrderPanel
+          key={offlineOrder.id}
+          order={offlineOrder}
+          menuPanel={<Menu outletId={shift.outletId} orderId={offlineOrder.id} />}
+        />
+      ) : orderId ? (
         <OrderPanel
           key={orderId}
           orderId={orderId}
@@ -308,14 +355,30 @@ function OrderPanel({
   const [pending, setPending] = useState(false);
   const order = useQuery({
     queryKey: [...root, 'order', orderId],
-    queryFn: () => api.call('getPosOrder', { params: { orderId } }),
+    queryFn: useSaved(`pos-order:${orderId}`, () =>
+      api.call('getPosOrder', { params: { orderId } }),
+    ),
   });
+  const online = useOnlineStatus();
+  const queued = useQueuedPos(shift.outletId);
+  const waitingLines = queued.linesFor(orderId);
+  const menu = useOutletMenu(shift.outletId);
+  const send = useRegisterSend();
   const drop = useChange(() => api.call('cancelPosOrder', { params: { orderId } }), onClosed);
-  const toKitchen = useChange(() => api.call('sendPosOrderToKitchen', { params: { orderId } }));
+  const toKitchen = useMutation({
+    mutationFn: (label: string) =>
+      send(
+        'sendPosOrderToKitchen',
+        { params: { orderId } },
+        t('pos.offline.kitchenLabel', { label }),
+      ),
+  });
   const o = order.data;
   if (!o) return null;
   if (o.status !== 'OPEN') return <Settled order={o} onDone={onClosed} />;
   const active = o.lines.filter((l) => !l.voided);
+  // Paying, room charges and changes need the connection; items may wait (T-158).
+  const live = online && waitingLines.length === 0;
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
       <div>
@@ -378,7 +441,7 @@ function OrderPanel({
                       {f.money(l.discount.amountMinor)}
                     </span>
                   )}
-                  {canAdjust && !l.voided && (
+                  {canAdjust && live && !l.voided && (
                     <button
                       type="button"
                       className="block text-xs text-accent underline"
@@ -400,6 +463,8 @@ function OrderPanel({
             ))}
           </ul>
         )}
+        <QueuedLines menu={menu.data} lines={waitingLines} />
+        <OfflineNotice waiting={waitingLines.length} />
         <dl className="mt-3 grid grid-cols-2 gap-1 border-t border-border pt-2 text-sm">
           {o.discountMinor !== '0' && (
             <>
@@ -415,19 +480,22 @@ function OrderPanel({
           <dd className="text-right font-semibold">{f.money(o.totalMinor)}</dd>
         </dl>
         <div className="mt-3 flex flex-col gap-2">
-          {o.unsentKitchenLines > 0 && (
-            <Button
-              variant="secondary"
-              className="h-11"
-              disabled={toKitchen.isPending}
-              onClick={() => toKitchen.mutate(undefined)}
-            >
-              {t('pos.register.sendKitchen', { count: o.unsentKitchenLines })}
-            </Button>
-          )}
+          {(o.unsentKitchenLines > 0 || (waitingLines.length > 0 && !online)) &&
+            queued.kitchenSendsFor(orderId) === 0 && (
+              <Button
+                variant="secondary"
+                className="h-11"
+                disabled={toKitchen.isPending}
+                onClick={() => toKitchen.mutate(o.label)}
+              >
+                {o.unsentKitchenLines > 0
+                  ? t('pos.register.sendKitchen', { count: o.unsentKitchenLines })
+                  : t('pos.offline.sendKitchen')}
+              </Button>
+            )}
           <Button
             className="h-11"
-            disabled={active.length === 0 || methods.length === 0}
+            disabled={!live || active.length === 0 || methods.length === 0}
             onClick={() => setMode('pay')}
           >
             {t('pos.register.pay')}
@@ -435,12 +503,12 @@ function OrderPanel({
           <Button
             variant="secondary"
             className="h-11"
-            disabled={active.length === 0}
+            disabled={!live || active.length === 0}
             onClick={() => setMode('room')}
           >
             {t('pos.register.room')}
           </Button>
-          {active.length === 0 && (
+          {active.length === 0 && live && (
             <Button variant="ghost" className="h-11" onClick={() => drop.mutate(undefined)}>
               {t('pos.register.drop')}
             </Button>
@@ -567,21 +635,24 @@ function AdjustForm({
 function Menu({ outletId, orderId }: { outletId: string; orderId: string }) {
   const { t } = useTranslation();
   const f = useFormats();
-  const root = useRoot();
   const [picking, setPicking] = useState<string | null>(null);
   const [mods, setMods] = useState<string[]>([]);
-  const menu = useQuery({
-    queryKey: [...root, 'menu', outletId],
-    queryFn: () => api.call('getOutletMenu', { query: { outletId } }),
-  });
-  const add = useChange(
-    (v: { menuItemId: string; modifierIds: string[] }) =>
-      api.call('addPosOrderLine', { params: { orderId }, body: v }),
-    () => {
+  const menu = useOutletMenu(outletId);
+  const send = useRegisterSend();
+  const nameOf = (id: string) =>
+    menu.data?.categories.flatMap((c) => c.items).find((i) => i.id === id)?.name ?? '';
+  const add = useMutation({
+    mutationFn: (v: { menuItemId: string; modifierIds: string[] }) =>
+      send(
+        'addPosOrderLine',
+        { params: { orderId }, body: v },
+        t('pos.offline.addLabel', { item: nameOf(v.menuItemId) }),
+      ),
+    onSuccess: () => {
       setPicking(null);
       setMods([]);
     },
-  );
+  });
   const items = (menu.data?.categories ?? []).flatMap((c) => c.items);
   const item = items.find((i) => i.id === picking);
   return (

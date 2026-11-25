@@ -234,6 +234,9 @@ export const RateCalendarDay = z
     closedToArrival: z.boolean(),
     closedToDeparture: z.boolean(),
     stopSell: z.boolean(),
+    /** The booking window (T-164): at least / at most this many days ahead of arrival. */
+    minAdvanceDays: z.number().int().nullable(),
+    maxAdvanceDays: z.number().int().nullable(),
     /** Goes up on every change; quotes store it. Null = never set. */
     ruleVersion: z.number().int().nullable(),
   })
@@ -260,12 +263,20 @@ export const RateCalendarSet = z
     closedToArrival: z.boolean(),
     closedToDeparture: z.boolean(),
     stopSell: z.boolean(),
+    /** Book at least this many days before arrival (an early-bird rate); null clears it. */
+    minAdvanceDays: z.number().int().min(0).max(730).nullable(),
+    /** Book at most this many days before arrival (a last-minute rate); null clears it. */
+    maxAdvanceDays: z.number().int().min(0).max(730).nullable(),
   })
   .partial()
   .refine((s) => Object.keys(s).length > 0, 'Change at least one thing')
   .refine((s) => (s.minStay ?? 0) <= (s.maxStay ?? 365), {
     message: 'Maximum stay must be at least the minimum',
     path: ['maxStay'],
+  })
+  .refine((s) => (s.minAdvanceDays ?? 0) <= (s.maxAdvanceDays ?? 730), {
+    message: 'The latest booking must come after the earliest',
+    path: ['maxAdvanceDays'],
   });
 
 export const RateCalendarUpdateBody = z

@@ -43,10 +43,19 @@ export interface DayRestrictions {
   closedToArrival: boolean;
   closedToDeparture: boolean;
   stopSell: boolean;
+  /** The booking window (T-164): days between booking and arrival, set on the arrival date. */
+  minAdvanceDays?: number | null;
+  maxAdvanceDays?: number | null;
 }
 
 export type RestrictionRule =
-  'STOP_SELL' | 'CLOSED_TO_ARRIVAL' | 'CLOSED_TO_DEPARTURE' | 'MIN_STAY' | 'MAX_STAY';
+  | 'STOP_SELL'
+  | 'CLOSED_TO_ARRIVAL'
+  | 'CLOSED_TO_DEPARTURE'
+  | 'MIN_STAY'
+  | 'MAX_STAY'
+  | 'MIN_ADVANCE'
+  | 'MAX_ADVANCE';
 
 export interface RestrictionViolation {
   rule: RestrictionRule;
@@ -60,11 +69,14 @@ export interface RestrictionViolation {
  * stop-sell on any night; closed to arrival on the arrival date; closed to departure on the
  * departure date; min/max stay as set on the arrival date. A date without a row has no
  * restrictions. Closed to arrival on a date never stops a stay that arrives earlier.
+ * With `bookedOn` (the property's today when booking), the booking window on the arrival date
+ * too: at least `minAdvanceDays` and at most `maxAdvanceDays` days ahead (T-164).
  */
 export function restrictionViolations(
   days: readonly DayRestrictions[],
   arrival: string,
   departure: string,
+  bookedOn?: string,
 ): RestrictionViolation[] {
   const byDate = new Map(days.map((d) => [d.date, d]));
   const nights = Math.round(
@@ -89,6 +101,19 @@ export function restrictionViolations(
   }
   if (maxStay !== null && nights > maxStay) {
     out.push({ rule: 'MAX_STAY', date: arrival, limit: maxStay });
+  }
+  if (bookedOn !== undefined) {
+    const ahead = Math.round(
+      (Date.parse(`${arrival}T00:00:00Z`) - Date.parse(`${bookedOn}T00:00:00Z`)) / 86_400_000,
+    );
+    const minAdvance = first?.minAdvanceDays ?? null;
+    const maxAdvance = first?.maxAdvanceDays ?? null;
+    if (minAdvance !== null && ahead < minAdvance) {
+      out.push({ rule: 'MIN_ADVANCE', date: arrival, limit: minAdvance });
+    }
+    if (maxAdvance !== null && ahead > maxAdvance) {
+      out.push({ rule: 'MAX_ADVANCE', date: arrival, limit: maxAdvance });
+    }
   }
   return out;
 }

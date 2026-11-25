@@ -19,6 +19,8 @@ export const VIOLATION_RULES = [
   'CLOSED_TO_DEPARTURE',
   'MIN_STAY',
   'MAX_STAY',
+  'MIN_ADVANCE',
+  'MAX_ADVANCE',
   'NO_PRICE',
 ] as const;
 

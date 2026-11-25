@@ -96,6 +96,25 @@ describe('restrictionViolations (M2-06)', () => {
       { rule: 'MAX_STAY', date: '2026-12-24', limit: 5 },
     ]);
   });
+
+  it('checks the booking window set on the arrival date, when the booking date is known (T-164)', () => {
+    // An early-bird night: 30+ days ahead. A last-minute night: within 3 days.
+    const days = [
+      day('2026-12-24', { minAdvanceDays: 30 }),
+      day('2026-11-12', { maxAdvanceDays: 3 }),
+      day('2026-11-20', { maxAdvanceDays: 3 }),
+    ];
+    expect(restrictionViolations(days, '2026-12-24', '2026-12-26', '2026-11-25')).toEqual([
+      { rule: 'MIN_ADVANCE', date: '2026-12-24', limit: 30 },
+    ]);
+    expect(restrictionViolations(days, '2026-12-24', '2026-12-26', '2026-11-24')).toEqual([]);
+    expect(restrictionViolations(days, '2026-11-12', '2026-11-13', '2026-11-10')).toEqual([]);
+    expect(restrictionViolations(days, '2026-11-20', '2026-11-21', '2026-11-10')).toEqual([
+      { rule: 'MAX_ADVANCE', date: '2026-11-20', limit: 3 },
+    ]);
+    // Without a booking date (an extension, an OTA booking): no window.
+    expect(restrictionViolations(days, '2026-12-24', '2026-12-26')).toEqual([]);
+  });
 });
 
 describe('splitPackage (M2-07)', () => {

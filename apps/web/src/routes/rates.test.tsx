@@ -121,6 +121,8 @@ beforeEach(() => {
           closedToArrival: i === 1,
           closedToDeparture: false,
           stopSell: i === 2,
+          minAdvanceDays: i === 3 ? 30 : null,
+          maxAdvanceDays: null,
           ruleVersion: 1,
         })),
       });
@@ -215,6 +217,21 @@ describe('Bulk edit', () => {
       set: { amountMinor: '6000000', stopSell: false },
     });
     expect(await within(form).findByText('4 days changed.')).toBeVisible();
+  });
+
+  it('sets a booking window, and shows it on the calendar (T-164)', async () => {
+    const user = userEvent.setup();
+    renderAt('/rates');
+    expect(await screen.findByText(/Book ≥30d ahead/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit prices and restrictions' }));
+    const form = screen.getByRole('form', { name: 'Edit Best available' });
+    await user.type(within(form).getByLabelText('Book at least (days ahead)'), '21');
+    await user.type(within(form).getByLabelText('Book at most (days ahead)'), '-');
+    await user.click(within(form).getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(sent('PUT /rate-calendar')).toHaveLength(1));
+    expect(sent('PUT /rate-calendar')[0]?.body).toMatchObject({
+      set: { minAdvanceDays: 21, maxAdvanceDays: null },
+    });
   });
 
   it('offers no price on a derived plan', async () => {

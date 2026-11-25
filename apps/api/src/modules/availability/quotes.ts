@@ -191,7 +191,8 @@ function price(
   ctx: Context,
   plan: PlanWithParts,
   roomTypeId: string,
-  stay: { arrival: string; departure: string },
+  /** `bookedOn`: the property's today, to check the booking window (T-164); left out, no window. */
+  stay: { arrival: string; departure: string; bookedOn?: string },
   guests: number,
   discountBps = 0,
   /** The price of each night when it is already set (an OTA booking, T-153). */
@@ -210,6 +211,8 @@ function price(
             closedToArrival: d.closedToArrival,
             closedToDeparture: d.closedToDeparture,
             stopSell: d.stopSell,
+            minAdvanceDays: d.minAdvanceDays,
+            maxAdvanceDays: d.maxAdvanceDays,
           },
         ]
       : [];
@@ -218,6 +221,7 @@ function price(
     restrictionDays,
     stay.arrival,
     stay.departure,
+    stay.bookedOn,
   );
   const taxes = new Map<string, bigint>();
   const nights: QuoteNight[] = [];
@@ -322,7 +326,7 @@ async function checkStay(
   if (nights > MAX_STAY_NIGHTS) {
     throw invalid(`${where}.departure`, `At most ${MAX_STAY_NIGHTS} nights per search`);
   }
-  return { currency: property.baseCurrency, nights };
+  return { currency: property.baseCurrency, nights, today };
 }
 
 export async function getAvailability(
@@ -331,7 +335,7 @@ export async function getAvailability(
   query: z.output<typeof AvailabilityQuery>,
   discountBps = 0,
 ) {
-  const { currency, nights } = await checkStay(deps, tenant, query, 'query');
+  const { currency, nights, today } = await checkStay(deps, tenant, query, 'query');
   const ctx = await load(deps.tenantDb, query);
   const dates = stayDates(query.arrival, query.departure);
   const guests = query.adults + query.children;
@@ -342,7 +346,7 @@ export async function getAvailability(
       const plans = [...ctx.plans.values()]
         .filter((p) => sells(p, type.id, query.companyId))
         .map((plan) => {
-          const p = price(ctx, plan, type.id, query, guests, discountBps);
+          const p = price(ctx, plan, type.id, { ...query, bookedOn: today }, guests, discountBps);
           return {
             ratePlanId: plan.id,
             code: plan.code,
@@ -378,7 +382,7 @@ export async function createQuote(
   body: z.output<typeof QuoteBody>,
   discountBps = 0,
 ): Promise<z.input<typeof QuoteItem>> {
-  const { currency } = await checkStay(deps, tenant, body, 'body');
+  const { currency, today } = await checkStay(deps, tenant, body, 'body');
   const ctx = await load(deps.tenantDb, body);
   const type = ctx.types.find((t) => t.id === body.roomTypeId);
   if (!type) throw invalid('body.roomTypeId', 'Choose an active room type of this property');
@@ -402,7 +406,7 @@ export async function createQuote(
       'Add a room revenue code (Tax and FX) before selling rooms',
     );
   }
-  const p = price(ctx, plan, type.id, body, guests, discountBps);
+  const p = price(ctx, plan, type.id, { ...body, bookedOn: today }, guests, discountBps);
   if (p.violations.length > 0 || !p.nights) {
     throw new AppError('RESTRICTION_VIOLATED', 'This stay cannot be sold on this rate plan', {
       violations: p.violations,

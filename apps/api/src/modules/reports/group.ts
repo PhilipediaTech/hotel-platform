@@ -39,16 +39,20 @@ const nextMonth = (month: string) => {
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 /**
- * The properties whose group figures the caller sees: every one of the organisation when they
- * hold report.group organisation-wide, else those they hold it for. Archived ones are left out.
+ * The properties the caller holds a group permission for: every one of the organisation when
+ * they hold it organisation-wide, else those they hold it for. Archived ones are left out.
  */
-async function groupProperties(deps: ReportDeps, tenant: TenantContext) {
+export async function propertiesWith(
+  deps: Pick<ReportDeps, 'db'>,
+  tenant: TenantContext,
+  permission: 'report.group' | 'rate.group.manage',
+) {
   const memberships = await deps.db.membership.findMany({
     where: {
       userId: tenant.userId,
       organisationId: tenant.organisationId,
       active: true,
-      role: { permissions: { has: 'report.group' } },
+      role: { permissions: { has: permission } },
     },
     select: { propertyId: true },
   });
@@ -94,7 +98,7 @@ export async function groupDashboard(
 ): Promise<DashboardOut> {
   const month =
     q.month ?? (await businessDay(deps.db, tenant.propertyId, deps.clock)).date.slice(0, 7);
-  const properties = await groupProperties(deps, tenant);
+  const properties = await propertiesWith(deps, tenant, 'report.group');
   const groupCurrency = await groupCurrencyOf(deps, tenant);
   const rates = await ratesFor(deps, tenant, month, groupCurrency);
   // Several properties: read outside this request's property (row-level security would show
@@ -194,7 +198,7 @@ export async function groupDashboard(
 
 async function ratesOut(deps: ReportDeps, tenant: TenantContext, month: string): Promise<RatesOut> {
   const groupCurrency = await groupCurrencyOf(deps, tenant);
-  const properties = await groupProperties(deps, tenant);
+  const properties = await propertiesWith(deps, tenant, 'report.group');
   const currencies = [...new Set(properties.map((p) => p.baseCurrency))]
     .filter((c) => c !== groupCurrency)
     .sort();
@@ -222,7 +226,7 @@ export async function putGroupRates(
   tenant: TenantContext,
   body: z.output<typeof GroupRatesBody>,
 ): Promise<RatesOut> {
-  const properties = await groupProperties(deps, tenant);
+  const properties = await propertiesWith(deps, tenant, 'report.group');
   const used = new Set(properties.map((p) => p.baseCurrency));
   const issues: { path: string; code: string; message: string }[] = [];
   body.rates.forEach((r, i) => {

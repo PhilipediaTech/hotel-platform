@@ -412,6 +412,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-033',
   },
   {
+    // T-162 (PRD M2-13): one plan in several properties; beside the rate calendar (S23).
+    id: 'group-rates',
+    path: '/group-rates',
+    anyOf: ['rate.group.manage'],
+    group: 'revenue',
+    screen: 'S23',
+    ticket: 'T-162',
+  },
+  {
     // M14-13: no screen of its own in tab 5; it sits with the rate calendar (S23).
     id: 'price-suggestions',
     path: '/price-suggestions',

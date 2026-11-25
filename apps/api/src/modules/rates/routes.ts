@@ -1,7 +1,8 @@
-import { PRICE_SUGGESTION_ROUTES, RATE_ROUTES } from '@hotel/shared';
+import { GROUP_ROUTES, PRICE_SUGGESTION_ROUTES, RATE_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as group from './group.ts';
 import * as rates from './service.ts';
 import * as suggestions from './suggestions.ts';
 
@@ -43,6 +44,10 @@ export function rateRoutes(deps: rates.RateDeps): Router {
   mountRoute(router, r.getRateCalendar, ({ query }) => rates.getRateCalendar(deps, query));
   mountRoute(router, r.updateRateCalendar, ({ body }, { tenant }) =>
     rates.updateRateCalendar(deps, tenantFrom(tenant), body),
+  );
+  // One plan in several properties at once (M2-13; T-162).
+  mountRoute(router, GROUP_ROUTES.changeGroupRates, ({ body }, { tenant }) =>
+    group.changeGroupRates(deps, tenantFrom(tenant), body),
   );
 
   mountRoute(router, r.listPackages, async () => ({

@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-161 (group dashboard with currency conversion) is pushed on `feat/T-161-group-dashboard` (migration 20270104090000_group_reports). Next: V2 group rate push (M2-13).
+T-162 (rate changes across properties) is pushed on `feat/T-162-group-rate-push` (no migration). Next: corporate accounts at group level (V2).

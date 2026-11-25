@@ -159,8 +159,14 @@ export const GroupRestrictions = z
     closedToArrival: z.boolean(),
     closedToDeparture: z.boolean(),
     stopSell: z.boolean(),
+    minAdvanceDays: z.number().int().min(0).max(730).nullable(),
+    maxAdvanceDays: z.number().int().min(0).max(730).nullable(),
   })
   .partial()
+  .refine((r) => (r.minAdvanceDays ?? 0) <= (r.maxAdvanceDays ?? 730), {
+    message: 'The latest booking must come after the earliest',
+    path: ['maxAdvanceDays'],
+  })
   .refine((r) => (r.minStay ?? 0) <= (r.maxStay ?? 365), {
     message: 'Maximum stay must be at least the minimum',
     path: ['maxStay'],

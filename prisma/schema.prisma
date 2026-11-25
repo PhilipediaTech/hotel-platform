@@ -1041,6 +1041,9 @@ model RateDay {
   closedToArrival   Boolean  @default(false) @map("closed_to_arrival")
   closedToDeparture Boolean  @default(false) @map("closed_to_departure")
   stopSell          Boolean  @default(false) @map("stop_sell")
+  /// The booking window (T-164): days between booking and arrival, on the arrival date.
+  minAdvanceDays    Int?     @map("min_advance_days")
+  maxAdvanceDays    Int?     @map("max_advance_days")
   ruleVersion       Int      @default(1) @map("rule_version")
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 

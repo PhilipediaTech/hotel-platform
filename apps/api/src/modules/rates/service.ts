@@ -421,6 +421,8 @@ export async function getRateCalendar(
         closedToArrival: row?.closedToArrival ?? false,
         closedToDeparture: row?.closedToDeparture ?? false,
         stopSell: row?.stopSell ?? false,
+        minAdvanceDays: row?.minAdvanceDays ?? null,
+        maxAdvanceDays: row?.maxAdvanceDays ?? null,
         ruleVersion: row?.ruleVersion ?? null,
       });
     }
@@ -475,11 +477,12 @@ export async function writeRateDays(
   const has = (field: keyof typeof s) => s[field] !== undefined;
   return tx.$executeRaw`
       INSERT INTO rate_days AS r (property_id, rate_plan_id, room_type_id, date, amount_minor,
-        min_stay, max_stay, closed_to_arrival, closed_to_departure, stop_sell, rule_version, updated_at)
+        min_stay, max_stay, closed_to_arrival, closed_to_departure, stop_sell,
+        min_advance_days, max_advance_days, rule_version, updated_at)
       SELECT ${propertyId}::uuid, ${ratePlanId}::uuid, rt, d::date,
         ${big(s.amountMinor)}::bigint, ${s.minStay ?? null}::int, ${s.maxStay ?? null}::int,
         ${s.closedToArrival ?? false}, ${s.closedToDeparture ?? false}, ${s.stopSell ?? false},
-        1, now()
+        ${s.minAdvanceDays ?? null}::int, ${s.maxAdvanceDays ?? null}::int, 1, now()
       FROM unnest(${body.roomTypeIds}::uuid[]) AS rt,
         generate_series(${body.from}::date, ${body.to}::date, interval '1 day') AS d
       WHERE extract(isodow FROM d)::int = ANY(${body.weekdays}::int[])
@@ -490,6 +493,8 @@ export async function writeRateDays(
         closed_to_arrival = CASE WHEN ${has('closedToArrival')} THEN EXCLUDED.closed_to_arrival ELSE r.closed_to_arrival END,
         closed_to_departure = CASE WHEN ${has('closedToDeparture')} THEN EXCLUDED.closed_to_departure ELSE r.closed_to_departure END,
         stop_sell = CASE WHEN ${has('stopSell')} THEN EXCLUDED.stop_sell ELSE r.stop_sell END,
+        min_advance_days = CASE WHEN ${has('minAdvanceDays')} THEN EXCLUDED.min_advance_days ELSE r.min_advance_days END,
+        max_advance_days = CASE WHEN ${has('maxAdvanceDays')} THEN EXCLUDED.max_advance_days ELSE r.max_advance_days END,
         rule_version = r.rule_version + 1,
         updated_at = now()
       WHERE (
@@ -498,9 +503,11 @@ export async function writeRateDays(
         CASE WHEN ${has('maxStay')} THEN EXCLUDED.max_stay ELSE r.max_stay END,
         CASE WHEN ${has('closedToArrival')} THEN EXCLUDED.closed_to_arrival ELSE r.closed_to_arrival END,
         CASE WHEN ${has('closedToDeparture')} THEN EXCLUDED.closed_to_departure ELSE r.closed_to_departure END,
-        CASE WHEN ${has('stopSell')} THEN EXCLUDED.stop_sell ELSE r.stop_sell END
+        CASE WHEN ${has('stopSell')} THEN EXCLUDED.stop_sell ELSE r.stop_sell END,
+        CASE WHEN ${has('minAdvanceDays')} THEN EXCLUDED.min_advance_days ELSE r.min_advance_days END,
+        CASE WHEN ${has('maxAdvanceDays')} THEN EXCLUDED.max_advance_days ELSE r.max_advance_days END
       ) IS DISTINCT FROM (r.amount_minor, r.min_stay, r.max_stay, r.closed_to_arrival,
-        r.closed_to_departure, r.stop_sell)`;
+        r.closed_to_departure, r.stop_sell, r.min_advance_days, r.max_advance_days)`;
 }
 
 export async function updateRateCalendar(
@@ -547,6 +554,12 @@ export async function updateRateCalendar(
       // A max stay below an existing min stay (or the reverse) on some day.
       if (pgErrorInfo(err)?.constraint === 'rate_days_stay_check') {
         throw invalid('set.maxStay', 'On some days the maximum stay would be below the minimum');
+      }
+      if (pgErrorInfo(err)?.constraint === 'rate_days_advance_check') {
+        throw invalid(
+          'set.maxAdvanceDays',
+          'On some days the latest booking would come before the earliest',
+        );
       }
       throw err;
     });

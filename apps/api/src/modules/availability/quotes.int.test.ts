@@ -113,7 +113,7 @@ async function hotel(rooms = 3) {
       adults: 2,
       ...body,
     });
-  return { ...h, as, gm, std, ste, roomIds, bar, corp, bb, rates, search, quote };
+  return { ...h, as, gm, ok, std, ste, roomIds, bar, corp, bb, rates, search, quote };
 }
 
 const planOf = (types: Type[], typeId: string, code: string) =>
@@ -369,5 +369,86 @@ describe('availability search (M2-10, M2 rules 1 and 5)', () => {
     ).get(`/availability?arrival=${ARRIVE}&departure=${LEAVE}&adults=1`);
     expect(res.status).toBe(403);
     expect(errorOf(res).details).toEqual({ permission: 'availability.read' });
+  });
+});
+
+describe('the booking window (T-164)', () => {
+  it('sells an early-bird night only far enough ahead, and a last-minute one only close in', async () => {
+    const h = await hotel();
+    // Christmas on BAR: book at least 45 days ahead (today is 10 November: 44 days to 24 Dec).
+    await h.rates({
+      ratePlanId: h.bar.id,
+      roomTypeIds: [h.std.id],
+      from: '2026-12-24',
+      to: '2026-12-24',
+      set: { minAdvanceDays: 45 },
+    });
+    const early = await h.quote({ arrival: '2026-12-24', departure: '2026-12-26' });
+    expect(early.status).toBe(422);
+    expect(errorOf(early).details).toEqual({
+      violations: [{ rule: 'MIN_ADVANCE', date: '2026-12-24', limit: 45 }],
+    });
+    // Arriving the 25th is not restricted (the window is on the arrival date).
+    expect((await h.quote({ arrival: '2026-12-25', departure: '2026-12-27' })).status).toBe(201);
+
+    // Last minute: the 12th within 3 days (2 ahead: fine), the 20th too (10 ahead: not).
+    await h.rates({
+      ratePlanId: h.bar.id,
+      roomTypeIds: [h.std.id],
+      from: '2026-11-12',
+      to: '2026-11-20',
+      set: { maxAdvanceDays: 3 },
+    });
+    expect((await h.quote({})).status).toBe(201);
+    const search = await h.search('arrival=2026-11-20&departure=2026-11-21&adults=1');
+    const bar = search.roomTypes.find((t) => t.code === 'STD')?.plans.find((p) => p.code === 'BAR');
+    expect(bar).toMatchObject({
+      sellable: false,
+      violations: [{ rule: 'MAX_ADVANCE', date: '2026-11-20', limit: 3 }],
+    });
+
+    // The calendar shows the window, and clearing it sells again.
+    const cal = await h.ok<{
+      days: { date: string; roomTypeId: string; minAdvanceDays: number | null }[];
+    }>(h.gm.get(`/rate-calendar?ratePlanId=${h.bar.id}&from=2026-12-24&to=2026-12-24`));
+    expect(cal.days.find((d) => d.roomTypeId === h.std.id)?.minAdvanceDays).toBe(45);
+    await h.rates({
+      ratePlanId: h.bar.id,
+      roomTypeIds: [h.std.id],
+      from: '2026-12-24',
+      to: '2026-12-24',
+      set: { minAdvanceDays: null },
+    });
+    expect((await h.quote({ arrival: '2026-12-24', departure: '2026-12-26' })).status).toBe(201);
+  });
+
+  it('refuses a latest booking before the earliest', async () => {
+    const h = await hotel();
+    const bad = await h.gm.put('/rate-calendar', {
+      ratePlanId: h.bar.id,
+      roomTypeIds: [h.std.id],
+      from: '2026-12-01',
+      to: '2026-12-01',
+      set: { minAdvanceDays: 10, maxAdvanceDays: 5 },
+    });
+    expect(bad.status).toBe(400);
+    await h.rates({
+      ratePlanId: h.bar.id,
+      roomTypeIds: [h.std.id],
+      from: '2026-12-01',
+      to: '2026-12-01',
+      set: { minAdvanceDays: 10 },
+    });
+    const clash = await h.gm.put('/rate-calendar', {
+      ratePlanId: h.bar.id,
+      roomTypeIds: [h.std.id],
+      from: '2026-12-01',
+      to: '2026-12-01',
+      set: { maxAdvanceDays: 5 },
+    });
+    expect(clash.status).toBe(400);
+    expect(errorOf(clash).message).toBe(
+      'On some days the latest booking would come before the earliest',
+    );
   });
 });

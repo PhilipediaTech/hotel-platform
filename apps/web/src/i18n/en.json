@@ -518,7 +518,9 @@
       "cta": "No arrivals",
       "ctd": "No departures",
       "min": "Min {{n}}",
-      "max": "Max {{n}}"
+      "max": "Max {{n}}",
+      "minAdvance": "Book ≥{{n}}d ahead",
+      "maxAdvance": "Book ≤{{n}}d ahead"
     },
     "kinds": {
       "BAR": "BAR",
@@ -560,6 +562,9 @@
       "derivedPrice": "Prices follow the parent plan; you can still set restrictions here.",
       "minStay": "Minimum nights",
       "maxStay": "Maximum nights",
+      "minAdvance": "Book at least (days ahead)",
+      "maxAdvance": "Book at most (days ahead)",
+      "advanceHint": "Days between booking and arrival, set on the arrival date. Blank keeps it; \"-\" removes it",
       "stayHint": "Blank keeps it; \"-\" removes it",
       "cta": "Closed to arrival",
       "ctd": "Closed to departure",
@@ -850,6 +855,8 @@
       "CLOSED_TO_DEPARTURE": "No departures {{date}}",
       "MIN_STAY": "At least {{n}} nights from {{date}}",
       "MAX_STAY": "At most {{n}} nights from {{date}}",
+      "MIN_ADVANCE": "Book at least {{n}} days ahead to arrive {{date}}",
+      "MAX_ADVANCE": "Bookable at most {{n}} days ahead to arrive {{date}}",
       "NO_PRICE": "No price on {{date}}"
     },
     "detailsTitle": "Booking details",

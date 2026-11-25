@@ -338,6 +338,8 @@ function Badges({ day }: { day: Day }) {
     day.closedToDeparture && t('rates.tags.ctd'),
     day.minStay !== null && t('rates.tags.min', { n: day.minStay }),
     day.maxStay !== null && t('rates.tags.max', { n: day.maxStay }),
+    day.minAdvanceDays !== null && t('rates.tags.minAdvance', { n: day.minAdvanceDays }),
+    day.maxAdvanceDays !== null && t('rates.tags.maxAdvance', { n: day.maxAdvanceDays }),
   ].filter(Boolean);
   if (tags.length === 0) return null;
   return (
@@ -491,6 +493,8 @@ function BulkForm({ plan, r, onDone }: { plan: Plan; r: Rates; onDone: () => voi
   const [clearPrice, setClearPrice] = useState(false);
   const [minStay, setMinStay] = useState('');
   const [maxStay, setMaxStay] = useState('');
+  const [minAdvance, setMinAdvance] = useState('');
+  const [maxAdvance, setMaxAdvance] = useState('');
   const [cta, setCta] = useState<Tri>('leave');
   const [ctd, setCtd] = useState<Tri>('leave');
   const [stop, setStop] = useState<Tri>('leave');
@@ -508,6 +512,12 @@ function BulkForm({ plan, r, onDone }: { plan: Plan; r: Rates; onDone: () => voi
             : {}),
         ...(minStay.trim() ? { minStay: minStay === '-' ? null : Number(minStay) } : {}),
         ...(maxStay.trim() ? { maxStay: maxStay === '-' ? null : Number(maxStay) } : {}),
+        ...(minAdvance.trim()
+          ? { minAdvanceDays: minAdvance === '-' ? null : Number(minAdvance) }
+          : {}),
+        ...(maxAdvance.trim()
+          ? { maxAdvanceDays: maxAdvance === '-' ? null : Number(maxAdvance) }
+          : {}),
         ...(tri(cta) !== undefined ? { closedToArrival: tri(cta) } : {}),
         ...(tri(ctd) !== undefined ? { closedToDeparture: tri(ctd) } : {}),
         ...(tri(stop) !== undefined ? { stopSell: tri(stop) } : {}),
@@ -654,6 +664,24 @@ function BulkForm({ plan, r, onDone }: { plan: Plan; r: Rates; onDone: () => voi
           value={maxStay}
           onChange={(e) => setMaxStay(e.target.value)}
           error={errors['maxStay']}
+        />
+      </div>
+      <div className="grid gap-x-4 sm:grid-cols-2">
+        <Field
+          label={t('rates.bulk.minAdvance')}
+          hint={t('rates.bulk.advanceHint')}
+          inputMode="numeric"
+          value={minAdvance}
+          onChange={(e) => setMinAdvance(e.target.value)}
+          error={errors['minAdvanceDays']}
+        />
+        <Field
+          label={t('rates.bulk.maxAdvance')}
+          hint={t('rates.bulk.advanceHint')}
+          inputMode="numeric"
+          value={maxAdvance}
+          onChange={(e) => setMaxAdvance(e.target.value)}
+          error={errors['maxAdvanceDays']}
         />
       </div>
       <div className="grid gap-x-4 sm:grid-cols-3">

@@ -6040,6 +6040,18 @@
           "stopSell": {
             "type": "boolean"
           },
+          "minAdvanceDays": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "maxAdvanceDays": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "ruleVersion": {
             "type": [
               "integer",
@@ -6057,6 +6069,8 @@
           "closedToArrival",
           "closedToDeparture",
           "stopSell",
+          "minAdvanceDays",
+          "maxAdvanceDays",
           "ruleVersion"
         ]
       },
@@ -6382,6 +6396,8 @@
               "CLOSED_TO_DEPARTURE",
               "MIN_STAY",
               "MAX_STAY",
+              "MIN_ADVANCE",
+              "MAX_ADVANCE",
               "NO_PRICE"
             ]
           },
@@ -45692,6 +45708,22 @@
                       },
                       "stopSell": {
                         "type": "boolean"
+                      },
+                      "minAdvanceDays": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 730
+                      },
+                      "maxAdvanceDays": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 730
                       }
                     }
                   }
@@ -83889,6 +83921,22 @@
                       },
                       "stopSell": {
                         "type": "boolean"
+                      },
+                      "minAdvanceDays": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 730
+                      },
+                      "maxAdvanceDays": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 730
                       }
                     }
                   },

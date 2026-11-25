@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-163 (corporate accounts at group level) is pushed on `feat/T-163-group-corporate-accounts` (no migration). Next: advanced rate restrictions (V2).
+T-164 (booking window) is pushed on `feat/T-164-booking-window` (migration 20270105090000_booking_window). Next: the pickup and pace report (V2).

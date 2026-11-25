@@ -47,7 +47,7 @@ type ItemOut = z.input<typeof ReviewItem>;
 type PublicOut = z.input<typeof PublicReview>;
 type Status = (typeof REVIEW_STATUSES)[number];
 
-const LINK_DAYS = 30;
+export const LINK_DAYS = 30;
 /** Guests who checked out longer ago than this are never asked (late switch-on, outages). */
 const LOOK_BACK_DAYS = 7;
 const DAY = 86_400_000;

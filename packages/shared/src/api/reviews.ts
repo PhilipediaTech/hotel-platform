@@ -37,7 +37,7 @@ export const ReviewItem = z
     arrival: IsoDate,
     departure: IsoDate,
     /** How the request went. */
-    channel: z.enum(['EMAIL', 'WHATSAPP']),
+    channel: z.enum(['EMAIL', 'WHATSAPP', 'PORTAL']),
     requestedAt: Instant,
     rating: z.number().int().min(1).max(5).nullable(),
     comment: z.string().nullable(),

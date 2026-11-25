@@ -21,7 +21,8 @@
     "asked": "Asked {{when}} by {{channel}}; no review yet.",
     "channel": {
       "EMAIL": "email",
-      "WHATSAPP": "WhatsApp"
+      "WHATSAPP": "WhatsApp",
+      "PORTAL": "their booking link"
     },
     "noComment": "No comment, only stars.",
     "repliedBy": "Sent by {{name}}, {{when}}",

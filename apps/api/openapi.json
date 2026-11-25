@@ -3396,6 +3396,108 @@
           "currency"
         ]
       },
+      "PublicStay": {
+        "type": "object",
+        "properties": {
+          "closedReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_CONFIRMED",
+              "CANCELLED",
+              "ENDED",
+              null
+            ]
+          },
+          "roomNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "HOUSEKEEPING",
+                    "AMENITIES",
+                    "MAINTENANCE",
+                    "FOOD_DRINK",
+                    "TRANSPORT",
+                    "OTHER"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "RECEIVED",
+                    "ON_IT",
+                    "DONE"
+                  ]
+                },
+                "createdAt": {
+                  "$ref": "#/components/schemas/Instant"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "note",
+                "status",
+                "createdAt"
+              ]
+            }
+          },
+          "feedback": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "AVAILABLE",
+                  "OPEN",
+                  "GIVEN",
+                  "EXPIRED"
+                ]
+              },
+              "path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "path"
+            ]
+          }
+        },
+        "required": [
+          "closedReason",
+          "roomNumber",
+          "requests",
+          "feedback"
+        ]
+      },
       "OnlineCheckInForDesk": {
         "type": "object",
         "properties": {
@@ -18675,7 +18777,8 @@
             "type": "string",
             "enum": [
               "EMAIL",
-              "WHATSAPP"
+              "WHATSAPP",
+              "PORTAL"
             ]
           },
           "requestedAt": {
@@ -34710,6 +34813,307 @@
                   "required": [
                     "paymentUrl",
                     "amountMinor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/bookings/{token}/stay": {
+      "get": {
+        "operationId": "getPublicStay",
+        "summary": "The guest’s requests and feedback, from their secure link (M11-06)",
+        "tags": [
+          "Public booking"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 100
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicStay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/bookings/{token}/requests": {
+      "post": {
+        "operationId": "createPublicServiceRequest",
+        "summary": "Ask the hotel for something, from the secure link (M11-06)",
+        "tags": [
+          "Public booking"
+        ],
+        "security": [],
+        "description": "From confirmation until the stay ends. Each request becomes a guest-request task for the department that does it. At most 5 wait at once.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 100
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "requestKey": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "HOUSEKEEPING",
+                      "AMENITIES",
+                      "MAINTENANCE",
+                      "FOOD_DRINK",
+                      "TRANSPORT",
+                      "OTHER"
+                    ]
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "default": null
+                  }
+                },
+                "required": [
+                  "requestKey",
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicStay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`, `IDEMPOTENCY_KEY_REUSED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/bookings/{token}/feedback": {
+      "post": {
+        "operationId": "startPublicFeedback",
+        "summary": "Open the page to rate the stay, from the secure link (M11-06)",
+        "tags": [
+          "Public booking"
+        ],
+        "security": [],
+        "description": "Gives the review page of this stay, making it the first time.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 100
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
                   ]
                 }
               }

@@ -189,6 +189,7 @@ model Property {
   channelAriChanges    ChannelAriChange[]
   channelBookings      ChannelBookingRevision[]
   guestReviews         GuestReview[]
+  serviceRequests      ServiceRequest[]
   kitchenTickets       KitchenTicket[]
   recipes              Recipe[]
   recipeLines          RecipeLine[]
@@ -1288,6 +1289,7 @@ model Reservation {
   messageThreads          MessageThread[]
   channelBookingRevisions ChannelBookingRevision[]
   reviews                 GuestReview[]
+  serviceRequests         ServiceRequest[]
 
   @@unique([propertyId, confirmationNo])
   @@unique([propertyId, source, channelRef])
@@ -1323,24 +1325,25 @@ model Stay {
   version         Int               @default(0)
   serviceBookings ServiceBooking[]
 
-  property    Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  reservation Reservation         @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
-  guest       Guest               @relation(fields: [guestId], references: [id], onDelete: Restrict)
-  review      GuestReview?
-  roomType    RoomType            @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
-  room        Room?               @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
-  ratePlan    RatePlan            @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
-  quote       Quote               @relation(fields: [quoteId], references: [id], onDelete: Restrict)
-  folio       Folio?              @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
-  nights      StayNight[]
-  allocations RoomAllocation[]
-  keys        KeyIssue[]
-  occupants   StayOccupant[]
-  visitors    Visitor[]
-  roomCharges RoomChargePosting[]
-  commission  Commission?
-  tasks       Task[]
-  card        RegistrationCard?
+  property        Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation     Reservation         @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  guest           Guest               @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  review          GuestReview?
+  serviceRequests ServiceRequest[]
+  roomType        RoomType            @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict)
+  room            Room?               @relation(fields: [propertyId, roomId], references: [propertyId, id], onDelete: Restrict)
+  ratePlan        RatePlan            @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict)
+  quote           Quote               @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  folio           Folio?              @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
+  nights          StayNight[]
+  allocations     RoomAllocation[]
+  keys            KeyIssue[]
+  occupants       StayOccupant[]
+  visitors        Visitor[]
+  roomCharges     RoomChargePosting[]
+  commission      Commission?
+  tasks           Task[]
+  card            RegistrationCard?
 
   // Target of the composite foreign key from room allocations.
   onlineCheckIn OnlineCheckIn?
@@ -2356,6 +2359,7 @@ model Task {
   workOrder      WorkOrderDetail?
   preventivePlan PreventivePlan?
   checklistRun   ChecklistRun?
+  serviceRequest ServiceRequest?
 
   @@unique([propertyId, number])
   @@index([propertyId, status])
@@ -4932,6 +4936,31 @@ model GuestReview {
   @@index([propertyId, requestedAt])
   @@index([reservationId, guestId])
   @@map("guest_reviews")
+}
+
+/// What a guest asked for from their private link (PRD M11-06 "request services"; S45; T-159).
+/// Each request is a guest-request task for the department that does it; the guest follows the
+/// task's progress on their link. clientKey: the page's own key, so a retry is the same request.
+model ServiceRequest {
+  id            String   @id @db.Uuid
+  propertyId    String   @map("property_id") @db.Uuid
+  reservationId String   @map("reservation_id") @db.Uuid
+  stayId        String   @map("stay_id") @db.Uuid
+  /// HOUSEKEEPING | AMENITIES | MAINTENANCE | FOOD_DRINK | TRANSPORT | OTHER
+  kind          String
+  note          String?
+  taskId        String   @unique @map("task_id") @db.Uuid
+  clientKey     String   @map("client_key") @db.Uuid
+  createdAt     DateTime @map("created_at") @db.Timestamptz(6)
+
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation Reservation @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  stay        Stay        @relation(fields: [propertyId, stayId], references: [propertyId, id], onDelete: Restrict)
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, clientKey])
+  @@index([reservationId, createdAt])
+  @@map("service_requests")
 }
 
 // ───────────────────────── Kitchen display (M8-06; T-156) ─────────────────────────

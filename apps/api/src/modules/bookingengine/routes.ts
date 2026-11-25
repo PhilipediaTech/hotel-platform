@@ -2,6 +2,7 @@ import { BOOKING_ENGINE_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as requests from './guest-requests.ts';
 import * as checkIn from './online-check-in.ts';
 import * as engine from './service.ts';
 
@@ -43,6 +44,13 @@ export function bookingEngineRoutes(deps: engine.BookingEngineDeps): Router {
   );
   mountRoute(router, r.payPublicBalance, ({ params, body }) =>
     checkIn.payBalance(deps, params.token, body.returnUrl),
+  );
+  mountRoute(router, r.getPublicStay, ({ params }) => requests.getPublicStay(deps, params.token));
+  mountRoute(router, r.createPublicServiceRequest, ({ params, body }) =>
+    requests.createServiceRequest(deps, params.token, body),
+  );
+  mountRoute(router, r.startPublicFeedback, ({ params }) =>
+    requests.startFeedback(deps, params.token),
   );
   mountRoute(router, r.getOnlineCheckIn, ({ params }) =>
     checkIn.onlineCheckInForDesk(deps, params.stayId),

@@ -120,6 +120,7 @@ label {
 }
 
 select,
+textarea,
 input:not([type='radio'], [type='checkbox'], [type='file']) {
   width: 100%;
   min-height: 44px;
@@ -208,6 +209,34 @@ button.danger {
 
 .status-cancelled {
   color: var(--critical);
+}
+
+/* Requests on the guest's link (T-159) */
+.requests {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.requests li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.requests .status {
+  margin-left: auto;
+}
+
+.status-received {
+  color: var(--muted);
+}
+
+.status-on_it,
+.status-done {
+  color: var(--brand);
 }
 
 /* Review page (T-155) */

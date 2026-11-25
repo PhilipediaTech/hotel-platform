@@ -7,6 +7,8 @@ import type {
   PublicBookingCreated,
   PublicProperty,
   PublicReview,
+  PublicServiceRequestBody,
+  PublicStay,
 } from '@hotel/shared';
 import type { z } from 'zod';
 
@@ -21,6 +23,8 @@ export type BookingRequest = z.input<typeof PublicBookingBody>;
 export type CheckInInfo = z.output<typeof OnlineCheckInInfo>;
 export type CheckInRequest = z.input<typeof OnlineCheckInBody>;
 export type Review = z.output<typeof PublicReview>;
+export type Stay = z.output<typeof PublicStay>;
+export type ServiceRequest = z.input<typeof PublicServiceRequestBody>;
 
 export interface SearchRequest {
   slug: string;
@@ -45,6 +49,10 @@ export interface Api {
   /** The guest's review page (T-155). */
   review(token: string): Promise<Review>;
   submitReview(token: string, body: { rating: number; comment: string | null }): Promise<Review>;
+  /** Requests and feedback on the guest's link (T-159). */
+  stay(token: string): Promise<Stay>;
+  requestService(token: string, body: ServiceRequest): Promise<Stay>;
+  startFeedback(token: string): Promise<{ path: string }>;
 }
 
 export class ApiError extends Error {
@@ -125,6 +133,11 @@ export function createApi(base: string): Api {
       call(base, `/bookings/${encodeURIComponent(token)}/pay`, post({ returnUrl })),
     review: (token) => call(base, `/reviews/${encodeURIComponent(token)}`),
     submitReview: (token, body) => call(base, `/reviews/${encodeURIComponent(token)}`, post(body)),
+    stay: (token) => call(base, `/bookings/${encodeURIComponent(token)}/stay`),
+    requestService: (token, body) =>
+      call(base, `/bookings/${encodeURIComponent(token)}/requests`, post(body)),
+    startFeedback: (token) =>
+      call(base, `/bookings/${encodeURIComponent(token)}/feedback`, post({})),
     uploadId: async (token, file) => {
       const link = await call<{
         fileId: string;

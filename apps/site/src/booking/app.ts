@@ -7,6 +7,8 @@ import {
   type CheckInRequest,
   type Property,
   type Review,
+  type ServiceRequest,
+  type Stay,
 } from './api.ts';
 
 // The guest booking site (PRD M11-01, M11-02; S39; T-113): dates, rooms, plans, guest details,
@@ -77,6 +79,22 @@ const PURPOSES: Record<string, string> = {
   CONFERENCE: 'Conference',
   FAMILY: 'Family',
   OTHER: 'Other',
+};
+
+// What a guest can ask for on their link, and how its progress reads (T-159).
+const KINDS: [ServiceRequest['kind'], string][] = [
+  ['HOUSEKEEPING', 'Cleaning or fresh towels'],
+  ['AMENITIES', 'Toiletries, pillows or other extras'],
+  ['MAINTENANCE', 'Something in the room needs fixing'],
+  ['FOOD_DRINK', 'Food or drink'],
+  ['TRANSPORT', 'Airport pickup or a taxi'],
+  ['OTHER', 'Something else'],
+];
+const KIND_NAME = Object.fromEntries(KINDS) as Record<ServiceRequest['kind'], string>;
+const PROGRESS: Record<Stay['requests'][number]['status'], string> = {
+  RECEIVED: 'Received',
+  ON_IT: 'Someone is on it',
+  DONE: 'Done',
 };
 
 const messageOf = (err: unknown) =>
@@ -615,6 +633,7 @@ export function mount(root: HTMLElement, env: Env): void {
     document.title = `Your booking ${b.confirmationNo}`;
     const area = h('div', {});
     const extras = h('div', {});
+    const during = h('div', {});
     const due = BigInt(b.totalMinor) - BigInt(b.paidMinor);
     show(
       h('h1', {}, b.hotel.name),
@@ -651,9 +670,167 @@ export function mount(root: HTMLElement, env: Env): void {
         area,
       ),
       extras,
+      during,
     );
     if (b.cancellation.allowed) offerCancel(area, token, b);
     if (b.status === 'CONFIRMED') void offerCheckIn(extras, token, b);
+    if (['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'].includes(b.status)) {
+      void offerStay(during, token);
+    }
+  }
+
+  // ── During and after the stay (M11-06; S45; T-159) ────────────────────────────────────
+
+  async function offerStay(during: HTMLElement, token: string) {
+    let stay: Stay;
+    try {
+      stay = await env.api.stay(token);
+    } catch {
+      return; // The booking still shows; requests are an extra.
+    }
+    renderStay(during, token, stay, false);
+  }
+
+  function renderStay(during: HTMLElement, token: string, stay: Stay, sent: boolean) {
+    const parts: Node[] = [];
+    if (sent) parts.push(plain('Thank you. The hotel has your request.'));
+    if (stay.closedReason === null || stay.requests.length > 0) {
+      parts.push(requestCard(during, token, stay));
+    }
+    if (stay.feedback) parts.push(feedbackCard(token, stay.feedback));
+    during.replaceChildren(...parts);
+  }
+
+  function requestCard(during: HTMLElement, token: string, stay: Stay) {
+    const list = stay.requests.length
+      ? h(
+          'ul',
+          { class: 'requests' },
+          ...stay.requests.map((r) =>
+            h(
+              'li',
+              {},
+              h('strong', {}, KIND_NAME[r.kind]),
+              r.note && h('span', {}, ` – ${r.note}`),
+              h('span', { class: `status status-${r.status.toLowerCase()}` }, PROGRESS[r.status]),
+            ),
+          ),
+        )
+      : null;
+    if (stay.closedReason !== null) {
+      return h('section', { class: 'card' }, h('h2', {}, 'Your requests'), list);
+    }
+    const problem = h('div', {});
+    const kind = h(
+      'select',
+      { id: 'f-kind', name: 'kind', required: 'required' },
+      h('option', { value: '' }, 'Choose'),
+      ...KINDS.map(([value, text]) => h('option', { value }, text)),
+    ) as HTMLSelectElement;
+    const note = h('textarea', {
+      id: 'f-note',
+      name: 'note',
+      maxlength: '500',
+      rows: '3',
+    }) as HTMLTextAreaElement;
+    const submit = h('button', { type: 'submit' }, 'Send request') as HTMLButtonElement;
+    // One key per request the guest means to send: a retry after a lost answer is the same one.
+    let requestKey = crypto.randomUUID();
+    const form = h(
+      'form',
+      {
+        'aria-label': 'Ask for something',
+        onsubmit: (e: Event) => {
+          e.preventDefault();
+          if (!kind.value) {
+            problem.replaceChildren(alert('Choose what you need.'));
+            return;
+          }
+          submit.disabled = true;
+          env.api
+            .requestService(token, {
+              requestKey,
+              kind: kind.value as ServiceRequest['kind'],
+              note: note.value.trim() || null,
+            })
+            .then((next) => {
+              requestKey = crypto.randomUUID();
+              renderStay(during, token, next, true);
+            })
+            .catch((err: unknown) => {
+              problem.replaceChildren(alert(messageOf(err)));
+              submit.disabled = false;
+            });
+        },
+      },
+      h('div', { class: 'field' }, h('label', { for: 'f-kind' }, 'What do you need?'), kind),
+      h(
+        'div',
+        { class: 'field' },
+        h('label', { for: 'f-note' }, 'Anything we should know? (optional)'),
+        note,
+      ),
+      problem,
+      submit,
+    );
+    return h(
+      'section',
+      { class: 'card' },
+      h(
+        'h2',
+        {},
+        stay.roomNumber ? `Ask for something, room ${stay.roomNumber}` : 'Ask for something',
+      ),
+      h('p', {}, 'Tell us what you need. The right team gets it straight away.'),
+      form,
+      list,
+    );
+  }
+
+  function feedbackCard(token: string, feedback: NonNullable<Stay['feedback']>) {
+    const title = h('h2', {}, 'How was your stay?');
+    if (feedback.state === 'GIVEN') {
+      return h(
+        'section',
+        { class: 'card' },
+        title,
+        h('p', {}, 'Thank you for your review. '),
+        feedback.path && h('a', { href: feedback.path }, 'See your review'),
+      );
+    }
+    if (feedback.state === 'EXPIRED') {
+      return h('section', { class: 'card' }, title, plain('Thank you for staying with us.'));
+    }
+    const problem = h('div', {});
+    const open = h(
+      'button',
+      {
+        type: 'button',
+        onclick: () => {
+          if (feedback.path) {
+            env.navigate(`${env.origin}${feedback.path}`);
+            return;
+          }
+          (open as HTMLButtonElement).disabled = true;
+          env.api
+            .startFeedback(token)
+            .then((r) => env.navigate(`${env.origin}${r.path}`))
+            .catch((err: unknown) => {
+              problem.replaceChildren(alert(messageOf(err)));
+              (open as HTMLButtonElement).disabled = false;
+            });
+        },
+      },
+      'Rate your stay',
+    );
+    return h(
+      'section',
+      { class: 'card' },
+      title,
+      h('p', {}, 'Tell us in a minute. It helps us look after our next guests.'),
+      problem,
+      open,
+    );
   }
 
   // ── Online check-in (M3-20, M11-06; T-114) ────────────────────────────────────────────

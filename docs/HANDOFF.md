@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-158 (offline POS order taking) is pushed on `feat/T-158-offline-pos` (no migration). Next: the guest portal beyond online check-in.
+T-159 (guest portal requests and feedback) is pushed on `feat/T-159-guest-requests` (migration 20270102090000_service_requests). Next: e-invoicing (M4-24), ask first.

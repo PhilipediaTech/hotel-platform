@@ -583,7 +583,7 @@ export async function createPublicBooking(
 
 // ── A guest's link (M11-02) ─────────────────────────────────────────────────────────────
 
-async function byToken(deps: BookingEngineDeps, token: string) {
+export async function byToken(deps: BookingEngineDeps, token: string) {
   const link = await deps.db.guestLink.findUnique({
     where: { tokenHash: hashToken(deps.config.sessionSecret, token) },
   });

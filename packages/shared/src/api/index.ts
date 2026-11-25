@@ -58,6 +58,7 @@ export * from './id-scan.ts';
 export * from './channels.ts';
 export * from './reviews.ts';
 export * from './kitchen.ts';
+export * from './recipes.ts';
 export * from './tasks.ts';
 export * from './handovers.ts';
 export * from './leakage.ts';

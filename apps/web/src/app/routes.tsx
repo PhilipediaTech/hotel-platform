@@ -115,6 +115,9 @@ const PosSetupPage = lazy(() =>
 const ChannelsPage = lazy(() =>
   import('../routes/channels.tsx').then((m) => ({ default: m.ChannelsPage })),
 );
+const RecipesPage = lazy(() =>
+  import('../routes/recipes.tsx').then((m) => ({ default: m.RecipesPage })),
+);
 const KitchenPage = lazy(() =>
   import('../routes/kitchen.tsx').then((m) => ({ default: m.KitchenPage })),
 );
@@ -219,6 +222,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/channels': <ChannelsPage />,
   '/reviews': <ReviewsPage />,
   '/kitchen': <KitchenPage />,
+  '/recipes': <RecipesPage />,
   '/owner': <OwnerHomePage />,
   '/settings/billing': <BillingPage />,
   '/settings/booking-engine': <BookingEngineSettingsPage />,

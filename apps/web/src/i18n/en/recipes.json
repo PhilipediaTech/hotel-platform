@@ -1,0 +1,26 @@
+{
+  "recipes": {
+    "title": "Recipes",
+    "intro": "Say what one of each menu item uses from stock. When it is sold, that leaves the outlet's stock location, so the stock on hand follows the sales.",
+    "noOutlets": "No outlets yet: set them up in Outlets and menus.",
+    "noStock": "No stock items yet: add them in Stock first.",
+    "location": "Takes stock from",
+    "noLocation": "Nowhere (sales use no stock)",
+    "noLocationHint": "Choose a location, or this outlet's sales won't use any stock.",
+    "saveLocation": "Save",
+    "items": "Menu items of {{outlet}}",
+    "none": "No recipe.",
+    "add": "Add a recipe",
+    "edit": "Change",
+    "cost": "Costs {{cost}} in stock: {{share}}% of the price",
+    "costOnly": "Costs {{cost}} in stock",
+    "form": "Recipe for {{item}}",
+    "stockItem": "Stock item",
+    "choose": "Choose…",
+    "quantity": "Quantity for one ({{unit}})",
+    "remove": "Remove",
+    "addLine": "Add a stock item",
+    "save": "Save recipe",
+    "cancel": "Cancel"
+  }
+}

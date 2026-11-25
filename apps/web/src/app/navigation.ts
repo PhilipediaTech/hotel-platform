@@ -306,6 +306,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-142',
   },
   {
+    // T-157 (PRD M8-07): what each menu item uses from stock.
+    id: 'recipes',
+    path: '/recipes',
+    anyOf: ['pos.recipe'],
+    group: 'admin',
+    screen: 'S33',
+    ticket: 'T-157',
+  },
+  {
     id: 'pos-setup',
     path: '/pos/setup',
     anyOf: ['pos.setup'],

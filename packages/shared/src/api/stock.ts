@@ -212,7 +212,8 @@ export const updateStockLocation = defineRoute({
 // ---------------------------------------------------------------------------------------
 // Movements: the ledger, adjustments and transfers
 
-export const StockMovementKind = z.enum(['RECEIPT', 'ISSUE', 'TRANSFER', 'ADJUSTMENT']);
+/** SALE (T-157): used by a POS sale, from the menu item's recipe. */
+export const StockMovementKind = z.enum(['RECEIPT', 'ISSUE', 'TRANSFER', 'ADJUSTMENT', 'SALE']);
 
 export const StockMovementItem = z
   .object({
@@ -232,6 +233,8 @@ export const StockMovementItem = z
     stocktakeNumber: z.number().int().nullable(),
     /** The goods receipt a RECEIPT belongs to (T-146). */
     receiptNumber: z.number().int().nullable(),
+    /** The POS order a SALE came from (T-157). */
+    posOrderNumber: z.string().nullable(),
   })
   .meta({ id: 'StockMovement' });
 

@@ -290,6 +290,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-139',
   },
   {
+    id: 'kitchen',
+    path: '/kitchen',
+    anyOf: ['pos.kitchen'],
+    group: 'operations',
+    screen: 'S44',
+    ticket: 'T-156',
+  },
+  {
     id: 'pos',
     path: '/pos',
     anyOf: ['pos.order', 'pos.shift'],
@@ -534,6 +542,7 @@ export type HomeKey =
   | 'housekeeping'
   | 'attendant'
   | 'maintenance'
+  | 'kitchen'
   | 'staff';
 
 interface Home {
@@ -597,6 +606,8 @@ export const HOMES: readonly Home[] = [
     landing: 'my-jobs',
     bottomBar: ['my-jobs', 'report-fault'],
   },
+  // T-156: the Kitchen role lands on its display.
+  { key: 'kitchen', when: 'pos.kitchen', landing: 'kitchen', bottomBar: ['kitchen'] },
   { key: 'staff', when: null, landing: 'tasks', bottomBar: ['tasks', 'report-fault'] },
 ];
 

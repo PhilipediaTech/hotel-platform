@@ -87,6 +87,7 @@ describe('migrations', () => {
       'inspections',
       'invitations',
       'key_issues',
+      'kitchen_tickets',
       'leakage_alerts',
       'leakage_rules',
       'leave_requests',

@@ -15780,6 +15780,12 @@
           "active": {
             "type": "boolean"
           },
+          "kitchenStation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "items": {
             "type": "array",
             "items": {
@@ -15792,6 +15798,7 @@
           "name",
           "sortOrder",
           "active",
+          "kitchenStation",
           "items"
         ]
       },
@@ -16117,6 +16124,9 @@
               "folioId"
             ]
           },
+          "unsentKitchenLines": {
+            "type": "integer"
+          },
           "version": {
             "type": "integer"
           }
@@ -16140,6 +16150,7 @@
           "settledBy",
           "payments",
           "room",
+          "unsentKitchenLines",
           "version"
         ]
       },
@@ -16223,6 +16234,34 @@
           },
           "totalMinor": {
             "$ref": "#/components/schemas/AmountMinor"
+          },
+          "kitchen": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "station": {
+                "type": "string"
+              },
+              "sentAt": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Instant"
+                  },
+                  {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "station",
+              "sentAt"
+            ]
           }
         },
         "required": [
@@ -16236,7 +16275,8 @@
           "addedAt",
           "voided",
           "discount",
-          "totalMinor"
+          "totalMinor",
+          "kitchen"
         ]
       },
       "PosSettings": {
@@ -18789,6 +18829,151 @@
           "review",
           "reply",
           "publicReviewUrl"
+        ]
+      },
+      "KitchenBoard": {
+        "type": "object",
+        "properties": {
+          "outlets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "stations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "stations"
+              ]
+            }
+          },
+          "waiting": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KitchenTicket"
+            }
+          },
+          "bumped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KitchenTicket"
+            }
+          }
+        },
+        "required": [
+          "outlets",
+          "waiting",
+          "bumped"
+        ]
+      },
+      "KitchenTicket": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "orderId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "station": {
+            "type": "string"
+          },
+          "sentAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "sentBy": {
+            "type": "string"
+          },
+          "bumpedAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "bumpedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cancelled": {
+            "type": "boolean"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "integer"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "voided": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "quantity",
+                "note",
+                "voided"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "orderId",
+          "orderNumber",
+          "label",
+          "number",
+          "station",
+          "sentAt",
+          "sentBy",
+          "bumpedAt",
+          "bumpedBy",
+          "cancelled",
+          "lines"
         ]
       },
       "Task": {
@@ -68506,6 +68691,14 @@
                     "minimum": 0,
                     "maximum": 999,
                     "default": 0
+                  },
+                  "kitchenStation": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 30,
+                    "default": null
                   }
                 },
                 "required": [
@@ -68653,6 +68846,13 @@
                   },
                   "active": {
                     "type": "boolean"
+                  },
+                  "kitchenStation": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 30
                   }
                 }
               }
@@ -70983,6 +71183,137 @@
           },
           "409": {
             "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pos/orders/{orderId}/send-to-kitchen": {
+      "post": {
+        "operationId": "sendPosOrderToKitchen",
+        "summary": "Send the items not sent yet to their kitchen displays (M8-06)",
+        "tags": [
+          "POS"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4: designed in T-156. One ticket per kitchen station; items of categories without a station never go. Settling or charging the order sends what is left. Nothing to send: the order as it is.",
+        "x-permission": "pos.order",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "orderId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
             "content": {
               "application/json": {
                 "schema": {
@@ -80366,6 +80697,333 @@
           },
           "409": {
             "description": "Conflict: `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/kitchen/tickets": {
+      "get": {
+        "operationId": "getKitchenBoard",
+        "summary": "A station’s tickets: waiting, oldest first, and the last ones bumped",
+        "tags": [
+          "Kitchen"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4 (tab 5 S44 names the screen): designed in T-156. Without an outlet and station, the first outlet's first station.",
+        "x-permission": "pos.kitchen",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": false,
+            "name": "outletId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            },
+            "required": false,
+            "name": "station",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KitchenBoard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/kitchen/tickets/{ticketId}/bump": {
+      "post": {
+        "operationId": "bumpKitchenTicket",
+        "summary": "Done: take the ticket off the display",
+        "tags": [
+          "Kitchen"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4 (tab 5 S44 names the screen): designed in T-156. Bumping a bumped ticket changes nothing.",
+        "x-permission": "pos.kitchen",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "ticketId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KitchenTicket"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/kitchen/tickets/{ticketId}/recall": {
+      "post": {
+        "operationId": "recallKitchenTicket",
+        "summary": "Put a bumped ticket back on the display",
+        "tags": [
+          "Kitchen"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4 (tab 5 S44 names the screen): designed in T-156. Recalling a waiting ticket changes nothing.",
+        "x-permission": "pos.kitchen",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "name": "ticketId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KitchenTicket"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found: `NOT_FOUND`",
             "content": {
               "application/json": {
                 "schema": {

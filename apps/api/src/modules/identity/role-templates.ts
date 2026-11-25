@@ -272,6 +272,16 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
     permissions: ['pos.shift', 'pos.order', 'pos.void', ...SELF_SERVICE],
   },
   {
+    // Kitchen display (PRD M8-06; tab 5 S44 names the Kitchen role; T-156): the station's
+    // tickets, bump and recall; nothing else.
+    name: 'Kitchen',
+    slug: 'kitchen',
+    requiresMfa: false,
+    orgWide: false,
+    department: null,
+    permissions: ['pos.kitchen', ...SELF_SERVICE],
+  },
+  {
     // Inventory (PRD M10-01, M10-02, M10-05; T-145): items, issues against requisitions,
     // adjustments, transfers and stocktakes; receiving goods arrives with purchasing (M10-04)
     name: 'Store Keeper',

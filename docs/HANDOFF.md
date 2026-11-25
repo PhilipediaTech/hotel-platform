@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-155 (review requests and drafted replies) is pushed on `feat/T-155-review-requests` (run `npm run db:deploy` and `npm run db:generate` after merging; add review.manage to existing GM roles). Next: V1.4.
+T-156 (kitchen display) is pushed on `feat/T-156-kitchen-display` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: T-157 recipes and stock depletion (M8-07).

@@ -168,6 +168,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   ChannelAriChange: { kind: 'property' },
   ChannelBookingRevision: { kind: 'property' },
   GuestReview: { kind: 'property' },
+  KitchenTicket: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

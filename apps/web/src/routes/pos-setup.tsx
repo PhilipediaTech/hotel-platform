@@ -164,11 +164,15 @@ function OutletForm({ onDone }: { onDone: () => void }) {
 function OutletCard({ outlet, codes }: { outlet: Outlet; codes: Code[] }) {
   const { t } = useTranslation();
   const [section, setSection] = useState('');
+  const [station, setStation] = useState('');
   const toggle = useChange(() =>
     api.call('updateOutlet', { params: { outletId: outlet.id }, body: { active: !outlet.active } }),
   );
   const addSection = useChange(() =>
-    api.call('addMenuCategory', { params: { outletId: outlet.id }, body: { name: section } }),
+    api.call('addMenuCategory', {
+      params: { outletId: outlet.id },
+      body: { name: section, kitchenStation: station.trim() || null },
+    }),
   );
   const error = toggle.error ?? addSection.error;
   return (
@@ -203,7 +207,12 @@ function OutletCard({ outlet, codes }: { outlet: Outlet; codes: Code[] }) {
         className="mt-3 flex flex-wrap items-end gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          addSection.mutate(undefined, { onSuccess: () => setSection('') });
+          addSection.mutate(undefined, {
+            onSuccess: () => {
+              setSection('');
+              setStation('');
+            },
+          });
         }}
       >
         <div className="flex flex-col gap-1">
@@ -213,6 +222,16 @@ function OutletCard({ outlet, codes }: { outlet: Outlet; codes: Code[] }) {
             required
             value={section}
             onChange={(e) => setSection(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor={`station-${outlet.id}`}>{t('pos.setup.kitchenStation')}</Label>
+          <Input
+            id={`station-${outlet.id}`}
+            maxLength={30}
+            placeholder={t('pos.setup.kitchenStationHint')}
+            value={station}
+            onChange={(e) => setStation(e.target.value)}
           />
         </div>
         <Button type="submit" variant="secondary" className="h-11" disabled={addSection.isPending}>
@@ -226,10 +245,17 @@ function OutletCard({ outlet, codes }: { outlet: Outlet; codes: Code[] }) {
 function Section({ category, codes }: { category: Outlet['categories'][number]; codes: Code[] }) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
+  const [station, setStation] = useState<string | null>(null);
   const toggle = useChange(() =>
     api.call('updateMenuCategory', {
       params: { categoryId: category.id },
       body: { active: !category.active },
+    }),
+  );
+  const saveStation = useChange(() =>
+    api.call('updateMenuCategory', {
+      params: { categoryId: category.id },
+      body: { kitchenStation: (station ?? '').trim() || null },
     }),
   );
   return (
@@ -238,6 +264,11 @@ function Section({ category, codes }: { category: Outlet['categories'][number]; 
         <h3 className={cn('font-medium', !category.active && 'text-text-muted')}>
           {category.name}
           {!category.active && ` (${t('pos.setup.off')})`}
+          <span className="ml-2 text-sm font-normal text-text-muted">
+            {category.kitchenStation
+              ? t('pos.setup.goesTo', { station: category.kitchenStation })
+              : t('pos.setup.noStation')}
+          </span>
         </h3>
         <div className="flex gap-2">
           {!adding && (
@@ -250,6 +281,38 @@ function Section({ category, codes }: { category: Outlet['categories'][number]; 
           </Button>
         </div>
       </div>
+      <form
+        aria-label={t('pos.setup.stationForm', { section: category.name })}
+        className="mt-2 flex flex-wrap items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          saveStation.mutate(undefined, { onSuccess: () => setStation(null) });
+        }}
+      >
+        <div className="flex flex-col gap-1">
+          <Label htmlFor={`station-${category.id}`}>{t('pos.setup.kitchenStation')}</Label>
+          <Input
+            id={`station-${category.id}`}
+            maxLength={30}
+            placeholder={t('pos.setup.kitchenStationHint')}
+            value={station ?? category.kitchenStation ?? ''}
+            onChange={(e) => setStation(e.target.value)}
+          />
+        </div>
+        <Button
+          type="submit"
+          size="sm"
+          variant="secondary"
+          disabled={station === null || saveStation.isPending}
+        >
+          {t('pos.setup.saveStation')}
+        </Button>
+      </form>
+      {saveStation.error && (
+        <Alert tone="critical" className="mt-2">
+          {errorMessage(saveStation.error)}
+        </Alert>
+      )}
       {adding && (
         <ItemForm categoryId={category.id} codes={codes} onDone={() => setAdding(false)} />
       )}

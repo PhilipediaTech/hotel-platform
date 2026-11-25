@@ -1,8 +1,9 @@
-import { AR_ROUTES, COMMISSION_ROUTES } from '@hotel/shared';
+import { AR_ROUTES, COMMISSION_ROUTES, GROUP_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as commissions from './commissions.ts';
+import * as group from './group.ts';
 import * as ar from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -15,6 +16,13 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
 export function arRoutes(deps: ar.ArDeps): Router {
   const router = express.Router();
   const r = AR_ROUTES;
+  // Corporate accounts at group level (T-163).
+  mountRoute(router, GROUP_ROUTES.listGroupCompanies, (_i, { tenant }) =>
+    group.listGroupCompanies(deps, tenantFrom(tenant)),
+  );
+  mountRoute(router, GROUP_ROUTES.getGroupCompany, ({ params }, { tenant }) =>
+    group.getGroupCompany(deps, tenantFrom(tenant), params.companyId),
+  );
   mountRoute(router, r.listArAccounts, (_i, { tenant }) =>
     ar.listAccounts(deps, tenantFrom(tenant)),
   );

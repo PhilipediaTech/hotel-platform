@@ -31,6 +31,7 @@ import type { EmailProvider } from '../../core/email.ts';
 import { AppError } from '../../core/errors.ts';
 import { recordEvent } from '../../core/outbox.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import { groupLimitCheck } from './group.ts';
 import type { TenantDb } from '../../core/tenant-db.ts';
 import { houseRights } from '../folios/service.ts';
 import { facts, footer, header, money, render, table, totals } from '../payments/documents.ts';
@@ -64,7 +65,7 @@ const invalid = (path: string, message: string) =>
 const stateError = (message: string, details?: Record<string, unknown>) =>
   new AppError('STATE_TRANSITION_INVALID', message, details);
 
-const ACCOUNT_INCLUDE = {
+export const ACCOUNT_INCLUDE = {
   company: { select: { id: true, name: true, kind: true, billingInstructions: true } },
   invoices: {
     include: { allocations: true, folio: { select: { id: true, number: true, name: true } } },
@@ -75,7 +76,7 @@ const ACCOUNT_INCLUDE = {
     orderBy: [{ receivedOn: 'asc' }, { createdAt: 'asc' }],
   },
 } satisfies Prisma.ArAccountInclude;
-type AccountRow = Prisma.ArAccountGetPayload<{ include: typeof ACCOUNT_INCLUDE }>;
+export type AccountRow = Prisma.ArAccountGetPayload<{ include: typeof ACCOUNT_INCLUDE }>;
 
 const allocated = (rows: { amountMinor: bigint }[]) => rows.reduce((s, r) => s + r.amountMinor, 0n);
 
@@ -84,7 +85,7 @@ async function today(db: Client, propertyId: string, clock: Clock) {
   return localDate(clock(), p.timeZone);
 }
 
-function itemOf(a: AccountRow, on: string): Account {
+export function itemOf(a: AccountRow, on: string): Account {
   let open = 0n;
   let overdue = 0n;
   for (const inv of a.invoices) {
@@ -368,7 +369,14 @@ export async function transfer(
   if (amount <= 0n) throw invalid('amountMinor', 'Nothing is owed on this window');
   const account = await loadAccount(deps.tenantDb, accountId);
   const on = await today(deps.tenantDb, tenant.propertyId, deps.clock);
-  const over = BigInt(itemOf(account, on).balanceMinor) + amount > account.creditLimitMinor;
+  const propertyOver = BigInt(itemOf(account, on).balanceMinor) + amount > account.creditLimitMinor;
+  // The company's group limit too, across every property (T-163).
+  const group = await groupLimitCheck(deps, tenant, account.companyId, folio.currency, amount);
+  const over = propertyOver || group?.over === true;
+  const reason =
+    group?.over && !propertyOver && body.reason.trim()
+      ? `${body.reason.trim()} (${group.reason})`
+      : body.reason;
   const payload = {
     accountId,
     folioId: folio.id,
@@ -391,7 +399,7 @@ export async function transfer(
         tenant,
         arTransferHandler(deps),
         payload,
-        body.reason,
+        reason,
       );
       if (isApprovalPending(result)) return result;
       invoiceId = result.resultRef;

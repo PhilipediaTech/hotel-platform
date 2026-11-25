@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-162 (rate changes across properties) is pushed on `feat/T-162-group-rate-push` (no migration). Next: corporate accounts at group level (V2).
+T-163 (corporate accounts at group level) is pushed on `feat/T-163-group-corporate-accounts` (no migration). Next: advanced rate restrictions (V2).

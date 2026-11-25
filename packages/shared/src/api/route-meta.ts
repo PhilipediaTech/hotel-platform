@@ -446,6 +446,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   updateEinvoiceSettings: {"operationId":"updateEinvoiceSettings","method":"put","path":"/einvoicing/settings","body":true,"propertyScoped":true},
   listEinvoices: {"operationId":"listEinvoices","method":"get","path":"/einvoices","propertyScoped":true},
   submitEinvoice: {"operationId":"submitEinvoice","method":"post","path":"/folios/{folioId}/windows/{windowNumber}/einvoice","body":true,"propertyScoped":true,"idempotent":true},
+  listGroupCompanies: {"operationId":"listGroupCompanies","method":"get","path":"/group/companies","propertyScoped":true},
+  getGroupCompany: {"operationId":"getGroupCompany","method":"get","path":"/group/companies/{companyId}","propertyScoped":true},
   getGroupDashboard: {"operationId":"getGroupDashboard","method":"get","path":"/group/dashboard","propertyScoped":true},
   getGroupRates: {"operationId":"getGroupRates","method":"get","path":"/group/rates","propertyScoped":true},
   putGroupRates: {"operationId":"putGroupRates","method":"put","path":"/group/rates","body":true,"propertyScoped":true},

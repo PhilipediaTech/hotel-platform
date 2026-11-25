@@ -69,7 +69,10 @@ export async function propertiesWith(
 }
 
 /** The group currency: the organisation's choice, else its first property's. */
-async function groupCurrencyOf(deps: ReportDeps, tenant: TenantContext): Promise<string> {
+export async function groupCurrencyOf(
+  deps: Pick<ReportDeps, 'db'>,
+  tenant: Pick<TenantContext, 'organisationId'>,
+): Promise<string> {
   const org = await deps.db.organisation.findUniqueOrThrow({
     where: { id: tenant.organisationId },
   });
@@ -81,7 +84,12 @@ async function groupCurrencyOf(deps: ReportDeps, tenant: TenantContext): Promise
   return first?.baseCurrency ?? 'NGN';
 }
 
-async function ratesFor(deps: ReportDeps, tenant: TenantContext, month: string, to: string) {
+export async function ratesFor(
+  deps: Pick<ReportDeps, 'db'>,
+  tenant: Pick<TenantContext, 'organisationId'>,
+  month: string,
+  to: string,
+) {
   const rows = await deps.db.groupExchangeRate.findMany({
     where: { organisationId: tenant.organisationId, toCurrency: to, month: monthStart(month) },
     include: { setBy: { select: { name: true } } },

@@ -657,6 +657,13 @@ async function bArAccount(db: Db, world: TenantWorld, propertyId: string) {
   return { ...theirs, accountId: account.id, invoiceId: invoice.id, paymentId: payment.id };
 }
 
+/** B's company account, with the company named (T-163). */
+async function bGroupCompany(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bArAccount(db, world, propertyId);
+  const account = await db.arAccount.findUniqueOrThrow({ where: { id: theirs.accountId } });
+  return { ...theirs, companyId: account.companyId };
+}
+
 async function bArUnchanged(db: Db, world: TenantWorld) {
   const accounts = await db.arAccount.findMany({ where: { propertyId: world.b1.id } });
   expect(accounts.map((a) => [a.creditLimitMinor, a.status])).toEqual([[1000000n, 'ACTIVE']]);
@@ -3068,6 +3075,12 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bArUnchanged,
   },
   getArAccount: { seed: bArAccount },
+  // Corporate accounts at group level (T-163)
+  listGroupCompanies: {
+    seed: bGroupCompany,
+    listIds: (body) => (body as { data: { companyId: string }[] }).data.map((c) => c.companyId),
+  },
+  getGroupCompany: { seed: bGroupCompany },
   updateArAccount: {
     seed: bArAccount,
     body: () => ({ creditLimitMinor: '9', termsDays: 1, status: 'CLOSED' }),

@@ -76,6 +76,46 @@ const RATES = {
   rates: [{ currency: 'GHS', rate: null, setBy: null, setAt: null }],
 };
 
+const COMPANY = {
+  companyId: id(9),
+  name: 'Dangote Group',
+  kind: 'COMPANY',
+  properties: 2,
+  groupCurrency: 'NGN',
+  groupLimitMinor: '20000000',
+  balanceMinor: '22325000',
+  overdueMinor: '10000000',
+  overLimit: true,
+  missingRates: [],
+};
+const COMPANY_DETAIL = {
+  ...COMPANY,
+  accounts: [
+    {
+      propertyId: id(1),
+      propertyName: 'Lagos Hotel',
+      accountId: id(11),
+      currency: 'NGN',
+      status: 'ACTIVE',
+      creditLimitMinor: '50000000',
+      balanceMinor: '12325000',
+      overdueMinor: '0',
+      inGroupCurrencyMinor: '12325000',
+    },
+  ],
+  openInvoices: [
+    {
+      propertyName: 'Accra Hotel',
+      number: 'AR-00001',
+      currency: 'GHS',
+      openMinor: '100000',
+      issuedOn: '2026-10-02',
+      dueOn: '2026-11-01',
+      overdue: true,
+    },
+  ],
+};
+
 const calls: { key: string; body: unknown; search: string }[] = [];
 const sent = (key: string) => calls.filter((c) => c.key === key);
 let handlers: Record<string, (body: unknown, search: string) => Response>;
@@ -87,6 +127,8 @@ beforeEach(() => {
     'GET /auth/device': () => json(200, { pinSwitchAvailable: false, deviceLabel: null }),
     'GET /group/dashboard': () => json(200, DASHBOARD),
     'GET /group/rates': () => json(200, RATES),
+    'GET /group/companies': () => json(200, { data: [COMPANY] }),
+    [`GET /group/companies/${id(9)}`]: () => json(200, COMPANY_DETAIL),
   };
   vi.stubGlobal(
     'fetch',
@@ -150,5 +192,18 @@ describe('Group', () => {
     });
     await waitFor(() => expect(sent('GET /group/dashboard').length).toBeGreaterThan(1));
     expect(await within(form).findByText('Set by Owner')).toBeInTheDocument();
+  });
+
+  it('lists what each company owes the group, and opens one across properties', async () => {
+    const user = userEvent.setup();
+    renderAt('/group');
+    const table = await screen.findByRole('table', { name: 'Company accounts' });
+    const row = within(table).getByRole('row', { name: /Dangote Group/ });
+    expect(within(row).getByText('Over the limit')).toBeInTheDocument();
+    await user.click(within(row).getByRole('button', { name: 'Show Dangote Group' }));
+    const region = await screen.findByRole('region', { name: 'Dangote Group' });
+    const invoices = within(region).getByRole('table', { name: 'Open invoices' });
+    expect(within(invoices).getByText('Accra Hotel')).toBeInTheDocument();
+    expect(within(invoices).getByText(/2026-11-01 · Overdue/)).toBeInTheDocument();
   });
 });

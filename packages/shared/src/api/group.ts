@@ -223,7 +223,94 @@ export const changeGroupRates = defineRoute({
   response: GroupRateChangeResult,
 });
 
+// ── Corporate accounts at group level (Versions V2; T-163) ───────────────────────────────
+
+/** A company's city ledger across the group: each property's account and the group total. */
+const GroupExposure = {
+  groupCurrency: Currency,
+  /** The company's group credit limit, in the group currency; null = none (property limits only). */
+  groupLimitMinor: AmountMinor.nullable(),
+  /** What the company owes the group, in the group currency, over the accounts with a rate. */
+  balanceMinor: AmountMinor,
+  overdueMinor: AmountMinor,
+  overLimit: z.boolean(),
+  /** Currencies with an open balance and no group rate this month: left out of the totals. */
+  missingRates: z.array(Currency),
+};
+
+export const GroupCompanyItem = z
+  .object({
+    companyId: Uuid,
+    name: z.string(),
+    kind: z.string(),
+    properties: z.number().int(),
+    ...GroupExposure,
+  })
+  .meta({ id: 'GroupCompanyItem' });
+
+export const GroupCompanyDetail = z
+  .object({
+    companyId: Uuid,
+    name: z.string(),
+    kind: z.string(),
+    ...GroupExposure,
+    accounts: z.array(
+      z.object({
+        propertyId: Uuid,
+        propertyName: z.string(),
+        accountId: Uuid,
+        currency: Currency,
+        status: z.string(),
+        creditLimitMinor: AmountMinor,
+        balanceMinor: AmountMinor,
+        overdueMinor: AmountMinor,
+        /** The balance in the group currency; null without a rate. */
+        inGroupCurrencyMinor: AmountMinor.nullable(),
+      }),
+    ),
+    /** Invoices still owed, oldest due first, across the properties. */
+    openInvoices: z.array(
+      z.object({
+        propertyName: z.string(),
+        number: z.string(),
+        currency: Currency,
+        openMinor: AmountMinor,
+        issuedOn: IsoDate,
+        dueOn: IsoDate,
+        overdue: z.boolean(),
+      }),
+    ),
+  })
+  .meta({ id: 'GroupCompanyDetail' });
+
+const GROUP_AR_NOTE =
+  "Not in tab 4: designed in T-163 (Versions V2, corporate accounts at group level). Balances in each property's currency; totals in the group currency at this month's group rates (T-161).";
+
+export const listGroupCompanies = defineRoute({
+  ...GROUP,
+  operationId: 'listGroupCompanies',
+  method: 'get',
+  path: '/group/companies',
+  summary:
+    'Companies with an account in any of the group’s properties, with what they owe the group',
+  description: GROUP_AR_NOTE,
+  response: z.object({ data: z.array(GroupCompanyItem) }),
+});
+
+export const getGroupCompany = defineRoute({
+  ...GROUP,
+  operationId: 'getGroupCompany',
+  method: 'get',
+  path: '/group/companies/{companyId}',
+  summary: 'One company’s accounts across the group, and its open invoices',
+  description: GROUP_AR_NOTE,
+  params: z.object({ companyId: Uuid }),
+  response: GroupCompanyDetail,
+});
+
 export const GROUP_ROUTES = {
+  listGroupCompanies,
+  getGroupCompany,
   getGroupDashboard,
   getGroupRates,
   putGroupRates,

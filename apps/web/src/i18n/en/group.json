@@ -27,6 +27,28 @@
       "none": "All your properties use the group currency: no rates needed.",
       "save": "Save rates",
       "saved": "Saved."
+    },
+    "companies": {
+      "title": "Company accounts",
+      "intro": "What each company owes across your properties, in {{currency}}, against its group credit limit.",
+      "none": "No company has an account in your properties yet.",
+      "company": "Company",
+      "owed": "Owed",
+      "overdue": "Overdue",
+      "limit": "Group limit",
+      "noLimit": "None",
+      "over": "Over the limit",
+      "missing": "Without {{currencies}} (no rate this month)",
+      "show": "Show {{name}}",
+      "accounts": "Accounts at each property",
+      "property": "Property",
+      "propertyLimit": "Account limit",
+      "inGroup": "In {{currency}}",
+      "invoices": "Open invoices",
+      "invoice": "Invoice",
+      "due": "Due",
+      "open": "Open",
+      "overdueMark": "Overdue"
     }
   }
 }

@@ -76,6 +76,7 @@ export function GroupPage() {
       {d && <Totals d={d} />}
       {d && <Comparison d={d} />}
       {d && <RatesCard month={month} />}
+      {d && <Companies />}
     </section>
   );
 }
@@ -242,5 +243,158 @@ function RatesCard({ month }: { month: string }) {
         </Button>
       )}
     </form>
+  );
+}
+
+// ── Company accounts across the group (T-163) ──────────────────────────────────────────
+
+function Companies() {
+  const { t } = useTranslation();
+  const money = useMoney();
+  const session = useSession();
+  const [open, setOpen] = useState<string | null>(null);
+  const list = useQuery({
+    queryKey: ['group-companies', session.currentPropertyId ?? ''],
+    queryFn: () => api.call('listGroupCompanies', {}),
+  });
+  const rows = list.data?.data ?? [];
+  return (
+    <div className={`${card} mt-4 overflow-x-auto`}>
+      <h2 className="font-medium">{t('group.companies.title')}</h2>
+      {rows[0] && (
+        <p className="mt-1 text-sm text-text-muted">
+          {t('group.companies.intro', { currency: rows[0].groupCurrency })}
+        </p>
+      )}
+      {list.error && (
+        <Alert tone="critical" className="mt-2">
+          {errorMessage(list.error)}
+        </Alert>
+      )}
+      {list.data && rows.length === 0 && (
+        <p className="mt-2 text-sm">{t('group.companies.none')}</p>
+      )}
+      {rows.length > 0 && (
+        <table className="mt-2 text-sm" aria-label={t('group.companies.title')}>
+          <thead>
+            <tr>
+              <th className="pr-3 text-left">{t('group.companies.company')}</th>
+              <th className="px-2 text-right">{t('group.companies.owed')}</th>
+              <th className="px-2 text-right">{t('group.companies.overdue')}</th>
+              <th className="pl-2 text-right">{t('group.companies.limit')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((c) => (
+              <tr key={c.companyId}>
+                <th scope="row" className="pr-3 text-left font-normal">
+                  <button
+                    type="button"
+                    className="underline"
+                    aria-label={t('group.companies.show', { name: c.name })}
+                    onClick={() => setOpen(open === c.companyId ? null : c.companyId)}
+                  >
+                    {c.name}
+                  </button>
+                  {c.overLimit && (
+                    <span className="ml-2 text-critical">{t('group.companies.over')}</span>
+                  )}
+                  {c.missingRates.length > 0 && (
+                    <span className="ml-2 text-text-muted">
+                      {t('group.companies.missing', { currencies: c.missingRates.join(', ') })}
+                    </span>
+                  )}
+                </th>
+                <td className="px-2 text-right">{money(c.balanceMinor, c.groupCurrency)}</td>
+                <td className="px-2 text-right">{money(c.overdueMinor, c.groupCurrency)}</td>
+                <td className="pl-2 text-right">
+                  {c.groupLimitMinor
+                    ? money(c.groupLimitMinor, c.groupCurrency)
+                    : t('group.companies.noLimit')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {open && <CompanyDetail companyId={open} />}
+    </div>
+  );
+}
+
+function CompanyDetail({ companyId }: { companyId: string }) {
+  const { t } = useTranslation();
+  const money = useMoney();
+  const session = useSession();
+  const q = useQuery({
+    queryKey: ['group-company', session.currentPropertyId ?? '', companyId],
+    queryFn: () => api.call('getGroupCompany', { params: { companyId } }),
+  });
+  const d = q.data;
+  if (q.error) {
+    return (
+      <Alert tone="critical" className="mt-3">
+        {errorMessage(q.error)}
+      </Alert>
+    );
+  }
+  if (!d) return null;
+  return (
+    <div className="mt-4" role="region" aria-label={d.name}>
+      <h3 className="font-medium">{d.name}</h3>
+      <table className="mt-2 text-sm" aria-label={t('group.companies.accounts')}>
+        <thead>
+          <tr>
+            <th className="pr-3 text-left">{t('group.companies.property')}</th>
+            <th className="px-2 text-right">{t('group.companies.owed')}</th>
+            <th className="px-2 text-right">{t('group.companies.propertyLimit')}</th>
+            <th className="pl-2 text-right">
+              {t('group.companies.inGroup', { currency: d.groupCurrency })}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {d.accounts.map((a) => (
+            <tr key={a.accountId}>
+              <th scope="row" className="pr-3 text-left font-normal">
+                {a.propertyName}
+              </th>
+              <td className="px-2 text-right">{money(a.balanceMinor, a.currency)}</td>
+              <td className="px-2 text-right">{money(a.creditLimitMinor, a.currency)}</td>
+              <td className="pl-2 text-right">
+                {a.inGroupCurrencyMinor
+                  ? money(a.inGroupCurrencyMinor, d.groupCurrency)
+                  : t('group.noRate')}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {d.openInvoices.length > 0 && (
+        <table className="mt-3 text-sm" aria-label={t('group.companies.invoices')}>
+          <thead>
+            <tr>
+              <th className="pr-3 text-left">{t('group.companies.invoice')}</th>
+              <th className="px-2 text-left">{t('group.companies.property')}</th>
+              <th className="px-2 text-left">{t('group.companies.due')}</th>
+              <th className="pl-2 text-right">{t('group.companies.open')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.openInvoices.map((i) => (
+              <tr key={`${i.propertyName}-${i.number}`}>
+                <td className="pr-3">{i.number}</td>
+                <td className="px-2">{i.propertyName}</td>
+                <td className={`px-2 ${i.overdue ? 'text-critical' : ''}`}>
+                  {i.dueOn}
+                  {i.overdue && ` · ${t('group.companies.overdueMark')}`}
+                </td>
+                <td className="pl-2 text-right">{money(i.openMinor, i.currency)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
   );
 }

@@ -230,7 +230,7 @@ describe('Companies', () => {
     const form = screen.getByRole('form', { name: 'Add company' });
     await user.selectOptions(within(form).getByLabelText('Kind'), 'TRAVEL_AGENT');
     await user.type(within(form).getByLabelText('Name'), 'Wakanow');
-    await user.type(within(form).getByLabelText('Credit limit (₦)'), '500000');
+    await user.type(within(form).getByLabelText('Group credit limit'), '500000');
     await user.type(within(form).getByLabelText('Payment terms (days)'), '30');
     await user.type(within(form).getByLabelText('Commission (%)'), '10');
     await user.type(within(form).getByLabelText('Send invoices to'), 'accounts@wakanow.test');

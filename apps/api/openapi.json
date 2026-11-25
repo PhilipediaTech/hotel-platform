@@ -19459,6 +19459,249 @@
           "acceptedAt"
         ]
       },
+      "GroupDashboard": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "$ref": "#/components/schemas/Month"
+          },
+          "groupCurrency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "propertyId": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "days": {
+                  "type": "integer"
+                },
+                "through": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  ]
+                },
+                "roomsAvailable": {
+                  "type": "integer"
+                },
+                "roomsSold": {
+                  "type": "integer"
+                },
+                "occupancyBps": {
+                  "type": "integer"
+                },
+                "roomRevenueMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "revenueMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "adrMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "revparMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "rate": {
+                  "$ref": "#/components/schemas/Rate"
+                },
+                "inGroupCurrency": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "roomRevenueMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    "revenueMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    "adrMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    },
+                    "revparMinor": {
+                      "$ref": "#/components/schemas/AmountMinor"
+                    }
+                  },
+                  "required": [
+                    "roomRevenueMinor",
+                    "revenueMinor",
+                    "adrMinor",
+                    "revparMinor"
+                  ]
+                }
+              },
+              "required": [
+                "propertyId",
+                "code",
+                "name",
+                "currency",
+                "days",
+                "through",
+                "roomsAvailable",
+                "roomsSold",
+                "occupancyBps",
+                "roomRevenueMinor",
+                "revenueMinor",
+                "adrMinor",
+                "revparMinor",
+                "rate",
+                "inGroupCurrency"
+              ]
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "roomsAvailable": {
+                "type": "integer"
+              },
+              "roomsSold": {
+                "type": "integer"
+              },
+              "occupancyBps": {
+                "type": "integer"
+              },
+              "roomRevenueMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "revenueMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "adrMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "revparMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "propertiesInMoneyTotals": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "roomsAvailable",
+              "roomsSold",
+              "occupancyBps",
+              "roomRevenueMinor",
+              "revenueMinor",
+              "adrMinor",
+              "revparMinor",
+              "propertiesInMoneyTotals"
+            ]
+          },
+          "missingRates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          "definitions": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "groupCurrency",
+          "properties",
+          "totals",
+          "missingRates",
+          "definitions"
+        ]
+      },
+      "Month": {
+        "type": "string",
+        "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+        "example": "2026-11"
+      },
+      "Rate": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^(0|[1-9]\\d{0,11})(\\.\\d{1,6})?$",
+        "example": "1580.5"
+      },
+      "GroupRates": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "$ref": "#/components/schemas/Month"
+          },
+          "groupCurrency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "rates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "rate": {
+                  "$ref": "#/components/schemas/Rate"
+                },
+                "setBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "setAt": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Instant"
+                    },
+                    {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "currency",
+                "rate",
+                "setBy",
+                "setAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "month",
+          "groupCurrency",
+          "rates"
+        ]
+      },
       "Task": {
         "type": "object",
         "properties": {
@@ -22658,11 +22901,6 @@
           "setBy",
           "lockedAt"
         ]
-      },
-      "Rate": {
-        "type": "string",
-        "pattern": "^(0|[1-9]\\d{0,11})(\\.\\d{1,6})?$",
-        "example": "1580.5"
       }
     },
     "parameters": {}
@@ -82636,6 +82874,337 @@
           },
           "409": {
             "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`, `STATE_TRANSITION_INVALID`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/group/dashboard": {
+      "get": {
+        "operationId": "getGroupDashboard",
+        "summary": "The group’s month: each property side by side, and totals in the group currency",
+        "tags": [
+          "Group"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4: designed in T-161 (PRD M1-13, M12-07). Closed days only, from night audit's kept figures. The month defaults to the current property's.",
+        "x-permission": "report.group",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Month"
+            },
+            "required": false,
+            "name": "month",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDashboard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/group/rates": {
+      "get": {
+        "operationId": "getGroupRates",
+        "summary": "The group currency and a month’s rates into it",
+        "tags": [
+          "Group"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4: designed in T-161 (PRD M1-13, M12-07).",
+        "x-permission": "report.group",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Month"
+            },
+            "required": true,
+            "name": "month",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupRates"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "putGroupRates",
+        "summary": "Set the group currency and a month’s rates into it",
+        "tags": [
+          "Group"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4: designed in T-161 (PRD M1-13, M12-07). The listed rates are set or replaced; others stay. Only currencies the group's properties use.",
+        "x-permission": "report.group",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "month": {
+                    "$ref": "#/components/schemas/Month"
+                  },
+                  "groupCurrency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "rates": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "currency": {
+                          "type": "string",
+                          "pattern": "^[A-Z]{3}$"
+                        },
+                        "rate": {
+                          "$ref": "#/components/schemas/Rate"
+                        }
+                      },
+                      "required": [
+                        "currency",
+                        "rate"
+                      ]
+                    },
+                    "maxItems": 20
+                  }
+                },
+                "required": [
+                  "month",
+                  "groupCurrency",
+                  "rates"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupRates"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
             "content": {
               "application/json": {
                 "schema": {

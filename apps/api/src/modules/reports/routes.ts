@@ -1,7 +1,8 @@
-import { REPORT_ROUTES } from '@hotel/shared';
+import { GROUP_ROUTES, REPORT_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import * as group from './group.ts';
 import { operations } from './operations.ts';
 import * as reports from './service.ts';
 
@@ -15,6 +16,17 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
 export function reportRoutes(deps: reports.ReportDeps): Router {
   const router = express.Router();
   const r = REPORT_ROUTES;
+  // Group dashboards (S46; T-161).
+  const g = GROUP_ROUTES;
+  mountRoute(router, g.getGroupDashboard, ({ query }, { tenant }) =>
+    group.groupDashboard(deps, tenantFrom(tenant), query),
+  );
+  mountRoute(router, g.getGroupRates, ({ query }, { tenant }) =>
+    group.getGroupRates(deps, tenantFrom(tenant), query.month),
+  );
+  mountRoute(router, g.putGroupRates, ({ body }, { tenant }) =>
+    group.putGroupRates(deps, tenantFrom(tenant), body),
+  );
   mountRoute(router, r.getDashboardReport, ({ query }, { tenant }) =>
     reports.dashboard(deps, tenantFrom(tenant), query),
   );

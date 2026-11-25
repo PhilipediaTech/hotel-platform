@@ -43,16 +43,19 @@ enum PropertyStatus {
 }
 
 model Organisation {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String
-  legalName   String?  @map("legal_name")
-  country     String   @db.Char(2)
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  legalName     String?  @map("legal_name")
+  country       String   @db.Char(2)
   /// A country pack given by platform staff (M14-09); null = the sign-up country's.
-  countryPack String?  @map("country_pack") @db.Char(2)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  countryPack   String?  @map("country_pack") @db.Char(2)
+  /// The currency group reports are in (M12-07; T-161); null = the first property's.
+  groupCurrency String?  @map("group_currency") @db.Char(3)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   properties         Property[]
+  groupRates         GroupExchangeRate[]
   tasks              Task[]
   roles              Role[]
   memberships        Membership[]
@@ -336,6 +339,7 @@ model User {
   invitationsSent      Invitation[]         @relation("InvitedBy")
   reviewsReplied       GuestReview[]        @relation("ReviewReplier")
   einvoicesSubmitted   EinvoiceSubmission[] @relation("EinvoiceSubmitter")
+  groupRatesSet        GroupExchangeRate[]  @relation("GroupRateSetter")
   kitchenTicketsSent   KitchenTicket[]      @relation("KitchenTicketSender")
   kitchenTicketsBumped KitchenTicket[]      @relation("KitchenTicketBumper")
   recipesEdited        Recipe[]             @relation("RecipeEditor")
@@ -5004,6 +5008,26 @@ model EinvoiceSubmission {
   @@unique([propertyId, invoiceNumber])
   @@index([propertyId, status, nextAttemptAt])
   @@map("einvoice_submissions")
+}
+
+/// What one unit of a property's currency is worth in the group currency for a month, for
+/// group reports (PRD M12-07; S46; T-161). Set by the group owner; a month with no rate leaves
+/// that property's money out of the group totals, never converted at a guess.
+model GroupExchangeRate {
+  organisationId String   @map("organisation_id") @db.Uuid
+  fromCurrency   String   @map("from_currency") @db.Char(3)
+  toCurrency     String   @map("to_currency") @db.Char(3)
+  /// The first day of the month.
+  month          DateTime @db.Date
+  rateMicros     BigInt   @map("rate_micros")
+  setById        String   @map("set_by_id") @db.Uuid
+  setAt          DateTime @map("set_at") @db.Timestamptz(6)
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  setBy        User         @relation("GroupRateSetter", fields: [setById], references: [id], onDelete: Restrict)
+
+  @@id([organisationId, fromCurrency, toCurrency, month])
+  @@map("group_exchange_rates")
 }
 
 // ───────────────────────── Kitchen display (M8-06; T-156) ─────────────────────────

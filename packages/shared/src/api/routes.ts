@@ -49,6 +49,7 @@ import { REVIEW_ROUTES } from './reviews.ts';
 import { KITCHEN_ROUTES } from './kitchen.ts';
 import { RECIPE_ROUTES } from './recipes.ts';
 import { EINVOICE_ROUTES } from './einvoicing.ts';
+import { GROUP_ROUTES } from './group.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
 import { NIGHT_AUDIT_ROUTES } from './night-audit.ts';
@@ -139,6 +140,7 @@ export const API_ROUTES = {
   ...KITCHEN_ROUTES,
   ...RECIPE_ROUTES,
   ...EINVOICE_ROUTES,
+  ...GROUP_ROUTES,
   ...TASK_ROUTES,
   ...HANDOVER_ROUTES,
   ...LEAKAGE_ROUTES,

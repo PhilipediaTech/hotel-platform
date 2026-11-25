@@ -77,6 +77,7 @@ describe('migrations', () => {
       'goods_receipts',
       'group_block_nights',
       'group_blocks',
+      'group_exchange_rates',
       'guest_links',
       'guest_reviews',
       'guests',

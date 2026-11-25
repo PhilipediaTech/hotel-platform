@@ -19702,6 +19702,55 @@
           "rates"
         ]
       },
+      "GroupRateChangeResult": {
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "propertyId": {
+                  "$ref": "#/components/schemas/Uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "roomTypeCodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "changedDays": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "propertyId",
+                "name",
+                "currency",
+                "roomTypeCodes",
+                "changedDays"
+              ]
+            }
+          },
+          "changedDays": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dryRun",
+          "properties",
+          "changedDays"
+        ]
+      },
       "Task": {
         "type": "object",
         "properties": {
@@ -83205,6 +83254,283 @@
           },
           "403": {
             "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/group/rate-changes": {
+      "post": {
+        "operationId": "changeGroupRates",
+        "summary": "Change one rate plan’s prices or restrictions in several properties at once",
+        "tags": [
+          "Group"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4: designed in T-162 (PRD M2-13). Every property is checked first; any problem (no such plan or room type, a derived plan's price, a date before that property's today, a property you can't change group rates in) refuses the whole change with each problem named, and nothing is written. Then all properties change in one go. A percentage or an amount moves each day's own price (days without one stay so); one price for all needs one currency. At most 366 days. `dryRun` counts without writing.",
+        "x-permission": "rate.group.manage",
+        "x-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Reuse the same key when retrying; a different body with a used key is rejected."
+            },
+            "required": true,
+            "description": "Reuse the same key when retrying; a different body with a used key is rejected.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "propertyIds": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Uuid"
+                    },
+                    "minItems": 1,
+                    "maxItems": 50
+                  },
+                  "ratePlanCode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20
+                  },
+                  "roomTypeCodes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "minItems": 1,
+                    "maxItems": 30
+                  },
+                  "from": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "to": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 7
+                    },
+                    "minItems": 1,
+                    "maxItems": 7,
+                    "default": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6,
+                      7
+                    ]
+                  },
+                  "price": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": [
+                              "PERCENT"
+                            ]
+                          },
+                          "bps": {
+                            "type": "integer",
+                            "minimum": -9000,
+                            "maximum": 10000
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "bps"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": [
+                              "AMOUNT"
+                            ]
+                          },
+                          "amountMinor": {
+                            "type": "string",
+                            "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                            "example": "4500000"
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "amountMinor"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": [
+                              "SET"
+                            ]
+                          },
+                          "amountMinor": {
+                            "type": "string",
+                            "pattern": "^-?(0|[1-9]\\d{0,17})$",
+                            "example": "4500000"
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "amountMinor"
+                        ]
+                      }
+                    ]
+                  },
+                  "restrictions": {
+                    "type": "object",
+                    "properties": {
+                      "minStay": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 1,
+                        "maximum": 365
+                      },
+                      "maxStay": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 1,
+                        "maximum": 365
+                      },
+                      "closedToArrival": {
+                        "type": "boolean"
+                      },
+                      "closedToDeparture": {
+                        "type": "boolean"
+                      },
+                      "stopSell": {
+                        "type": "boolean"
+                      }
+                    }
+                  },
+                  "dryRun": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "propertyIds",
+                  "ratePlanCode",
+                  "from",
+                  "to"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupRateChangeResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`",
             "content": {
               "application/json": {
                 "schema": {

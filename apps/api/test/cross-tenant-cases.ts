@@ -2598,6 +2598,22 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     }),
     untouched: bRatesUnchanged,
   },
+  // One plan in several properties (T-162): naming B's property is refused.
+  changeGroupRates: {
+    seed: async (db, world, propertyId) => ({
+      ...(await bPlan(db, world, propertyId)),
+      propertyId,
+    }),
+    creates: true,
+    body: (theirs) => ({
+      propertyIds: [theirs['propertyId']],
+      ratePlanCode: 'BAR',
+      from: '2099-01-01',
+      to: '2099-01-02',
+      price: { mode: 'SET', amountMinor: '5000000' },
+    }),
+    untouched: bRatesUnchanged,
+  },
   // Price suggestions (T-149)
   listPriceSuggestions: {
     seed: bPlan,

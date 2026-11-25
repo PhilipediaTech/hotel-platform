@@ -121,6 +121,9 @@ const RecipesPage = lazy(() =>
 const KitchenPage = lazy(() =>
   import('../routes/kitchen.tsx').then((m) => ({ default: m.KitchenPage })),
 );
+const GroupRatesPage = lazy(() =>
+  import('../routes/group-rates.tsx').then((m) => ({ default: m.GroupRatesPage })),
+);
 const GroupPage = lazy(() => import('../routes/group.tsx').then((m) => ({ default: m.GroupPage })));
 const EinvoicesPage = lazy(() =>
   import('../routes/einvoices.tsx').then((m) => ({ default: m.EinvoicesPage })),
@@ -227,6 +230,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/reviews': <ReviewsPage />,
   '/einvoices': <EinvoicesPage />,
   '/group': <GroupPage />,
+  '/group-rates': <GroupRatesPage />,
   '/kitchen': <KitchenPage />,
   '/recipes': <RecipesPage />,
   '/owner': <OwnerHomePage />,

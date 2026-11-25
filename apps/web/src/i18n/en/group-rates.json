@@ -1,0 +1,36 @@
+{
+  "groupRates": {
+    "title": "Rates across properties",
+    "intro": "Change one rate plan in several properties at once. Preview first: nothing changes until you apply, and if any property can’t take the change, none of them changes.",
+    "form": "Rate change",
+    "properties": "Properties",
+    "plan": "Rate plan code",
+    "roomTypes": "Room type codes (optional, comma between)",
+    "roomTypesHint": "Leave empty for every room type the plan sells.",
+    "from": "From",
+    "to": "To (included)",
+    "weekdays": "Days of the week",
+    "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    "price": "Price",
+    "priceModes": {
+      "NONE": "Leave prices",
+      "PERCENT": "Change by a percentage",
+      "AMOUNT": "Change by an amount",
+      "SET": "Set one price (one currency only)"
+    },
+    "percent": "Percentage (e.g. 10 or -5)",
+    "amount": "Amount (e.g. 5000 or -2500)",
+    "setPrice": "Price",
+    "restrictions": "Restrictions",
+    "minStay": "Minimum stay (nights, optional)",
+    "stopSell": "Stop selling",
+    "closedToArrival": "Closed to arrival",
+    "preview": "Preview",
+    "apply": "Apply to {{count}} properties",
+    "previewResult": "Would change {{count}} room-type days:",
+    "applied": "Changed {{count}} room-type days:",
+    "propertyResult": "{{name}}: {{count}} days ({{types}})",
+    "pickProperty": "Choose at least one property.",
+    "badNumber": "Enter a number."
+  }
+}

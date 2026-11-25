@@ -1909,6 +1909,26 @@ async function bReviewUnchanged(db: Db, world: TenantWorld) {
   expect((property.settings as { reviews: { delayHours: number } }).reviews.delayHours).toBe(5);
 }
 
+/** B's settled folio, with e-invoicing on and its TIN set (T-160). */
+async function bEinvoice(db: Db, world: TenantWorld, propertyId: string) {
+  const theirs = await bFolio(db, world, propertyId);
+  await db.folio.update({ where: { id: theirs.folioId }, data: { status: 'SETTLED' } });
+  await db.property.update({
+    where: { id: propertyId },
+    data: {
+      taxRegistration: { tin: '99999999-0001' },
+      settings: { einvoicing: { enabled: true, enabledAt: '2000-01-01T00:00:00.000Z' } } as never,
+    },
+  });
+  return { ...theirs, windowNumber: '1' };
+}
+
+async function bEinvoiceUnchanged(db: Db, world: TenantWorld) {
+  expect(await db.einvoiceSubmission.count({ where: { propertyId: world.b1.id } })).toBe(0);
+  const property = await db.property.findUniqueOrThrow({ where: { id: world.b1.id } });
+  expect((property.settings as { einvoicing: { enabled: boolean } }).einvoicing.enabled).toBe(true);
+}
+
 async function bStockUnchanged(db: Db, world: TenantWorld) {
   const where = { propertyId: world.b1.id };
   expect((await db.stockItem.findMany({ where })).map((i) => [i.name, i.active])).toEqual([
@@ -3980,6 +4000,20 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({ reply: 'Thank you' }),
     untouched: bReviewUnchanged,
   },
+  // E-invoicing (T-160)
+  getEinvoiceSettings: { seed: bEinvoice, listIds: () => [] },
+  updateEinvoiceSettings: {
+    seed: bEinvoice,
+    // Changes the caller's own property only.
+    creates: true,
+    body: () => ({ enabled: false }),
+    untouched: bEinvoiceUnchanged,
+  },
+  listEinvoices: {
+    seed: bEinvoice,
+    listIds: (body) => (body as { data: { folioId: string }[] }).data.map((i) => i.folioId),
+  },
+  submitEinvoice: { seed: bEinvoice, body: () => ({}), untouched: bEinvoiceUnchanged },
   // Channel manager (T-151)
   getChannelConnection: {
     seed: bChannel,

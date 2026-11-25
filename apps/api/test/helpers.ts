@@ -32,6 +32,7 @@ export const TEST_CONFIG: Config = {
   localFilesDir: path.join(os.tmpdir(), 'hotel-test-files'),
   payments: { provider: 'fake', secretKey: null, webhookSecret: null },
   ai: { provider: 'fake', apiKey: null, model: 'claude-opus-5-5' },
+  einvoice: { provider: 'fake' },
   channel: {
     provider: 'fake',
     apiKey: null,

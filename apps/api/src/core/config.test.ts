@@ -36,6 +36,7 @@ describe('loadConfig', () => {
       localFilesDir: path.resolve(import.meta.dirname, '../../../../.data/files'),
       payments: { provider: 'fake', secretKey: null, webhookSecret: null },
       ai: { provider: 'fake', apiKey: null, model: 'claude-opus-5-5' },
+      einvoice: { provider: 'fake' },
       channel: {
         provider: 'fake',
         apiKey: null,
@@ -210,6 +211,15 @@ describe('loadConfig', () => {
     expect(() =>
       loadConfig({ ...ORIGINS, NODE_ENV: 'production', CHANNEL_PROVIDER: 'fake' }),
     ).toThrow(/CHANNEL_PROVIDER=fake in production/);
+  });
+
+  it('keeps e-invoicing off when asked, never the fake in production (T-160)', () => {
+    expect(loadConfig({ ...ORIGINS, EINVOICE_PROVIDER: 'off' }).einvoice).toEqual({
+      provider: 'off',
+    });
+    expect(() =>
+      loadConfig({ ...ORIGINS, NODE_ENV: 'production', EINVOICE_PROVIDER: 'fake' }),
+    ).toThrow(/EINVOICE_PROVIDER=fake in production/);
   });
 
   it('requires a PostgreSQL DATABASE_URL', () => {

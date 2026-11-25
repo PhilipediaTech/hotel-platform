@@ -11,6 +11,7 @@ import { createPaymentProvider } from './core/payment-provider.ts';
 import { createMessageProvider } from './core/message-provider.ts';
 import { createFakeEmailProvider } from './core/email.ts';
 import { createChannelManager } from './core/channel-manager.ts';
+import { createEinvoiceProvider } from './core/einvoice.ts';
 
 // Worker entry (tab 2: one process for HTTP, one for jobs; T-021): scheduled jobs, outbox
 // handlers and the outbox publisher. Needs the same environment as the API.
@@ -54,6 +55,7 @@ try {
       email: createFakeEmailProvider(logger),
       config,
       channel,
+      einvoice: createEinvoiceProvider(config),
     }),
     // Email: the fake logs messages until the SES adapter (AWS account; production stops above).
     handlers: eventHandlers({

@@ -44,6 +44,9 @@ envVarGroups:
         value: claude-opus-5-5
       - key: ANTHROPIC_API_KEY
         sync: false
+      # E-invoicing (T-160): off until an accredited provider is chosen and its adapter added.
+      - key: EINVOICE_PROVIDER
+        value: 'off'
       # Channel manager (T-151): off until the Channex key (production, after Channex certifies the integration) is added and this
       # is set to channex.
       - key: CHANNEL_PROVIDER

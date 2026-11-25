@@ -10,6 +10,7 @@ import { createLocalFileStore } from './files.ts';
 import { createFakeAiProvider } from './ai.ts';
 import { createFakeEmailProvider } from './email.ts';
 import { createFakeChannelManager } from './channel-manager.ts';
+import { createFakeEinvoiceProvider } from './einvoice.ts';
 import { createFakePaymentProvider } from './payments.ts';
 import { createSession } from './auth.ts';
 import { cleanupJob, RETENTION } from './cleanup.ts';
@@ -88,6 +89,7 @@ beforeAll(async () => {
       email: createFakeEmailProvider(),
       config: TEST_CONFIG,
       channel: createFakeChannelManager(),
+      einvoice: createFakeEinvoiceProvider(),
     }),
     handlers: HANDLERS,
     // Tests publish by hand.

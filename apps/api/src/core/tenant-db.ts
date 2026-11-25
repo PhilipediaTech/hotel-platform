@@ -172,6 +172,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   Recipe: { kind: 'property' },
   RecipeLine: { kind: 'property' },
   ServiceRequest: { kind: 'property' },
+  EinvoiceSubmission: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

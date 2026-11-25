@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-159 (guest portal requests and feedback) is pushed on `feat/T-159-guest-requests` (migration 20270102090000_service_requests). Next: e-invoicing (M4-24), ask first.
+T-160 (e-invoicing, provider to come) is pushed on `feat/T-160-einvoicing` (migration 20270103090000_einvoicing). Next: V2.

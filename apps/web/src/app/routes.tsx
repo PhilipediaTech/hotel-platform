@@ -121,6 +121,9 @@ const RecipesPage = lazy(() =>
 const KitchenPage = lazy(() =>
   import('../routes/kitchen.tsx').then((m) => ({ default: m.KitchenPage })),
 );
+const EinvoicesPage = lazy(() =>
+  import('../routes/einvoices.tsx').then((m) => ({ default: m.EinvoicesPage })),
+);
 const ReviewsPage = lazy(() =>
   import('../routes/reviews.tsx').then((m) => ({ default: m.ReviewsPage })),
 );
@@ -221,6 +224,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/price-suggestions': <PriceSuggestionsPage />,
   '/channels': <ChannelsPage />,
   '/reviews': <ReviewsPage />,
+  '/einvoices': <EinvoicesPage />,
   '/kitchen': <KitchenPage />,
   '/recipes': <RecipesPage />,
   '/owner': <OwnerHomePage />,

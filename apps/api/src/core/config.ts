@@ -39,6 +39,8 @@ const envSchema = z.object({
   AI_PROVIDER: z.enum(['off', 'fake', 'anthropic']).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   AI_MODEL: z.string().min(1).default('claude-opus-5-5'),
+  // E-invoicing (M4-24; T-160): `off` until an accredited provider is chosen; `fake` locally.
+  EINVOICE_PROVIDER: z.enum(['off', 'fake']).optional(),
   // Channel manager (M11-07; T-151): `fake` locally and in tests, `channex` with its API key.
   CHANNEL_PROVIDER: z.enum(['off', 'fake', 'channex']).optional(),
   CHANNEX_API_KEY: z.string().min(20).optional(),
@@ -126,6 +128,8 @@ export interface Config {
   passwordBreachCheck: 'hibp' | 'fake';
   /** The AI provider, its key (null unless anthropic) and model (T-116). */
   ai: { provider: 'off' | 'fake' | 'anthropic'; apiKey: string | null; model: string };
+  /** The e-invoicing provider (M4-24; T-160): off until an accredited provider is chosen. */
+  einvoice: { provider: 'off' | 'fake' };
   /** The channel manager, its key (null unless channex) and API base URL (T-151). */
   channel: {
     provider: 'off' | 'fake' | 'channex';
@@ -189,6 +193,10 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   if (e.NODE_ENV === 'production' && channelProvider === 'fake') {
     throw new Error('Invalid environment configuration:\n✖ CHANNEL_PROVIDER=fake in production');
   }
+  const einvoiceProvider = e.EINVOICE_PROVIDER ?? (e.NODE_ENV === 'production' ? 'off' : 'fake');
+  if (e.NODE_ENV === 'production' && einvoiceProvider === 'fake') {
+    throw new Error('Invalid environment configuration:\n✖ EINVOICE_PROVIDER=fake in production');
+  }
   if (e.PAYMENT_PROVIDER === 'paystack' && !e.PAYMENT_SECRET_KEY) {
     throw new Error(
       'Invalid environment configuration:\n✖ PAYMENT_SECRET_KEY is required with PAYMENT_PROVIDER=paystack',
@@ -222,6 +230,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     appOrigin: e.APP_ORIGIN,
     siteOrigin: e.SITE_ORIGIN,
     ai: { provider: aiProvider, apiKey: e.ANTHROPIC_API_KEY ?? null, model: e.AI_MODEL },
+    einvoice: { provider: einvoiceProvider },
     channel: {
       provider: channelProvider,
       apiKey: e.CHANNEX_API_KEY ?? null,

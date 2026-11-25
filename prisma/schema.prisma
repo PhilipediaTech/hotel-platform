@@ -190,6 +190,7 @@ model Property {
   channelBookings      ChannelBookingRevision[]
   guestReviews         GuestReview[]
   serviceRequests      ServiceRequest[]
+  einvoiceSubmissions  EinvoiceSubmission[]
   kitchenTickets       KitchenTicket[]
   recipes              Recipe[]
   recipeLines          RecipeLine[]
@@ -330,26 +331,27 @@ model User {
   mfaRecoveryCodes     MfaRecoveryCode[]
   auditEvents          AuditEvent[]
   idempotencyKeys      IdempotencyKey[]
-  approvalsRequested   ApprovalRequest[]  @relation("RequestedBy")
-  approvalsDecided     ApprovalRequest[]  @relation("DecidedBy")
-  invitationsSent      Invitation[]       @relation("InvitedBy")
-  reviewsReplied       GuestReview[]      @relation("ReviewReplier")
-  kitchenTicketsSent   KitchenTicket[]    @relation("KitchenTicketSender")
-  kitchenTicketsBumped KitchenTicket[]    @relation("KitchenTicketBumper")
-  recipesEdited        Recipe[]           @relation("RecipeEditor")
+  approvalsRequested   ApprovalRequest[]    @relation("RequestedBy")
+  approvalsDecided     ApprovalRequest[]    @relation("DecidedBy")
+  invitationsSent      Invitation[]         @relation("InvitedBy")
+  reviewsReplied       GuestReview[]        @relation("ReviewReplier")
+  einvoicesSubmitted   EinvoiceSubmission[] @relation("EinvoiceSubmitter")
+  kitchenTicketsSent   KitchenTicket[]      @relation("KitchenTicketSender")
+  kitchenTicketsBumped KitchenTicket[]      @relation("KitchenTicketBumper")
+  recipesEdited        Recipe[]             @relation("RecipeEditor")
   filesUploaded        FileObject[]
   roomBlocksCreated    RoomBlock[]
   importJobs           ImportJob[]
   keysIssued           KeyIssue[]
-  occupantsAdded       StayOccupant[]     @relation("OccupantAddedBy")
-  occupantsRemoved     StayOccupant[]     @relation("OccupantRemovedBy")
-  visitorsSignedIn     Visitor[]          @relation("VisitorSignedInBy")
-  visitorsSignedOut    Visitor[]          @relation("VisitorSignedOutBy")
+  occupantsAdded       StayOccupant[]       @relation("OccupantAddedBy")
+  occupantsRemoved     StayOccupant[]       @relation("OccupantRemovedBy")
+  visitorsSignedIn     Visitor[]            @relation("VisitorSignedInBy")
+  visitorsSignedOut    Visitor[]            @relation("VisitorSignedOutBy")
   cardsSigned          RegistrationCard[]
   daysClosed           BusinessDay[]
   folioLinesPosted     FolioLine[]
-  shifts               CashierShift[]     @relation("ShiftCashier")
-  shiftsSignedOff      CashierShift[]     @relation("ShiftSignedOff")
+  shifts               CashierShift[]       @relation("ShiftCashier")
+  shiftsSignedOff      CashierShift[]       @relation("ShiftSignedOff")
   cashReceived         CashHandover[]
   leakageAlerts        LeakageAlert[]
   alertOutcomes        AlertOutcome[]
@@ -360,40 +362,40 @@ model User {
   hkAssignments        HkAssignment[]
   roomStatusReports    RoomStatusReport[]
   inspections          Inspection[]
-  tasksReported        Task[]             @relation("TaskReporter")
-  tasksAssigned        Task[]             @relation("TaskAssignee")
-  tasksVerified        Task[]             @relation("TaskVerifier")
+  tasksReported        Task[]               @relation("TaskReporter")
+  tasksAssigned        Task[]               @relation("TaskAssignee")
+  tasksVerified        Task[]               @relation("TaskVerifier")
   taskEvents           TaskEvent[]
-  preventivePlans      PreventivePlan[]   @relation("PlanAssignee")
-  generatorRunsStarted GeneratorRun[]     @relation("RunStartedBy")
-  generatorRunsStopped GeneratorRun[]     @relation("RunStoppedBy")
+  preventivePlans      PreventivePlan[]     @relation("PlanAssignee")
+  generatorRunsStarted GeneratorRun[]       @relation("RunStartedBy")
+  generatorRunsStopped GeneratorRun[]       @relation("RunStoppedBy")
   fuelMovements        FuelMovement[]
   meterReadings        MeterReading[]
-  lostItemsFound       LostFoundItem[]    @relation("LostFoundBy")
-  lostItemsHeld        LostFoundItem[]    @relation("LostCustodian")
-  lostItemsClosed      LostFoundItem[]    @relation("LostClosedBy")
-  checklistsAssigned   Checklist[]        @relation("ChecklistAssignee")
-  checklistsCreated    Checklist[]        @relation("ChecklistCreatedBy")
-  checklistRunsGiven   ChecklistRun[]     @relation("ChecklistRunAssignee")
-  checklistRunsDone    ChecklistRun[]     @relation("ChecklistRunDoneBy")
-  staffProfiles        StaffProfile[]     @relation("StaffLogin")
-  staffManaged         StaffProfile[]     @relation("StaffManager")
-  leaveDecided         LeaveRequest[]     @relation("LeaveDecidedBy")
-  attendanceRecorded   AttendanceEvent[]  @relation("AttendanceRecordedBy")
-  timesheetsCreated    Timesheet[]        @relation("TimesheetCreatedBy")
-  timesheetsApproved   Timesheet[]        @relation("TimesheetApprovedBy")
-  payItemsRequested    PayItem[]          @relation("PayItemRequestedBy")
-  payItemsDecided      PayItem[]          @relation("PayItemDecidedBy")
-  staffDocumentsAdded  StaffDocument[]    @relation("StaffDocumentUploadedBy")
-  lostFoundEvents      LostFoundEvent[]   @relation("LostEventBy")
-  lostFoundCustody     LostFoundEvent[]   @relation("LostEventCustodian")
-  handoversWritten     HandoverNote[]     @relation("HandoverWriter")
-  handoversAcked       HandoverNote[]     @relation("HandoverAcknowledger")
-  invitationsClaimed   Invitation[]       @relation("AcceptedBy")
+  lostItemsFound       LostFoundItem[]      @relation("LostFoundBy")
+  lostItemsHeld        LostFoundItem[]      @relation("LostCustodian")
+  lostItemsClosed      LostFoundItem[]      @relation("LostClosedBy")
+  checklistsAssigned   Checklist[]          @relation("ChecklistAssignee")
+  checklistsCreated    Checklist[]          @relation("ChecklistCreatedBy")
+  checklistRunsGiven   ChecklistRun[]       @relation("ChecklistRunAssignee")
+  checklistRunsDone    ChecklistRun[]       @relation("ChecklistRunDoneBy")
+  staffProfiles        StaffProfile[]       @relation("StaffLogin")
+  staffManaged         StaffProfile[]       @relation("StaffManager")
+  leaveDecided         LeaveRequest[]       @relation("LeaveDecidedBy")
+  attendanceRecorded   AttendanceEvent[]    @relation("AttendanceRecordedBy")
+  timesheetsCreated    Timesheet[]          @relation("TimesheetCreatedBy")
+  timesheetsApproved   Timesheet[]          @relation("TimesheetApprovedBy")
+  payItemsRequested    PayItem[]            @relation("PayItemRequestedBy")
+  payItemsDecided      PayItem[]            @relation("PayItemDecidedBy")
+  staffDocumentsAdded  StaffDocument[]      @relation("StaffDocumentUploadedBy")
+  lostFoundEvents      LostFoundEvent[]     @relation("LostEventBy")
+  lostFoundCustody     LostFoundEvent[]     @relation("LostEventCustodian")
+  handoversWritten     HandoverNote[]       @relation("HandoverWriter")
+  handoversAcked       HandoverNote[]       @relation("HandoverAcknowledger")
+  invitationsClaimed   Invitation[]         @relation("AcceptedBy")
   supportSessions      SupportSession[]
   referralPartner      ReferralPartner?
-  partnerPayouts       PartnerPayout[]    @relation("PartnerPayoutBy")
-  partnerChanges       PartnerChange[]    @relation("PartnerChangeBy")
+  partnerPayouts       PartnerPayout[]      @relation("PartnerPayoutBy")
+  partnerChanges       PartnerChange[]      @relation("PartnerChangeBy")
 
   messagesSent           Message[]             @relation("MessageSentBy")
   eventEnquiries         EventEnquiry[]
@@ -1560,8 +1562,8 @@ model Folio {
   createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   version          Int         @default(0)
 
-  property       Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  reservation    Reservation?    @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
+  property       Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  reservation    Reservation?         @relation(fields: [propertyId, reservationId], references: [propertyId, id], onDelete: Restrict)
   windows        FolioWindow[]
   lines          FolioLine[]
   routingRules   RoutingRule[]
@@ -1572,6 +1574,7 @@ model Folio {
   eventBookings  EventBooking[]
   arInvoices     ArInvoice[]
   posOrders      PosOrder[]
+  einvoices      EinvoiceSubmission[]
 
   @@unique([propertyId, number])
   @@unique([propertyId, id])
@@ -1589,12 +1592,13 @@ model FolioWindow {
   payerGuestId String? @map("payer_guest_id") @db.Uuid
   companyId    String? @map("company_id") @db.Uuid
 
-  folio        Folio         @relation(fields: [folioId], references: [id], onDelete: Restrict)
-  payerGuest   Guest?        @relation(fields: [payerGuestId], references: [id], onDelete: Restrict)
-  company      Company?      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  folio        Folio               @relation(fields: [folioId], references: [id], onDelete: Restrict)
+  payerGuest   Guest?              @relation(fields: [payerGuestId], references: [id], onDelete: Restrict)
+  company      Company?            @relation(fields: [companyId], references: [id], onDelete: Restrict)
   lines        FolioLine[]
   routingRules RoutingRule[]
   payments     Payment[]
+  einvoice     EinvoiceSubmission?
 
   @@unique([folioId, number])
   @@map("folio_windows")
@@ -4961,6 +4965,45 @@ model ServiceRequest {
   @@unique([propertyId, clientKey])
   @@index([reservationId, createdAt])
   @@map("service_requests")
+}
+
+/// One invoice (a folio window) sent to the tax authority's e-invoicing platform through the
+/// accredited provider (PRD M4-24; Strategy §7.6; T-160). QUEUED until the worker sends it;
+/// ACCEPTED with the reference number (IRN) and QR data the provider returned, printed on the
+/// invoice; REJECTED with the provider's reasons; FAILED when the provider stayed unreachable.
+/// A rejected or failed invoice is sent again on the same row, with a fresh document.
+model EinvoiceSubmission {
+  id            String    @id @db.Uuid
+  propertyId    String    @map("property_id") @db.Uuid
+  folioId       String    @map("folio_id") @db.Uuid
+  windowId      String    @unique @map("window_id") @db.Uuid
+  invoiceNumber String    @map("invoice_number")
+  /// QUEUED | ACCEPTED | REJECTED | FAILED
+  status        String
+  /// The provider it went to (FAKE in tests).
+  provider      String
+  /// The document as sent (EinvoiceDocument).
+  document      Json
+  totalMinor    BigInt    @map("total_minor")
+  currency      String    @db.Char(3)
+  irn           String?
+  qrData        String?   @map("qr_data")
+  reasons       String[]  @default([])
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime? @map("next_attempt_at") @db.Timestamptz(6)
+  lastError     String?   @map("last_error")
+  submittedById String?   @map("submitted_by_id") @db.Uuid
+  submittedAt   DateTime  @map("submitted_at") @db.Timestamptz(6)
+  acceptedAt    DateTime? @map("accepted_at") @db.Timestamptz(6)
+
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  folio       Folio       @relation(fields: [propertyId, folioId], references: [propertyId, id], onDelete: Restrict)
+  window      FolioWindow @relation(fields: [windowId], references: [id], onDelete: Restrict)
+  submittedBy User?       @relation("EinvoiceSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, invoiceNumber])
+  @@index([propertyId, status, nextAttemptAt])
+  @@map("einvoice_submissions")
 }
 
 // ───────────────────────── Kitchen display (M8-06; T-156) ─────────────────────────

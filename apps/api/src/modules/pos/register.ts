@@ -34,6 +34,7 @@ import {
   taxesFor,
 } from '../folios/service.ts';
 import * as shifts from '../shifts/service.ts';
+import { lockItem } from '../stock/service.ts';
 
 // Lite POS register (PRD M8-02, M8-03, M8-05; tab 3 pos_orders, pos_order_lines; tab 4 row
 // POS; S33; T-142). An outlet shift is a cashier shift with its outlet: opening, the blind
@@ -497,6 +498,62 @@ async function sendKitchenLines(
   return byStation.size;
 }
 
+// ── Stock (M8-07; T-157) ────────────────────────────────────────────────────────────────
+
+/**
+ * Takes what the sold items' recipes use out of the outlet's stock location (SALE movements,
+ * one per order line and stock item). Never refuses a sale: the location may go below zero,
+ * and the stocktake shows the difference. Items are locked in one order, like issues.
+ */
+async function depleteStock(
+  tx: Tx,
+  tenant: TenantContext,
+  order: {
+    id: string;
+    number: string;
+    outlet: { stockLocationId: string | null };
+    lines: LineRow[];
+  },
+  now: Date,
+): Promise<void> {
+  const locationId = order.outlet.stockLocationId;
+  if (!locationId) return;
+  const sold = order.lines.filter((l) => l.voidedAt === null);
+  if (sold.length === 0) return;
+  const recipes = await tx.recipe.findMany({
+    where: { menuItemId: { in: [...new Set(sold.map((l) => l.menuItemId))] } },
+    include: { lines: true },
+  });
+  const recipeOf = new Map(recipes.map((r) => [r.menuItemId, r.lines]));
+  const uses = sold.flatMap((l) =>
+    (recipeOf.get(l.menuItemId) ?? []).map((r) => ({
+      line: l,
+      stockItemId: r.stockItemId,
+      quantityMilli: r.quantityMilli * BigInt(l.quantity),
+    })),
+  );
+  if (uses.length === 0) return;
+  const items = new Map<string, { unitCostMinor: bigint }>();
+  for (const id of [...new Set(uses.map((u) => u.stockItemId))].sort()) {
+    items.set(id, await lockItem(tx, id, 'recipe'));
+  }
+  for (const u of uses) {
+    await tx.stockMovement.create({
+      data: {
+        itemId: u.stockItemId,
+        locationId,
+        kind: 'SALE',
+        quantityMilli: -u.quantityMilli,
+        unitCostMinor: items.get(u.stockItemId)?.unitCostMinor ?? 0n,
+        reason: `Sold: ${u.line.quantity} × ${u.line.name} (${order.number})`.slice(0, 500),
+        posOrderLineId: u.line.id,
+        byUserId: tenant.userId,
+        at: now,
+      } as unknown as Prisma.StockMovementUncheckedCreateInput, // tenant IDs come from the client
+    });
+  }
+}
+
 /** The cashier sends what is waiting to the kitchen displays (M8-06). */
 export async function sendToKitchen(deps: RegisterDeps, tenant: TenantContext, orderId: string) {
   await deps.tenantDb.$transaction(async (tx) => {
@@ -746,6 +803,7 @@ export async function settleOrder(
       const shift = await myShiftAt(tx, tenant, order.outletId);
       // Paid before cooking (counter service): the kitchen gets it now (T-156).
       await sendKitchenLines(tx, tenant, order, now);
+      await depleteStock(tx, tenant, order, now);
       const property = await tx.property.findUniqueOrThrow({ where: { id: tenant.propertyId } });
       const allowed = posMethods(property.settings);
       const off = body.payments.find((p) => !allowed.includes(p.method));
@@ -856,6 +914,7 @@ export async function chargeToRoom(
     needsLines(order);
     const shift = await myShiftAt(tx, tenant, order.outletId);
     await sendKitchenLines(tx, tenant, order, now);
+    await depleteStock(tx, tenant, order, now);
     const stay = await tx.stay.findUnique({ where: { id: body.stayId } });
     if (!stay) throw invalid('body.stayId', 'Choose a checked-in room');
     if (stay.status !== 'CHECKED_IN' || !stay.folioId) {

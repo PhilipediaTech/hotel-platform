@@ -190,6 +190,8 @@ model Property {
   channelBookings      ChannelBookingRevision[]
   guestReviews         GuestReview[]
   kitchenTickets       KitchenTicket[]
+  recipes              Recipe[]
+  recipeLines          RecipeLine[]
   checklistRuns        ChecklistRun[]
   handoverNotes        HandoverNote[]
   notifications        NotificationDelivery[]
@@ -333,6 +335,7 @@ model User {
   reviewsReplied       GuestReview[]      @relation("ReviewReplier")
   kitchenTicketsSent   KitchenTicket[]    @relation("KitchenTicketSender")
   kitchenTicketsBumped KitchenTicket[]    @relation("KitchenTicketBumper")
+  recipesEdited        Recipe[]           @relation("RecipeEditor")
   filesUploaded        FileObject[]
   roomBlocksCreated    RoomBlock[]
   importJobs           ImportJob[]
@@ -2999,14 +3002,17 @@ model StaffDocument {
 
 /// A point of sale: restaurant, bar, pool bar, room service (M8-01).
 model Outlet {
-  id         String   @id @default(uuid()) @db.Uuid
-  propertyId String   @map("property_id") @db.Uuid
-  code       String
-  name       String
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id              String   @id @default(uuid()) @db.Uuid
+  propertyId      String   @map("property_id") @db.Uuid
+  code            String
+  name            String
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// T-157: where its sales take stock from (recipes); null: sales use no stock.
+  stockLocationId String?  @map("stock_location_id") @db.Uuid
 
   property       Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  stockLocation  StockLocation?  @relation(fields: [stockLocationId], references: [id], onDelete: Restrict)
   categories     MenuCategory[]
   shifts         CashierShift[]
   orders         PosOrder[]
@@ -3052,6 +3058,7 @@ model MenuItem {
   revenueCode RevenueCode    @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
   modifiers   MenuModifier[]
   orderLines  PosOrderLine[]
+  recipe      Recipe?
 
   @@index([categoryId])
   @@map("menu_items")
@@ -3151,14 +3158,15 @@ model PosOrderLine {
   /// The ticket it went to the kitchen on; null until sent.
   kitchenTicketId           String?   @map("kitchen_ticket_id") @db.Uuid
 
-  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  order         PosOrder       @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  kitchenTicket KitchenTicket? @relation(fields: [kitchenTicketId], references: [id], onDelete: Restrict)
-  menuItem      MenuItem       @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
-  revenueCode   RevenueCode    @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
-  addedBy       User           @relation("PosOrderLineAuthor", fields: [addedById], references: [id], onDelete: Restrict)
-  voidedBy      User?          @relation("PosOrderLineVoider", fields: [voidedById], references: [id], onDelete: Restrict)
-  discountedBy  User?          @relation("PosOrderLineDiscounter", fields: [discountedById], references: [id], onDelete: Restrict)
+  property       Property        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  order          PosOrder        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  kitchenTicket  KitchenTicket?  @relation(fields: [kitchenTicketId], references: [id], onDelete: Restrict)
+  stockMovements StockMovement[]
+  menuItem       MenuItem        @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  revenueCode    RevenueCode     @relation(fields: [revenueCodeId], references: [id], onDelete: Restrict)
+  addedBy        User            @relation("PosOrderLineAuthor", fields: [addedById], references: [id], onDelete: Restrict)
+  voidedBy       User?           @relation("PosOrderLineVoider", fields: [voidedById], references: [id], onDelete: Restrict)
+  discountedBy   User?           @relation("PosOrderLineDiscounter", fields: [discountedById], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@map("pos_order_lines")
@@ -4178,6 +4186,7 @@ model StockLocation {
   movements  StockMovement[]
   stocktakes Stocktake[]
   receipts   GoodsReceipt[]
+  outlets    Outlet[]
 
   @@unique([propertyId, code])
   @@map("stock_locations")
@@ -4206,6 +4215,7 @@ model StockItem {
   requisitionLines RequisitionLine[]
   stocktakeLines   StocktakeLine[]
   orderLines       PurchaseOrderLine[]
+  recipeLines      RecipeLine[]
 
   @@unique([propertyId, code])
   @@map("stock_items")
@@ -4220,6 +4230,8 @@ enum StockMovementKind {
   TRANSFER
   /// Opening stock, breakage, a stocktake variance: always with a reason.
   ADJUSTMENT
+  /// Used by a POS sale, from the menu item's recipe (M8-07; T-157).
+  SALE
 }
 
 /// Append-only (tab 3): on hand = the sum of quantity_milli per item and location.
@@ -4240,6 +4252,8 @@ model StockMovement {
   stocktakeId       String?           @map("stocktake_id") @db.Uuid
   goodsReceiptId    String?           @map("goods_receipt_id") @db.Uuid
   orderLineId       String?           @map("purchase_order_line_id") @db.Uuid
+  /// SALE: the POS order line whose recipe used it (T-157).
+  posOrderLineId    String?           @map("pos_order_line_id") @db.Uuid
   byUserId          String            @map("by_user_id") @db.Uuid
   /// M10 rule: every issue has a requester and an approver.
   requestedById     String?           @map("requested_by_id") @db.Uuid
@@ -4254,6 +4268,7 @@ model StockMovement {
   stocktake       Stocktake?         @relation(fields: [stocktakeId], references: [id], onDelete: Restrict)
   goodsReceipt    GoodsReceipt?      @relation(fields: [goodsReceiptId], references: [id], onDelete: Restrict)
   orderLine       PurchaseOrderLine? @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+  posOrderLine    PosOrderLine?      @relation(fields: [posOrderLineId], references: [id], onDelete: Restrict)
   by              User               @relation("StockMovementBy", fields: [byUserId], references: [id], onDelete: Restrict)
   requestedBy     User?              @relation("StockMovementRequester", fields: [requestedById], references: [id], onDelete: Restrict)
   approvedBy      User?              @relation("StockMovementApprover", fields: [approvedById], references: [id], onDelete: Restrict)
@@ -4947,4 +4962,40 @@ model KitchenTicket {
   @@unique([orderId, number])
   @@index([propertyId, outletId, station, bumpedAt])
   @@map("kitchen_tickets")
+}
+
+// ───────────────────────── Recipes (M8-07; T-157) ─────────────────────────
+
+/// What one of a menu item uses from stock (M8-07; T-157): when it is sold, these leave the
+/// outlet's stock location. One per menu item; its lines are replaced as a whole.
+model Recipe {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  menuItemId  String   @unique @map("menu_item_id") @db.Uuid
+  updatedAt   DateTime @map("updated_at") @db.Timestamptz(6)
+  updatedById String   @map("updated_by_id") @db.Uuid
+
+  property  Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  menuItem  MenuItem     @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  updatedBy User         @relation("RecipeEditor", fields: [updatedById], references: [id], onDelete: Restrict)
+  lines     RecipeLine[]
+
+  @@map("recipes")
+}
+
+/// One stock item a recipe uses, in thousandths of the item's unit for one sold.
+model RecipeLine {
+  id            String @id @default(uuid()) @db.Uuid
+  propertyId    String @map("property_id") @db.Uuid
+  recipeId      String @map("recipe_id") @db.Uuid
+  stockItemId   String @map("stock_item_id") @db.Uuid
+  quantityMilli BigInt @map("quantity_milli")
+
+  property  Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  recipe    Recipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  stockItem StockItem @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+
+  @@unique([recipeId, stockItemId])
+  @@index([propertyId, stockItemId])
+  @@map("recipe_lines")
 }

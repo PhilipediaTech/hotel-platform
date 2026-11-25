@@ -132,6 +132,8 @@ describe('migrations', () => {
       'rate_days',
       'rate_limit_hits',
       'rate_plans',
+      'recipe_lines',
+      'recipes',
       'reconciliation_matches',
       'referral_partners',
       'registration_cards',

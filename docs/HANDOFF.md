@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-156 (kitchen display) is pushed on `feat/T-156-kitchen-display` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: T-157 recipes and stock depletion (M8-07).
+T-157 (recipes and stock depletion) is pushed on `feat/T-157-recipes` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: T-158 offline POS (M8-08).

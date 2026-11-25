@@ -119,7 +119,8 @@
         "RECEIPT": "Received",
         "ISSUE": "Issued",
         "TRANSFER": "Moved",
-        "ADJUSTMENT": "Adjusted"
+        "ADJUSTMENT": "Adjusted",
+        "SALE": "Sold"
       }
     },
     "orders": {

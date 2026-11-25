@@ -1,8 +1,9 @@
-import { KITCHEN_ROUTES, POS_REGISTER_ROUTES, POS_ROUTES } from '@hotel/shared';
+import { KITCHEN_ROUTES, POS_REGISTER_ROUTES, POS_ROUTES, RECIPE_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as kitchen from './kitchen.ts';
+import * as recipes from './recipes.ts';
 import * as reg from './register.ts';
 import * as setup from './setup.ts';
 
@@ -20,6 +21,16 @@ export function posRoutes(deps: reg.RegisterDeps): Router {
   const router = express.Router();
   const r = POS_ROUTES;
   const k = KITCHEN_ROUTES;
+  const rc = RECIPE_ROUTES;
+  mountRoute(router, rc.getRecipeBook, (_in, { tenant }) =>
+    recipes.getRecipeBook(deps, tenantFrom(tenant)),
+  );
+  mountRoute(router, rc.setRecipe, ({ params, body }, { tenant }) =>
+    recipes.setRecipe(deps, tenantFrom(tenant), params.menuItemId, body),
+  );
+  mountRoute(router, rc.setOutletStockLocation, ({ params, body }, { tenant }) =>
+    recipes.setOutletStockLocation(deps, tenantFrom(tenant), params.outletId, body),
+  );
   mountRoute(router, k.getKitchenBoard, ({ query }) => kitchen.getKitchenBoard(deps, query));
   mountRoute(router, k.bumpKitchenTicket, ({ params }, { tenant }) =>
     kitchen.bumpKitchenTicket(deps, tenantFrom(tenant), params.ticketId),

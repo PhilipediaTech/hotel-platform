@@ -1636,6 +1636,37 @@ async function bStock(db: Db, world: TenantWorld, propertyId: string) {
   };
 }
 
+/** B's menu item with a recipe using their stock item, and their outlet's location (T-157). */
+async function bRecipe(db: Db, world: TenantWorld, propertyId: string) {
+  const menu = await bOutlet(db, world, propertyId);
+  const unit = await db.stockUnit.create({ data: { propertyId, code: 'KG', name: 'Kilogram' } });
+  const location = await db.stockLocation.create({
+    data: { propertyId, code: 'KIT', name: 'Their kitchen' },
+  });
+  const stock = await db.stockItem.create({
+    data: { propertyId, code: 'RICE', name: 'Their rice', unitId: unit.id },
+  });
+  await db.outlet.update({ where: { id: menu.outletId }, data: { stockLocationId: location.id } });
+  await db.recipe.create({
+    data: {
+      propertyId,
+      menuItemId: menu.itemId,
+      updatedAt: new Date('2026-11-10T09:00:00Z'),
+      updatedById: world.bStaff.id,
+      lines: { create: { propertyId, stockItemId: stock.id, quantityMilli: 250n } },
+    },
+  });
+  return { ...menu, menuItemId: menu.itemId, stockItemId: stock.id, stockLocationId: location.id };
+}
+
+async function bRecipeUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.recipeLine.findMany({ where })).map((l) => l.quantityMilli)).toEqual([250n]);
+  expect((await db.outlet.findMany({ where })).map((o) => o.stockLocationId !== null)).toEqual([
+    true,
+  ]);
+}
+
 /** B's purchasing: a supplier, an approved order for 3 of their gin, and one receipt of 1. */
 async function bPurchasing(db: Db, world: TenantWorld, propertyId: string) {
   const stock = await bStock(db, world, propertyId);
@@ -3775,6 +3806,32 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bPosOrderUnchanged,
   },
   cancelPosOrder: { seed: bPosOrder, untouched: bPosOrderUnchanged },
+  // Recipes (T-157)
+  getRecipeBook: {
+    seed: bRecipe,
+    listIds: (body) => {
+      const b = body as {
+        outlets: { id: string; items: { menuItemId: string }[] }[];
+        stockItems: { id: string }[];
+        locations: { id: string }[];
+      };
+      return [
+        ...b.outlets.flatMap((o) => [o.id, ...o.items.map((i) => i.menuItemId)]),
+        ...b.stockItems.map((i) => i.id),
+        ...b.locations.map((l) => l.id),
+      ];
+    },
+  },
+  setRecipe: {
+    seed: bRecipe,
+    body: (theirs) => ({ lines: [{ stockItemId: theirs['stockItemId'], quantity: '1' }] }),
+    untouched: bRecipeUnchanged,
+  },
+  setOutletStockLocation: {
+    seed: bRecipe,
+    body: () => ({ stockLocationId: null }),
+    untouched: bRecipeUnchanged,
+  },
   // Kitchen display (T-156)
   sendPosOrderToKitchen: { seed: bKitchen, untouched: bKitchenUnchanged },
   getKitchenBoard: {

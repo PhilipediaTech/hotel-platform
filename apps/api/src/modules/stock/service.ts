@@ -346,6 +346,7 @@ const MOVEMENT_INCLUDE = {
   requisition: { select: { number: true } },
   stocktake: { select: { number: true } },
   goodsReceipt: { select: { number: true } },
+  posOrderLine: { select: { order: { select: { number: true } } } },
 } as const satisfies Prisma.StockMovementInclude;
 type MovementRow = Prisma.StockMovementGetPayload<{ include: typeof MOVEMENT_INCLUDE }>;
 
@@ -365,6 +366,7 @@ function movementItem(m: MovementRow): z.input<typeof StockMovementItem> {
     requisitionNumber: m.requisition?.number ?? null,
     stocktakeNumber: m.stocktake?.number ?? null,
     receiptNumber: m.goodsReceipt?.number ?? null,
+    posOrderNumber: m.posOrderLine?.order.number ?? null,
   };
 }
 

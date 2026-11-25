@@ -181,6 +181,42 @@ const OPERATIONS = {
 };
 
 let permissions: string[];
+const PACE = {
+  from: '2026-11-20',
+  days: 2,
+  asOf: '2026-11-20T09:30:00Z',
+  currency: 'NGN',
+  nights: [
+    {
+      date: '2026-11-20',
+      roomsAvailable: 10,
+      rooms: 6,
+      revenueMinor: '60000000',
+      occupancyBps: 6000,
+      pickup: { d1: 1, d7: 3, d30: -1 },
+      lastYear: { date: '2025-11-21', sameTime: 4, final: 8 },
+    },
+    {
+      date: '2026-11-21',
+      roomsAvailable: 10,
+      rooms: 2,
+      revenueMinor: '20000000',
+      occupancyBps: 2000,
+      pickup: { d1: 0, d7: 0, d30: 2 },
+      lastYear: { date: '2025-11-22', sameTime: 1, final: 5 },
+    },
+  ],
+  totals: {
+    roomsAvailable: 20,
+    rooms: 8,
+    revenueMinor: '80000000',
+    occupancyBps: 4000,
+    pickup: { d1: 1, d7: 3, d30: 1 },
+    lastYear: { sameTime: 5, final: 13 },
+  },
+  definitions: 'Rooms: overnight stays on the books.',
+};
+
 const calls: URL[] = [];
 
 beforeEach(() => {
@@ -193,6 +229,7 @@ beforeEach(() => {
     'GET /reports/tax': () => json(200, TAX),
     'GET /reports/dashboard': () => json(200, DASHBOARD),
     'GET /reports/operations': () => json(200, OPERATIONS),
+    'GET /reports/pace': () => json(200, PACE),
   };
   vi.stubGlobal(
     'fetch',
@@ -319,5 +356,26 @@ describe('Dashboard (S05)', () => {
         ),
       ).toBe(true),
     );
+  });
+});
+
+describe('Pickup and pace (T-165)', () => {
+  it('shows the coming nights on the books, their pickup and last year', async () => {
+    const user = userEvent.setup();
+    renderAt('/reports');
+    await user.click(await screen.findByRole('tab', { name: 'Pickup and pace' }));
+    const summary = await screen.findByRole('status');
+    expect(summary).toHaveTextContent('8 room nights on the books (40.0%)');
+    expect(summary).toHaveTextContent(
+      'Picked up: +1 in the last day, +3 in 7 days, +1 in 30 days. Last year at this point: 5; it finished with 13.',
+    );
+    const table = screen.getByRole('table', { name: 'Nights on the books' });
+    const first = within(table).getAllByRole('row')[1] as HTMLElement;
+    expect(within(first).getByText('-1')).toBeInTheDocument();
+    expect(
+      calls.some(
+        (u) => u.pathname.endsWith('/reports/pace') && u.searchParams.get('days') === '30',
+      ),
+    ).toBe(true);
   });
 });

@@ -19985,6 +19985,164 @@
           "changedDays"
         ]
       },
+      "PaceReport": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/IsoDate"
+          },
+          "days": {
+            "type": "integer"
+          },
+          "asOf": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "nights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "$ref": "#/components/schemas/IsoDate"
+                },
+                "roomsAvailable": {
+                  "type": "integer"
+                },
+                "rooms": {
+                  "type": "integer"
+                },
+                "revenueMinor": {
+                  "$ref": "#/components/schemas/AmountMinor"
+                },
+                "occupancyBps": {
+                  "type": "integer"
+                },
+                "pickup": {
+                  "type": "object",
+                  "properties": {
+                    "d1": {
+                      "type": "integer"
+                    },
+                    "d7": {
+                      "type": "integer"
+                    },
+                    "d30": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "d1",
+                    "d7",
+                    "d30"
+                  ]
+                },
+                "lastYear": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "$ref": "#/components/schemas/IsoDate"
+                    },
+                    "sameTime": {
+                      "type": "integer"
+                    },
+                    "final": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "sameTime",
+                    "final"
+                  ]
+                }
+              },
+              "required": [
+                "date",
+                "roomsAvailable",
+                "rooms",
+                "revenueMinor",
+                "occupancyBps",
+                "pickup",
+                "lastYear"
+              ]
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "roomsAvailable": {
+                "type": "integer"
+              },
+              "rooms": {
+                "type": "integer"
+              },
+              "revenueMinor": {
+                "$ref": "#/components/schemas/AmountMinor"
+              },
+              "occupancyBps": {
+                "type": "integer"
+              },
+              "pickup": {
+                "type": "object",
+                "properties": {
+                  "d1": {
+                    "type": "integer"
+                  },
+                  "d7": {
+                    "type": "integer"
+                  },
+                  "d30": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "d1",
+                  "d7",
+                  "d30"
+                ]
+              },
+              "lastYear": {
+                "type": "object",
+                "properties": {
+                  "sameTime": {
+                    "type": "integer"
+                  },
+                  "final": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "sameTime",
+                  "final"
+                ]
+              }
+            },
+            "required": [
+              "roomsAvailable",
+              "rooms",
+              "revenueMinor",
+              "occupancyBps",
+              "pickup",
+              "lastYear"
+            ]
+          },
+          "definitions": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "days",
+          "asOf",
+          "currency",
+          "nights",
+          "totals",
+          "definitions"
+        ]
+      },
       "Task": {
         "type": "object",
         "properties": {
@@ -83998,6 +84156,116 @@
           },
           "409": {
             "description": "Conflict: `IDEMPOTENCY_KEY_REUSED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/pace": {
+      "get": {
+        "operationId": "getPaceReport",
+        "summary": "Pickup and pace: the coming nights on the books, recent pickup, and last year",
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Not in tab 4: designed in T-165 (Versions V2, revenue-management support). From today by default; at most 120 nights.",
+        "x-permission": "report.dashboard",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/IsoDate"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 120,
+              "default": 90
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaceReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
             "content": {
               "application/json": {
                 "schema": {

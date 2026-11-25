@@ -8,7 +8,8 @@
       "trial": "Trial balance",
       "cashier": "Cashier",
       "tax": "Tax",
-      "operations": "Operations"
+      "operations": "Operations",
+      "pace": "Pickup and pace"
     },
     "date": "Closed day",
     "lastClosed": "Last closed day",

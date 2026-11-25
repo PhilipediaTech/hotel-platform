@@ -4065,6 +4065,8 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({ reply: 'Thank you' }),
     untouched: bReviewUnchanged,
   },
+  // Pickup and pace (T-165): B's booking never counts in A's nights.
+  getPaceReport: { seed: bReservation, listIds: () => [] },
   // Group dashboards (T-161)
   getGroupDashboard: {
     seed: bGroup,

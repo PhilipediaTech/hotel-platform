@@ -605,12 +605,34 @@ export async function listOrders(
 export const getOrder = (deps: RegisterDeps, orderId: string) =>
   orderView(deps.tenantDb, orderId, deps.clock);
 
+/**
+ * M8-08 (T-158): when something done offline really happened, for the audit trail. A device
+ * clock far ahead, or a day behind, is refused rather than recorded.
+ */
+function offlineTime(takenAt: string | undefined, now: Date, path: string): string | undefined {
+  if (takenAt === undefined) return undefined;
+  const t = Date.parse(takenAt);
+  if (t > now.getTime() + 5 * 60_000 || t < now.getTime() - 24 * 3_600_000) {
+    throw invalid(path, 'The time it was taken must be within the last day');
+  }
+  return takenAt;
+}
+
 export async function openOrder(
   deps: RegisterDeps,
   tenant: TenantContext,
-  body: { outletId: string; label: string },
+  body: { outletId: string; label: string; id?: string | undefined; takenAt?: string | undefined },
 ) {
+  const takenAt = offlineTime(body.takenAt, deps.clock(), 'body.takenAt');
   const id = await deps.tenantDb.$transaction(async (tx) => {
+    if (
+      body.id &&
+      (await tx.posOrder.findFirst({ where: { id: body.id }, select: { id: true } }))
+    ) {
+      throw new AppError('STATE_TRANSITION_INVALID', 'An order with this ID exists already', {
+        reason: 'ORDER_EXISTS',
+      });
+    }
     const outlet = await tx.outlet.findFirst({ where: { id: body.outletId } });
     if (!outlet) throw invalid('body.outletId', 'Choose an outlet');
     const shift = await myShiftAt(tx, tenant, outlet.id);
@@ -618,6 +640,7 @@ export async function openOrder(
     const n = await nextPropertyCounter(tx, tenant.propertyId, COUNTER.POS_ORDER);
     const order = await tx.posOrder.create({
       data: {
+        ...(body.id ? { id: body.id } : {}),
         outletId: outlet.id,
         shiftId: shift.id,
         number: `P${String(n).padStart(5, '0')}`,
@@ -630,7 +653,13 @@ export async function openOrder(
       action: 'pos.order_opened',
       entityType: 'pos_order',
       entityId: order.id,
-      after: { number: order.number, label: body.label, outletId: outlet.id, shiftId: shift.id },
+      after: {
+        number: order.number,
+        label: body.label,
+        outletId: outlet.id,
+        shiftId: shift.id,
+        ...(takenAt ? { takenOfflineAt: takenAt } : {}),
+      },
     });
     return order.id;
   });
@@ -657,8 +686,15 @@ export async function addLine(
   deps: RegisterDeps,
   tenant: TenantContext,
   orderId: string,
-  body: { menuItemId: string; quantity: number; modifierIds: string[]; note: string | null },
+  body: {
+    menuItemId: string;
+    quantity: number;
+    modifierIds: string[];
+    note: string | null;
+    takenAt?: string | undefined;
+  },
 ) {
+  const takenAt = offlineTime(body.takenAt, deps.clock(), 'body.takenAt');
   await deps.tenantDb.$transaction(async (tx) => {
     const order = await lockOpenOrder(tx, orderId);
     await myShiftAt(tx, tenant, order.outletId);
@@ -710,6 +746,7 @@ export async function addLine(
         name,
         quantity: body.quantity,
         unitPriceMinor: unit.toString(),
+        ...(takenAt ? { takenOfflineAt: takenAt } : {}),
       },
     });
   });

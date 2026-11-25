@@ -130,6 +130,8 @@ export const PosOrderItem = z
   .meta({ id: 'PosOrder' });
 
 const POS = { tags: ['POS'], propertyScoped: true as const };
+/** When something was done on a device without a connection (M8-08; T-158). */
+const OfflineTime = Instant;
 const ADDED = 'Tab 4 row POS names the paths; the bodies are designed in T-142.';
 const OrderParams = z.object({ orderId: Uuid });
 const ShiftParams = z.object({ shiftId: Uuid });
@@ -240,11 +242,18 @@ export const openPosOrder = defineRoute({
   method: 'post',
   path: '/pos/orders',
   summary: 'Open a tab or a table (M8-03)',
-  description: `${ADDED} Needs your open shift at the outlet (SHIFT_NOT_OPEN).`,
+  description: `${ADDED} Needs your open shift at the outlet (SHIFT_NOT_OPEN). T-158 (M8-08): an order taken offline comes with its own ID (chosen on the device, so items added offline can name it) and the time it was taken; it is opened when the connection is back.`,
   permission: 'pos.order',
   idempotent: true,
   status: 201,
-  body: z.object({ outletId: Uuid, label: z.string().trim().min(1).max(40) }),
+  body: z.object({
+    outletId: Uuid,
+    label: z.string().trim().min(1).max(40),
+    /** M8-08: the order's ID, chosen on the device (offline). */
+    id: Uuid.optional(),
+    /** M8-08: when it was really taken, offline (kept in the audit trail). */
+    takenAt: OfflineTime.optional(),
+  }),
   response: PosOrderItem,
   errors: ['SHIFT_NOT_OPEN'],
 });
@@ -271,6 +280,8 @@ export const addPosOrderLine = defineRoute({
       .transform((v) => (v === '' ? null : v))
       .nullable()
       .default(null),
+    /** M8-08: when it was really added, offline (kept in the audit trail). */
+    takenAt: OfflineTime.optional(),
   }),
   response: PosOrderItem,
   errors: ['SHIFT_NOT_OPEN', 'STATE_TRANSITION_INVALID'],

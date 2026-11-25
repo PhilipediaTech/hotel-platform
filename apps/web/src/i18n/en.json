@@ -97,7 +97,7 @@
     "unmatched-transfers": "Unmatched transfers"
   },
   "offline": {
-    "banner": "You're offline. Lists show the last saved copy. Payments, check-in, check-out, postings and night audit are paused until you reconnect. Notes, task updates and room status are kept on this device and sent when you're back.",
+    "banner": "You're offline. Lists show the last saved copy. Payments, check-in, check-out, postings and night audit are paused until you reconnect. Notes, task updates, room status and POS orders are kept on this device and sent when you're back.",
     "savedCopy": "Offline: saved copy from {{time}}.",
     "labels": {
       "task": "Task {{number}}: {{what}}",

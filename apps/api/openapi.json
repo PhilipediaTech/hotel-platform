@@ -70558,7 +70558,7 @@
             "session": []
           }
         ],
-        "description": "Tab 4 row POS names the paths; the bodies are designed in T-142. Needs your open shift at the outlet (SHIFT_NOT_OPEN).",
+        "description": "Tab 4 row POS names the paths; the bodies are designed in T-142. Needs your open shift at the outlet (SHIFT_NOT_OPEN). T-158 (M8-08): an order taken offline comes with its own ID (chosen on the device, so items added offline can name it) and the time it was taken; it is opened when the connection is back.",
         "x-permission": "pos.order",
         "x-idempotent": true,
         "parameters": [
@@ -70599,6 +70599,12 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 40
+                  },
+                  "id": {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  "takenAt": {
+                    "$ref": "#/components/schemas/Instant"
                   }
                 },
                 "required": [
@@ -70870,6 +70876,9 @@
                     ],
                     "maxLength": 200,
                     "default": null
+                  },
+                  "takenAt": {
+                    "$ref": "#/components/schemas/Instant"
                   }
                 },
                 "required": [

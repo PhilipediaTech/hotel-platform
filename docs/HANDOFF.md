@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-157 (recipes and stock depletion) is pushed on `feat/T-157-recipes` (run `npm run db:deploy` and `npm run db:generate` after merging). Next: T-158 offline POS (M8-08).
+T-158 (offline POS order taking) is pushed on `feat/T-158-offline-pos` (no migration). Next: the guest portal beyond online check-in.

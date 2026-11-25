@@ -338,4 +338,58 @@ describe('POS register (S33)', () => {
     });
     expect(await screen.findByText(/Discount: Regular guest/)).toBeInTheDocument();
   }, 15_000);
+
+  it('keeps taking orders offline, and sends them in order once back (M8-08; T-158)', async () => {
+    let online = true;
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => online });
+    const real = globalThis.fetch;
+    let created: { id: string; label: string } | null = null;
+    handlers[`GET /pos/orders/${id(3)}`] = () => json(200, order([]));
+    handlers['POST /pos/orders'] = (body) => {
+      created = body as { id: string; label: string };
+      handlers[`POST /pos/orders/${created.id}/lines`] = () =>
+        json(201, order([line], { id: created?.id, label: created?.label }));
+      return json(201, order([], { id: created.id, label: created.label }));
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string, init: RequestInit) =>
+        online ? real(input, init) : Promise.reject(new TypeError('Failed to fetch')),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt('/pos');
+    // Online first: the menu and the orders are saved on the device.
+    const list = await screen.findByRole('list', { name: 'Open orders' });
+    await user.click(await within(list).findByRole('button', { name: /Table 4/ }));
+    await screen.findByRole('region', { name: 'Drinks' });
+
+    online = false;
+    window.dispatchEvent(new Event('offline'));
+    await user.type(screen.getByLabelText('Table or tab name'), 'Table 9');
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    const panel = await screen.findByRole('complementary', { name: 'Table 9 (on this device)' });
+    expect(within(list).getByRole('button', { name: /Table 9.*not sent yet/ })).toBeInTheDocument();
+    const drinks = screen.getByRole('region', { name: 'Drinks' });
+    await user.click(within(drinks).getByRole('button', { name: /Zobo/ }));
+    const waiting = await within(panel).findByRole('list', { name: 'Items waiting to be sent' });
+    expect(within(waiting).getByText(/Zobo/)).toBeInTheDocument();
+    expect(within(panel).getByText(/About ₦1,500.00 before tax/)).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Take payment' })).toBeDisabled();
+    expect(sent('POST /pos/orders')).toHaveLength(0);
+
+    // Back online: the order goes first, then its item, naming the order by its own ID.
+    online = true;
+    window.dispatchEvent(new Event('online'));
+    await waitFor(() => expect(created).not.toBeNull());
+    expect(created).toMatchObject({ outletId: outlet.id, label: 'Table 9' });
+    expect((created as unknown as { takenAt?: string }).takenAt).toMatch(/^\d{4}-/);
+    const orderId = (created as unknown as { id: string }).id;
+    await waitFor(() => expect(sent(`POST /pos/orders/${orderId}/lines`)).toHaveLength(1));
+    expect(sent(`POST /pos/orders/${orderId}/lines`)[0]?.body).toMatchObject({
+      menuItemId: zobo.id,
+      modifierIds: [],
+      takenAt: expect.any(String) as string,
+    });
+  }, 20_000);
 });

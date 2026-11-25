@@ -7,7 +7,9 @@ import { offlineStore, type QueuedAction } from './store.ts';
 // updates, housekeeping status). Each queued action has a client UUID and idempotency key; on
 // reconnect it replays in order and shows conflicts"; QA "network cut on front desk → note
 // queued → reconnect → note synced"; T-093). Anything else, money above all, needs the
-// connection and is refused offline by the API client.
+// connection and is refused offline by the API client. T-158 (PRD M8-08 "I keep taking orders
+// during an outage; they sync when online"): POS orders, their items and sending them to the
+// kitchen may wait too; paying for them waits for the connection.
 
 /** The only operations that may wait for the connection. */
 export const QUEUEABLE = new Set([
@@ -20,6 +22,10 @@ export const QUEUEABLE = new Set([
   'submitStatusReport',
   // Notes only (the queue refuses any other field).
   'updateReservation',
+  // T-158: POS order taking (an order opened offline carries its own ID).
+  'openPosOrder',
+  'addPosOrderLine',
+  'sendPosOrderToKitchen',
 ]);
 
 export type Queueable =
@@ -30,7 +36,10 @@ export type Queueable =
   | 'resolveTask'
   | 'updateAssignment'
   | 'submitStatusReport'
-  | 'updateReservation';
+  | 'updateReservation'
+  | 'openPosOrder'
+  | 'addPosOrderLine'
+  | 'sendPosOrderToKitchen';
 
 type Input = QueuedAction['input'];
 
@@ -69,6 +78,9 @@ function checkQueueable(operationId: string, input: Input): void {
   if (operationId === 'updateReservation') {
     const keys = Object.keys(input.body ?? {});
     if (keys.some((k) => k !== 'notes')) throw new Error('Only notes can wait offline');
+  }
+  if (operationId === 'openPosOrder' && !(input.body as { id?: string } | undefined)?.id) {
+    throw new Error('An order taken offline needs its own ID');
   }
 }
 

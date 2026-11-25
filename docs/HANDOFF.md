@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-160 (e-invoicing, provider to come) is pushed on `feat/T-160-einvoicing` (migration 20270103090000_einvoicing). Next: V2.
+T-161 (group dashboard with currency conversion) is pushed on `feat/T-161-group-dashboard` (migration 20270104090000_group_reports). Next: V2 group rate push (M2-13).

@@ -1929,6 +1929,42 @@ async function bEinvoiceUnchanged(db: Db, world: TenantWorld) {
   expect((property.settings as { einvoicing: { enabled: boolean } }).einvoicing.enabled).toBe(true);
 }
 
+/** B's group: a closed November day kept, and a cedi rate in its own group currency (T-161). */
+async function bGroup(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  await db.organisation.update({ where: { id: organisationId }, data: { groupCurrency: 'GHS' } });
+  await db.nightAuditRun.create({
+    data: {
+      propertyId,
+      businessDate: new Date('2026-11-01'),
+      status: 'COMPLETED',
+      currentStep: 10,
+      finishedAt: new Date('2026-11-01T23:00:00Z'),
+      summary: { reports: { flash: { roomsSold: 9, roomsAvailable: 9 } } } as never,
+    },
+  });
+  const owner = await db.user.findFirstOrThrow({ where: { id: world.aStaff.id } });
+  await db.groupExchangeRate.create({
+    data: {
+      organisationId,
+      fromCurrency: 'NGN',
+      toCurrency: 'GHS',
+      month: new Date('2026-11-01'),
+      rateMicros: 9_000n,
+      setById: owner.id,
+      setAt: new Date('2026-11-01T09:00:00Z'),
+    },
+  });
+  return { propertyId };
+}
+
+async function bGroupUnchanged(db: Db, world: TenantWorld) {
+  const org = await db.organisation.findUniqueOrThrow({ where: { id: orgOf(world, world.b1.id) } });
+  expect(org.groupCurrency).toBe('GHS');
+  const rates = await db.groupExchangeRate.findMany({ where: { organisationId: org.id } });
+  expect(rates.map((r) => [r.fromCurrency, r.rateMicros])).toEqual([['NGN', 9_000n]]);
+}
+
 async function bStockUnchanged(db: Db, world: TenantWorld) {
   const where = { propertyId: world.b1.id };
   expect((await db.stockItem.findMany({ where })).map((i) => [i.name, i.active])).toEqual([
@@ -3999,6 +4035,21 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     seed: bReview,
     body: () => ({ reply: 'Thank you' }),
     untouched: bReviewUnchanged,
+  },
+  // Group dashboards (T-161)
+  getGroupDashboard: {
+    seed: bGroup,
+    query: () => ({ month: '2026-11' }),
+    listIds: (body) =>
+      (body as { properties: { propertyId: string }[] }).properties.map((p) => p.propertyId),
+  },
+  getGroupRates: { seed: bGroup, query: () => ({ month: '2026-11' }), listIds: () => [] },
+  putGroupRates: {
+    seed: bGroup,
+    // Changes the caller's own organisation only.
+    creates: true,
+    body: () => ({ month: '2026-11', groupCurrency: 'USD', rates: [] }),
+    untouched: bGroupUnchanged,
   },
   // E-invoicing (T-160)
   getEinvoiceSettings: { seed: bEinvoice, listIds: () => [] },

@@ -421,6 +421,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-149',
   },
   {
+    // T-161 (PRD M1-13, M12-07): the owner's group dashboard.
+    id: 'group',
+    path: '/group',
+    anyOf: ['report.group'],
+    group: 'revenue',
+    screen: 'S46',
+    ticket: 'T-161',
+  },
+  {
     id: 'reports',
     path: '/reports',
     anyOf: ['report.dashboard', 'report.audit', 'report.tax', 'report.flash', 'report.ops'],

@@ -1,0 +1,32 @@
+{
+  "group": {
+    "title": "Group",
+    "intro": "Your properties side by side for a month, and the group’s totals in {{currency}}. Closed days only, as night audit kept them.",
+    "month": "Month",
+    "totals": "Group totals",
+    "occupancy": "Occupancy",
+    "roomsSold": "Rooms sold",
+    "adr": "ADR",
+    "revpar": "RevPAR",
+    "roomRevenue": "Room revenue",
+    "revenue": "Revenue before tax",
+    "inTotals": "Money totals count {{count}} of {{total}} properties.",
+    "missing": "No {{month}} rate for {{currencies}}: those properties are left out of the money totals until you set one below.",
+    "properties": "Properties",
+    "property": "Property",
+    "days": "Closed days",
+    "inGroup": "In {{currency}}",
+    "noRate": "No rate",
+    "noDays": "No closed days this month",
+    "rates": {
+      "title": "Group currency and rates",
+      "intro": "What one unit of each property’s currency is worth in the group currency, for this month.",
+      "groupCurrency": "Group currency",
+      "rateFor": "{{currency}} → {{group}}",
+      "setBy": "Set by {{name}}",
+      "none": "All your properties use the group currency: no rates needed.",
+      "save": "Save rates",
+      "saved": "Saved."
+    }
+  }
+}

@@ -171,6 +171,7 @@ export const TENANT_MODELS: Record<string, Scope> = {
   KitchenTicket: { kind: 'property' },
   Recipe: { kind: 'property' },
   RecipeLine: { kind: 'property' },
+  ServiceRequest: { kind: 'property' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },
   HandoverNote: { kind: 'property' },

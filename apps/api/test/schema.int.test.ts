@@ -153,6 +153,7 @@ describe('migrations', () => {
       'rota_patterns',
       'routing_rules',
       'service_bookings',
+      'service_requests',
       'services',
       'sessions',
       'shift_assignments',

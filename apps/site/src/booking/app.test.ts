@@ -8,6 +8,7 @@ import {
   type CheckInInfo,
   type Property,
   type Review,
+  type Stay,
 } from './api.ts';
 import { mount } from './app.ts';
 
@@ -101,6 +102,8 @@ const REVIEW: Review = {
   publicReviewUrl: 'https://g.page/r/demo-lagos/review',
 };
 
+const STAY: Stay = { closedReason: null, roomNumber: null, requests: [], feedback: null };
+
 let root: HTMLElement;
 let navigate: ReturnType<typeof vi.fn<(url: string) => void>>;
 let api: { [K in keyof Api]: ReturnType<typeof vi.fn<Api[K]>> };
@@ -125,6 +128,9 @@ beforeEach(() => {
       .fn<Api['payBalance']>()
       .mockResolvedValue({ paymentUrl: 'https://pay.test/bal' }),
     review: vi.fn<Api['review']>().mockResolvedValue(REVIEW),
+    stay: vi.fn<Api['stay']>().mockResolvedValue(STAY),
+    requestService: vi.fn<Api['requestService']>(),
+    startFeedback: vi.fn<Api['startFeedback']>().mockResolvedValue({ path: '/r/review-token' }),
     submitReview: vi.fn<Api['submitReview']>().mockImplementation((_token, body) =>
       Promise.resolve({
         ...REVIEW,
@@ -447,6 +453,95 @@ describe('online check-in (M3-20, M11-06)', () => {
     });
     buttonNamed('Change my details').click();
     expect(byId('f-nationality')).not.toBeNull();
+  });
+});
+
+describe('requests and feedback on the guest’s link (M11-06; T-159)', () => {
+  const open = async (status = 'CHECKED_IN') => {
+    api.booking.mockResolvedValue({
+      ...BOOKING,
+      status,
+      cancellation: { allowed: false, feeMinor: '0' },
+    });
+    start('/demo-lagos/manage', '?token=secret-token');
+    await settle();
+  };
+
+  it('sends a request, shows its progress, and a retry sends the same key', async () => {
+    api.stay.mockResolvedValue({ ...STAY, roomNumber: '204' });
+    await open();
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('Ask for something, room 204');
+    });
+    submit('Ask for something');
+    expect(root.textContent).toContain('Choose what you need.');
+    expect(api.requestService).not.toHaveBeenCalled();
+
+    api.requestService.mockRejectedValueOnce(
+      new ApiError(0, 'We can’t reach the booking system.', null, {}),
+    );
+    byId('f-kind').value = 'HOUSEKEEPING';
+    (root.querySelector('#f-note') as HTMLTextAreaElement).value = '  Two extra towels ';
+    submit('Ask for something');
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('We can’t reach the booking system.');
+    });
+    api.requestService.mockResolvedValueOnce({
+      ...STAY,
+      roomNumber: '204',
+      requests: [
+        {
+          id: 'r1',
+          kind: 'HOUSEKEEPING',
+          note: 'Two extra towels',
+          status: 'ON_IT',
+          createdAt: '2026-12-14T15:00:00Z',
+        },
+      ],
+    });
+    submit('Ask for something');
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('The hotel has your request');
+    });
+    expect(root.textContent).toContain(
+      'Cleaning or fresh towels – Two extra towelsSomeone is on it',
+    );
+    const [first, second] = api.requestService.mock.calls;
+    expect(first?.[1]).toMatchObject({ kind: 'HOUSEKEEPING', note: 'Two extra towels' });
+    expect(second?.[1].requestKey).toBe(first?.[1].requestKey);
+  });
+
+  it('after the stay: no new requests, the list stays, and rating opens the review page', async () => {
+    api.stay.mockResolvedValue({
+      ...STAY,
+      closedReason: 'ENDED',
+      requests: [
+        {
+          id: 'r1',
+          kind: 'TRANSPORT',
+          note: null,
+          status: 'DONE',
+          createdAt: '2026-12-14T15:00:00Z',
+        },
+      ],
+      feedback: { state: 'AVAILABLE', path: null },
+    });
+    await open('CHECKED_OUT');
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('How was your stay?');
+    });
+    expect(root.querySelector('form[aria-label="Ask for something"]')).toBeNull();
+    expect(root.textContent).toContain('Airport pickup or a taxiDone');
+    buttonNamed('Rate your stay').click();
+    await vi.waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith('https://book.test/r/review-token');
+    });
+    expect(api.startFeedback).toHaveBeenCalledWith('secret-token');
+  });
+
+  it('a cancelled booking asks for nothing', async () => {
+    await open('CANCELLED');
+    expect(api.stay).not.toHaveBeenCalled();
   });
 });
 

@@ -408,6 +408,105 @@ export const payPublicBalance = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+// ── Requests and feedback from the guest's link (M11-06; S45; T-159) ────────────────────
+
+/** What a guest can ask for from their link; each goes to the department that does it. */
+export const SERVICE_REQUEST_KINDS = [
+  'HOUSEKEEPING',
+  'AMENITIES',
+  'MAINTENANCE',
+  'FOOD_DRINK',
+  'TRANSPORT',
+  'OTHER',
+] as const;
+export type ServiceRequestKind = (typeof SERVICE_REQUEST_KINDS)[number];
+
+/** At most this many requests wait at once per booking. */
+export const MAX_OPEN_SERVICE_REQUESTS = 5;
+
+export const PublicStay = z
+  .object({
+    /** Why new requests can't be made now; null when they can. */
+    closedReason: z.enum(['NOT_CONFIRMED', 'CANCELLED', 'ENDED']).nullable(),
+    roomNumber: z.string().nullable(),
+    requests: z.array(
+      z.object({
+        id: Uuid,
+        kind: z.enum(SERVICE_REQUEST_KINDS),
+        note: z.string().nullable(),
+        /** RECEIVED: not yet picked up; ON_IT: someone has it; DONE: done. */
+        status: z.enum(['RECEIVED', 'ON_IT', 'DONE']),
+        createdAt: Instant,
+      }),
+    ),
+    /**
+     * Rating the stay, after check-out when the hotel asks for reviews. AVAILABLE: the guest may
+     * start it (startPublicFeedback); OPEN, GIVEN, EXPIRED: it exists at `path`.
+     */
+    feedback: z
+      .object({
+        state: z.enum(['AVAILABLE', 'OPEN', 'GIVEN', 'EXPIRED']),
+        path: z.string().nullable(),
+      })
+      .nullable(),
+  })
+  .meta({ id: 'PublicStay' });
+
+export const getPublicStay = defineRoute({
+  ...PUBLIC,
+  operationId: 'getPublicStay',
+  method: 'get',
+  path: '/public/bookings/{token}/stay',
+  summary: 'The guest’s requests and feedback, from their secure link (M11-06)',
+  params: TokenParams,
+  response: PublicStay,
+});
+
+export const PublicServiceRequestBody = z
+  .object({
+    /** A UUID the page makes once per request: sending it again returns the same request. */
+    requestKey: Uuid,
+    kind: z.enum(SERVICE_REQUEST_KINDS),
+    note: z
+      .string()
+      .trim()
+      .max(500)
+      .transform((v) => v || null)
+      .nullable()
+      .default(null),
+  })
+  .refine((b) => b.kind !== 'OTHER' || b.note !== null, {
+    path: ['note'],
+    message: 'Say what you need',
+  });
+
+export const createPublicServiceRequest = defineRoute({
+  ...PUBLIC,
+  operationId: 'createPublicServiceRequest',
+  method: 'post',
+  path: '/public/bookings/{token}/requests',
+  summary: 'Ask the hotel for something, from the secure link (M11-06)',
+  description: `From confirmation until the stay ends. Each request becomes a guest-request task for the department that does it. At most ${MAX_OPEN_SERVICE_REQUESTS} wait at once.`,
+  status: 201,
+  params: TokenParams,
+  body: PublicServiceRequestBody,
+  response: PublicStay,
+  errors: ['STATE_TRANSITION_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
+});
+
+export const startPublicFeedback = defineRoute({
+  ...PUBLIC,
+  operationId: 'startPublicFeedback',
+  method: 'post',
+  path: '/public/bookings/{token}/feedback',
+  summary: 'Open the page to rate the stay, from the secure link (M11-06)',
+  description: 'Gives the review page of this stay, making it the first time.',
+  params: TokenParams,
+  body: z.object({}),
+  response: z.object({ path: z.string() }),
+  errors: ['STATE_TRANSITION_INVALID'],
+});
+
 export const OnlineCheckInForDesk = z
   .object({
     submitted: z
@@ -458,6 +557,9 @@ export const BOOKING_ENGINE_ROUTES = {
   createPublicIdUpload,
   submitPublicCheckIn,
   payPublicBalance,
+  getPublicStay,
+  createPublicServiceRequest,
+  startPublicFeedback,
   getOnlineCheckIn,
   sendGuestLink,
   getBookingEngineSettings,

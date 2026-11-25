@@ -1,0 +1,41 @@
+{
+  "einvoices": {
+    "title": "E-invoicing",
+    "intro": "Invoices sent to the tax authority through the accredited provider. Once accepted, the printed invoice carries its reference number and QR code.",
+    "settings": {
+      "label": "E-invoicing for this property",
+      "on": "On since {{when}}: invoices with charges from then can be sent.",
+      "off": "Off: no invoices are sent.",
+      "noProvider": "No e-invoicing provider is set up on the platform yet, so it can’t be switched on.",
+      "noTin": "Add the hotel’s TIN to its tax registration (Settings) before switching on.",
+      "tin": "Hotel TIN {{tin}}",
+      "switchOn": "Switch on",
+      "switchOff": "Switch off"
+    },
+    "filter": "Show invoices",
+    "filters": {
+      "NOT_SENT": "Not sent ({{count}})",
+      "QUEUED": "Sending ({{count}})",
+      "ACCEPTED": "Accepted ({{count}})",
+      "REJECTED": "Rejected ({{count}})",
+      "FAILED": "Failed ({{count}})"
+    },
+    "list": "Invoices",
+    "none": "No invoices here.",
+    "status": {
+      "NOT_SENT": "Not sent",
+      "QUEUED": "Sending",
+      "ACCEPTED": "Accepted",
+      "REJECTED": "Rejected",
+      "FAILED": "Failed"
+    },
+    "billTo": "Bill to {{name}}",
+    "buyerTin": "TIN {{tin}}",
+    "noBuyerTin": "No TIN",
+    "irn": "Reference {{irn}}",
+    "attempts": "Tried {{count}} times; the provider couldn’t be reached.",
+    "send": "Send",
+    "sendAgain": "Send again",
+    "sendLabel": "Send invoice {{number}}"
+  }
+}

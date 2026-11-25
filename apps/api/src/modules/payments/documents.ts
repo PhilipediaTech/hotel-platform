@@ -1,5 +1,6 @@
 import { microsToRate } from '@hotel/shared';
 import PDFDocument from 'pdfkit';
+import { encode } from 'uqr';
 import type { Property } from '../../generated/prisma/client.ts';
 import { recordAudit } from '../../core/audit.ts';
 import { businessDate } from '../../core/business-day.ts';
@@ -75,6 +76,25 @@ export function header(doc: Doc, property: Property, title: string) {
 }
 
 /** Label / value pairs, two columns. */
+/**
+ * The e-invoice QR code (M4-24; T-160) under the title, top right, and the reference beside the
+ * other facts. Drawn as squares so it prints sharp at any size.
+ */
+export function einvoiceQr(doc: Doc, data: string) {
+  const { data: modules, size } = encode(data, { ecc: 'M', border: 0 });
+  const side = 72;
+  const cell = side / size;
+  const x0 = RIGHT - side;
+  const y0 = 72;
+  modules.forEach((row, y) => {
+    row.forEach((dark, x) => {
+      if (dark) doc.rect(x0 + x * cell, y0 + y * cell, cell, cell);
+    });
+  });
+  doc.fill('#000000');
+  doc.y = Math.max(doc.y, y0 + side + 10);
+}
+
 export function facts(doc: Doc, rows: [string, string][]) {
   const top = doc.y;
   rows.forEach(([label, value], i) => {
@@ -208,6 +228,14 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
   const number =
     windowNumber && windowNumber > 1 ? `${folio.number}-${windowNumber}` : folio.number;
   const date = await businessDate(db, folio.propertyId, deps.clock);
+  const window = folio.windows.find((w) => w.number === (windowNumber ?? 1));
+  // Accepted by the tax authority (T-160): its reference and QR code go on the invoice.
+  const einvoice = window
+    ? await db.einvoiceSubmission.findFirst({
+        where: { windowId: window.id, status: 'ACCEPTED' },
+        select: { irn: true, qrData: true },
+      })
+    : null;
 
   // Deposits applied and transfers move money between bills: they are not charges.
   const moved = new Set(['DEPOSIT_APPLY', 'TRANSFER_IN', 'TRANSFER_OUT']);
@@ -232,8 +260,10 @@ export async function folioInvoice(deps: PaymentDeps, folioId: string, windowNum
 
   const content = await render((doc) => {
     header(doc, folio.property, 'INVOICE');
+    if (einvoice?.qrData) einvoiceQr(doc, einvoice.qrData);
     facts(doc, [
       ['Invoice no.', number],
+      ...(einvoice?.irn ? [['E-invoice ref.', einvoice.irn] as [string, string]] : []),
       ['Date', date],
       ['Bill to', payerOf(folio, windowNumber ?? 1)],
       ['Guest', folio.name],

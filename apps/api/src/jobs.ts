@@ -38,6 +38,8 @@ import { eventHoldExpiryJob } from './modules/events/routes.ts';
 import { groupBlockReleaseJob } from './modules/groups/routes.ts';
 import { platformBillingJob } from './modules/platform/billing.ts';
 import type { ChannelManager } from './core/channel-manager.ts';
+import type { EinvoiceProvider } from './core/einvoice.ts';
+import { einvoiceSendJob } from './modules/einvoicing/service.ts';
 import { channelSyncJob } from './modules/channels/sync.ts';
 import { channelBookingsHandler, channelBookingsJob } from './modules/channels/bookings.ts';
 import { reviewDraftHandler, reviewRequestJob } from './modules/reviews/service.ts';
@@ -53,6 +55,8 @@ export function workerJobs(deps: {
   config: Config;
   /** Prices and availability to the channel manager (T-152). */
   channel: ChannelManager;
+  /** Invoices to the tax authority (T-160). */
+  einvoice: EinvoiceProvider;
 }): readonly JobDefinition<never>[] {
   return [
     ownerSummaryJob({ ai: deps.ai }),
@@ -83,6 +87,8 @@ export function workerJobs(deps: {
     ...(deps.channel.name === 'OFF'
       ? []
       : [channelSyncJob({ channel: deps.channel }), channelBookingsJob({ channel: deps.channel })]),
+    // No e-invoicing provider yet: nothing can be queued (switching on needs one).
+    ...(deps.einvoice.name === 'OFF' ? [] : [einvoiceSendJob({ provider: deps.einvoice })]),
   ];
 }
 

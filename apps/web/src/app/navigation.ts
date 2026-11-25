@@ -136,6 +136,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-126',
   },
   {
+    // T-160 (PRD M4-24): invoices to the tax authority, beside the city ledger.
+    id: 'einvoices',
+    path: '/einvoices',
+    anyOf: ['einvoice.submit'],
+    group: 'revenue',
+    screen: 'S32',
+    ticket: 'T-160',
+  },
+  {
     id: 'reconciliation',
     path: '/reconciliation',
     anyOf: ['recon.manage'],

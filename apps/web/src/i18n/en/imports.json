@@ -1,16 +1,17 @@
 {
   "imports": {
     "title": "Imports",
-    "intro": "Load rooms, rates, guests, companies or what companies owed at go-live from a spreadsheet. The file is checked first and nothing changes until you confirm.",
+    "intro": "Load rooms, rates, guests, companies, what companies owed at go-live, or bookings still to come from a spreadsheet. The file is checked first and nothing changes until you confirm.",
     "what": "What are you importing?",
     "kinds": {
       "ROOMS": "Rooms and room types",
       "RATES": "Rates",
       "GUESTS": "Guests",
       "COMPANIES": "Companies and travel agents",
-      "BALANCES": "Company opening balances"
+      "BALANCES": "Company opening balances",
+      "RESERVATIONS": "Future bookings"
     },
-    "later": "Import companies before their opening balances.",
+    "later": "Import rooms, rates and companies first: opening balances and bookings use them.",
     "step1": "1. Get the template",
     "step2": "2. Upload the filled file (CSV or Excel .xlsx)",
     "help": {
@@ -18,7 +19,8 @@
       "RATES": "One row per rate plan, room type and date range (from and to included). Prices in naira; leave the price empty to change only restrictions. Dates as 2026-12-01 or 01/12/2026; restrictions as yes or no.",
       "GUESTS": "One row per guest. A guest whose email or phone is already here is left as it is. Phones like 08031234567 or +2348031234567; separate tags with a semicolon; marketing consent and VIP as yes or no.",
       "COMPANIES": "One row per company or travel agent (kind: company or travel agent). A name already here is refused. Credit limit in naira; commission as a percentage.",
-      "BALANCES": "One row per open invoice from the old system, for a company already here. The reference is the old invoice number and is imported once. The issue date defaults to today; the due date to the account’s terms. Needs the city ledger permission."
+      "BALANCES": "One row per open invoice from the old system, for a company already here. The reference is the old invoice number and is imported once. The issue date defaults to today; the due date to the account’s terms. Needs the city ledger permission.",
+      "RESERVATIONS": "One row per room booked, arriving today or later. Rows with the same old confirmation number are one booking; its first row gives the booker, company and source. Every night is charged the nightly rate in naira, as agreed in the old system. Each booking gets a new confirmation number; the old one is kept and can be searched. A booking whose room type is full on a night is refused. Deposits already paid are not imported. Needs the permission to make bookings."
     },
     "template": "Download template",
     "choose": "Choose file",
@@ -76,7 +78,17 @@
       "invoicesWritten_one": "{{count}} invoice added",
       "invoicesWritten_other": "{{count}} invoices added",
       "accountsOpened_one": "{{count}} account opened",
-      "accountsOpened_other": "{{count}} accounts opened"
+      "accountsOpened_other": "{{count}} accounts opened",
+      "reservationsNew_one": "{{count}} booking",
+      "reservationsNew_other": "{{count}} bookings",
+      "staysNew_one": "{{count}} room",
+      "staysNew_other": "{{count}} rooms",
+      "nights_one": "{{count}} night",
+      "nights_other": "{{count}} nights",
+      "reservationsWritten_one": "{{count}} booking made",
+      "reservationsWritten_other": "{{count}} bookings made",
+      "staysWritten_one": "{{count}} room booked",
+      "staysWritten_other": "{{count}} rooms booked"
     }
   }
 }

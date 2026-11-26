@@ -122,7 +122,7 @@ describe('Imports', () => {
     click.mockRestore();
   });
 
-  it('offers guests, companies and opening balances, each with its own columns (T-168)', async () => {
+  it('offers guests, companies, opening balances and future bookings, each with its own columns (T-168, T-169)', async () => {
     const user = userEvent.setup();
     renderAt('/settings/imports');
     await user.click(await screen.findByRole('radio', { name: 'Guests' }));
@@ -132,6 +132,9 @@ describe('Imports', () => {
     await user.click(screen.getByRole('radio', { name: 'Company opening balances' }));
     expect(screen.getByText('reference *')).toBeVisible();
     expect(screen.getByText(/Needs the city ledger permission/)).toBeVisible();
+    await user.click(screen.getByRole('radio', { name: 'Future bookings' }));
+    expect(screen.getByText('old_confirmation_no *')).toBeVisible();
+    expect(screen.getByText(/Deposits already paid are not imported/)).toBeVisible();
   });
 
   it('uploads, shows the preview and imports only on confirm', async () => {

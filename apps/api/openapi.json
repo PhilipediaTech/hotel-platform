@@ -6092,7 +6092,8 @@
               "RATES",
               "GUESTS",
               "COMPANIES",
-              "BALANCES"
+              "BALANCES",
+              "RESERVATIONS"
             ]
           },
           "status": {
@@ -46803,7 +46804,8 @@
                       "RATES",
                       "GUESTS",
                       "COMPANIES",
-                      "BALANCES"
+                      "BALANCES",
+                      "RESERVATIONS"
                     ]
                   },
                   "fileId": {

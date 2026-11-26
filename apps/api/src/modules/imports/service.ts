@@ -14,6 +14,7 @@ import {
   type CompanyRow,
   type GuestRow,
   type RateRow,
+  type ReservationRow,
   type RoomRow,
 } from '@hotel/shared';
 import { readSheet } from 'read-excel-file/node';
@@ -36,8 +37,10 @@ import {
   checkCompanies,
   checkGuests,
 } from './migration.ts';
+import { applyReservations, checkReservations } from './reservations.ts';
 
-// Spreadsheet imports (PRD M1-03; T-034; guests, companies and opening balances T-168). Checking reads the uploaded file once, checks
+// Spreadsheet imports (PRD M1-03; T-034; guests, companies and opening balances T-168; future
+// reservations T-169). Checking reads the uploaded file once, checks
 // every row (cells in @hotel/shared imports.ts, codes and clashes here) and stores the checked
 // rows in the report; applying writes exactly those rows in one transaction, all or none,
 // after checking them again against the property.
@@ -51,7 +54,7 @@ export interface ImportDeps {
 
 type Tx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
 type JobOut = z.input<typeof ImportJobItem>;
-type Rows = RoomRow[] | RateRow[] | GuestRow[] | CompanyRow[] | BalanceRow[];
+type Rows = RoomRow[] | RateRow[] | GuestRow[] | CompanyRow[] | BalanceRow[] | ReservationRow[];
 
 interface StoredReport {
   total: number;
@@ -268,6 +271,8 @@ function checkRows(
       return checkCompanies(db, rows as CompanyRow[]);
     case 'BALANCES':
       return checkBalances(db, rows as BalanceRow[], tenant, today);
+    case 'RESERVATIONS':
+      return checkReservations(db, rows as ReservationRow[], tenant, today);
   }
 }
 
@@ -493,7 +498,15 @@ export async function applyImport(
                 ? await applyGuests(tx, report.data as GuestRow[], now)
                 : kind === 'COMPANIES'
                   ? await applyCompanies(tx, report.data as CompanyRow[])
-                  : await applyBalances(tx, report.data as BalanceRow[], today, now);
+                  : kind === 'BALANCES'
+                    ? await applyBalances(tx, report.data as BalanceRow[], today, now)
+                    : await applyReservations(
+                        tx,
+                        tenant,
+                        report.data as ReservationRow[],
+                        now,
+                        fresh.id,
+                      );
         const updated = await tx.importJob.update({
           where: { id: fresh.id },
           data: {

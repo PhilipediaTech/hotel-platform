@@ -4252,6 +4252,12 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bSupportUnchanged,
   },
   resolveSupportTicket: { seed: bSupport, body: () => ({}), untouched: bSupportUnchanged },
+  // Getting started (T-172): B's staff never show up in A's team, nor B's steps in A's own.
+  listGettingStarted: { seed: bUser, listIds: () => [] },
+  listTeamGettingStarted: {
+    seed: bUser,
+    listIds: (body) => (body as { data: { user: { id: string } }[] }).data.map((m) => m.user.id),
+  },
   // Training with the support team (T-171)
   listMyTraining: {
     seed: bTraining,

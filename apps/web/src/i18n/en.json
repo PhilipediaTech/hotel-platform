@@ -26,7 +26,10 @@
     "myPhone": "My phone",
     "help": "Help",
     "helpUnread_one": "Help: {{count}} new reply",
-    "helpUnread_other": "Help: {{count}} new replies"
+    "helpUnread_other": "Help: {{count}} new replies",
+    "gettingStarted": "Getting started: {{done}} of {{total}} first steps done.",
+    "gettingStartedOpen": "See them",
+    "gettingStartedHide": "Hide"
   },
   "navGroup": {
     "operations": "Operations",

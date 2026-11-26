@@ -74,6 +74,15 @@ beforeEach(() => {
     'POST /support/tickets': () =>
       json(201, ticket({ id: T1, status: 'OPEN', unread: false, messages: [messages[0]] })),
     [`GET /support/tickets/${T1}`]: () => json(200, { ...ticket({ unread: false }), messages }),
+    'GET /getting-started': () =>
+      json(200, {
+        steps: [
+          { id: 'booking', path: '/bookings/new', done: true },
+          { id: 'checkIn', path: '/front-desk', done: false },
+        ],
+        done: 1,
+        total: 2,
+      }),
     'GET /support/training': () =>
       json(200, {
         data: [
@@ -127,6 +136,12 @@ describe('Help', () => {
     expect(
       await screen.findByText('Your onboarding contact: Chidi Support (chidi@platform.test)'),
     ).toBeVisible();
+    const first = await screen.findByRole('region', { name: 'Getting started' });
+    expect(first).toHaveTextContent('1 of 2 done');
+    expect(within(first).getByRole('link', { name: 'Check a guest in' })).toHaveAttribute(
+      'href',
+      '/front-desk',
+    );
     const training = await screen.findByRole('region', { name: 'Training with the support team' });
     expect(training).toHaveTextContent('Front Desk · Lagos Hotel');
     expect(training).toHaveTextContent('with Chidi Support');
@@ -161,6 +176,17 @@ describe('Help', () => {
         },
       ]),
     );
+  }, 15_000);
+});
+
+describe('the getting-started banner', () => {
+  it('shows progress until hidden', async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    renderAt('/support');
+    expect(await screen.findByText('Getting started: 1 of 2 first steps done.')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Hide' }));
+    expect(screen.queryByText('Getting started: 1 of 2 first steps done.')).toBeNull();
   }, 15_000);
 });
 

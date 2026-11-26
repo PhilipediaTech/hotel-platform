@@ -3,7 +3,13 @@ import { NavLink, Outlet } from 'react-router';
 import { bottomBarItems, railItems, type NavItem } from '../../app/navigation.ts';
 import { useSession } from '../../app/session.ts';
 import { cn } from '../../lib/cn.ts';
-import { OfflineBanner, SupportBanner, SuspendedBanner, UpdateBanner } from './banners.tsx';
+import {
+  GettingStartedBanner,
+  OfflineBanner,
+  SupportBanner,
+  SuspendedBanner,
+  UpdateBanner,
+} from './banners.tsx';
 import { PendingChanges } from '../../offline/pending-changes.tsx';
 import { PropertyContext, TopBar } from './top-bar.tsx';
 
@@ -95,6 +101,7 @@ export function AppShell() {
         <OfflineBanner />
         <PendingChanges />
         <UpdateBanner />
+        <GettingStartedBanner />
         {session.preview && (
           <p className="bg-surface-sunken px-4 py-1 text-xs text-text-muted">
             {t('shell.devPreview')}

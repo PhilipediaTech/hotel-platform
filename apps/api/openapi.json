@@ -20148,6 +20148,45 @@
           "definitions"
         ]
       },
+      "PartnerRoomCharge": {
+        "type": "object",
+        "properties": {
+          "chargeId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "stayId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "roomNumber": {
+            "type": "string"
+          },
+          "checkNumber": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "totalMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "postedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "duplicate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "chargeId",
+          "stayId",
+          "roomNumber",
+          "checkNumber",
+          "currency",
+          "totalMinor",
+          "postedAt",
+          "duplicate"
+        ]
+      },
       "PartnerProperty": {
         "type": "object",
         "properties": {
@@ -20199,7 +20238,8 @@
                 "availability:read",
                 "reservations:read",
                 "guests:read",
-                "folios:read"
+                "folios:read",
+                "pos:charge"
               ]
             }
           }
@@ -20445,7 +20485,8 @@
                 "availability:read",
                 "reservations:read",
                 "guests:read",
-                "folios:read"
+                "folios:read",
+                "pos:charge"
               ]
             }
           },
@@ -84818,6 +84859,356 @@
         }
       }
     },
+    "/partner/in-house": {
+      "get": {
+        "operationId": "listPartnerInHouse",
+        "summary": "Rooms with a guest checked in who can take charges (no names: the guest gives theirs)",
+        "tags": [
+          "Partner API"
+        ],
+        "security": [
+          {
+            "partnerKey": [
+              "pos:charge"
+            ]
+          }
+        ],
+        "description": "Not in tab 4: designed in T-167 (Versions V2, POS integration).",
+        "x-scope": "pos:charge",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "stayId": {
+                            "$ref": "#/components/schemas/Uuid"
+                          },
+                          "roomNumber": {
+                            "type": "string"
+                          },
+                          "arrival": {
+                            "$ref": "#/components/schemas/IsoDate"
+                          },
+                          "departure": {
+                            "$ref": "#/components/schemas/IsoDate"
+                          },
+                          "adults": {
+                            "type": "integer"
+                          },
+                          "children": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "stayId",
+                          "roomNumber",
+                          "arrival",
+                          "departure",
+                          "adults",
+                          "children"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partner/revenue-codes": {
+      "get": {
+        "operationId": "listPartnerRevenueCodes",
+        "summary": "The revenue codes a charge can carry, to map the POS items to",
+        "tags": [
+          "Partner API"
+        ],
+        "security": [
+          {
+            "partnerKey": [
+              "pos:charge"
+            ]
+          }
+        ],
+        "description": "Not in tab 4: designed in T-167 (Versions V2, POS integration).",
+        "x-scope": "pos:charge",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "name",
+                          "group"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partner/room-charges": {
+      "post": {
+        "operationId": "createPartnerRoomCharge",
+        "summary": "Charge a checked-in guest’s room; the same check number twice posts once",
+        "tags": [
+          "Partner API"
+        ],
+        "security": [
+          {
+            "partnerKey": [
+              "pos:charge"
+            ]
+          }
+        ],
+        "description": "Not in tab 4: designed in T-167 (Versions V2, POS integration). Refused unless the surname matches the guest in the room, the stay's bill is open and the room's credit limit allows it. A void is the hotel's (a reversal at the desk). The same check number again answers 200 with duplicate true; with different contents, 409 IDEMPOTENCY_KEY_REUSED.",
+        "x-scope": "pos:charge",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roomNumber": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "checkNumber": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "revenueCode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999,
+                    "default": 1
+                  },
+                  "unitAmountMinor": {
+                    "$ref": "#/components/schemas/AmountMinor"
+                  }
+                },
+                "required": [
+                  "roomNumber",
+                  "lastName",
+                  "checkNumber",
+                  "revenueCode",
+                  "description",
+                  "unitAmountMinor"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerRoomCharge"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: `STATE_TRANSITION_INVALID`, `CREDIT_LIMIT_EXCEEDED`, `BUSINESS_DAY_CLOSED`, `IDEMPOTENCY_KEY_REUSED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/partner/property": {
       "get": {
         "operationId": "getPartnerProperty",
@@ -85542,7 +85933,8 @@
                         "availability:read",
                         "reservations:read",
                         "guests:read",
-                        "folios:read"
+                        "folios:read",
+                        "pos:charge"
                       ]
                     },
                     "minItems": 1

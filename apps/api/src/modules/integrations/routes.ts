@@ -4,6 +4,7 @@ import type { ApiKeyContext } from '../../core/api-keys.ts';
 import { mountRoute, type RouteContext } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as partner from './partner.ts';
+import * as pos from './partner-pos.ts';
 import * as integrations from './service.ts';
 
 /** Integrations settings and the partner API (T-166). */
@@ -50,5 +51,13 @@ export function integrationRoutes(deps: integrations.IntegrationDeps): Router {
   mountRoute(router, p.listPartnerReservationFolios, ({ params }) =>
     partner.listPartnerReservationFolios(deps, params.reservationId),
   );
+  // An outside POS charging rooms (T-167).
+  mountRoute(router, p.listPartnerInHouse, () => pos.listInHouse(deps));
+  mountRoute(router, p.listPartnerRevenueCodes, () => pos.listRevenueCodes(deps));
+  mountRoute(router, p.createPartnerRoomCharge, async ({ body }, ctx) => {
+    const { status, out } = await pos.chargeRoom(deps, key(ctx), body);
+    ctx.res.locals['status'] = status;
+    return out;
+  });
   return router;
 }

@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-166 (partner API keys and webhooks) is pushed on `feat/T-166-partner-api-webhooks`, with migration 20270106090000_partner_api. Next: V2 POS charge posting and an accounting push on top of it, or the next V2 item.
+T-167 (room charges from an outside POS) is pushed on `feat/T-167-partner-room-charges`, with migration 20270107090000_partner_room_charges. Next: the next V2 item (onboarding, support tooling and stronger migration), or an accounting push once a provider is chosen.

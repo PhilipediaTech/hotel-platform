@@ -8,7 +8,8 @@ import { GUARANTEES } from './rates.ts';
 // The partner API (Versions V2 "Partner API and webhooks, accounting and POS integrations";
 // T-166, Philip's choice: keys and webhooks first, integrations generic). An outside system
 // (accounting, a POS, a revenue tool) reads one property with a key the hotel made for it:
-// `Authorization: Bearer hk_…`. Read-only for now; each key holds only the scopes it was given.
+// `Authorization: Bearer hk_…`; each key holds only the scopes it was given. The one write is
+// an outside POS charging a guest's room (pos:charge, T-167).
 // What changes is pushed to the hotel's webhook endpoints (integrations.ts).
 
 const ADDED = 'Not in tab 4: designed in T-166 (Versions V2, partner API).';
@@ -19,6 +20,8 @@ export const API_SCOPES = [
   /** With reservations:read: the booker's email and phone. */
   'guests:read',
   'folios:read',
+  /** An outside POS: in-house rooms, revenue codes, and charges to a room (T-167). */
+  'pos:charge',
 ] as const;
 export const ApiScope = z.enum(API_SCOPES);
 export type ApiScope = z.infer<typeof ApiScope>;
@@ -201,7 +204,99 @@ export const listPartnerReservationFolios = defineRoute({
   response: z.object({ data: z.array(PartnerFolio) }),
 });
 
+// ── Room charges from an outside POS (T-167; Philip's choice: room number and surname) ──
+
+const ADDED_POS = 'Not in tab 4: designed in T-167 (Versions V2, POS integration).';
+
+export const PartnerInHouseRoom = z.object({
+  stayId: Uuid,
+  roomNumber: z.string(),
+  arrival: IsoDate,
+  departure: IsoDate,
+  adults: z.number().int(),
+  children: z.number().int(),
+});
+
+export const listPartnerInHouse = defineRoute({
+  operationId: 'listPartnerInHouse',
+  method: 'get',
+  path: '/partner/in-house',
+  summary: 'Rooms with a guest checked in who can take charges (no names: the guest gives theirs)',
+  description: ADDED_POS,
+  tags: ['Partner API'],
+  auth: 'apiKey',
+  scope: 'pos:charge',
+  response: z.object({ data: z.array(PartnerInHouseRoom) }),
+});
+
+export const listPartnerRevenueCodes = defineRoute({
+  operationId: 'listPartnerRevenueCodes',
+  method: 'get',
+  path: '/partner/revenue-codes',
+  summary: 'The revenue codes a charge can carry, to map the POS items to',
+  description: ADDED_POS,
+  tags: ['Partner API'],
+  auth: 'apiKey',
+  scope: 'pos:charge',
+  response: z.object({
+    data: z.array(z.object({ code: z.string(), name: z.string(), group: z.string() })),
+  }),
+});
+
+export const PartnerRoomChargeBody = z.object({
+  roomNumber: z.string().trim().min(1).max(20),
+  /** The guest's surname as they give it at the till; must match the guest in the room. */
+  lastName: z.string().trim().min(1).max(100),
+  /** The POS's own check or bill number: the same one twice posts once. */
+  checkNumber: z.string().trim().min(1).max(64),
+  revenueCode: z.string().trim().min(1).max(20),
+  description: z.string().trim().min(1).max(200),
+  quantity: z.number().int().min(1).max(999).default(1),
+  /** Price of one, as charged (taxes added, or included when the tax is inclusive). */
+  unitAmountMinor: AmountMinor,
+});
+
+export const PartnerRoomCharge = z
+  .object({
+    /** The charge line on the guest's bill. */
+    chargeId: Uuid,
+    stayId: Uuid,
+    roomNumber: z.string(),
+    checkNumber: z.string(),
+    currency: z.string(),
+    /** With the taxes the hotel's rules add. */
+    totalMinor: AmountMinor,
+    postedAt: Instant,
+    /** True when this check number was posted before: nothing new was charged. */
+    duplicate: z.boolean(),
+  })
+  .meta({ id: 'PartnerRoomCharge' });
+
+export const createPartnerRoomCharge = defineRoute({
+  operationId: 'createPartnerRoomCharge',
+  method: 'post',
+  path: '/partner/room-charges',
+  summary: 'Charge a checked-in guest’s room; the same check number twice posts once',
+  description: `${ADDED_POS} Refused unless the surname matches the guest in the room, the stay's bill is open and the room's credit limit allows it. A void is the hotel's (a reversal at the desk). The same check number again answers 200 with duplicate true; with different contents, 409 IDEMPOTENCY_KEY_REUSED.`,
+  tags: ['Partner API'],
+  auth: 'apiKey',
+  scope: 'pos:charge',
+  body: PartnerRoomChargeBody,
+  status: 201,
+  response: PartnerRoomCharge,
+  errors: [
+    'VALIDATION_ERROR',
+    'STATE_TRANSITION_INVALID',
+    'CREDIT_LIMIT_EXCEEDED',
+    'BUSINESS_DAY_CLOSED',
+    'IDEMPOTENCY_KEY_REUSED',
+  ],
+});
+
 export const PARTNER_API_ROUTES = {
+  listPartnerInHouse,
+  listPartnerRevenueCodes,
+  createPartnerRoomCharge,
   getPartnerProperty,
   getPartnerAvailability,
   listPartnerReservations,

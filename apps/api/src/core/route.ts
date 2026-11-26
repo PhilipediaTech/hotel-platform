@@ -238,7 +238,9 @@ export function mountRoute<R extends RouteContract>(
 
 /**
  * A partner API route (T-166): the key's scope first, then the request, run as the key's
- * property. Read-only for now, so the Origin check (non-GET only) never applies to these.
+ * property. GETs, and the POSTs a partner system makes (T-167: room charges, exempt from the
+ * Origin check in csrf.ts: servers send none, and these routes never read a cookie).
+ * A handler may answer another success status through `res.locals.status` (a repeat: 200).
  */
 function mountApiKeyRoute<R extends RouteContract>(
   router: Router,
@@ -246,7 +248,7 @@ function mountApiKeyRoute<R extends RouteContract>(
   handler: RouteHandler<R>,
 ): void {
   if (
-    route.method !== 'get' ||
+    !['get', 'post'].includes(route.method) ||
     route.propertyScoped ||
     route.permission ||
     route.idempotent ||
@@ -256,9 +258,9 @@ function mountApiKeyRoute<R extends RouteContract>(
     route.platform ||
     route.produces
   ) {
-    throw new Error(`${route.operationId}: an apiKey route is a plain GET (T-166)`);
+    throw new Error(`${route.operationId}: an apiKey route is a plain GET or POST (T-166)`);
   }
-  router.get(toExpressPath(route.path), async (req: Request, res: Response) => {
+  router[route.method](toExpressPath(route.path), async (req: Request, res: Response) => {
     const key = requireApiKey(req, route.scope);
     const { tenant } = key;
     if (route.module && tenant.disabledModules?.has(route.module)) {
@@ -266,14 +268,22 @@ function mountApiKeyRoute<R extends RouteContract>(
         module: route.module,
       });
     }
+    // M13-06: a group suspended for non-payment can still be read, not changed.
+    if (tenant.suspended && route.method !== 'get') {
+      throw new AppError(
+        'SUBSCRIPTION_SUSPENDED',
+        'This hotel account is suspended for an unpaid invoice.',
+      );
+    }
     const issues: Issue[] = [];
     const params = parsePart('params', route.params, req.params, issues);
     const query = parsePart('query', route.query, req.query, issues);
+    const body = parsePart('body', route.body, req.body, issues);
     if (issues.length > 0) {
       throw new AppError('VALIDATION_ERROR', 'Request validation failed.', { issues });
     }
     const out = await runAsTenant(tenant, async () => {
-      const result = await handler({ params, query, body: undefined } as ParsedRouteInput<R>, {
+      const result = await handler({ params, query, body } as ParsedRouteInput<R>, {
         req,
         res,
         auth: null,
@@ -288,6 +298,7 @@ function mountApiKeyRoute<R extends RouteContract>(
       }
       return parsed.data;
     });
-    res.status(200).set('Cache-Control', 'no-store').json(out);
+    const status = (res.locals['status'] as number | undefined) ?? route.status ?? 200;
+    res.status(status).set('Cache-Control', 'no-store').json(out);
   });
 }

@@ -74,7 +74,15 @@ const API_KEY_ROUTES = [
   'listPartnerReservations',
   'getPartnerReservation',
   'listPartnerReservationFolios',
+  // Reviewed in T-167: an outside POS (pos:charge). In-house rooms carry no names; a charge
+  // needs the room's guest's surname, an open bill and room under the credit limit.
+  'listPartnerInHouse',
+  'listPartnerRevenueCodes',
+  'createPartnerRoomCharge',
 ];
+
+/** Reviewed in T-167: the partner API's only writes. */
+const API_KEY_WRITES = ['createPartnerRoomCharge'];
 
 /** Reviewed in T-102: reachable after the password, before MFA (to get through MFA). */
 const PENDING_MFA_ROUTES = ['getMe', 'verifyMfa', 'enrolMfa', 'confirmMfa'];
@@ -200,10 +208,17 @@ describe('reviewed route lists (T-102)', () => {
     );
   });
 
-  it('only the reviewed routes take a partner API key, and only to read', () => {
+  it('only the reviewed routes take a partner API key, and only the reviewed ones write', () => {
     const keyed = ROUTES.filter((r) => r.auth === 'apiKey');
     expect(sorted(keyed.map((r) => r.operationId))).toEqual(sorted(API_KEY_ROUTES));
-    expect(keyed.filter((r) => r.method !== 'get' || r.propertyScoped || r.permission)).toEqual([]);
+    expect(
+      keyed.filter((r) => !r.scope || r.propertyScoped || r.permission).map((r) => r.operationId),
+    ).toEqual([
+      // Any live key may read its own property.
+      'getPartnerProperty',
+    ]);
+    const writes = keyed.filter((r) => r.method !== 'get').map((r) => r.operationId);
+    expect(sorted(writes)).toEqual(sorted(API_KEY_WRITES));
   });
 
   it('only the reviewed routes are reachable before MFA', () => {
@@ -219,12 +234,19 @@ describe('reviewed route lists (T-102)', () => {
     ).toEqual(sorted(Object.keys(MEMBER_ROUTES)));
   });
 
-  it('skips the Origin check only for signed webhooks and the local file links', () => {
-    expect(ORIGIN_CHECK_EXEMPT).toEqual(['/api/v1/webhooks/', '/api/v1/local-files/']);
-    const exempt = ROUTES.filter((r) =>
-      `/api/v1${r.path}`.startsWith(ORIGIN_CHECK_EXEMPT[0] ?? ''),
-    );
-    expect(exempt.every((r) => r.auth === 'none')).toBe(true);
+  it('skips the Origin check only for signed webhooks, the local file links and partner writes', () => {
+    expect(ORIGIN_CHECK_EXEMPT).toEqual([
+      '/api/v1/webhooks/',
+      '/api/v1/local-files/',
+      '/api/v1/partner/room-charges',
+    ]);
+    const under = (prefix: string | undefined) =>
+      ROUTES.filter((r) => `/api/v1${r.path}`.startsWith(prefix ?? ''));
+    expect(under(ORIGIN_CHECK_EXEMPT[0]).every((r) => r.auth === 'none')).toBe(true);
+    // A partner system's write takes a key and never a cookie (T-167).
+    expect(under(ORIGIN_CHECK_EXEMPT[2]).map((r) => [r.operationId, r.auth])).toEqual([
+      ['createPartnerRoomCharge', 'apiKey'],
+    ]);
   });
 });
 

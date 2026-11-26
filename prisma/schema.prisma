@@ -1652,7 +1652,7 @@ model FolioLine {
   parentLineId      String?  @map("parent_line_id") @db.Uuid
   reversesLineId    String?  @unique @map("reverses_line_id") @db.Uuid
   taxRuleVersionId  String?  @map("tax_rule_version_id") @db.Uuid
-  /// STAY_NIGHT | POS_ORDER | MINIBAR | EVENT | SERVICE | MANUAL
+  /// STAY_NIGHT | POS_ORDER | MINIBAR | EVENT | SERVICE | MANUAL | PARTNER (T-167: "<key id>:<check>")
   sourceType        String?  @map("source_type")
   sourceId          String?  @map("source_id")
   postedById        String?  @map("posted_by_id") @db.Uuid

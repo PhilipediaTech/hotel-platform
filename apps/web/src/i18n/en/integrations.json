@@ -28,7 +28,8 @@
       "availability_read": "Availability",
       "reservations_read": "Reservations",
       "guests_read": "Guest email and phone (with reservations)",
-      "folios_read": "Bills and balances"
+      "folios_read": "Bills and balances",
+      "pos_charge": "Charge rooms (an outside POS)"
     },
     "hooks": {
       "title": "Webhooks",

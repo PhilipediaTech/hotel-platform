@@ -8,9 +8,15 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 /**
  * Paths called by servers, not browsers; they authenticate with signatures instead.
  * Payment and channel webhooks (T-062 onward) live here, and the local file store's signed
- * links (T-023), which stand in for direct uploads to storage.
+ * links (T-023), which stand in for direct uploads to storage. The partner API's room charges
+ * (T-167) are made by other systems with a key in the Authorization header and never read a
+ * cookie, so a cross-site form can't act through them.
  */
-export const ORIGIN_CHECK_EXEMPT = ['/api/v1/webhooks/', `${LOCAL_FILES_PATH}/`];
+export const ORIGIN_CHECK_EXEMPT = [
+  '/api/v1/webhooks/',
+  `${LOCAL_FILES_PATH}/`,
+  '/api/v1/partner/room-charges',
+];
 
 /**
  * Middleware step 6, CSRF defence: every state-changing request must carry an `Origin` from

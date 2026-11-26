@@ -2,19 +2,22 @@ import { EXPORT_PERMISSION, isExportFile, type ExportFile } from './exports.ts';
 import { ApprovalPending, type ParsedRouteInput, type RouteContract } from '@hotel/shared';
 import type { Request, Response, Router } from 'express';
 import type { z } from 'zod';
+import { requireApiKey, type ApiKeyContext } from './api-keys.ts';
 import { getAuth, requireAuth, type AuthContext } from './auth.ts';
 import { isApprovalPending, type ApprovalPendingResult } from './approvals.ts';
 import { AppError } from './errors.ts';
 import { withIdempotency } from './idempotency.ts';
-import { tenantOf, withoutTenant, type TenantContext } from './tenancy.ts';
+import { runAsTenant, tenantOf, withoutTenant, type TenantContext } from './tenancy.ts';
 
 export interface RouteContext {
   req: Request;
   res: Response;
   /** Always set on `auth: 'session'` routes (default); may be null on public ones. */
   auth: AuthContext | null;
-  /** Always set on `propertyScoped` routes (middleware step 7). */
+  /** Always set on `propertyScoped` routes (middleware step 7), and on `apiKey` ones. */
   tenant: TenantContext | null;
+  /** Always set on `apiKey` routes (the partner API, T-166). */
+  apiKey: ApiKeyContext | null;
 }
 
 /**
@@ -89,6 +92,10 @@ export function mountRoute<R extends RouteContract>(
   route: R,
   handler: RouteHandler<R>,
 ): void {
+  if (route.auth === 'apiKey') {
+    mountApiKeyRoute(router, route, handler);
+    return;
+  }
   // Permissions are checked against the property's roles; organisation-level checks arrive
   // with the routes that need them (T-013).
   if (route.permission && !route.propertyScoped) {
@@ -170,6 +177,7 @@ export function mountRoute<R extends RouteContract>(
         res,
         auth,
         tenant,
+        apiKey: null,
       });
       // Over the caller's limit: an approval request was stored instead (tab 4, "Approvals").
       if (isApprovalPending(result)) {
@@ -225,5 +233,61 @@ export function mountRoute<R extends RouteContract>(
       return;
     }
     res.status(status).json(out);
+  });
+}
+
+/**
+ * A partner API route (T-166): the key's scope first, then the request, run as the key's
+ * property. Read-only for now, so the Origin check (non-GET only) never applies to these.
+ */
+function mountApiKeyRoute<R extends RouteContract>(
+  router: Router,
+  route: R,
+  handler: RouteHandler<R>,
+): void {
+  if (
+    route.method !== 'get' ||
+    route.propertyScoped ||
+    route.permission ||
+    route.idempotent ||
+    route.ifMatch ||
+    route.approval ||
+    route.exports ||
+    route.platform ||
+    route.produces
+  ) {
+    throw new Error(`${route.operationId}: an apiKey route is a plain GET (T-166)`);
+  }
+  router.get(toExpressPath(route.path), async (req: Request, res: Response) => {
+    const key = requireApiKey(req, route.scope);
+    const { tenant } = key;
+    if (route.module && tenant.disabledModules?.has(route.module)) {
+      throw new AppError('MODULE_DISABLED', 'This module is switched off for the hotel.', {
+        module: route.module,
+      });
+    }
+    const issues: Issue[] = [];
+    const params = parsePart('params', route.params, req.params, issues);
+    const query = parsePart('query', route.query, req.query, issues);
+    if (issues.length > 0) {
+      throw new AppError('VALIDATION_ERROR', 'Request validation failed.', { issues });
+    }
+    const out = await runAsTenant(tenant, async () => {
+      const result = await handler({ params, query, body: undefined } as ParsedRouteInput<R>, {
+        req,
+        res,
+        auth: null,
+        tenant,
+        apiKey: key,
+      });
+      const parsed = route.response.safeParse(result);
+      if (!parsed.success) {
+        throw new Error(
+          `Response for ${route.operationId} does not match its contract: ${parsed.error.message}`,
+        );
+      }
+      return parsed.data;
+    });
+    res.status(200).set('Cache-Control', 'no-store').json(out);
   });
 }

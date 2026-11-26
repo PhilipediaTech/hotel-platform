@@ -1936,6 +1936,53 @@ async function bEinvoiceUnchanged(db: Db, world: TenantWorld) {
   expect((property.settings as { einvoicing: { enabled: boolean } }).einvoicing.enabled).toBe(true);
 }
 
+/** B's partner API key, webhook endpoint and a failed delivery (T-166). */
+async function bIntegrations(db: Db, world: TenantWorld, propertyId: string) {
+  const key = await db.apiKey.create({
+    data: {
+      propertyId,
+      name: 'Their key',
+      prefix: 'hk_theirs0',
+      tokenHash: crypto.randomUUID(),
+      scopes: ['reservations:read'],
+      createdById: world.bStaff.id,
+    },
+  });
+  const endpoint = await db.webhookEndpoint.create({
+    data: {
+      propertyId,
+      url: 'https://theirs.example.test/hooks',
+      events: ['reservation.created'],
+      secretEnc: Buffer.alloc(40, 1),
+      createdById: world.bStaff.id,
+    },
+  });
+  const delivery = await db.webhookDelivery.create({
+    data: {
+      propertyId,
+      endpointId: endpoint.id,
+      eventType: 'reservation.created',
+      body: '{}',
+      status: 'FAILED',
+      attempts: 7,
+    },
+  });
+  return { apiKeyId: key.id, endpointId: endpoint.id, deliveryId: delivery.id };
+}
+
+async function bIntegrationsUnchanged(db: Db, world: TenantWorld) {
+  const where = { propertyId: world.b1.id };
+  expect((await db.apiKey.findMany({ where })).map((k) => [k.name, k.revokedAt])).toEqual([
+    ['Their key', null],
+  ]);
+  expect(
+    (await db.webhookEndpoint.findMany({ where })).map((e) => [e.url, e.events, e.active]),
+  ).toEqual([['https://theirs.example.test/hooks', ['reservation.created'], true]]);
+  expect((await db.webhookDelivery.findMany({ where })).map((d) => [d.status, d.attempts])).toEqual(
+    [['FAILED', 7]],
+  );
+}
+
 /** B's group: a closed November day kept, and a cedi rate in its own group currency (T-161). */
 async function bGroup(db: Db, world: TenantWorld, propertyId: string) {
   const organisationId = orgOf(world, propertyId);
@@ -4096,6 +4143,47 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     listIds: (body) => (body as { data: { folioId: string }[] }).data.map((i) => i.folioId),
   },
   submitEinvoice: { seed: bEinvoice, body: () => ({}), untouched: bEinvoiceUnchanged },
+  // Partner API keys and webhooks (T-166)
+  listApiKeys: {
+    seed: bIntegrations,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((k) => k.id),
+  },
+  createApiKey: {
+    seed: bIntegrations,
+    creates: true,
+    body: () => ({ name: 'Mine', scopes: ['folios:read'] }),
+    untouched: bIntegrationsUnchanged,
+  },
+  revokeApiKey: { seed: bIntegrations, body: () => ({}), untouched: bIntegrationsUnchanged },
+  listWebhookEndpoints: {
+    seed: bIntegrations,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((e) => e.id),
+  },
+  createWebhookEndpoint: {
+    seed: bIntegrations,
+    creates: true,
+    body: () => ({ url: 'https://mine.example.test/hooks', events: ['reservation.created'] }),
+    untouched: bIntegrationsUnchanged,
+  },
+  updateWebhookEndpoint: {
+    seed: bIntegrations,
+    body: () => ({ active: false, events: ['stay.checked_in'] }),
+    untouched: bIntegrationsUnchanged,
+  },
+  testWebhookEndpoint: {
+    seed: bIntegrations,
+    body: () => ({}),
+    untouched: bIntegrationsUnchanged,
+  },
+  listWebhookDeliveries: {
+    seed: bIntegrations,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((d) => d.id),
+  },
+  retryWebhookDelivery: {
+    seed: bIntegrations,
+    body: () => ({}),
+    untouched: bIntegrationsUnchanged,
+  },
   // Channel manager (T-151)
   getChannelConnection: {
     seed: bChannel,

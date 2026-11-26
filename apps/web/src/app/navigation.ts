@@ -364,6 +364,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ticket: 'T-151',
   },
   {
+    // T-166 (Versions V2): partner API keys and webhooks, beside the channel manager.
+    id: 'integrations',
+    path: '/integrations',
+    anyOf: ['integration.manage'],
+    group: 'admin',
+    screen: 'S41',
+    ticket: 'T-166',
+  },
+  {
     id: 'my-jobs',
     path: '/tasks?assignee=me',
     anyOf: ['task.work'],

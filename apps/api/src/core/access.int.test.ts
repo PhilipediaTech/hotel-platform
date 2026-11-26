@@ -63,6 +63,19 @@ const PUBLIC_ROUTES = [
   'submitPublicReview',
 ];
 
+/**
+ * Reviewed in T-166: the partner API. A live key of the property (Bearer, HMAC stored), its
+ * scope checked before the request is read; GET only; never a session, and the key is never
+ * a session elsewhere.
+ */
+const API_KEY_ROUTES = [
+  'getPartnerProperty',
+  'getPartnerAvailability',
+  'listPartnerReservations',
+  'getPartnerReservation',
+  'listPartnerReservationFolios',
+];
+
 /** Reviewed in T-102: reachable after the password, before MFA (to get through MFA). */
 const PENDING_MFA_ROUTES = ['getMe', 'verifyMfa', 'enrolMfa', 'confirmMfa'];
 
@@ -187,6 +200,12 @@ describe('reviewed route lists (T-102)', () => {
     );
   });
 
+  it('only the reviewed routes take a partner API key, and only to read', () => {
+    const keyed = ROUTES.filter((r) => r.auth === 'apiKey');
+    expect(sorted(keyed.map((r) => r.operationId))).toEqual(sorted(API_KEY_ROUTES));
+    expect(keyed.filter((r) => r.method !== 'get' || r.propertyScoped || r.permission)).toEqual([]);
+  });
+
   it('only the reviewed routes are reachable before MFA', () => {
     const pending = ROUTES.filter((r) => r.allowPendingMfa).map((r) => r.operationId);
     expect(sorted(pending)).toEqual(sorted(PENDING_MFA_ROUTES));
@@ -215,6 +234,19 @@ describe('route-wide sweeps (T-102)', () => {
       ROUTES.filter((r) => r.auth !== 'none'),
       async (route) => {
         const res = await send(app, route, { propertyId });
+        return res.status === 401 && errorOf(res).code === 'UNAUTHENTICATED'
+          ? null
+          : `answered ${res.status}`;
+      },
+    );
+    expect(failures).toEqual([]);
+  });
+
+  it('every partner API route refuses a staff session instead of a key', async () => {
+    const failures = await sweep(
+      ROUTES.filter((r) => r.auth === 'apiKey'),
+      async (route) => {
+        const res = await send(app, route, { cookie: memberCookie, propertyId });
         return res.status === 401 && errorOf(res).code === 'UNAUTHENTICATED'
           ? null
           : `answered ${res.status}`;

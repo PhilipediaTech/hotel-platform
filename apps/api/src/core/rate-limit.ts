@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express';
 import type { Logger } from 'pino';
+import { getApiKey } from './api-keys.ts';
 import { getAuth } from './auth.ts';
 import type { Clock } from './clock.ts';
 import type { Db } from './db.ts';
@@ -15,6 +16,8 @@ export const RATE_LIMITS = {
   publicPerIp: 120,
   /** A booking holds a room: one visitor must not be able to hold a whole hotel (T-112). */
   publicBookingsPerIp: 10,
+  /** Each partner API key (T-166). */
+  perApiKey: 120,
 } as const;
 
 const WINDOW_MS = 60_000;
@@ -45,6 +48,8 @@ export function rateLimiter(deps: { db: Db; clock: Clock; logger: Logger }): Req
         });
       }
     }
+    const key = getApiKey(req);
+    if (key) checks.push({ key: `apikey:${key.keyId}`, limit: RATE_LIMITS.perApiKey });
     const auth = getAuth(req);
     if (auth) checks.push({ key: `user:${auth.user.id}`, limit: RATE_LIMITS.perUser });
     if (checks.length === 0) return next();

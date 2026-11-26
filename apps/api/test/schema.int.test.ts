@@ -23,6 +23,7 @@ describe('migrations', () => {
       'accounting_exports',
       'accounting_mappings',
       'alert_outcomes',
+      'api_keys',
       'approval_policies',
       'approval_requests',
       'ar_accounts',
@@ -188,6 +189,8 @@ describe('migrations', () => {
       'users',
       'virtual_accounts',
       'visitors',
+      'webhook_deliveries',
+      'webhook_endpoints',
       'webhook_events',
       'work_order_details',
     ]);

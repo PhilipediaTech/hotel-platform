@@ -43,6 +43,8 @@ import { einvoiceSendJob } from './modules/einvoicing/service.ts';
 import { channelSyncJob } from './modules/channels/sync.ts';
 import { channelBookingsHandler, channelBookingsJob } from './modules/channels/bookings.ts';
 import { reviewDraftHandler, reviewRequestJob } from './modules/reviews/service.ts';
+import { createWebhookSender, type WebhookSender } from './core/webhook-sender.ts';
+import { partnerWebhookHandler, webhookDeliveryJob } from './modules/integrations/service.ts';
 
 // Everything the worker runs. Modules add their scheduled jobs and outbox handlers here.
 
@@ -57,8 +59,13 @@ export function workerJobs(deps: {
   channel: ChannelManager;
   /** Invoices to the tax authority (T-160). */
   einvoice: EinvoiceProvider;
+  /** Outgoing webhooks (T-166); real requests unless given. */
+  webhooks?: WebhookSender;
 }): readonly JobDefinition<never>[] {
+  const webhooks = deps.webhooks ?? createWebhookSender(deps.config);
   return [
+    // Webhook tries that are due again (T-166).
+    webhookDeliveryJob({ sender: webhooks, config: deps.config }),
     ownerSummaryJob({ ai: deps.ai }),
     cleanupJob,
     approvalExpiryJob,
@@ -105,6 +112,8 @@ export function eventHandlers(deps: {
   files: FileStore;
   /** OTA bookings, read at once when the channel manager's webhook says one waits (T-153). */
   channel: ChannelManager;
+  /** Outgoing webhooks (T-166); real requests unless given. */
+  webhooks?: WebhookSender;
 }): EventHandler[] {
   const send = {
     db: deps.db,
@@ -135,6 +144,14 @@ export function eventHandlers(deps: {
       store: deps.files,
       ai: deps.ai,
       messages: deps.messages,
+      logger: deps.logger,
+    }),
+    // The hotel's events to its webhook endpoints (T-166).
+    partnerWebhookHandler({
+      db: deps.db,
+      clock: deps.clock,
+      sender: deps.webhooks ?? createWebhookSender(deps.config),
+      config: deps.config,
       logger: deps.logger,
     }),
     // Drafts a reply to each review that comes in (T-155).

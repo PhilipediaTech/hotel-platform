@@ -61,11 +61,14 @@ export function hotelClient(
   propertyId: string,
   extra: { routes?: Router; approvalHandlers?: readonly ApprovalActionHandler<never>[] } = {},
 ) {
-  const { app, email, files, payments, messages, ai, channel } = buildTestApp(extra.routes, {
-    db,
-    clock,
-    ...(extra.approvalHandlers ? { approvalHandlers: extra.approvalHandlers } : {}),
-  });
+  const { app, email, files, payments, messages, ai, channel, webhooks } = buildTestApp(
+    extra.routes,
+    {
+      db,
+      clock,
+      ...(extra.approvalHandlers ? { approvalHandlers: extra.approvalHandlers } : {}),
+    },
+  );
   const as = (cookie: string) => {
     const withHeaders = (req: request.Test) =>
       req.set('Cookie', cookie).set('X-Property-Id', propertyId).set('Origin', APP_ORIGIN);
@@ -86,5 +89,5 @@ export function hotelClient(
       return (cookie ? req.set('Cookie', cookie) : req).send(body);
     },
   };
-  return { app, email, files, payments, messages, ai, channel, as, anon };
+  return { app, email, files, payments, messages, ai, channel, webhooks, as, anon };
 }

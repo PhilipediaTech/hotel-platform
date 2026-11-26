@@ -18,6 +18,7 @@ import { z } from 'zod';
 export type OpenApiDocument = ReturnType<OpenApiGeneratorV31['generateDocument']>;
 
 const SESSION_SCHEME = 'session';
+const API_KEY_SCHEME = 'partnerKey';
 
 const STATUS_TEXT: Record<number, string> = {
   200: 'OK',
@@ -117,7 +118,12 @@ function toRouteConfig(route: RouteContract): RouteConfig {
     operationId: route.operationId,
     summary: route.summary,
     tags: [...route.tags],
-    security: route.auth === 'none' ? [] : [{ [SESSION_SCHEME]: [] }],
+    security:
+      route.auth === 'none'
+        ? []
+        : route.auth === 'apiKey'
+          ? [{ [API_KEY_SCHEME]: route.scope ? [route.scope] : [] }]
+          : [{ [SESSION_SCHEME]: [] }],
     request: {
       ...(route.params && { params: route.params }),
       ...(route.query && { query: route.query }),
@@ -128,6 +134,7 @@ function toRouteConfig(route: RouteContract): RouteConfig {
   };
   if (route.description) config.description = route.description;
   if (route.permission) config['x-permission'] = route.permission;
+  if (route.scope) config['x-scope'] = route.scope;
   if (route.idempotent) config['x-idempotent'] = true;
   return config;
 }
@@ -142,6 +149,12 @@ export function buildOpenApiDocument(
     in: 'cookie',
     name: 'sid',
     description: 'Session cookie set by sign-in (httpOnly, Secure, SameSite=Lax).',
+  });
+  registry.registerComponent('securitySchemes', API_KEY_SCHEME, {
+    type: 'http',
+    scheme: 'bearer',
+    description:
+      'A partner API key the hotel made under Settings → Integrations (hk_…); it holds scopes (T-166).',
   });
   // Schemas carrying `.meta({ id })` (ErrorEnvelope, Money…) become components when used.
 

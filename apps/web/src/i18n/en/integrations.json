@@ -1,0 +1,79 @@
+{
+  "integrations": {
+    "title": "Integrations",
+    "intro": "Let outside systems (accounting, a POS, a revenue tool) read this property through the partner API, and send them the hotel's events as they happen.",
+    "docs": "The API description lists every partner route, under Partner API, at /api/v1/openapi.json.",
+    "keys": {
+      "title": "API keys",
+      "intro": "A key reads only what its scopes allow. It is shown once: copy it into the other system straight away.",
+      "list": "API keys",
+      "none": "No keys yet.",
+      "name": "Name",
+      "scopes": "What it may read",
+      "create": "Make key",
+      "made": "Copy this key now: it won't be shown again.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "done": "Done",
+      "revoke": "Revoke",
+      "revokeYes": "Yes, revoke",
+      "cancel": "Cancel",
+      "revokeConfirm": "Revoke {{name}}? Systems using it stop working at once.",
+      "revoked": "Revoked {{when}}",
+      "line": "{{prefix}}… · made by {{by}} {{when}}",
+      "lastUsed": "Last used {{when}}",
+      "neverUsed": "Never used"
+    },
+    "scope": {
+      "availability_read": "Availability",
+      "reservations_read": "Reservations",
+      "guests_read": "Guest email and phone (with reservations)",
+      "folios_read": "Bills and balances"
+    },
+    "hooks": {
+      "title": "Webhooks",
+      "intro": "Each event is sent once to every URL that takes it, signed with that URL's secret (X-Webhook-Signature). Failed sends are tried again for about 17 hours.",
+      "list": "Webhook endpoints",
+      "none": "No webhook URLs yet.",
+      "url": "URL",
+      "description": "Note (optional)",
+      "events": "Events to send",
+      "create": "Add URL",
+      "made": "The signing secret, shown once: put it in the receiving system to check signatures.",
+      "pause": "Pause",
+      "resume": "Switch on",
+      "paused": "Paused",
+      "test": "Send a test",
+      "stats": "Last 7 days: {{delivered}} delivered, {{failed}} failed, {{pending}} waiting",
+      "eventsLine": "Sends: {{events}}"
+    },
+    "event": {
+      "reservation_created": "Reservation made",
+      "reservation_modified": "Reservation changed",
+      "reservation_cancelled": "Reservation cancelled",
+      "reservation_reinstated": "Reservation reinstated",
+      "reservation_no_show": "No-show",
+      "stay_checked_in": "Checked in",
+      "stay_checked_out": "Checked out",
+      "folio_charge_posted": "Charge posted",
+      "payment_captured": "Payment taken",
+      "payment_refunded": "Refund paid",
+      "business_day_closed": "Day closed (accounting journal ready)",
+      "webhook_test": "Test"
+    },
+    "deliveries": {
+      "title": "Recent deliveries",
+      "list": "Recent deliveries",
+      "none": "Nothing sent yet.",
+      "status": {
+        "PENDING": "Waiting to try again",
+        "DELIVERED": "Delivered",
+        "FAILED": "Failed"
+      },
+      "line": "{{event}} → {{url}} · {{when}}",
+      "tries_one": "{{count}} try",
+      "tries_other": "{{count}} tries",
+      "retry": "Send again"
+    }
+  }
+}

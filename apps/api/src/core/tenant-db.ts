@@ -173,6 +173,10 @@ export const TENANT_MODELS: Record<string, Scope> = {
   RecipeLine: { kind: 'property' },
   ServiceRequest: { kind: 'property' },
   EinvoiceSubmission: { kind: 'property' },
+  // Partner API keys and outgoing webhooks (T-166).
+  ApiKey: { kind: 'property' },
+  WebhookEndpoint: { kind: 'property' },
+  WebhookDelivery: { kind: 'property' },
   GroupExchangeRate: { kind: 'organisation' },
   TaskTemplate: { kind: 'property' },
   Task: { kind: 'property', organisationField: 'organisationId' },

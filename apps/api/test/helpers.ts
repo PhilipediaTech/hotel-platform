@@ -1,3 +1,4 @@
+import { createFakeWebhookSender } from '../src/core/webhook-sender.ts';
 import type { ErrorBody, ErrorEnvelope } from '@hotel/shared';
 import { mkdtempSync } from 'node:fs';
 import os from 'node:os';
@@ -89,6 +90,7 @@ export function buildTestApp(routes?: Router, options: TestAppOptions = {}) {
   const messages = createFakeMessageProvider();
   const ai = createFakeAiProvider();
   const channel = createFakeChannelManager();
+  const webhooks = createFakeWebhookSender();
   const app = createApp({
     config: TEST_CONFIG,
     logger,
@@ -99,11 +101,12 @@ export function buildTestApp(routes?: Router, options: TestAppOptions = {}) {
     ai,
     files,
     channel,
+    webhooks,
     ...(options.clock ? { clock: options.clock } : {}),
     ...(routes ? { routes } : {}),
     ...(options.approvalHandlers ? { approvalHandlers: options.approvalHandlers } : {}),
   });
-  return { app, logLines, logger, email, payments, messages, files, ai, channel };
+  return { app, logLines, logger, email, payments, messages, files, ai, channel, webhooks };
 }
 
 /** Typed access to an error envelope in a Supertest response. */

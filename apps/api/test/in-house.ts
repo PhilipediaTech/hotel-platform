@@ -178,5 +178,7 @@ export async function inHouse(
     /** The file store (T-150) and the fake channel manager (T-151). */
     files: c.files,
     channel: c.channel,
+    /** Outgoing webhooks (T-166). */
+    webhooks: c.webhooks,
   };
 }

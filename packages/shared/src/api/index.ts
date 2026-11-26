@@ -62,6 +62,8 @@ export * from './recipes.ts';
 export * from './einvoicing.ts';
 export * from './group.ts';
 export * from './pace.ts';
+export * from './partner-api.ts';
+export * from './integrations.ts';
 export * from './tasks.ts';
 export * from './handovers.ts';
 export * from './leakage.ts';

@@ -128,6 +128,9 @@ const GroupPage = lazy(() => import('../routes/group.tsx').then((m) => ({ defaul
 const EinvoicesPage = lazy(() =>
   import('../routes/einvoices.tsx').then((m) => ({ default: m.EinvoicesPage })),
 );
+const IntegrationsPage = lazy(() =>
+  import('../routes/integrations.tsx').then((m) => ({ default: m.IntegrationsPage })),
+);
 const ReviewsPage = lazy(() =>
   import('../routes/reviews.tsx').then((m) => ({ default: m.ReviewsPage })),
 );
@@ -229,6 +232,7 @@ const SCREENS: Record<string, ReactElement> = {
   '/channels': <ChannelsPage />,
   '/reviews': <ReviewsPage />,
   '/einvoices': <EinvoicesPage />,
+  '/integrations': <IntegrationsPage />,
   '/group': <GroupPage />,
   '/group-rates': <GroupRatesPage />,
   '/kitchen': <KitchenPage />,

@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-165 (pickup and pace) is pushed on `feat/T-165-pickup-pace` (no migration). Next: the partner API and webhooks (V2).
+T-166 (partner API keys and webhooks) is pushed on `feat/T-166-partner-api-webhooks`, with migration 20270106090000_partner_api. Next: V2 POS charge posting and an accounting push on top of it, or the next V2 item.

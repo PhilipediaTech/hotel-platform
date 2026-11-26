@@ -9,6 +9,7 @@ import {
 } from './core/breached-passwords.ts';
 import { auditContext } from './core/audit.ts';
 import { idempotencyStore } from './core/idempotency.ts';
+import { apiKeyLoader } from './core/api-keys.ts';
 import { sessionLoader } from './core/auth.ts';
 import { systemClock, type Clock } from './core/clock.ts';
 import type { Config } from './core/config.ts';
@@ -66,6 +67,8 @@ import { accountingRoutes } from './modules/accounting/routes.ts';
 import { channelRoutes } from './modules/channels/routes.ts';
 import { reviewRoutes } from './modules/reviews/routes.ts';
 import { einvoiceRoutes } from './modules/einvoicing/routes.ts';
+import { integrationRoutes } from './modules/integrations/routes.ts';
+import { createWebhookSender, type WebhookSender } from './core/webhook-sender.ts';
 import { createChannelManager, type ChannelManager } from './core/channel-manager.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
 import { reportRoutes } from './modules/reports/routes.ts';
@@ -95,6 +98,8 @@ export interface AppOptions {
   ai: AiProvider;
   /** The channel manager (M11-07: Channex; the fake locally and in tests; T-151). */
   channel?: ChannelManager;
+  /** Outgoing webhooks (T-166): real requests; the fake in tests. */
+  webhooks?: WebhookSender;
   /** WhatsApp (ADR-016: Meta Cloud API; the fake locally and in tests). */
   messages: MessageProvider;
   /** File storage (R2 in production); the local store also serves its signed links. */
@@ -119,6 +124,7 @@ export function createApp({
   messages,
   files,
   channel = createChannelManager(config),
+  webhooks = createWebhookSender(config),
   clock = systemClock,
   routes,
   approvalHandlers,
@@ -166,6 +172,8 @@ export function createApp({
   );
   // 5. Session load (cookie → sessions row)
   app.use(sessionLoader({ db, config, clock }));
+  // 5b. Partner API key (Authorization: Bearer; /partner routes only; T-166)
+  app.use(apiKeyLoader({ db, config, clock }));
   // Request facts (request ID, IP, device, user) for audit events.
   app.use(auditContext());
   // 6. CSRF: Origin must be allow-listed on every non-GET
@@ -249,6 +257,7 @@ export function createApp({
   api.use(ownerRoutes({ db, tenantDb, clock, ai }));
   api.use(reviewRoutes({ db, tenantDb, clock, config, ai }));
   api.use(einvoiceRoutes({ db, tenantDb, clock, config }));
+  api.use(integrationRoutes({ db, tenantDb, clock, config, webhooks }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));
   api.use(partnerRoutes({ db, clock, config, email }));

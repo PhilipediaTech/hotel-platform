@@ -24,8 +24,13 @@ export interface RouteContract<
   summary: string;
   description?: string;
   tags: readonly string[];
-  /** `session` = needs the `sid` cookie (default); `none` = public. */
-  auth?: 'session' | 'none';
+  /**
+   * `session` = needs the `sid` cookie (default); `none` = public; `apiKey` = the partner API
+   * (T-166): `Authorization: Bearer <key>`, the key's property, never a session.
+   */
+  auth?: 'session' | 'none' | 'apiKey';
+  /** `apiKey` routes: the scope the key must hold (none: any live key of the property). */
+  scope?: string;
   /** Reachable before MFA is passed (only the routes that get a user through MFA). */
   allowPendingMfa?: boolean;
   /** Sends `X-Property-Id`; the server checks membership (tab 4, "Property scope"). */
@@ -116,10 +121,12 @@ export function routeErrorCodes(route: RouteContract): ErrorCode[] {
   if (route.params || route.query || route.body || route.idempotent || route.ifMatch) {
     codes.add('VALIDATION_ERROR');
   }
-  if (route.auth !== 'none') {
+  if (route.auth === 'apiKey') {
+    codes.add('UNAUTHENTICATED');
+  } else if (route.auth !== 'none') {
     codes.add('UNAUTHENTICATED').add('SESSION_EXPIRED').add('MFA_REQUIRED');
   }
-  if (route.permission || route.propertyScoped) codes.add('FORBIDDEN');
+  if (route.permission || route.propertyScoped || route.scope) codes.add('FORBIDDEN');
   if (route.propertyScoped) codes.add('MODULE_DISABLED');
   if (route.params) codes.add('NOT_FOUND');
   if (route.idempotent) codes.add('IDEMPOTENCY_KEY_REUSED');

@@ -226,6 +226,8 @@ model Property {
   eventEnquiries        EventEnquiry[]
   eventBookings         EventBooking[]
   messageThreads        MessageThread[]
+  apiKeys               ApiKey[]
+  webhookEndpoints      WebhookEndpoint[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -438,6 +440,9 @@ model User {
   pettyCashTopUps        PettyCashTopUp[]      @relation("PettyCashToppedUpBy")
   accountingExports      AccountingExport[]    @relation("AccountingExporter")
   channelsConnected      ChannelConnection[]   @relation("ChannelConnector")
+  apiKeysCreated         ApiKey[]              @relation("ApiKeyCreator")
+  apiKeysRevoked         ApiKey[]              @relation("ApiKeyRevoker")
+  webhookEndpoints       WebhookEndpoint[]     @relation("WebhookEndpointCreator")
 
   @@map("users")
 }
@@ -5097,4 +5102,80 @@ model RecipeLine {
   @@unique([recipeId, stockItemId])
   @@index([propertyId, stockItemId])
   @@map("recipe_lines")
+}
+
+/// A key an outside system uses to read through the partner API (T-166). Only the key's HMAC
+/// is kept; the key itself is shown once, when it is made.
+model ApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  propertyId  String    @map("property_id") @db.Uuid
+  name        String
+  /// The key's first characters, to tell keys apart ("hk_" and 8 more).
+  prefix      String
+  tokenHash   String    @unique @map("token_hash")
+  /// What the key may read: availability:read, reservations:read, guests:read, folios:read.
+  scopes      String[]
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedById String?   @map("revoked_by_id") @db.Uuid
+
+  property  Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  createdBy User     @relation("ApiKeyCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  revokedBy User?    @relation("ApiKeyRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([propertyId])
+  @@map("api_keys")
+}
+
+/// Where the hotel's events are sent, signed with the endpoint's secret (T-166).
+model WebhookEndpoint {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  url         String
+  description String?
+  /// Event types sent here (PARTNER_EVENT_TYPES).
+  events      String[]
+  /// The signing secret, encrypted with ID_KEY; shown once, when the endpoint is made.
+  secretEnc   Bytes    @map("secret_enc")
+  active      Boolean  @default(true)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  createdBy  User              @relation("WebhookEndpointCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  deliveries WebhookDelivery[]
+
+  @@unique([propertyId, id])
+  @@index([propertyId])
+  @@map("webhook_endpoints")
+}
+
+/// One event to one endpoint, and how sending it went (T-166).
+model WebhookDelivery {
+  id             String    @id @default(uuid()) @db.Uuid
+  propertyId     String    @map("property_id") @db.Uuid
+  endpointId     String    @map("endpoint_id") @db.Uuid
+  /// The domain event sent; null for a test.
+  eventId        BigInt?   @map("event_id")
+  eventType      String    @map("event_type")
+  /// The JSON body, the same bytes on every try.
+  body           String
+  /// PENDING | DELIVERED | FAILED
+  status         String    @default("PENDING")
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime? @map("next_attempt_at") @db.Timestamptz(6)
+  lastStatusCode Int?      @map("last_status_code")
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deliveredAt    DateTime? @map("delivered_at") @db.Timestamptz(6)
+
+  endpoint WebhookEndpoint @relation(fields: [propertyId, endpointId], references: [propertyId, id], onDelete: Restrict)
+
+  @@unique([endpointId, eventId])
+  @@index([status, nextAttemptAt])
+  @@index([propertyId, createdAt])
+  @@map("webhook_deliveries")
 }

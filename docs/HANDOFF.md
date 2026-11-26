@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-172 (getting started per role) is pushed on `feat/T-172-getting-started` (no migration). Next: ask Philip about the help centre, or move on to the second country pack (ask first) or the V2 AI and IoT items.
+T-173 (help centre) is pushed on `feat/T-173-help-centre`, with migration `20270111090000_help_articles` (starter articles inside). Next: second country pack (ask first) or the V2 AI and IoT items.

@@ -1,4 +1,4 @@
-import { GETTING_STARTED_ROUTES, ONBOARDING_ROUTES } from '@hotel/shared';
+import { GETTING_STARTED_ROUTES, HELP_ROUTES, ONBOARDING_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { getAuth, requireAuth } from '../../core/auth.ts';
 import type { Config } from '../../core/config.ts';
@@ -7,6 +7,7 @@ import { isPlatformAdmin } from '../../core/platform-admin.ts';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as gettingStarted from './getting-started.ts';
+import * as help from './help.ts';
 import * as onboarding from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -24,7 +25,7 @@ export function onboardingRoutes(
 
   // Platform staff only, as for the rest of /platform (platform/routes.ts).
   router.use(
-    ['/platform/onboarding', '/platform/tenants', '/platform/training'],
+    ['/platform/onboarding', '/platform/tenants', '/platform/training', '/platform/help'],
     (req, _res, next) => {
       const auth = getAuth(req);
       if (auth && !isPlatformAdmin(deps.config, auth.user)) {
@@ -55,6 +56,18 @@ export function onboardingRoutes(
   );
   mountRoute(router, GETTING_STARTED_ROUTES.listTeamGettingStarted, (_req, { tenant }) =>
     gettingStarted.teamSteps(deps, tenantFrom(tenant)),
+  );
+
+  // Help centre (T-173).
+  const h = HELP_ROUTES;
+  mountRoute(router, h.listHelpArticles, ({ query }) => help.listArticles(deps, query));
+  mountRoute(router, h.getHelpArticle, ({ params }) => help.getArticle(deps, params.slug));
+  mountRoute(router, h.listPlatformHelpArticles, () => help.listAllArticles(deps));
+  mountRoute(router, h.createHelpArticle, ({ body }, { req }) =>
+    help.createArticle(deps, requireAuth(req), body),
+  );
+  mountRoute(router, h.updateHelpArticle, ({ params, body }, { req }) =>
+    help.updateArticle(deps, requireAuth(req), params.articleId, body),
   );
   return router;
 }

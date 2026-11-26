@@ -8,6 +8,7 @@ import { createQueryClient } from '../app/query-client.ts';
 import { routes } from '../app/routes.tsx';
 import { setApiPropertyId } from '../lib/api.ts';
 import { LAGOS, ORG, makeMe, membership } from '../test/me-fixture.ts';
+import { blocksOf } from './help-articles.tsx';
 import { OnboardingTracker } from './platform-onboarding.tsx';
 import { SupportQueue } from './platform-support.tsx';
 
@@ -82,6 +83,30 @@ beforeEach(() => {
         ],
         done: 1,
         total: 2,
+      }),
+    'GET /help/articles': () =>
+      json(200, {
+        data: [
+          {
+            id: '55555555-0000-4000-8000-0000000000e1',
+            slug: 'check-a-guest-in',
+            title: 'Check a guest in',
+            excerpt: 'Arrivals for today are on the Front desk.',
+            pages: ['/front-desk'],
+          },
+        ],
+      }),
+    'GET /help/articles/check-a-guest-in': () =>
+      json(200, {
+        id: '55555555-0000-4000-8000-0000000000e1',
+        slug: 'check-a-guest-in',
+        title: 'Check a guest in',
+        excerpt: 'Arrivals for today are on the Front desk.',
+        pages: ['/front-desk'],
+        body: 'Arrivals for today are on the Front desk.\n\n1. Open the arrival.\n2. Check in.',
+        published: true,
+        updatedAt: '2026-11-10T09:00:00Z',
+        updatedBy: null,
       }),
     'GET /support/training': () =>
       json(200, {
@@ -282,4 +307,29 @@ describe('the S31 onboarding tracker', () => {
     expect(row).toHaveTextContent('3 in, 2 invited');
     expect(row).toHaveTextContent('Still to train: Front Desk');
   }, 15_000);
+});
+
+describe('help articles', () => {
+  it('shows the page’s own articles and reads one, steps as a list', async () => {
+    const user = userEvent.setup();
+    renderAt('/support?from=%2Ffront-desk');
+    const help = await screen.findByRole('region', { name: 'Help articles' });
+    expect(within(help).getByRole('heading', { name: 'Help for this page' })).toBeVisible();
+    await user.click(await within(help).findByRole('button', { name: /Check a guest in/ }));
+    const article = await screen.findByRole('article', { name: 'Check a guest in' });
+    expect(
+      within(article)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Open the arrival.', 'Check in.']);
+    expect(calls.some((c) => c.key === 'GET /help/articles')).toBe(true);
+  }, 15_000);
+
+  it('reads plain text as paragraphs and lists, never as markup', () => {
+    expect(blocksOf('One\ntwo\n\n- a\n- b\n\n1. x\n2. <b>y</b>')).toEqual([
+      { kind: 'p', lines: ['One', 'two'] },
+      { kind: 'ul', items: ['a', 'b'] },
+      { kind: 'ol', items: ['x', '<b>y</b>'] },
+    ]);
+  });
 });

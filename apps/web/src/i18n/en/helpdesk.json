@@ -92,6 +92,29 @@
         "SUSPENDED": "Suspended"
       },
       "over": "over target"
+    },
+    "articles": {
+      "title": "Help articles",
+      "forPage": "Help for this page",
+      "search": "Search help",
+      "searchPlaceholder": "e.g. refund, night audit",
+      "none": "No articles found. Ask the support team instead.",
+      "back": "All articles",
+      "edited": "Updated {{when}}",
+      "manage": "Help centre",
+      "newArticle": "New article",
+      "slug": "Address (slug)",
+      "articleTitle": "Title",
+      "pages": "App pages it explains",
+      "pagesHint": "Separate with commas, e.g. /front-desk, /folios",
+      "body": "Text",
+      "bodyHint": "Plain text. Leave a blank line between paragraphs; start lines with \"- \" or \"1. \" for lists.",
+      "published": "Published",
+      "draft": "Draft",
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "preview": "Preview"
     }
   }
 }

@@ -191,8 +191,8 @@ export async function getTicket(
   ticketId: string,
 ): Promise<Detail> {
   const ticket = await visibleTicket(deps, tenant, ticketId);
-  // Reads only for a platform admin in a support session, or a suspended group.
-  if (ticket.hotelUnread && !tenant.support && !tenant.suspended) {
+  // Reads only for a platform admin in a support session.
+  if (ticket.hotelUnread && !tenant.support) {
     await deps.tenantDb.supportTicket.update({
       where: { id: ticket.id },
       data: { hotelUnread: false },

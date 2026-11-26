@@ -186,7 +186,7 @@ describe('past due, grace period and suspension (M13-06)', () => {
     expect(audit).toMatchObject({ reason: 'Unpaid November', actorType: 'SUPPORT' });
   });
 
-  it('a suspended group can read, export and pay, but change nothing; nothing is deleted', async () => {
+  it('a suspended group can read, export, pay and ask for help, but change nothing; nothing is deleted', async () => {
     const s = await setup();
     await runBilling(s.deps);
     const rooms = await db.room.count({ where: { organisationId: s.org.id } });
@@ -207,6 +207,9 @@ describe('past due, grace period and suspension (M13-06)', () => {
       (await owner.patch('/subscription/billing', { legalName: 'Obi Hotels Ltd' })).status,
     ).toBe(200);
     expect(await db.room.count({ where: { organisationId: s.org.id } })).toBe(rooms);
+    // Help still reaches the support team (T-170; Philip, 2026-11-26).
+    const help = await owner.post('/support/tickets', { subject: 'Suspended', message: 'Help' });
+    expect(help.status, JSON.stringify(help.body)).toBe(201);
 
     // Paying online ends it.
     const [invoice] = await s.invoices();

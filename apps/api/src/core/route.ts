@@ -150,7 +150,8 @@ export function mountRoute<R extends RouteContract>(
       });
     }
 
-    // M13-06: a group suspended for non-payment can read and export, and pay, nothing else.
+    // M13-06: a group suspended for non-payment can read and export, and pay, nothing else
+    // (and ask for help: T-170, Philip 2026-11-26).
     if (tenant?.suspended && req.method !== 'GET' && !route.allowWhenSuspended) {
       throw new AppError(
         'SUBSCRIPTION_SUSPENDED',

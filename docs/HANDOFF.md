@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-168 (imports of guests, companies and opening balances) is pushed on `feat/T-168-import-guests-companies` (no migration). Next: T-169, future reservations.
+T-169 (import of future reservations) is pushed on `feat/T-169-import-reservations`, with migration `20270108090000_import_reservations`. Next: the rest of V2.

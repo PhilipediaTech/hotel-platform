@@ -97,6 +97,7 @@ export function ImportsPage({ wait = sleep }: { wait?: (ms: number) => Promise<u
       void queryClient.invalidateQueries({ queryKey: ['guests'] });
       void queryClient.invalidateQueries({ queryKey: ['companies'] });
       void queryClient.invalidateQueries({ queryKey: ['ar'] });
+      void queryClient.invalidateQueries({ queryKey: ['reservations'] });
     },
   });
   const current = jobId ? job.data : undefined;

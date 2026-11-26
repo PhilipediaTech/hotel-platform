@@ -3,8 +3,18 @@
 // the templates). Checks that need the database (codes that exist, rooms already there) are
 // in the API. Rows are numbered as in the spreadsheet: the header is row 1.
 
-/** Rooms and rates (T-034); guests, companies and their opening balances (T-168). */
-export const IMPORT_KINDS = ['ROOMS', 'RATES', 'GUESTS', 'COMPANIES', 'BALANCES'] as const;
+/**
+ * Rooms and rates (T-034); guests, companies and their opening balances (T-168); future
+ * reservations from the old system (T-169).
+ */
+export const IMPORT_KINDS = [
+  'ROOMS',
+  'RATES',
+  'GUESTS',
+  'COMPANIES',
+  'BALANCES',
+  'RESERVATIONS',
+] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
 /** Longest file we check in one go. */
@@ -71,6 +81,23 @@ export const IMPORT_COLUMNS: Record<ImportKind, readonly ImportColumn[]> = {
     { name: 'amount', required: true, examples: ['450000', '1,250,000.50'] },
     { name: 'issued_on', required: false, examples: ['2026-10-15', '01/11/2026'] },
     { name: 'due_on', required: false, examples: ['2026-11-14', ''] },
+  ],
+  RESERVATIONS: [
+    { name: 'old_confirmation_no', required: true, examples: ['R-4471', 'R-4471'] },
+    { name: 'arrival', required: true, examples: ['2026-12-20', '2026-12-20'] },
+    { name: 'departure', required: true, examples: ['2026-12-23', '2026-12-22'] },
+    { name: 'room_type_code', required: true, examples: ['STD', 'DLX'] },
+    { name: 'nightly_rate', required: true, examples: ['45000', '65000'] },
+    { name: 'first_name', required: true, examples: ['Ada', 'Tunde'] },
+    { name: 'last_name', required: true, examples: ['Obi', 'Bakare'] },
+    { name: 'email', required: false, examples: ['ada@example.com', ''] },
+    { name: 'phone', required: false, examples: ['08031234567', ''] },
+    { name: 'adults', required: false, examples: ['2', '1'] },
+    { name: 'children', required: false, examples: ['', ''] },
+    { name: 'rate_plan_code', required: false, examples: ['', 'BAR'] },
+    { name: 'company_name', required: false, examples: ['', ''] },
+    { name: 'source', required: false, examples: ['phone', 'phone'] },
+    { name: 'notes', required: false, examples: ['Late arrival', ''] },
   ],
 };
 
@@ -147,7 +174,46 @@ export interface BalanceRow {
   dueOn: string | null;
 }
 
-export type ImportRow = RoomRow | RateRow | GuestRow | CompanyRow | BalanceRow;
+/**
+ * One room of a booking still to come, from the old system (T-169). Rows with the same old
+ * confirmation number are one booking with several rooms; its first row gives the booker,
+ * company, source and notes.
+ */
+export interface ReservationRow {
+  row: number;
+  oldConfirmationNo: string;
+  arrival: string;
+  departure: string;
+  roomTypeCode: string;
+  /** Kobo, charged every night: the price the old system agreed. */
+  nightlyRateMinor: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  adults: number;
+  children: number;
+  /** Null: the property's best available rate plan. */
+  ratePlanCode: string | null;
+  companyName: string | null;
+  /** Null: corporate or travel agent with a company, else direct. */
+  source:
+    | 'WALK_IN'
+    | 'PHONE'
+    | 'EMAIL'
+    | 'WHATSAPP'
+    | 'DIRECT'
+    | 'OTA_MANUAL'
+    | 'CORPORATE'
+    | 'TRAVEL_AGENT'
+    | null;
+  notes: string | null;
+}
+
+/** Longest stay a reservation row may describe. */
+export const MAX_IMPORT_NIGHTS = 365;
+
+export type ImportRow = RoomRow | RateRow | GuestRow | CompanyRow | BalanceRow | ReservationRow;
 type AnyRow = ImportRow;
 
 /** "Room Number " → "room_number". */
@@ -289,6 +355,40 @@ const listOf = (text: string) =>
     .map((f) => f.trim())
     .filter(Boolean);
 
+const SOURCE_WORDS: Record<string, NonNullable<ReservationRow['source']>> = {
+  'walk in': 'WALK_IN',
+  walkin: 'WALK_IN',
+  phone: 'PHONE',
+  telephone: 'PHONE',
+  call: 'PHONE',
+  email: 'EMAIL',
+  'e mail': 'EMAIL',
+  whatsapp: 'WHATSAPP',
+  direct: 'DIRECT',
+  website: 'DIRECT',
+  web: 'DIRECT',
+  ota: 'OTA_MANUAL',
+  'booking com': 'OTA_MANUAL',
+  expedia: 'OTA_MANUAL',
+  'hotels ng': 'OTA_MANUAL',
+  jumia: 'OTA_MANUAL',
+  corporate: 'CORPORATE',
+  company: 'CORPORATE',
+  'travel agent': 'TRAVEL_AGENT',
+  agent: 'TRAVEL_AGENT',
+};
+
+function sourceCell(text: string): Cell {
+  if (text === '') return ok(null);
+  const word = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  return word in SOURCE_WORDS
+    ? ok(SOURCE_WORDS[word] as string)
+    : bad('Use walk-in, phone, email, whatsapp, direct, ota, corporate or travel agent');
+}
+
 function codeCell(text: string, pattern: RegExp, hint: string): Cell {
   const code = text.toUpperCase();
   return pattern.test(code) ? ok(code) : bad(hint);
@@ -327,6 +427,10 @@ export function parseSheet(
   kind: 'BALANCES',
   table: readonly (readonly string[])[],
 ): ParsedSheet<BalanceRow>;
+export function parseSheet(
+  kind: 'RESERVATIONS',
+  table: readonly (readonly string[])[],
+): ParsedSheet<ReservationRow>;
 export function parseSheet(
   kind: ImportKind,
   table: readonly (readonly string[])[],
@@ -535,6 +639,58 @@ export function parseSheet(
           creditLimitMinor: values.get('credit_limit') as string | null,
           paymentTermsDays: values.get('payment_terms_days') as number | null,
           commissionBps: values.get('commission_percent') as number | null,
+        });
+      }
+    } else if (kind === 'RESERVATIONS') {
+      text('old_confirmation_no', 40, true);
+      req('arrival', dateCell);
+      req('departure', dateCell);
+      req('room_type_code', (t) => codeCell(t, /^[A-Z0-9-]{2,10}$/, 'A room type code, e.g. DLX'));
+      req('nightly_rate', moneyCell);
+      text('first_name', 80, true);
+      text('last_name', 80, true);
+      take('email', emailCell(cell('email')));
+      take('phone', phoneCell(cell('phone')));
+      take('adults', intCell(cell('adults'), 1, 20));
+      take('children', intCell(cell('children'), 0, 20));
+      take(
+        'rate_plan_code',
+        cell('rate_plan_code') === ''
+          ? ok(null)
+          : codeCell(cell('rate_plan_code'), /^[A-Z0-9_-]{2,12}$/, 'A rate plan code, e.g. BAR'),
+      );
+      text('company_name', 160);
+      take('source', sourceCell(cell('source')));
+      text('notes', 1000);
+      const arrival = values.get('arrival') as string | undefined;
+      const departure = values.get('departure') as string | undefined;
+      if (arrival && departure) {
+        const nights = Math.round(
+          (Date.parse(`${departure}T00:00:00Z`) - Date.parse(`${arrival}T00:00:00Z`)) / 86_400_000,
+        );
+        if (nights < 1) take('departure', bad('Leave at least one night after the arrival'));
+        else if (nights > MAX_IMPORT_NIGHTS) {
+          take('departure', bad(`At most ${MAX_IMPORT_NIGHTS} nights`));
+        }
+      }
+      if (rowOk) {
+        rows.push({
+          row,
+          oldConfirmationNo: values.get('old_confirmation_no') as string,
+          arrival: arrival ?? '',
+          departure: departure ?? '',
+          roomTypeCode: values.get('room_type_code') as string,
+          nightlyRateMinor: values.get('nightly_rate') as string,
+          firstName: values.get('first_name') as string,
+          lastName: values.get('last_name') as string,
+          email: values.get('email') as string | null,
+          phone: values.get('phone') as string | null,
+          adults: (values.get('adults') as number | null) ?? 1,
+          children: (values.get('children') as number | null) ?? 0,
+          ratePlanCode: values.get('rate_plan_code') as string | null,
+          companyName: values.get('company_name') as string | null,
+          source: values.get('source') as ReservationRow['source'],
+          notes: values.get('notes') as string | null,
         });
       }
     } else {

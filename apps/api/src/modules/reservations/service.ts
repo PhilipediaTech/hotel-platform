@@ -224,6 +224,8 @@ function searchFilter(q: string | undefined): Prisma.ReservationWhereInput {
   const digits = text.replace(/\D/g, '').replace(/^0+/, '');
   const or: Prisma.ReservationWhereInput[] = [
     { confirmationNo: { contains: text, mode: 'insensitive' } },
+    // The old system's number of an imported booking, or the channel manager's ID (T-169).
+    { channelRef: { equals: text, mode: 'insensitive' } },
     { booker: { lastName: { startsWith: text, mode: 'insensitive' } } },
     { booker: { firstName: { startsWith: text, mode: 'insensitive' } } },
   ];

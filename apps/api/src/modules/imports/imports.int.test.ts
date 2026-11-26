@@ -363,7 +363,7 @@ describe('permissions', () => {
     const unknown = await h.gm.post('/imports', { kind: 'ROOMS', fileId: crypto.randomUUID() });
     expect(unknown.status).toBe(400);
     const later = await h.gm.post('/imports', {
-      kind: 'RESERVATIONS',
+      kind: 'DEPOSITS',
       fileId: crypto.randomUUID(),
     });
     expect((errorOf(later).details?.['issues'] as { path: string }[])[0]?.path).toBe('body.kind');

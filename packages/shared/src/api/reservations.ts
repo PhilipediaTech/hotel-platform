@@ -179,7 +179,10 @@ export const ReservationSummary = z
   .meta({ id: 'ReservationSummary' });
 
 export const ReservationQuery = PageQuery.extend({
-  /** Confirmation number, or the start of the booker's last name, or phone digits. */
+  /**
+   * Confirmation number, or the start of the booker's last name, or phone digits; or the old
+   * system's number of an imported booking, or a channel manager booking ID, in full (T-169).
+   */
   q: z.string().trim().max(100).optional(),
   status: z.enum(RESERVATION_STATUSES).optional(),
   /** Stays arriving from (inclusive) … to (inclusive). */

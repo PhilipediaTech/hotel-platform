@@ -219,4 +219,87 @@ describe('guests, companies and balances (T-168)', () => {
       { row: 4, column: 'reference', message: 'Required' },
     ]);
   });
+
+  it('reads future bookings: defaults, sources, and at least one night (T-169)', () => {
+    const header = IMPORT_COLUMNS.RESERVATIONS.map((c) => c.name);
+    const { rows, errors } = parseSheet('RESERVATIONS', [
+      header,
+      [
+        'R-1',
+        '20/12/2026',
+        '2026-12-23',
+        'std',
+        '₦40,000',
+        'Ada',
+        'Obi',
+        '',
+        '0803 123 4567',
+        '',
+        '',
+        '',
+        '',
+        'Booking.com',
+        '',
+      ],
+      [
+        'R-2',
+        '2026-12-20',
+        '2026-12-20',
+        'STD',
+        '40000',
+        'Ada',
+        'Obi',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ],
+      [
+        'R-3',
+        '2026-12-20',
+        '2026-12-21',
+        'STD',
+        '',
+        'Ada',
+        'Obi',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        'fax',
+        '',
+      ],
+    ]);
+    expect(rows).toEqual([
+      {
+        row: 2,
+        oldConfirmationNo: 'R-1',
+        arrival: '2026-12-20',
+        departure: '2026-12-23',
+        roomTypeCode: 'STD',
+        nightlyRateMinor: '4000000',
+        firstName: 'Ada',
+        lastName: 'Obi',
+        email: null,
+        phone: '+2348031234567',
+        adults: 1,
+        children: 0,
+        ratePlanCode: null,
+        companyName: null,
+        source: 'OTA_MANUAL',
+        notes: null,
+      },
+    ]);
+    expect(errors).toEqual([
+      { row: 3, column: 'departure', message: 'Leave at least one night after the arrival' },
+      { row: 4, column: 'nightly_rate', message: 'Required' },
+      expect.objectContaining({ row: 4, column: 'source' }),
+    ]);
+  });
 });

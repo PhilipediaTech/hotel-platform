@@ -2017,6 +2017,22 @@ async function bSupportUnchanged(db: Db, world: TenantWorld) {
   ]);
 }
 
+/** B's training session with the support team (T-171). */
+async function bTraining(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  const role = await makeRole(db, organisationId);
+  const session = await db.trainingSession.create({
+    data: {
+      organisationId,
+      propertyId,
+      roleId: role.id,
+      trainerId: world.bStaff.id,
+      scheduledAt: new Date('2026-11-20T09:00:00Z'),
+    },
+  });
+  return { sessionId: session.id };
+}
+
 /** B's group: a closed November day kept, and a cedi rate in its own group currency (T-161). */
 async function bGroup(db: Db, world: TenantWorld, propertyId: string) {
   const organisationId = orgOf(world, propertyId);
@@ -4236,6 +4252,11 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bSupportUnchanged,
   },
   resolveSupportTicket: { seed: bSupport, body: () => ({}), untouched: bSupportUnchanged },
+  // Training with the support team (T-171)
+  listMyTraining: {
+    seed: bTraining,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((s) => s.id),
+  },
   // Channel manager (T-151)
   getChannelConnection: {
     seed: bChannel,

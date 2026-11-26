@@ -17,6 +17,7 @@ import { registerStrings } from '../i18n/index.ts';
 import { api } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
+import { MyTraining } from './platform-onboarding.tsx';
 
 registerStrings(helpdeskStrings);
 
@@ -304,6 +305,7 @@ export function SupportPage() {
           </div>
         )}
       </div>
+      {!open && <MyTraining />}
     </section>
   );
 }

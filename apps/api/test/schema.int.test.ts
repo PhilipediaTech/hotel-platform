@@ -186,6 +186,7 @@ describe('migrations', () => {
       'tax_rule_versions',
       'tax_rules',
       'timesheets',
+      'training_sessions',
       'unmatched_transfers',
       'usage_counters',
       'users',

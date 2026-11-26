@@ -54,6 +54,7 @@ import { PACE_ROUTES } from './pace.ts';
 import { PARTNER_API_ROUTES } from './partner-api.ts';
 import { INTEGRATION_ROUTES } from './integrations.ts';
 import { SUPPORT_ROUTES } from './support.ts';
+import { ONBOARDING_ROUTES } from './onboarding.ts';
 import { IMPORT_ROUTES } from './imports.ts';
 import { INVENTORY_ROUTES } from './inventory.ts';
 import { NIGHT_AUDIT_ROUTES } from './night-audit.ts';
@@ -149,6 +150,7 @@ export const API_ROUTES = {
   ...PARTNER_API_ROUTES,
   ...INTEGRATION_ROUTES,
   ...SUPPORT_ROUTES,
+  ...ONBOARDING_ROUTES,
   ...TASK_ROUTES,
   ...HANDOVER_ROUTES,
   ...LEAKAGE_ROUTES,

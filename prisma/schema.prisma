@@ -58,6 +58,7 @@ model Organisation {
 
   onboardingContact  User?               @relation("OrganisationOnboardingContact", fields: [onboardingContactId], references: [id], onDelete: SetNull)
   supportTickets     SupportTicket[]
+  trainingSessions   TrainingSession[]
   properties         Property[]
   groupRates         GroupExchangeRate[]
   tasks              Task[]
@@ -233,6 +234,7 @@ model Property {
   apiKeys               ApiKey[]
   webhookEndpoints      WebhookEndpoint[]
   supportTickets        SupportTicket[]
+  trainingSessions      TrainingSession[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -340,6 +342,7 @@ model User {
   supportTicketsOpened   SupportTicket[]      @relation("SupportTicketOpener")
   supportTicketsAssigned SupportTicket[]      @relation("SupportTicketAssignee")
   supportMessages        SupportMessage[]
+  trainingsGiven         TrainingSession[]
   memberships            Membership[]
   authTokens             AuthToken[]
   mfaRecoveryCodes       MfaRecoveryCode[]
@@ -495,9 +498,10 @@ model Role {
   limits         Json     @default("{}")
   requiresMfa    Boolean  @default(false) @map("requires_mfa")
 
-  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  memberships  Membership[]
-  invitations  Invitation[]
+  organisation     Organisation      @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  memberships      Membership[]
+  invitations      Invitation[]
+  trainingSessions TrainingSession[]
 
   @@unique([organisationId, name])
   @@unique([organisationId, id])
@@ -5236,4 +5240,27 @@ model SupportMessage {
 
   @@index([ticketId, createdAt])
   @@map("support_messages")
+}
+
+/// A remote training session for a role of a hotel group, booked by the platform team
+/// (Strategy "remote training sessions per role"; T-171).
+model TrainingSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  organisationId String    @map("organisation_id") @db.Uuid
+  propertyId     String?   @map("property_id") @db.Uuid
+  roleId         String    @map("role_id") @db.Uuid
+  trainerId      String    @map("trainer_id") @db.Uuid
+  scheduledAt    DateTime  @map("scheduled_at") @db.Timestamptz(6)
+  heldAt         DateTime? @map("held_at") @db.Timestamptz(6)
+  cancelledAt    DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  note           String?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property     Property?    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  role         Role         @relation(fields: [organisationId, roleId], references: [organisationId, id], onDelete: Restrict)
+  trainer      User         @relation(fields: [trainerId], references: [id], onDelete: Restrict)
+
+  @@index([organisationId, scheduledAt])
+  @@map("training_sessions")
 }

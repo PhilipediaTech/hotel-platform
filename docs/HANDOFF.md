@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-170 (in-app support chat) is merged; `fix/T-170-support-when-suspended` lets a suspended group still reach support. Next: ask Philip for the next V2 onboarding item (tracker, help centre or getting-started lists).
+T-171 (onboarding tracker and training sessions) is pushed on `feat/T-171-onboarding-tracker`, with migration `20270110090000_training_sessions`. Next: ask Philip for the next V2 onboarding item (help centre or getting-started lists).

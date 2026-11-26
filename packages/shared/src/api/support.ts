@@ -73,6 +73,8 @@ export const SupportTicketBody = z.object({
 // ── The hotel's side ────────────────────────────────────────────────────────────────────
 
 const HOTEL = { tags: ['Support'], propertyScoped: true as const };
+/** A group suspended for non-payment can still reach support (Philip, 2026-11-26). */
+const EVEN_SUSPENDED = { allowWhenSuspended: true as const };
 
 export const listSupportTickets = defineRoute({
   ...HOTEL,
@@ -91,6 +93,7 @@ export const listSupportTickets = defineRoute({
 
 export const createSupportTicket = defineRoute({
   ...HOTEL,
+  ...EVEN_SUSPENDED,
   operationId: 'createSupportTicket',
   method: 'post',
   path: '/support/tickets',
@@ -114,6 +117,7 @@ export const getSupportTicket = defineRoute({
 
 export const replySupportTicket = defineRoute({
   ...HOTEL,
+  ...EVEN_SUSPENDED,
   operationId: 'replySupportTicket',
   method: 'post',
   path: '/support/tickets/{ticketId}/messages',
@@ -125,6 +129,7 @@ export const replySupportTicket = defineRoute({
 
 export const resolveSupportTicket = defineRoute({
   ...HOTEL,
+  ...EVEN_SUSPENDED,
   operationId: 'resolveSupportTicket',
   method: 'post',
   path: '/support/tickets/{ticketId}/resolve',

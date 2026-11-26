@@ -8,9 +8,11 @@ import { createQueryClient } from '../app/query-client.ts';
 import { routes } from '../app/routes.tsx';
 import { setApiPropertyId } from '../lib/api.ts';
 import { LAGOS, ORG, makeMe, membership } from '../test/me-fixture.ts';
+import { OnboardingTracker } from './platform-onboarding.tsx';
 import { SupportQueue } from './platform-support.tsx';
 
-// Help and the S31 support queue (Versions V2 "support tooling"; T-170).
+// Help and the S31 support queue (Versions V2 "support tooling"; T-170); training and the
+// onboarding tracker (T-171).
 
 const json = (status: number, body?: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
@@ -72,6 +74,21 @@ beforeEach(() => {
     'POST /support/tickets': () =>
       json(201, ticket({ id: T1, status: 'OPEN', unread: false, messages: [messages[0]] })),
     [`GET /support/tickets/${T1}`]: () => json(200, { ...ticket({ unread: false }), messages }),
+    'GET /support/training': () =>
+      json(200, {
+        data: [
+          {
+            id: '55555555-0000-4000-8000-0000000000f1',
+            role: { id: '55555555-0000-4000-8000-0000000000f2', name: 'Front Desk' },
+            propertyName: 'Lagos Hotel',
+            scheduledAt: '2026-11-18T09:00:00Z',
+            heldAt: null,
+            cancelledAt: null,
+            trainer: CHIDI,
+            note: 'Check-in and payments',
+          },
+        ],
+      }),
     [`POST /support/tickets/${T1}/messages`]: () =>
       json(200, { ...ticket({ status: 'OPEN', unread: false }), messages }),
   };
@@ -110,6 +127,9 @@ describe('Help', () => {
     expect(
       await screen.findByText('Your onboarding contact: Chidi Support (chidi@platform.test)'),
     ).toBeVisible();
+    const training = await screen.findByRole('region', { name: 'Training with the support team' });
+    expect(training).toHaveTextContent('Front Desk · Lagos Hotel');
+    expect(training).toHaveTextContent('with Chidi Support');
     await user.click(screen.getByRole('button', { name: /Cannot check guests in/ }));
     const conversation = await screen.findByRole('list', { name: 'Conversation' });
     expect(within(conversation).getByText(/Chidi Support · Support team/)).toBeVisible();
@@ -195,5 +215,45 @@ describe('the S31 support queue', () => {
         { message: 'Fixed: please refresh.' },
       ]),
     );
+  }, 15_000);
+});
+
+describe('the S31 onboarding tracker', () => {
+  it('shows a property past the 2-working-day target and the roles still to train', async () => {
+    handlers['GET /platform/onboarding'] = () =>
+      json(200, {
+        targetWorkingDays: 2,
+        data: [
+          {
+            organisation: { id: ORG, name: 'Obi Hotels' },
+            property: { id: LAGOS, name: 'Lagos Hotel', code: 'LAG', status: 'SETUP' },
+            contact: CHIDI,
+            createdAt: '2026-11-09T08:00:00Z',
+            wentLiveAt: null,
+            workingDays: 5,
+            onTarget: false,
+            checklist: { done: 6, required: 9, todo: ['tax', 'rates', 'rooms'] },
+            imports: { GUESTS: 1 },
+            staff: { members: 3, invitations: 2 },
+            training: {
+              needed: [{ id: '55555555-0000-4000-8000-0000000000f2', name: 'Front Desk' }],
+              held: 0,
+              next: null,
+            },
+          },
+        ],
+      });
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OnboardingTracker />
+      </QueryClientProvider>,
+    );
+    const row = await screen.findByRole('row', { name: /Lagos Hotel/ });
+    expect(row).toHaveTextContent('5 of 2 · over target');
+    expect(row).toHaveTextContent('6 of 9');
+    expect(row).toHaveTextContent('tax, rates, rooms');
+    expect(row).toHaveTextContent('GUESTS 1');
+    expect(row).toHaveTextContent('3 in, 2 invited');
+    expect(row).toHaveTextContent('Still to train: Front Desk');
   }, 15_000);
 });

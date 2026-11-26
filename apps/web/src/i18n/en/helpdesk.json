@@ -50,6 +50,48 @@
     "answer": "Your answer",
     "onboardingContact": "Onboarding contact",
     "onboardingHint": "The platform admin who looks after this group; blockers go to them by WhatsApp.",
-    "save": "Save"
+    "save": "Save",
+    "training": {
+      "title": "Training with the support team",
+      "none": "No training sessions yet.",
+      "held": "Held {{when}}",
+      "upcoming": "{{when}}",
+      "cancelled": "Cancelled",
+      "wholeGroup": "Whole group",
+      "with": "with {{name}}",
+      "book": "Book a session",
+      "role": "Role",
+      "property": "Property",
+      "when": "When",
+      "note": "Note",
+      "markHeld": "Mark as held",
+      "cancel": "Cancel"
+    },
+    "onboarding": {
+      "title": "Onboarding",
+      "empty": "No properties yet.",
+      "property": "Property",
+      "days": "Working days",
+      "daysValue": "{{days}} of {{target}}",
+      "setup": "Setup steps",
+      "setupValue": "{{done}} of {{required}}",
+      "imports": "Imports",
+      "noImports": "None",
+      "staff": "Staff",
+      "staffValue": "{{members}} in, {{invitations}} invited",
+      "training": "Training",
+      "trainingNeeded": "Still to train: {{roles}}",
+      "allTrained": "Every role trained",
+      "next": "Next: {{role}}, {{when}}",
+      "contact": "Contact",
+      "noContact": "None",
+      "wentLive": "Live since {{when}}",
+      "statuses": {
+        "SETUP": "In setup",
+        "LIVE": "Live",
+        "SUSPENDED": "Suspended"
+      },
+      "over": "over target"
+    }
   }
 }

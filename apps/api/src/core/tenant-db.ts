@@ -179,6 +179,8 @@ export const TENANT_MODELS: Record<string, Scope> = {
   // In-app support (T-170): the group's, asked from any of its properties.
   SupportTicket: { kind: 'organisation' },
   SupportMessage: { kind: 'organisation' },
+  // Training sessions with the support team (T-171): the group's.
+  TrainingSession: { kind: 'organisation' },
   WebhookDelivery: { kind: 'property' },
   GroupExchangeRate: { kind: 'organisation' },
   TaskTemplate: { kind: 'property' },

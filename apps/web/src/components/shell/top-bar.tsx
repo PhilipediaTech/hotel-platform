@@ -4,11 +4,14 @@ import {
   Building2,
   CalendarDays,
   CircleUser,
+  LifeBuoy,
   Search,
   ShieldCheck,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
+import { api } from '../../lib/api.ts';
 import { useSession, useSessionActions, type ShellProperty } from '../../app/session.ts';
 import { cn } from '../../lib/cn.ts';
 import { Button, buttonVariants } from '../ui/button.tsx';
@@ -87,6 +90,34 @@ function CountBadge({ count }: { count: number }) {
   );
 }
 
+/** Help (T-170): the support page, with the answers not read yet. */
+function HelpLink() {
+  const { t } = useTranslation();
+  const { currentPropertyId } = useSession();
+  const { pathname } = useLocation();
+  const list = useQuery({
+    queryKey: ['support', 'list'],
+    queryFn: () => api.call('listSupportTickets'),
+    enabled: currentPropertyId !== null,
+    refetchInterval: 120_000,
+  });
+  const rows: unknown = list.data?.data;
+  const unread = Array.isArray(rows)
+    ? (rows as { unread: boolean }[]).filter((x) => x.unread).length
+    : 0;
+  const from = pathname === '/support' ? '' : `?from=${encodeURIComponent(pathname)}`;
+  return (
+    <Link
+      to={`/support${from}`}
+      className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'relative')}
+      aria-label={unread > 0 ? t('shell.helpUnread', { count: unread }) : t('shell.help')}
+    >
+      <LifeBuoy aria-hidden className="size-5" />
+      <CountBadge count={unread} />
+    </Link>
+  );
+}
+
 export function TopBar() {
   const { t } = useTranslation();
   const session = useSession();
@@ -155,6 +186,7 @@ export function TopBar() {
             <CountBadge count={session.stayAlerts} />
           </Link>
         )}
+        <HelpLink />
         <Link
           to="/approvals"
           className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'relative')}

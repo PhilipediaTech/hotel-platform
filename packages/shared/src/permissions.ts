@@ -48,6 +48,7 @@ export const PERMISSIONS: readonly PermissionDef[] = [
   p('access', 'role.assign', 'Give and remove staff roles; manage staff accounts'),
   p('access', 'role.manage', 'Edit roles: permissions and limits'),
   p('access', 'device.manage', 'Open a shared device for PIN switching'),
+  p('access', 'support.manage', 'See and answer every support conversation of the group'),
   p('access', 'approval.decide', 'Approve or reject requests'),
   p('access', 'approval.policy.manage', 'Configure approval policies'),
   p('access', 'audit.read', 'View the audit log'),

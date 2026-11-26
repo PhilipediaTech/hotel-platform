@@ -68,6 +68,7 @@ import { channelRoutes } from './modules/channels/routes.ts';
 import { reviewRoutes } from './modules/reviews/routes.ts';
 import { einvoiceRoutes } from './modules/einvoicing/routes.ts';
 import { integrationRoutes } from './modules/integrations/routes.ts';
+import { supportRoutes } from './modules/support/routes.ts';
 import { createWebhookSender, type WebhookSender } from './core/webhook-sender.ts';
 import { createChannelManager, type ChannelManager } from './core/channel-manager.ts';
 import { ownerRoutes } from './modules/owner/routes.ts';
@@ -258,6 +259,7 @@ export function createApp({
   api.use(reviewRoutes({ db, tenantDb, clock, config, ai }));
   api.use(einvoiceRoutes({ db, tenantDb, clock, config }));
   api.use(integrationRoutes({ db, tenantDb, clock, config, webhooks }));
+  api.use(supportRoutes({ db, tenantDb, clock, config }));
   api.use(reportRoutes({ db, tenantDb, clock }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));
   api.use(partnerRoutes({ db, clock, config, email }));

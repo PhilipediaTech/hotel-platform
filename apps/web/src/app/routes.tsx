@@ -184,6 +184,9 @@ const MessagesPage = lazy(() =>
 const CheckOutPage = lazy(() =>
   import('../routes/check-out.tsx').then((m) => ({ default: m.CheckOutPage })),
 );
+const SupportPage = lazy(() =>
+  import('../routes/support.tsx').then((m) => ({ default: m.SupportPage })),
+);
 const ImportsPage = lazy(() =>
   import('../routes/settings/imports.tsx').then((m) => ({ default: m.ImportsPage })),
 );
@@ -318,6 +321,15 @@ export function buildRoutes(
               element: (
                 <Suspense fallback={<Loading />}>
                   <AccountPhonePage />
+                </Suspense>
+              ),
+            },
+            // Help for every member (T-170): in the top bar, not the navigation.
+            {
+              path: 'support',
+              element: (
+                <Suspense fallback={<Loading />}>
+                  <SupportPage />
                 </Suspense>
               ),
             },

@@ -21,7 +21,7 @@ export const MessageTemplateItem = z
   .object({
     code: Code,
     label: z.string(),
-    audience: z.enum(['GUEST', 'STAFF']),
+    audience: z.enum(['GUEST', 'STAFF', 'PLATFORM']),
     channel: Channel,
     language: Language,
     subject: z.string().nullable(),

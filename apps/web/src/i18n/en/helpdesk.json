@@ -1,0 +1,55 @@
+{
+  "helpdesk": {
+    "title": "Help",
+    "intro": "Ask the support team. We answer in the app, and by email too.",
+    "contact": "Your onboarding contact: {{name}}",
+    "contactEmail": "Your onboarding contact: {{name}} ({{email}})",
+    "noContact": "No onboarding contact is named yet; the whole support team sees your request.",
+    "new": "New request",
+    "subject": "Subject",
+    "message": "What happened?",
+    "urgency": "How urgent is it?",
+    "urgencies": {
+      "NORMAL": "Normal",
+      "BLOCKER": "The front desk can’t work"
+    },
+    "blockerHint": "Blockers also reach the team by WhatsApp.",
+    "send": "Send to support",
+    "sending": "Sending…",
+    "fromPage": "Asked from {{page}}",
+    "mine": "Your requests",
+    "all": "All requests of the group",
+    "none": "No requests yet.",
+    "statuses": {
+      "OPEN": "Waiting on support",
+      "ANSWERED": "Answered",
+      "RESOLVED": "Resolved"
+    },
+    "newReply": "New reply",
+    "openedBy": "{{name}}, {{when}}",
+    "conversation": "Conversation",
+    "team": "Support team",
+    "reply": "Your reply",
+    "sendReply": "Send",
+    "resolve": "Mark as resolved",
+    "back": "All requests",
+    "queue": "Support",
+    "queueFilter": "Show",
+    "filters": {
+      "ACTIVE": "Open and answered",
+      "OPEN": "Waiting on us",
+      "ANSWERED": "Waiting on the hotel",
+      "RESOLVED": "Resolved"
+    },
+    "queueEmpty": "Nothing here.",
+    "waiting": "waiting {{minutes}} min",
+    "overdue": "over {{minutes}} min: answer first",
+    "firstResponse": "first answer after {{minutes}} min",
+    "assignee": "Taken by",
+    "nobody": "Nobody",
+    "answer": "Your answer",
+    "onboardingContact": "Onboarding contact",
+    "onboardingHint": "The platform admin who looks after this group; blockers go to them by WhatsApp.",
+    "save": "Save"
+  }
+}

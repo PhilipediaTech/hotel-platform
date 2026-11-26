@@ -122,6 +122,13 @@ const MEMBER_ROUTES: Record<string, string> = {
     'task.work or checklist.manage; own and unassigned runs (checklists/service.ts)',
   completeChecklistRun:
     'task.work or checklist.manage; own and unassigned runs (checklists/service.ts)',
+  // Reviewed in T-170: anyone may ask for help; they see their own requests, and
+  // support.manage sees the group's (support/service.ts visibleTicket).
+  listSupportTickets: 'own requests, or the group’s with support.manage',
+  createSupportTicket: 'anyone may ask the support team for help',
+  getSupportTicket: 'own requests, or the group’s with support.manage',
+  replySupportTicket: 'own requests, or the group’s with support.manage',
+  resolveSupportTicket: 'own requests, or the group’s with support.manage',
 };
 
 const sorted = (xs: string[]) => [...xs].sort();

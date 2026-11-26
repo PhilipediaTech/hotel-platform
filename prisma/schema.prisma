@@ -43,17 +43,21 @@ enum PropertyStatus {
 }
 
 model Organisation {
-  id            String   @id @default(uuid()) @db.Uuid
-  name          String
-  legalName     String?  @map("legal_name")
-  country       String   @db.Char(2)
+  id                  String   @id @default(uuid()) @db.Uuid
+  name                String
+  legalName           String?  @map("legal_name")
+  country             String   @db.Char(2)
   /// A country pack given by platform staff (M14-09); null = the sign-up country's.
-  countryPack   String?  @map("country_pack") @db.Char(2)
+  countryPack         String?  @map("country_pack") @db.Char(2)
   /// The currency group reports are in (M12-07; T-161); null = the first property's.
-  groupCurrency String?  @map("group_currency") @db.Char(3)
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  groupCurrency       String?  @map("group_currency") @db.Char(3)
+  /// The platform admin who looks after the group's onboarding and support (T-170).
+  onboardingContactId String?  @map("onboarding_contact_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  onboardingContact  User?               @relation("OrganisationOnboardingContact", fields: [onboardingContactId], references: [id], onDelete: SetNull)
+  supportTickets     SupportTicket[]
   properties         Property[]
   groupRates         GroupExchangeRate[]
   tasks              Task[]
@@ -228,6 +232,7 @@ model Property {
   messageThreads        MessageThread[]
   apiKeys               ApiKey[]
   webhookEndpoints      WebhookEndpoint[]
+  supportTickets        SupportTicket[]
 
   @@unique([organisationId, code])
   // Target of composite foreign keys: a child row can only point at a property of its own organisation.
@@ -330,78 +335,82 @@ model User {
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  sessions             Session[]
-  memberships          Membership[]
-  authTokens           AuthToken[]
-  mfaRecoveryCodes     MfaRecoveryCode[]
-  auditEvents          AuditEvent[]
-  idempotencyKeys      IdempotencyKey[]
-  approvalsRequested   ApprovalRequest[]    @relation("RequestedBy")
-  approvalsDecided     ApprovalRequest[]    @relation("DecidedBy")
-  invitationsSent      Invitation[]         @relation("InvitedBy")
-  reviewsReplied       GuestReview[]        @relation("ReviewReplier")
-  einvoicesSubmitted   EinvoiceSubmission[] @relation("EinvoiceSubmitter")
-  groupRatesSet        GroupExchangeRate[]  @relation("GroupRateSetter")
-  kitchenTicketsSent   KitchenTicket[]      @relation("KitchenTicketSender")
-  kitchenTicketsBumped KitchenTicket[]      @relation("KitchenTicketBumper")
-  recipesEdited        Recipe[]             @relation("RecipeEditor")
-  filesUploaded        FileObject[]
-  roomBlocksCreated    RoomBlock[]
-  importJobs           ImportJob[]
-  keysIssued           KeyIssue[]
-  occupantsAdded       StayOccupant[]       @relation("OccupantAddedBy")
-  occupantsRemoved     StayOccupant[]       @relation("OccupantRemovedBy")
-  visitorsSignedIn     Visitor[]            @relation("VisitorSignedInBy")
-  visitorsSignedOut    Visitor[]            @relation("VisitorSignedOutBy")
-  cardsSigned          RegistrationCard[]
-  daysClosed           BusinessDay[]
-  folioLinesPosted     FolioLine[]
-  shifts               CashierShift[]       @relation("ShiftCashier")
-  shiftsSignedOff      CashierShift[]       @relation("ShiftSignedOff")
-  cashReceived         CashHandover[]
-  leakageAlerts        LeakageAlert[]
-  alertOutcomes        AlertOutcome[]
-  paymentsReceived     Payment[]
-  exchangeRatesSet     ExchangeRate[]
-  nightAuditsStarted   NightAuditRun[]
-  paymentIntents       PaymentIntent[]
-  hkAssignments        HkAssignment[]
-  roomStatusReports    RoomStatusReport[]
-  inspections          Inspection[]
-  tasksReported        Task[]               @relation("TaskReporter")
-  tasksAssigned        Task[]               @relation("TaskAssignee")
-  tasksVerified        Task[]               @relation("TaskVerifier")
-  taskEvents           TaskEvent[]
-  preventivePlans      PreventivePlan[]     @relation("PlanAssignee")
-  generatorRunsStarted GeneratorRun[]       @relation("RunStartedBy")
-  generatorRunsStopped GeneratorRun[]       @relation("RunStoppedBy")
-  fuelMovements        FuelMovement[]
-  meterReadings        MeterReading[]
-  lostItemsFound       LostFoundItem[]      @relation("LostFoundBy")
-  lostItemsHeld        LostFoundItem[]      @relation("LostCustodian")
-  lostItemsClosed      LostFoundItem[]      @relation("LostClosedBy")
-  checklistsAssigned   Checklist[]          @relation("ChecklistAssignee")
-  checklistsCreated    Checklist[]          @relation("ChecklistCreatedBy")
-  checklistRunsGiven   ChecklistRun[]       @relation("ChecklistRunAssignee")
-  checklistRunsDone    ChecklistRun[]       @relation("ChecklistRunDoneBy")
-  staffProfiles        StaffProfile[]       @relation("StaffLogin")
-  staffManaged         StaffProfile[]       @relation("StaffManager")
-  leaveDecided         LeaveRequest[]       @relation("LeaveDecidedBy")
-  attendanceRecorded   AttendanceEvent[]    @relation("AttendanceRecordedBy")
-  timesheetsCreated    Timesheet[]          @relation("TimesheetCreatedBy")
-  timesheetsApproved   Timesheet[]          @relation("TimesheetApprovedBy")
-  payItemsRequested    PayItem[]            @relation("PayItemRequestedBy")
-  payItemsDecided      PayItem[]            @relation("PayItemDecidedBy")
-  staffDocumentsAdded  StaffDocument[]      @relation("StaffDocumentUploadedBy")
-  lostFoundEvents      LostFoundEvent[]     @relation("LostEventBy")
-  lostFoundCustody     LostFoundEvent[]     @relation("LostEventCustodian")
-  handoversWritten     HandoverNote[]       @relation("HandoverWriter")
-  handoversAcked       HandoverNote[]       @relation("HandoverAcknowledger")
-  invitationsClaimed   Invitation[]         @relation("AcceptedBy")
-  supportSessions      SupportSession[]
-  referralPartner      ReferralPartner?
-  partnerPayouts       PartnerPayout[]      @relation("PartnerPayoutBy")
-  partnerChanges       PartnerChange[]      @relation("PartnerChangeBy")
+  sessions               Session[]
+  onboardingFor          Organisation[]       @relation("OrganisationOnboardingContact")
+  supportTicketsOpened   SupportTicket[]      @relation("SupportTicketOpener")
+  supportTicketsAssigned SupportTicket[]      @relation("SupportTicketAssignee")
+  supportMessages        SupportMessage[]
+  memberships            Membership[]
+  authTokens             AuthToken[]
+  mfaRecoveryCodes       MfaRecoveryCode[]
+  auditEvents            AuditEvent[]
+  idempotencyKeys        IdempotencyKey[]
+  approvalsRequested     ApprovalRequest[]    @relation("RequestedBy")
+  approvalsDecided       ApprovalRequest[]    @relation("DecidedBy")
+  invitationsSent        Invitation[]         @relation("InvitedBy")
+  reviewsReplied         GuestReview[]        @relation("ReviewReplier")
+  einvoicesSubmitted     EinvoiceSubmission[] @relation("EinvoiceSubmitter")
+  groupRatesSet          GroupExchangeRate[]  @relation("GroupRateSetter")
+  kitchenTicketsSent     KitchenTicket[]      @relation("KitchenTicketSender")
+  kitchenTicketsBumped   KitchenTicket[]      @relation("KitchenTicketBumper")
+  recipesEdited          Recipe[]             @relation("RecipeEditor")
+  filesUploaded          FileObject[]
+  roomBlocksCreated      RoomBlock[]
+  importJobs             ImportJob[]
+  keysIssued             KeyIssue[]
+  occupantsAdded         StayOccupant[]       @relation("OccupantAddedBy")
+  occupantsRemoved       StayOccupant[]       @relation("OccupantRemovedBy")
+  visitorsSignedIn       Visitor[]            @relation("VisitorSignedInBy")
+  visitorsSignedOut      Visitor[]            @relation("VisitorSignedOutBy")
+  cardsSigned            RegistrationCard[]
+  daysClosed             BusinessDay[]
+  folioLinesPosted       FolioLine[]
+  shifts                 CashierShift[]       @relation("ShiftCashier")
+  shiftsSignedOff        CashierShift[]       @relation("ShiftSignedOff")
+  cashReceived           CashHandover[]
+  leakageAlerts          LeakageAlert[]
+  alertOutcomes          AlertOutcome[]
+  paymentsReceived       Payment[]
+  exchangeRatesSet       ExchangeRate[]
+  nightAuditsStarted     NightAuditRun[]
+  paymentIntents         PaymentIntent[]
+  hkAssignments          HkAssignment[]
+  roomStatusReports      RoomStatusReport[]
+  inspections            Inspection[]
+  tasksReported          Task[]               @relation("TaskReporter")
+  tasksAssigned          Task[]               @relation("TaskAssignee")
+  tasksVerified          Task[]               @relation("TaskVerifier")
+  taskEvents             TaskEvent[]
+  preventivePlans        PreventivePlan[]     @relation("PlanAssignee")
+  generatorRunsStarted   GeneratorRun[]       @relation("RunStartedBy")
+  generatorRunsStopped   GeneratorRun[]       @relation("RunStoppedBy")
+  fuelMovements          FuelMovement[]
+  meterReadings          MeterReading[]
+  lostItemsFound         LostFoundItem[]      @relation("LostFoundBy")
+  lostItemsHeld          LostFoundItem[]      @relation("LostCustodian")
+  lostItemsClosed        LostFoundItem[]      @relation("LostClosedBy")
+  checklistsAssigned     Checklist[]          @relation("ChecklistAssignee")
+  checklistsCreated      Checklist[]          @relation("ChecklistCreatedBy")
+  checklistRunsGiven     ChecklistRun[]       @relation("ChecklistRunAssignee")
+  checklistRunsDone      ChecklistRun[]       @relation("ChecklistRunDoneBy")
+  staffProfiles          StaffProfile[]       @relation("StaffLogin")
+  staffManaged           StaffProfile[]       @relation("StaffManager")
+  leaveDecided           LeaveRequest[]       @relation("LeaveDecidedBy")
+  attendanceRecorded     AttendanceEvent[]    @relation("AttendanceRecordedBy")
+  timesheetsCreated      Timesheet[]          @relation("TimesheetCreatedBy")
+  timesheetsApproved     Timesheet[]          @relation("TimesheetApprovedBy")
+  payItemsRequested      PayItem[]            @relation("PayItemRequestedBy")
+  payItemsDecided        PayItem[]            @relation("PayItemDecidedBy")
+  staffDocumentsAdded    StaffDocument[]      @relation("StaffDocumentUploadedBy")
+  lostFoundEvents        LostFoundEvent[]     @relation("LostEventBy")
+  lostFoundCustody       LostFoundEvent[]     @relation("LostEventCustodian")
+  handoversWritten       HandoverNote[]       @relation("HandoverWriter")
+  handoversAcked         HandoverNote[]       @relation("HandoverAcknowledger")
+  invitationsClaimed     Invitation[]         @relation("AcceptedBy")
+  supportSessions        SupportSession[]
+  referralPartner        ReferralPartner?
+  partnerPayouts         PartnerPayout[]      @relation("PartnerPayoutBy")
+  partnerChanges         PartnerChange[]      @relation("PartnerChangeBy")
 
   messagesSent           Message[]             @relation("MessageSentBy")
   eventEnquiries         EventEnquiry[]
@@ -5178,4 +5187,53 @@ model WebhookDelivery {
   @@index([status, nextAttemptAt])
   @@index([propertyId, createdAt])
   @@map("webhook_deliveries")
+}
+
+/// A hotel's request for help from the platform team (Versions V2 "support tooling"; T-170).
+/// OPEN: waiting on the platform; ANSWERED: waiting on the hotel; RESOLVED.
+model SupportTicket {
+  id              String    @id @default(uuid()) @db.Uuid
+  organisationId  String    @map("organisation_id") @db.Uuid
+  propertyId      String?   @map("property_id") @db.Uuid
+  openedById      String    @map("opened_by_id") @db.Uuid
+  subject         String
+  /// NORMAL | BLOCKER (the front desk can't work)
+  urgency         String
+  status          String    @default("OPEN")
+  /// The app page it was asked from.
+  page            String?
+  assignedAdminId String?   @map("assigned_admin_id") @db.Uuid
+  hotelUnread     Boolean   @default(false) @map("hotel_unread")
+  platformUnread  Boolean   @default(true) @map("platform_unread")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastMessageAt   DateTime  @default(now()) @map("last_message_at") @db.Timestamptz(6)
+  firstResponseAt DateTime? @map("first_response_at") @db.Timestamptz(6)
+  resolvedAt      DateTime? @map("resolved_at") @db.Timestamptz(6)
+
+  organisation  Organisation     @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  property      Property?        @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  openedBy      User             @relation("SupportTicketOpener", fields: [openedById], references: [id], onDelete: Restrict)
+  assignedAdmin User?            @relation("SupportTicketAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  messages      SupportMessage[]
+
+  @@unique([organisationId, id])
+  @@index([organisationId, lastMessageAt])
+  @@index([status, lastMessageAt])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id             String   @id @default(uuid()) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  ticketId       String   @map("ticket_id") @db.Uuid
+  authorId       String   @map("author_id") @db.Uuid
+  fromPlatform   Boolean  @map("from_platform")
+  body           String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket SupportTicket @relation(fields: [organisationId, ticketId], references: [organisationId, id], onDelete: Restrict)
+  author User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+  @@map("support_messages")
 }

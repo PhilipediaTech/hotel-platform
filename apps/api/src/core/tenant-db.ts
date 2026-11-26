@@ -176,6 +176,9 @@ export const TENANT_MODELS: Record<string, Scope> = {
   // Partner API keys and outgoing webhooks (T-166).
   ApiKey: { kind: 'property' },
   WebhookEndpoint: { kind: 'property' },
+  // In-app support (T-170): the group's, asked from any of its properties.
+  SupportTicket: { kind: 'organisation' },
+  SupportMessage: { kind: 'organisation' },
   WebhookDelivery: { kind: 'property' },
   GroupExchangeRate: { kind: 'organisation' },
   TaskTemplate: { kind: 'property' },

@@ -92,6 +92,8 @@ export async function listTemplates(deps: MessagingDeps, _tenant: TenantContext)
   const rows = await deps.tenantDb.messageTemplate.findMany({ where: { channel: 'EMAIL' } });
   const templates: Item[] = [];
   for (const def of MESSAGE_TEMPLATES) {
+    // The platform team's own messages (T-170) are not the hotel's to see or change.
+    if (def.audience === 'PLATFORM') continue;
     if (def.email) {
       const own = rows.filter((r) => r.code === def.code);
       const languages = new Set<MessageLanguage>([DEFAULT_MESSAGE_LANGUAGE]);
@@ -116,7 +118,8 @@ export async function listTemplates(deps: MessagingDeps, _tenant: TenantContext)
 
 function knownDef(code: string): MessageTemplateDef {
   const def = messageTemplateDef(code);
-  if (!def) throw new AppError('NOT_FOUND', 'No such message template');
+  if (!def || def.audience === 'PLATFORM')
+    throw new AppError('NOT_FOUND', 'No such message template');
   return def;
 }
 

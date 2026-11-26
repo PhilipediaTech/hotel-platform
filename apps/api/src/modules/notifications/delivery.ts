@@ -228,7 +228,10 @@ export async function sendDelivery(
     return 'FAILED';
   }
   // M14 rule: the plan's monthly allowance. One-time codes never come this way.
+  // Messages to the platform team (T-170) are not the hotel's: no allowance, not counted.
+  const hotels = messageTemplateDef(d.templateCode)?.audience !== 'PLATFORM';
   if (
+    hotels &&
     d.channel === 'WHATSAPP' &&
     (await whatsappAllowanceUsedUp(db, organisationId, deps.clock()))
   ) {
@@ -251,7 +254,9 @@ export async function sendDelivery(
       where: { id: d.id, status: 'QUEUED' },
       data: { status: 'SENT', providerRef, sentAt: deps.clock(), lastError: null },
     });
-    if (d.channel === 'WHATSAPP') await countWhatsappSent(db, organisationId, deps.clock());
+    if (hotels && d.channel === 'WHATSAPP') {
+      await countWhatsappSent(db, organisationId, deps.clock());
+    }
     return 'SENT';
   } catch (err) {
     const known = err instanceof MessageSendError;

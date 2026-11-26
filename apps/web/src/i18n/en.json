@@ -23,7 +23,10 @@
     "loading": "Loading your account",
     "switchUser": "Switch user",
     "setPin": "Set my PIN",
-    "myPhone": "My phone"
+    "myPhone": "My phone",
+    "help": "Help",
+    "helpUnread_one": "Help: {{count}} new reply",
+    "helpUnread_other": "Help: {{count}} new replies"
   },
   "navGroup": {
     "operations": "Operations",

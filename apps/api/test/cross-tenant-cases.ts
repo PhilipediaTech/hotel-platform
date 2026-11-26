@@ -1983,6 +1983,40 @@ async function bIntegrationsUnchanged(db: Db, world: TenantWorld) {
   );
 }
 
+/** B's support request (T-170): opened by B's staff, one message. */
+async function bSupport(db: Db, world: TenantWorld, propertyId: string) {
+  const organisationId = orgOf(world, propertyId);
+  const ticket = await db.supportTicket.create({
+    data: {
+      organisationId,
+      propertyId,
+      openedById: world.bStaff.id,
+      subject: 'Their request',
+      urgency: 'NORMAL',
+    },
+  });
+  await db.supportMessage.create({
+    data: {
+      organisationId,
+      ticketId: ticket.id,
+      authorId: world.bStaff.id,
+      fromPlatform: false,
+      body: 'Their message',
+    },
+  });
+  return { ticketId: ticket.id };
+}
+
+async function bSupportUnchanged(db: Db, world: TenantWorld) {
+  const where = { organisationId: world.orgB.id };
+  expect(
+    (await db.supportTicket.findMany({ where })).map((t) => [t.subject, t.status, t.resolvedAt]),
+  ).toEqual([['Their request', 'OPEN', null]]);
+  expect((await db.supportMessage.findMany({ where })).map((m) => m.body)).toEqual([
+    'Their message',
+  ]);
+}
+
 /** B's group: a closed November day kept, and a cedi rate in its own group currency (T-161). */
 async function bGroup(db: Db, world: TenantWorld, propertyId: string) {
   const organisationId = orgOf(world, propertyId);
@@ -4184,6 +4218,24 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({}),
     untouched: bIntegrationsUnchanged,
   },
+  // In-app support (T-170)
+  listSupportTickets: {
+    seed: bSupport,
+    listIds: (body) => (body as { data: { id: string }[] }).data.map((t) => t.id),
+  },
+  createSupportTicket: {
+    seed: bSupport,
+    creates: true,
+    body: () => ({ subject: 'Mine', message: 'Help' }),
+    untouched: bSupportUnchanged,
+  },
+  getSupportTicket: { seed: bSupport },
+  replySupportTicket: {
+    seed: bSupport,
+    body: () => ({ message: 'Into theirs' }),
+    untouched: bSupportUnchanged,
+  },
+  resolveSupportTicket: { seed: bSupport, body: () => ({}), untouched: bSupportUnchanged },
   // Channel manager (T-151)
   getChannelConnection: {
     seed: bChannel,

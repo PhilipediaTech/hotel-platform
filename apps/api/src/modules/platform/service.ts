@@ -211,7 +211,7 @@ async function flagsOf(db: Db, organisationId: string) {
 export async function getTenant(deps: PlatformDeps, organisationId: string) {
   const now = deps.clock();
   const tenant = await tenantOf(deps, organisationId);
-  const [flags, invoices, sessions] = await Promise.all([
+  const [flags, invoices, sessions, org] = await Promise.all([
     flagsOf(deps.db, organisationId),
     deps.db.platformInvoice.findMany({
       where: { organisationId },
@@ -223,9 +223,14 @@ export async function getTenant(deps: PlatformDeps, organisationId: string) {
       orderBy: { startedAt: 'desc' },
       take: 50,
     }),
+    deps.db.organisation.findUniqueOrThrow({
+      where: { id: organisationId },
+      select: { onboardingContact: { select: { id: true, name: true } } },
+    }),
   ]);
   return {
     ...tenant,
+    onboardingContact: org.onboardingContact,
     flags,
     invoices: invoices.map(invoiceOf),
     supportSessions: await Promise.all(sessions.map((s) => sessionOf(deps.db, s, now))),

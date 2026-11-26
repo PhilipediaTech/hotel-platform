@@ -22,6 +22,7 @@ import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
 import { PartnersPanel, TenantPartnerForm } from './platform-partners.tsx';
+import { OnboardingContactForm, SupportQueue } from './platform-support.tsx';
 
 registerStrings(platformStrings);
 
@@ -545,6 +546,7 @@ function TenantDetail({ id }: { id: string }) {
       <CountryPackForm key={q.data.countryPack} tenant={q.data} />
       <Modules tenant={q.data} />
       <Invoices tenant={q.data} />
+      <OnboardingContactForm key={q.data.onboardingContact?.id ?? ''} tenant={q.data} />
       <Support tenant={q.data} />
       <TenantPartnerForm organisationId={q.data.id} />
     </article>
@@ -608,6 +610,7 @@ export function PlatformPage() {
         </nav>
         {selected && <TenantDetail key={selected} id={selected} />}
       </div>
+      <SupportQueue />
       <PartnersPanel />
     </section>
   );

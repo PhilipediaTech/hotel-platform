@@ -44,7 +44,8 @@ export interface TemplateVariable {
 export interface MessageTemplateDef {
   code: MessageTemplateCode;
   label: string;
-  audience: 'GUEST' | 'STAFF';
+  /** PLATFORM: to the platform team (T-170); not shown or edited in a hotel's templates. */
+  audience: 'GUEST' | 'STAFF' | 'PLATFORM';
   variables: readonly TemplateVariable[];
   email?: { subject: string; body: string };
   whatsapp?: {
@@ -335,6 +336,50 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplateDef[] = [
       body: 'Front desk alert at {{property_name}}: {{alert}}. {{detail}} Open the app to act on it.',
     },
   },
+  {
+    // T-170: a hotel asks for help; to every platform admin by email, and a front-desk
+    // blocker also by WhatsApp to the group's onboarding contact (else every admin).
+    code: 'SUPPORT_REQUEST',
+    label: 'Support request (to the platform team)',
+    audience: 'PLATFORM',
+    variables: [
+      v('hotel_name', 'Hotel group', 'Demo Hotels Ltd'),
+      v('urgency', 'Urgency', 'Front-desk blocker'),
+      v('subject', 'Subject', 'Cannot check guests in'),
+      v('from_name', 'From', 'Ada Obi'),
+      v('message', 'Message', 'The check-in button does nothing since this morning.'),
+    ],
+    email: {
+      subject: '[{{urgency}}] {{hotel_name}}: {{subject}}',
+      body:
+        '{{from_name}} at {{hotel_name}} wrote:\n\n{{message}}\n\nAnswer it in Platform, ' +
+        'Support.',
+    },
+    whatsapp: {
+      name: 'support_request',
+      category: 'UTILITY',
+      body:
+        'Support request from {{hotel_name}} ({{urgency}}): {{subject}}. From {{from_name}}: ' +
+        '{{message}} Answer it in Platform, Support.',
+    },
+  },
+  {
+    // T-170: the platform team answered; to the person who asked.
+    code: 'SUPPORT_REPLY',
+    label: 'Support reply',
+    audience: 'STAFF',
+    variables: [
+      v('subject', 'Subject', 'Cannot check guests in'),
+      v('admin_name', 'Support team member', 'Chidi Eze'),
+      v('message', 'Reply', 'Fixed: please refresh the page and try again.'),
+    ],
+    email: {
+      subject: 'Support: {{subject}}',
+      body:
+        '{{admin_name}} from the support team replied:\n\n{{message}}\n\nOpen Help in the ' +
+        'app to answer.',
+    },
+  },
 ];
 
 /**
@@ -355,6 +400,8 @@ export const MESSAGE_TEMPLATE_CODES = [
   'LEAKAGE_ALERT',
   'FLASH_REPORT',
   'STAY_ALERT',
+  'SUPPORT_REQUEST',
+  'SUPPORT_REPLY',
 ] as const;
 export type MessageTemplateCode = (typeof MESSAGE_TEMPLATE_CODES)[number];
 

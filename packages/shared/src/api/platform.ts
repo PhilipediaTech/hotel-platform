@@ -119,6 +119,8 @@ export const PlatformTenantDetail = PlatformTenantItem.extend({
   invoices: z.array(PlatformInvoiceItem),
   /** Every support session, newest first: the reasons are the support notes. */
   supportSessions: z.array(SupportSessionItem),
+  /** The platform admin who looks after the group (T-170). */
+  onboardingContact: z.object({ id: Uuid, name: z.string() }).nullable(),
 }).meta({ id: 'PlatformTenantDetail' });
 
 export const getPlatformTenant = defineRoute({

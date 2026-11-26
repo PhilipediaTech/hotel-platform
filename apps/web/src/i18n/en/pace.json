@@ -1,0 +1,19 @@
+{
+  "pace": {
+    "from": "From",
+    "days": "Nights",
+    "summary": "{{rooms}} room nights on the books ({{occupancy}}), {{revenue}}. Picked up: {{d1}} in the last day, {{d7}} in 7 days, {{d30}} in 30 days. Last year at this point: {{sameTime}}; it finished with {{final}}.",
+    "table": "Nights on the books",
+    "night": "Night",
+    "available": "Available",
+    "rooms": "On the books",
+    "occupancy": "Occupancy",
+    "revenue": "Revenue",
+    "d1": "1 day",
+    "d7": "7 days",
+    "d30": "30 days",
+    "pickup": "Pickup",
+    "lastYearSame": "Last year then",
+    "lastYearFinal": "Last year final"
+  }
+}

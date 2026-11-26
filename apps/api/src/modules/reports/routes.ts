@@ -1,9 +1,10 @@
-import { GROUP_ROUTES, REPORT_ROUTES } from '@hotel/shared';
+import { GROUP_ROUTES, PACE_ROUTES, REPORT_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as group from './group.ts';
 import { operations } from './operations.ts';
+import { paceReport } from './pace.ts';
 import * as reports from './service.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
@@ -16,6 +17,10 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
 export function reportRoutes(deps: reports.ReportDeps): Router {
   const router = express.Router();
   const r = REPORT_ROUTES;
+  // Pickup and pace (T-165).
+  mountRoute(router, PACE_ROUTES.getPaceReport, ({ query }, { tenant }) =>
+    paceReport(deps, tenantFrom(tenant), query),
+  );
   // Group dashboards (S46; T-161).
   const g = GROUP_ROUTES;
   mountRoute(router, g.getGroupDashboard, ({ query }, { tenant }) =>

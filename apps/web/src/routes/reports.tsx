@@ -18,6 +18,7 @@ import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import reportStrings from '../i18n/en/reports.json';
 import { registerStrings } from '../i18n/index.ts';
+import { Pace } from './report-pace.tsx';
 import { api } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
@@ -30,7 +31,7 @@ registerStrings(reportStrings);
 // day or period to show, the figures with their definitions (M12 rule), and CSV or PDF for
 // holders of report.export.
 
-type Tab = 'dashboard' | 'flash' | 'trial' | 'cashier' | 'tax' | 'operations';
+type Tab = 'dashboard' | 'flash' | 'trial' | 'cashier' | 'tax' | 'operations' | 'pace';
 const TABS: { id: Tab; permission: string }[] = [
   { id: 'dashboard', permission: 'report.dashboard' },
   { id: 'flash', permission: 'report.audit' },
@@ -38,6 +39,8 @@ const TABS: { id: Tab; permission: string }[] = [
   { id: 'cashier', permission: 'report.audit' },
   { id: 'tax', permission: 'report.tax' },
   { id: 'operations', permission: 'report.ops' },
+  // Pickup and pace (T-165).
+  { id: 'pace', permission: 'report.dashboard' },
 ];
 const OPERATION = {
   dashboard: 'getDashboardReport',
@@ -97,7 +100,8 @@ function ExportButtons({
   query,
   withPdf = true,
 }: {
-  tab: Tab;
+  /** Reports with CSV and PDF (pickup and pace has none). */
+  tab: keyof typeof OPERATION;
   query: Record<string, string>;
   withPdf?: boolean;
 }) {
@@ -711,6 +715,7 @@ export function ReportsPage() {
         )}
         {current === 'tax' && <Tax />}
         {current === 'operations' && <Operations />}
+        {current === 'pace' && <Pace />}
       </div>
     </section>
   );

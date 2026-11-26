@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-164 (booking window) is pushed on `feat/T-164-booking-window` (migration 20270105090000_booking_window). Next: the pickup and pace report (V2).
+T-165 (pickup and pace) is pushed on `feat/T-165-pickup-pace` (no migration). Next: the partner API and webhooks (V2).

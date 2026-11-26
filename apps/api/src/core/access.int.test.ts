@@ -131,6 +131,8 @@ const MEMBER_ROUTES: Record<string, string> = {
   resolveSupportTicket: 'own requests, or the group’s with support.manage',
   // Reviewed in T-171: when the support team trains the group's roles.
   listMyTraining: 'the group’s training sessions: times and roles only',
+  // Reviewed in T-172: the caller's own first steps, from their own permissions.
+  listGettingStarted: 'the caller’s own steps',
 };
 
 const sorted = (xs: string[]) => [...xs].sort();

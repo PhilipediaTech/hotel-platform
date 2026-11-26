@@ -488,6 +488,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   markTrainingHeld: {"operationId":"markTrainingHeld","method":"post","path":"/platform/training/{sessionId}/held"},
   cancelTraining: {"operationId":"cancelTraining","method":"post","path":"/platform/training/{sessionId}/cancel"},
   listMyTraining: {"operationId":"listMyTraining","method":"get","path":"/support/training","propertyScoped":true},
+  listGettingStarted: {"operationId":"listGettingStarted","method":"get","path":"/getting-started","propertyScoped":true},
+  listTeamGettingStarted: {"operationId":"listTeamGettingStarted","method":"get","path":"/getting-started/team","propertyScoped":true},
   listTasks: {"operationId":"listTasks","method":"get","path":"/tasks","propertyScoped":true},
   createTask: {"operationId":"createTask","method":"post","path":"/tasks","body":true,"propertyScoped":true,"idempotent":true},
   getTaskFormOptions: {"operationId":"getTaskFormOptions","method":"get","path":"/tasks/form-options","propertyScoped":true},

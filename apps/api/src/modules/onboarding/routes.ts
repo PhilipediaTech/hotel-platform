@@ -1,11 +1,19 @@
-import { ONBOARDING_ROUTES } from '@hotel/shared';
+import { GETTING_STARTED_ROUTES, ONBOARDING_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { getAuth, requireAuth } from '../../core/auth.ts';
 import type { Config } from '../../core/config.ts';
 import { AppError } from '../../core/errors.ts';
 import { isPlatformAdmin } from '../../core/platform-admin.ts';
 import { mountRoute } from '../../core/route.ts';
+import type { TenantContext } from '../../core/tenancy.ts';
+import * as gettingStarted from './getting-started.ts';
 import * as onboarding from './service.ts';
+
+/** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
+function tenantFrom(tenant: TenantContext | null): TenantContext {
+  if (!tenant) throw new Error('Tenant missing on a property-scoped route');
+  return tenant;
+}
 
 /** The onboarding tracker and training sessions (T-171). */
 export function onboardingRoutes(
@@ -40,5 +48,13 @@ export function onboardingRoutes(
     onboarding.cancelSession(deps, requireAuth(req), params.sessionId),
   );
   mountRoute(router, r.listMyTraining, () => onboarding.myTraining(deps));
+
+  // Getting started (T-172).
+  mountRoute(router, GETTING_STARTED_ROUTES.listGettingStarted, (_req, { tenant }) =>
+    gettingStarted.mySteps(deps, tenantFrom(tenant)),
+  );
+  mountRoute(router, GETTING_STARTED_ROUTES.listTeamGettingStarted, (_req, { tenant }) =>
+    gettingStarted.teamSteps(deps, tenantFrom(tenant)),
+  );
   return router;
 }

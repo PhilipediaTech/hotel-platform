@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-171 (onboarding tracker and training sessions) is pushed on `feat/T-171-onboarding-tracker`, with migration `20270110090000_training_sessions`. Next: ask Philip for the next V2 onboarding item (help centre or getting-started lists).
+T-172 (getting started per role) is pushed on `feat/T-172-getting-started` (no migration). Next: ask Philip about the help centre, or move on to the second country pack (ask first) or the V2 AI and IoT items.

@@ -66,6 +66,7 @@ export * from './partner-api.ts';
 export * from './integrations.ts';
 export * from './support.ts';
 export * from './onboarding.ts';
+export * from './getting-started.ts';
 export * from './tasks.ts';
 export * from './handovers.ts';
 export * from './leakage.ts';

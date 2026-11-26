@@ -6,6 +6,7 @@ export * from './errors.ts';
 export * from './files.ts';
 export * from './imports.ts';
 export * from './onboarding.ts';
+export * from './getting-started.ts';
 export * from './bank-statements.ts';
 export * from './leakage.ts';
 export * from './messages.ts';

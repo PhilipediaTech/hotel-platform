@@ -1,0 +1,31 @@
+{
+  "gettingStarted": {
+    "title": "Getting started",
+    "intro": "Your first steps here. Each one ticks itself off when you do it for real.",
+    "progress": "{{done}} of {{total}} done",
+    "allDone": "All done. Welcome aboard.",
+    "doneMark": "Done",
+    "go": "Go",
+    "steps": {
+      "invite": "Invite a member of staff",
+      "rates": "Set prices on the rate calendar",
+      "approve": "Decide an approval request",
+      "booking": "Make a booking",
+      "checkIn": "Check a guest in",
+      "payment": "Take a payment",
+      "charge": "Post a charge to a bill",
+      "shift": "Open your cashier shift",
+      "checkOut": "Check a guest out",
+      "nightAudit": "Run the night audit",
+      "roomStatus": "Update a room’s cleaning status",
+      "posOrder": "Open a POS order",
+      "receiveStock": "Receive goods into stock",
+      "expense": "Record an expense"
+    },
+    "team": "Your team’s first steps",
+    "teamEmpty": "No staff here yet.",
+    "member": "{{done}} of {{total}}",
+    "stillToDo": "Still to do: {{steps}}",
+    "finished": "Finished"
+  }
+}

@@ -1,8 +1,11 @@
-import { Lock, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Lock, RefreshCw, ShieldAlert, Sparkles, WifiOff } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useSession } from '../../app/session.ts';
+import { api } from '../../lib/api.ts';
 import { useOnlineStatus } from '../../offline/use-online-status.ts';
 import { Button } from '../ui/button.tsx';
 
@@ -76,6 +79,57 @@ export function SupportBanner() {
     >
       <ShieldAlert aria-hidden className="size-4 shrink-0" />
       <span>{t('support.banner', { org: support.organisationName, time })}</span>
+    </div>
+  );
+}
+
+const hiddenKey = (user: string) => `gettingStartedHidden:${user}`;
+
+function readHidden(user: string): boolean {
+  try {
+    return window.localStorage.getItem(hiddenKey(user)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** First steps not all done yet (T-172); each person may hide it on their device. */
+export function GettingStartedBanner() {
+  const { t } = useTranslation();
+  const { currentPropertyId, userName, support } = useSession();
+  const [hidden, setHidden] = useState(() => readHidden(userName));
+  const q = useQuery({
+    queryKey: ['getting-started', 'mine'],
+    queryFn: () => api.call('listGettingStarted'),
+    enabled: currentPropertyId !== null && !support && !hidden,
+  });
+  const data: unknown = q.data;
+  if (hidden || !data || typeof data !== 'object') return null;
+  const { done, total } = data as { done?: unknown; total?: unknown };
+  if (typeof done !== 'number' || typeof total !== 'number' || total === 0 || done >= total) {
+    return null;
+  }
+  const hide = () => {
+    try {
+      window.localStorage.setItem(hiddenKey(userName), '1');
+    } catch {
+      // Private window: hidden for this visit only.
+    }
+    setHidden(true);
+  };
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-2 bg-brand-subtle px-4 py-2 text-sm"
+    >
+      <Sparkles aria-hidden className="size-4 shrink-0 text-brand" />
+      <span>{t('shell.gettingStarted', { done, total })}</span>
+      <Link className="font-medium underline" to="/support#getting-started">
+        {t('shell.gettingStartedOpen')}
+      </Link>
+      <Button size="sm" variant="ghost" onClick={hide}>
+        {t('shell.gettingStartedHide')}
+      </Button>
     </div>
   );
 }

@@ -562,7 +562,9 @@ export async function statement(
       date: day(i.issuedOn),
       kind: 'INVOICE' as const,
       reference: i.number,
-      description: i.folio ? `Folio ${i.folio.number}, ${i.folio.name}` : 'Invoice',
+      description: i.folio
+        ? `Folio ${i.folio.number}, ${i.folio.name}`
+        : 'Brought forward from before go-live',
       amount: i.amountMinor,
     })),
     ...a.payments.map((p) => ({

@@ -1,18 +1,24 @@
 {
   "imports": {
     "title": "Imports",
-    "intro": "Load rooms or rates from a spreadsheet. The file is checked first and nothing changes until you confirm.",
+    "intro": "Load rooms, rates, guests, companies or what companies owed at go-live from a spreadsheet. The file is checked first and nothing changes until you confirm.",
     "what": "What are you importing?",
     "kinds": {
       "ROOMS": "Rooms and room types",
-      "RATES": "Rates"
+      "RATES": "Rates",
+      "GUESTS": "Guests",
+      "COMPANIES": "Companies and travel agents",
+      "BALANCES": "Company opening balances"
     },
-    "later": "Guests, companies and opening balances arrive with their own screens.",
+    "later": "Import companies before their opening balances.",
     "step1": "1. Get the template",
     "step2": "2. Upload the filled file (CSV or Excel .xlsx)",
     "help": {
       "ROOMS": "One row per room. A new room type code needs its name on its first row; rooms already in the system are updated. Separate features with a semicolon.",
-      "RATES": "One row per rate plan, room type and date range (from and to included). Prices in naira; leave the price empty to change only restrictions. Dates as 2026-12-01 or 01/12/2026; restrictions as yes or no."
+      "RATES": "One row per rate plan, room type and date range (from and to included). Prices in naira; leave the price empty to change only restrictions. Dates as 2026-12-01 or 01/12/2026; restrictions as yes or no.",
+      "GUESTS": "One row per guest. A guest whose email or phone is already here is left as it is. Phones like 08031234567 or +2348031234567; separate tags with a semicolon; marketing consent and VIP as yes or no.",
+      "COMPANIES": "One row per company or travel agent (kind: company or travel agent). A name already here is refused. Credit limit in naira; commission as a percentage.",
+      "BALANCES": "One row per open invoice from the old system, for a company already here. The reference is the old invoice number and is imported once. The issue date defaults to today; the due date to the account’s terms. Needs the city ledger permission."
     },
     "template": "Download template",
     "choose": "Choose file",
@@ -50,7 +56,27 @@
       "days_one": "{{count}} day",
       "days_other": "{{count}} days",
       "daysChanged_one": "{{count}} day changed",
-      "daysChanged_other": "{{count}} days changed"
+      "daysChanged_other": "{{count}} days changed",
+      "guestsNew_one": "{{count}} new guest",
+      "guestsNew_other": "{{count}} new guests",
+      "guestsExisting_one": "{{count}} guest already here (left as it is)",
+      "guestsExisting_other": "{{count}} guests already here (left as they are)",
+      "guestsWritten_one": "{{count}} guest added",
+      "guestsWritten_other": "{{count}} guests added",
+      "companiesNew_one": "{{count}} new company",
+      "companiesNew_other": "{{count}} new companies",
+      "companiesWritten_one": "{{count}} company added",
+      "companiesWritten_other": "{{count}} companies added",
+      "invoicesNew_one": "{{count}} open invoice",
+      "invoicesNew_other": "{{count}} open invoices",
+      "companiesWithBalances_one": "for {{count}} company",
+      "companiesWithBalances_other": "for {{count}} companies",
+      "accountsNew_one": "{{count}} city ledger account to open",
+      "accountsNew_other": "{{count}} city ledger accounts to open",
+      "invoicesWritten_one": "{{count}} invoice added",
+      "invoicesWritten_other": "{{count}} invoices added",
+      "accountsOpened_one": "{{count}} account opened",
+      "accountsOpened_other": "{{count}} accounts opened"
     }
   }
 }

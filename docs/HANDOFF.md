@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-167 (room charges from an outside POS) is pushed on `feat/T-167-partner-room-charges`, with migration 20270107090000_partner_room_charges. Next: the next V2 item (onboarding, support tooling and stronger migration), or an accounting push once a provider is chosen.
+T-168 (imports of guests, companies and opening balances) is pushed on `feat/T-168-import-guests-companies` (no migration). Next: T-169, future reservations.

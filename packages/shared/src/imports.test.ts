@@ -171,3 +171,52 @@ describe('RATES sheet', () => {
     ]);
   });
 });
+
+describe('guests, companies and balances (T-168)', () => {
+  it('reads Nigerian phone numbers written locally, emails and tags', () => {
+    const header = IMPORT_COLUMNS.GUESTS.map((c) => c.name);
+    const { rows, errors } = parseSheet('GUESTS', [
+      header,
+      ['Ada', 'Obi', 'Ada@Example.COM', '0803-123-4567', 'ng', '', 'A; B', 'y', ''],
+      ['Tunde', 'Bakare', '', '234 809 876 5432', '', '', '', '', ''],
+      ['Kemi', 'Ojo', '', '+44 20 7946 0958', '', '', '', '', ''],
+    ]);
+    expect(errors).toEqual([]);
+    expect(rows.map((r) => [r.email, r.phone, r.nationality, r.tags, r.marketingConsent])).toEqual([
+      ['ada@example.com', '+2348031234567', 'NG', ['A', 'B'], true],
+      [null, '+2348098765432', null, [], false],
+      [null, '+442079460958', null, [], false],
+    ]);
+  });
+
+  it('reads company kinds and commission percentages, and wants a contact name', () => {
+    const header = IMPORT_COLUMNS.COMPANIES.map((c) => c.name);
+    const { rows, errors } = parseSheet('COMPANIES', [
+      header,
+      ['Wakanow', 'Travel-Agent', '', 'Kemi', '', '', '', '', '', '12.5%'],
+      ['Dangote', '', '', '', '', 'a@x.test', '', '', '', '60'],
+    ]);
+    expect(rows).toEqual([expect.objectContaining({ kind: 'TRAVEL_AGENT', commissionBps: 1250 })]);
+    expect(errors).toEqual([{ row: 3, column: 'commission_percent', message: 'At most 50%' }]);
+    const noName = parseSheet('COMPANIES', [
+      header,
+      ['Dangote', '', '', '', '', 'a@x.test', '', '', '', ''],
+    ]);
+    expect(noName.errors[0]?.column).toBe('contact_name');
+  });
+
+  it('wants a positive amount and a due date after the issue date', () => {
+    const header = IMPORT_COLUMNS.BALANCES.map((c) => c.name);
+    const { errors } = parseSheet('BALANCES', [
+      header,
+      ['Dangote', 'A-1', '0', '', ''],
+      ['Dangote', 'A-2', '1000', '2026-10-15', '2026-10-01'],
+      ['Dangote', '', '1000', '', ''],
+    ]);
+    expect(errors).toEqual([
+      { row: 2, column: 'amount', message: 'Must be more than zero' },
+      { row: 3, column: 'due_on', message: 'Due on or after the issue date' },
+      { row: 4, column: 'reference', message: 'Required' },
+    ]);
+  });
+});

@@ -122,6 +122,18 @@ describe('Imports', () => {
     click.mockRestore();
   });
 
+  it('offers guests, companies and opening balances, each with its own columns (T-168)', async () => {
+    const user = userEvent.setup();
+    renderAt('/settings/imports');
+    await user.click(await screen.findByRole('radio', { name: 'Guests' }));
+    expect(screen.getByText('first_name *')).toBeVisible();
+    await user.click(screen.getByRole('radio', { name: 'Companies and travel agents' }));
+    expect(screen.getByText('commission_percent')).toBeVisible();
+    await user.click(screen.getByRole('radio', { name: 'Company opening balances' }));
+    expect(screen.getByText('reference *')).toBeVisible();
+    expect(screen.getByText(/Needs the city ledger permission/)).toBeVisible();
+  });
+
   it('uploads, shows the preview and imports only on confirm', async () => {
     const user = userEvent.setup();
     renderAt('/settings/imports');

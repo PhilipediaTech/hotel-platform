@@ -5,7 +5,8 @@ import { Instant, Uuid } from './primitives.ts';
 
 // Spreadsheet imports (tab 4 row "Imports"; PRD M1-03; S03; T-034): upload a file (T-023,
 // kind ImportJob), check it (nothing is written), read the report, then apply it. Rooms with
-// their room types, and rates, so far.
+// their room types, and rates (T-034); guests, companies, and companies' opening balances on
+// the city ledger, which also need ar.manage (T-168).
 
 const IMPORT = 'import.run';
 

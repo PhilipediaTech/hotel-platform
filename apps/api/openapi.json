@@ -6089,7 +6089,10 @@
             "type": "string",
             "enum": [
               "ROOMS",
-              "RATES"
+              "RATES",
+              "GUESTS",
+              "COMPANIES",
+              "BALANCES"
             ]
           },
           "status": {
@@ -46797,7 +46800,10 @@
                     "type": "string",
                     "enum": [
                       "ROOMS",
-                      "RATES"
+                      "RATES",
+                      "GUESTS",
+                      "COMPANIES",
+                      "BALANCES"
                     ]
                   },
                   "fileId": {

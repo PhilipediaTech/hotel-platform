@@ -10,6 +10,9 @@ import {
   type ImportError,
   type ImportJobItem,
   type ImportKind,
+  type BalanceRow,
+  type CompanyRow,
+  type GuestRow,
   type RateRow,
   type RoomRow,
 } from '@hotel/shared';
@@ -25,8 +28,16 @@ import type { TenantDb } from '../../core/tenant-db.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { rebuildInventory } from '../availability/inventory.ts';
 import { writeRateDays } from '../rates/service.ts';
+import {
+  applyBalances,
+  applyCompanies,
+  applyGuests,
+  checkBalances,
+  checkCompanies,
+  checkGuests,
+} from './migration.ts';
 
-// Spreadsheet imports (PRD M1-03; T-034). Checking reads the uploaded file once, checks
+// Spreadsheet imports (PRD M1-03; T-034; guests, companies and opening balances T-168). Checking reads the uploaded file once, checks
 // every row (cells in @hotel/shared imports.ts, codes and clashes here) and stores the checked
 // rows in the report; applying writes exactly those rows in one transaction, all or none,
 // after checking them again against the property.
@@ -40,7 +51,7 @@ export interface ImportDeps {
 
 type Tx = Parameters<Parameters<TenantDb['$transaction']>[0]>[0];
 type JobOut = z.input<typeof ImportJobItem>;
-type Rows = RoomRow[] | RateRow[];
+type Rows = RoomRow[] | RateRow[] | GuestRow[] | CompanyRow[] | BalanceRow[];
 
 interface StoredReport {
   total: number;
@@ -238,6 +249,28 @@ async function checkRates(tx: Tx | TenantDb, rows: RateRow[], today: string): Pr
   return { errors, summary: { rateLines: rows.length, days } };
 }
 
+/** The checks of one kind against the property (and organisation) as it is now. */
+function checkRows(
+  db: Tx | TenantDb,
+  kind: ImportKind,
+  rows: Rows,
+  tenant: TenantContext,
+  today: string,
+): Promise<Checked> {
+  switch (kind) {
+    case 'ROOMS':
+      return checkRooms(db, rows as RoomRow[]);
+    case 'RATES':
+      return checkRates(db, rows as RateRow[], today);
+    case 'GUESTS':
+      return checkGuests(db, rows as GuestRow[], tenant);
+    case 'COMPANIES':
+      return checkCompanies(db, rows as CompanyRow[]);
+    case 'BALANCES':
+      return checkBalances(db, rows as BalanceRow[], tenant, today);
+  }
+}
+
 async function todayAt(deps: ImportDeps, tenant: TenantContext): Promise<string> {
   const { timeZone } = await deps.db.property.findUniqueOrThrow({
     where: { id: tenant.propertyId },
@@ -281,18 +314,11 @@ export async function validateImport(
   let summary: Record<string, number> = {};
   if (!table) {
     errors = [{ row: null, column: null, message: 'This file could not be read as a spreadsheet' }];
-  } else if (body.kind === 'ROOMS') {
-    const sheet = parseSheet('ROOMS', table);
-    const checked = await checkRooms(deps.tenantDb, sheet.rows);
-    ({ total } = sheet);
-    rows = sheet.rows;
-    errors = [...sheet.errors, ...checked.errors];
-    summary = checked.summary;
   } else {
-    const sheet = parseSheet('RATES', table);
-    const checked = await checkRates(deps.tenantDb, sheet.rows, today);
+    const sheet = parseSheet(body.kind, table);
+    const checked = await checkRows(deps.tenantDb, body.kind, sheet.rows as Rows, tenant, today);
     ({ total } = sheet);
-    rows = sheet.rows;
+    rows = sheet.rows as Rows;
     errors = [...sheet.errors, ...checked.errors];
     summary = checked.summary;
   }
@@ -448,10 +474,8 @@ export async function applyImport(
         }
         const report = fresh.report as unknown as StoredReport;
         // The property may have changed since the check (rooms added, plans deactivated).
-        const again =
-          fresh.kind === 'ROOMS'
-            ? await checkRooms(tx, report.data as RoomRow[])
-            : await checkRates(tx, report.data as RateRow[], today);
+        const kind = fresh.kind as ImportKind;
+        const again = await checkRows(tx, kind, report.data, tenant, today);
         if (again.errors.length > 0) {
           throw new AppError(
             'STATE_TRANSITION_INVALID',
@@ -459,10 +483,17 @@ export async function applyImport(
             { errors: again.errors.slice(0, 20) },
           );
         }
+        const now = deps.clock();
         const applied =
-          fresh.kind === 'ROOMS'
+          kind === 'ROOMS'
             ? await applyRooms(tx, tenant.propertyId, today, report.data as RoomRow[])
-            : await applyRates(tx, tenant.propertyId, report.data as RateRow[]);
+            : kind === 'RATES'
+              ? await applyRates(tx, tenant.propertyId, report.data as RateRow[])
+              : kind === 'GUESTS'
+                ? await applyGuests(tx, report.data as GuestRow[], now)
+                : kind === 'COMPANIES'
+                  ? await applyCompanies(tx, report.data as CompanyRow[])
+                  : await applyBalances(tx, report.data as BalanceRow[], today, now);
         const updated = await tx.importJob.update({
           where: { id: fresh.id },
           data: {

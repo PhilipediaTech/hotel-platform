@@ -362,7 +362,10 @@ describe('permissions', () => {
     expect(errorOf(refused).details).toEqual({ permission: 'import.run' });
     const unknown = await h.gm.post('/imports', { kind: 'ROOMS', fileId: crypto.randomUUID() });
     expect(unknown.status).toBe(400);
-    const later = await h.gm.post('/imports', { kind: 'GUESTS', fileId: crypto.randomUUID() });
+    const later = await h.gm.post('/imports', {
+      kind: 'RESERVATIONS',
+      fileId: crypto.randomUUID(),
+    });
     expect((errorOf(later).details?.['issues'] as { path: string }[])[0]?.path).toBe('body.kind');
   });
 });

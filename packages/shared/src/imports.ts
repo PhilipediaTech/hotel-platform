@@ -3,8 +3,8 @@
 // the templates). Checks that need the database (codes that exist, rooms already there) are
 // in the API. Rows are numbered as in the spreadsheet: the header is row 1.
 
-/** Kinds built so far; GUESTS, COMPANIES and BALANCES arrive with T-043 and folios. */
-export const IMPORT_KINDS = ['ROOMS', 'RATES'] as const;
+/** Rooms and rates (T-034); guests, companies and their opening balances (T-168). */
+export const IMPORT_KINDS = ['ROOMS', 'RATES', 'GUESTS', 'COMPANIES', 'BALANCES'] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
 /** Longest file we check in one go. */
@@ -42,6 +42,36 @@ export const IMPORT_COLUMNS: Record<ImportKind, readonly ImportColumn[]> = {
     { name: 'closed_to_departure', required: false, examples: ['', ''] },
     { name: 'stop_sell', required: false, examples: ['', ''] },
   ],
+  GUESTS: [
+    { name: 'first_name', required: true, examples: ['Ada', 'Tunde'] },
+    { name: 'last_name', required: true, examples: ['Obi', 'Bakare'] },
+    { name: 'email', required: false, examples: ['ada@example.com', ''] },
+    { name: 'phone', required: false, examples: ['08031234567', '+2348098765432'] },
+    { name: 'nationality', required: false, examples: ['NG', 'GH'] },
+    { name: 'notes', required: false, examples: ['Prefers a high floor', ''] },
+    { name: 'tags', required: false, examples: ['Repeat; Business', ''] },
+    { name: 'marketing_consent', required: false, examples: ['yes', 'no'] },
+    { name: 'vip', required: false, examples: ['', 'yes'] },
+  ],
+  COMPANIES: [
+    { name: 'name', required: true, examples: ['Dangote Group', 'Wakanow'] },
+    { name: 'kind', required: false, examples: ['company', 'travel agent'] },
+    { name: 'tax_id', required: false, examples: ['12345678-0001', ''] },
+    { name: 'contact_name', required: false, examples: ['Bola Ade', 'Kemi Ojo'] },
+    { name: 'contact_phone', required: false, examples: ['08031234567', ''] },
+    { name: 'contact_email', required: false, examples: ['bola@example.com', 'kemi@example.com'] },
+    { name: 'invoice_email', required: false, examples: ['accounts@example.com', ''] },
+    { name: 'credit_limit', required: false, examples: ['2000000', ''] },
+    { name: 'payment_terms_days', required: false, examples: ['30', ''] },
+    { name: 'commission_percent', required: false, examples: ['', '10'] },
+  ],
+  BALANCES: [
+    { name: 'company_name', required: true, examples: ['Dangote Group', 'Dangote Group'] },
+    { name: 'reference', required: true, examples: ['INV-2041', 'INV-2077'] },
+    { name: 'amount', required: true, examples: ['450000', '1,250,000.50'] },
+    { name: 'issued_on', required: false, examples: ['2026-10-15', '01/11/2026'] },
+    { name: 'due_on', required: false, examples: ['2026-11-14', ''] },
+  ],
 };
 
 export interface ImportError {
@@ -77,6 +107,48 @@ export interface RateRow {
   closedToDeparture?: boolean;
   stopSell?: boolean;
 }
+
+export interface GuestRow {
+  row: number;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  nationality: string | null;
+  notes: string | null;
+  tags: string[];
+  marketingConsent: boolean;
+  vip: boolean;
+}
+
+export interface CompanyRow {
+  row: number;
+  name: string;
+  kind: 'COMPANY' | 'TRAVEL_AGENT';
+  taxId: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  invoiceEmail: string | null;
+  creditLimitMinor: string | null;
+  paymentTermsDays: number | null;
+  commissionBps: number | null;
+}
+
+/** What a company owed at go-live: one open invoice from the old system. */
+export interface BalanceRow {
+  row: number;
+  companyName: string;
+  reference: string;
+  amountMinor: string;
+  /** Null: the day of the import. */
+  issuedOn: string | null;
+  /** Null: issued on plus the account's terms. */
+  dueOn: string | null;
+}
+
+export type ImportRow = RoomRow | RateRow | GuestRow | CompanyRow | BalanceRow;
+type AnyRow = ImportRow;
 
 /** "Room Number " → "room_number". */
 export function normalizeHeader(header: string): string {
@@ -180,6 +252,43 @@ function yesNoCell(text: string): Cell {
   return bad('Use yes or no');
 }
 
+/** E.164; a Nigerian number written locally (0803 123 4567) is taken as +234 803 123 4567. */
+function phoneCell(text: string): Cell {
+  if (text === '') return ok(null);
+  const digits = text.replace(/[\s().-]/g, '');
+  const e164 = /^0\d{10}$/.test(digits)
+    ? `+234${digits.slice(1)}`
+    : /^234\d{10}$/.test(digits)
+      ? `+${digits}`
+      : digits;
+  return /^\+[1-9]\d{6,14}$/.test(e164)
+    ? ok(e164)
+    : bad('Use a phone number like 08031234567 or +2348031234567');
+}
+
+function emailCell(text: string): Cell {
+  if (text === '') return ok(null);
+  const email = text.toLowerCase();
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    ? ok(email)
+    : bad('Not an email address');
+}
+
+/** "10" or "10%" → 1000 basis points. */
+function percentCell(text: string, max: number): Cell {
+  if (text === '') return ok(null);
+  const clean = text.replace(/[%\s]/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(clean)) return bad('Use a percentage like 10 or 12.5');
+  const bps = Math.round(Number(clean) * 100);
+  return bps > max * 100 ? bad(`At most ${max}%`) : ok(bps);
+}
+
+const listOf = (text: string) =>
+  text
+    .split(/[;|]/)
+    .map((f) => f.trim())
+    .filter(Boolean);
+
 function codeCell(text: string, pattern: RegExp, hint: string): Cell {
   const code = text.toUpperCase();
   return pattern.test(code) ? ok(code) : bad(hint);
@@ -207,9 +316,25 @@ export function parseSheet(
   table: readonly (readonly string[])[],
 ): ParsedSheet<RateRow>;
 export function parseSheet(
+  kind: 'GUESTS',
+  table: readonly (readonly string[])[],
+): ParsedSheet<GuestRow>;
+export function parseSheet(
+  kind: 'COMPANIES',
+  table: readonly (readonly string[])[],
+): ParsedSheet<CompanyRow>;
+export function parseSheet(
+  kind: 'BALANCES',
+  table: readonly (readonly string[])[],
+): ParsedSheet<BalanceRow>;
+export function parseSheet(
   kind: ImportKind,
   table: readonly (readonly string[])[],
-): ParsedSheet<RoomRow | RateRow> {
+): ParsedSheet<AnyRow>;
+export function parseSheet(
+  kind: ImportKind,
+  table: readonly (readonly string[])[],
+): ParsedSheet<AnyRow> {
   const errors: ImportError[] = [];
   const [header = [], ...body] = table;
   const index = new Map(header.map((h, i) => [normalizeHeader(h), i]));
@@ -232,7 +357,7 @@ export function parseSheet(
     };
   }
 
-  const rows: (RoomRow | RateRow)[] = [];
+  const rows: AnyRow[] = [];
   for (const { row, cells } of data) {
     const cell = (name: string) => cells[index.get(name) ?? -1] ?? '';
     const values = new Map<string, string | number | boolean | null>();
@@ -295,7 +420,7 @@ export function parseSheet(
           features,
         });
       }
-    } else {
+    } else if (kind === 'RATES') {
       req('rate_plan_code', (t) => codeCell(t, /^[A-Z0-9_-]{2,12}$/, 'A rate plan code, e.g. BAR'));
       req('room_type_code', (t) => codeCell(t, /^[A-Z0-9-]{2,10}$/, 'A room type code, e.g. DLX'));
       req('from', dateCell);
@@ -340,6 +465,100 @@ export function parseSheet(
         take('price', bad('Give a price or at least one restriction'));
       }
       if (rowOk) rows.push(rate);
+    } else if (kind === 'GUESTS') {
+      text('first_name', 80, true);
+      text('last_name', 80, true);
+      take('email', emailCell(cell('email')));
+      take('phone', phoneCell(cell('phone')));
+      take(
+        'nationality',
+        cell('nationality') === ''
+          ? ok(null)
+          : codeCell(cell('nationality'), /^[A-Z]{2}$/, 'A two-letter country code, e.g. NG'),
+      );
+      text('notes', 1000);
+      const tags = listOf(cell('tags'));
+      if (tags.some((tag) => tag.length > 40) || tags.length > 20) {
+        take('tags', bad('At most 20 tags of 40 characters'));
+      }
+      take('marketing_consent', yesNoCell(cell('marketing_consent')));
+      take('vip', yesNoCell(cell('vip')));
+      if (rowOk) {
+        rows.push({
+          row,
+          firstName: values.get('first_name') as string,
+          lastName: values.get('last_name') as string,
+          email: values.get('email') as string | null,
+          phone: values.get('phone') as string | null,
+          nationality: values.get('nationality') as string | null,
+          notes: values.get('notes') as string | null,
+          tags,
+          marketingConsent: values.get('marketing_consent') === true,
+          vip: values.get('vip') === true,
+        });
+      }
+    } else if (kind === 'COMPANIES') {
+      text('name', 160, true);
+      const kindText = cell('kind')
+        .toLowerCase()
+        .replace(/[\s_-]+/g, ' ');
+      take(
+        'kind',
+        ['', 'company', 'corporate'].includes(kindText)
+          ? ok('COMPANY')
+          : ['travel agent', 'agent', 'agency', 'ta'].includes(kindText)
+            ? ok('TRAVEL_AGENT')
+            : bad('Use company or travel agent'),
+      );
+      text('tax_id', 30);
+      text('contact_name', 80);
+      take('contact_phone', phoneCell(cell('contact_phone')));
+      take('contact_email', emailCell(cell('contact_email')));
+      take('invoice_email', emailCell(cell('invoice_email')));
+      take('credit_limit', moneyCell(cell('credit_limit')));
+      take('payment_terms_days', intCell(cell('payment_terms_days'), 0, 365));
+      take('commission_percent', percentCell(cell('commission_percent'), 50));
+      const contact = ['contact_phone', 'contact_email'].some((c) => values.get(c));
+      if (rowOk && contact && !values.get('contact_name')) {
+        take('contact_name', bad('Give the contact’s name with their phone or email'));
+      }
+      if (rowOk) {
+        rows.push({
+          row,
+          name: values.get('name') as string,
+          kind: values.get('kind') as CompanyRow['kind'],
+          taxId: values.get('tax_id') as string | null,
+          contactName: values.get('contact_name') as string | null,
+          contactPhone: values.get('contact_phone') as string | null,
+          contactEmail: values.get('contact_email') as string | null,
+          invoiceEmail: values.get('invoice_email') as string | null,
+          creditLimitMinor: values.get('credit_limit') as string | null,
+          paymentTermsDays: values.get('payment_terms_days') as number | null,
+          commissionBps: values.get('commission_percent') as number | null,
+        });
+      }
+    } else {
+      text('company_name', 160, true);
+      text('reference', 40, true);
+      req('amount', moneyCell);
+      take('issued_on', cell('issued_on') === '' ? ok(null) : dateCell(cell('issued_on')));
+      take('due_on', cell('due_on') === '' ? ok(null) : dateCell(cell('due_on')));
+      if (rowOk && values.get('amount') === '0') take('amount', bad('Must be more than zero'));
+      const issued = values.get('issued_on') as string | null;
+      const due = values.get('due_on') as string | null;
+      if (rowOk && issued && due && due < issued) {
+        take('due_on', bad('Due on or after the issue date'));
+      }
+      if (rowOk) {
+        rows.push({
+          row,
+          companyName: values.get('company_name') as string,
+          reference: values.get('reference') as string,
+          amountMinor: values.get('amount') as string,
+          issuedOn: issued,
+          dueOn: due,
+        });
+      }
     }
   }
   return { rows, errors, total: data.length };

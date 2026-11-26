@@ -23,7 +23,7 @@ import { registerStrings } from '../../i18n/index.ts';
 
 registerStrings(importsStrings);
 
-// S03 Imports (PRD M1-03; T-034): download a template, upload the filled file, read the check
+// S03 Imports (PRD M1-03; T-034, T-168): download a template, upload the filled file, read the check
 // report, then apply it. Nothing is written until the user confirms.
 
 type Job = z.output<typeof ImportJobItem>;
@@ -90,10 +90,13 @@ export function ImportsPage({ wait = sleep }: { wait?: (ms: number) => Promise<u
     mutationFn: (id: string) => api.call('applyImport', { params: { importId: id } }),
     onSuccess: (applied) => {
       queryClient.setQueryData(['imports', currentPropertyId ?? '', applied.id], applied);
-      // Rooms, types and rates changed; so may the setup checklist.
+      // What the import wrote, and the setup checklist.
       void queryClient.invalidateQueries({ queryKey: ['rooms', currentPropertyId ?? ''] });
       void queryClient.invalidateQueries({ queryKey: ['rates', currentPropertyId ?? ''] });
       void queryClient.invalidateQueries({ queryKey: ['setup', currentPropertyId ?? ''] });
+      void queryClient.invalidateQueries({ queryKey: ['guests'] });
+      void queryClient.invalidateQueries({ queryKey: ['companies'] });
+      void queryClient.invalidateQueries({ queryKey: ['ar'] });
     },
   });
   const current = jobId ? job.data : undefined;

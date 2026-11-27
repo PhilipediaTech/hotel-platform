@@ -282,3 +282,42 @@ describe('Handover (S20)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('AI handover summary (T-175)', () => {
+  it('summarises on request and labels it as AI', async () => {
+    handlers['POST /handovers/summary'] = () =>
+      json(200, {
+        departmentId: HK.id,
+        businessDate: '2026-11-10',
+        handovers: 2,
+        summary: 'Restock the linen store (overdue).\nExtra towels for 101.',
+        generatedAt: '2026-11-10T14:00:00Z',
+      });
+    const user = userEvent.setup();
+    renderAt('/handovers');
+    const panel = await screen.findByRole('region', { name: 'Summary for your shift' });
+    await user.click(within(panel).getByRole('button', { name: 'Summarise' }));
+    expect(await within(panel).findByText(/Restock the linen store/)).toBeInTheDocument();
+    expect(panel).toHaveTextContent(
+      'AI summary of 2 waiting handovers and what is open now: check the notes below.',
+    );
+    expect(within(panel).getByRole('button', { name: 'Summarise again' })).toBeEnabled();
+    expect(sent('POST /handovers/summary')).toHaveLength(1);
+  });
+
+  it('shows why a summary is not available', async () => {
+    handlers['POST /handovers/summary'] = () =>
+      json(403, {
+        error: {
+          code: 'ALLOWANCE_USED_UP',
+          message: 'This month’s AI allowance is used up. Summaries will work again next month.',
+          requestId: 'r1',
+        },
+      });
+    const user = userEvent.setup();
+    renderAt('/handovers');
+    const panel = await screen.findByRole('region', { name: 'Summary for your shift' });
+    await user.click(within(panel).getByRole('button', { name: 'Summarise' }));
+    expect(await within(panel).findByText(/AI allowance is used up/)).toBeInTheDocument();
+  });
+});

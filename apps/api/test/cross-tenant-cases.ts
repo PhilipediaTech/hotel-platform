@@ -4754,6 +4754,12 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     untouched: bHandoverUnchanged,
   },
   acknowledgeHandoverNote: { seed: bHandover, untouched: bHandoverUnchanged },
+  summariseHandovers: {
+    // B's department from A1: not found, and B's handover is never read.
+    seed: bHandover,
+    body: (theirs) => ({ departmentId: theirs['departmentId'] }),
+    untouched: bHandoverUnchanged,
+  },
   listLeakageAlerts: { seed: bLeakage, listIds: ids },
   getLeakageAlert: { seed: bLeakage },
   addLeakageAlertOutcome: {

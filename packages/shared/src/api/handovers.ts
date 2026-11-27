@@ -157,9 +157,40 @@ export const acknowledgeHandoverNote = defineRoute({
   errors: ['STATE_TRANSITION_INVALID'],
 });
 
+// AI handover summary (Versions V3 "handover summaries"; T-175, Philip 2026-11-27): on request,
+// never stored. It reads the department's handovers nobody has acknowledged yet and what is
+// open now, and answers in a few short lines. Counted against the plan's AI allowance.
+
+export const HANDOVER_SUMMARY_LIMIT = 10;
+
+export const summariseHandovers = defineRoute({
+  operationId: 'summariseHandovers',
+  method: 'post',
+  path: '/handovers/summary',
+  summary: 'An AI summary of the handovers waiting and what is open now',
+  description:
+    'Read-only and not stored: the department’s unacknowledged handovers (newest ' +
+    `${String(HANDOVER_SUMMARY_LIMIT)}) and what a handover written now would carry. Uses one ` +
+    'of the plan’s AI allowance.',
+  tags: ['Handovers'],
+  propertyScoped: true,
+  permission: 'handover.manage',
+  body: z.object({ departmentId: Uuid.optional() }),
+  response: z.object({
+    departmentId: Uuid,
+    businessDate: IsoDate,
+    /** Handovers the summary read. */
+    handovers: z.number().int(),
+    summary: z.string(),
+    generatedAt: Instant,
+  }),
+  errors: ['AI_UNAVAILABLE', 'ALLOWANCE_USED_UP'],
+});
+
 export const HANDOVER_ROUTES = {
   listHandoverNotes,
   getHandoverDraft,
   writeHandoverNote,
   acknowledgeHandoverNote,
+  summariseHandovers,
 } as const;

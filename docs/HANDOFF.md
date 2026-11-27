@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-174 (second country pack: UK, Kenya, Uganda with suggested taxes) is pushed on `feat/T-174-country-packs`; no migration. Next: the V2 AI and IoT items.
+T-175 (AI handover summaries) is pushed on `feat/T-175-handover-summaries`; no migration. Next: T-176 AI task classification.

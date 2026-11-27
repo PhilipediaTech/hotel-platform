@@ -125,11 +125,26 @@ export const setThreadAssistant = defineRoute({
   response: ThreadItem,
 });
 
+export const draftThreadReply = defineRoute({
+  ...COMMON,
+  operationId: 'draftThreadReply',
+  method: 'post',
+  path: '/message-threads/{threadId}/draft',
+  summary: 'An AI draft of the next reply, for staff to edit and send (T-177)',
+  description:
+    'Nothing is sent or stored: the draft goes into the reply box. Written from the hotel facts, the linked stay and the conversation. 409 STATE_TRANSITION_INVALID with `details.reason = WINDOW_CLOSED` outside the 24-hour window, when only the follow-up template can be sent.',
+  params: ThreadParams,
+  body: z.object({}),
+  response: z.object({ draft: z.string() }),
+  errors: ['STATE_TRANSITION_INVALID', 'AI_UNAVAILABLE', 'ALLOWANCE_USED_UP'],
+});
+
 export const INBOX_ROUTES = {
   setThreadAssistant,
   listMessageThreads,
   getMessageThread,
   sendThreadMessage,
+  draftThreadReply,
   sendThreadFollowUp,
   markThreadRead,
 } as const;

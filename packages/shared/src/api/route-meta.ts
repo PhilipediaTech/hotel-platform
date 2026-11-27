@@ -15,6 +15,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   listMessageThreads: {"operationId":"listMessageThreads","method":"get","path":"/message-threads","propertyScoped":true},
   getMessageThread: {"operationId":"getMessageThread","method":"get","path":"/message-threads/{threadId}","propertyScoped":true},
   sendThreadMessage: {"operationId":"sendThreadMessage","method":"post","path":"/message-threads/{threadId}/messages","body":true,"propertyScoped":true,"idempotent":true},
+  draftThreadReply: {"operationId":"draftThreadReply","method":"post","path":"/message-threads/{threadId}/draft","body":true,"propertyScoped":true},
   sendThreadFollowUp: {"operationId":"sendThreadFollowUp","method":"post","path":"/message-threads/{threadId}/follow-up","body":true,"propertyScoped":true,"idempotent":true},
   markThreadRead: {"operationId":"markThreadRead","method":"post","path":"/message-threads/{threadId}/read","body":true,"propertyScoped":true},
   listSpaces: {"operationId":"listSpaces","method":"get","path":"/spaces","propertyScoped":true},

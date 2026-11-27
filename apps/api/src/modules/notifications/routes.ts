@@ -3,6 +3,7 @@ import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import { RAW_BODY } from '../payments/webhook-routes.ts';
+import { draftReply, type DraftDeps } from './draft.ts';
 import * as inbox from './inbox.ts';
 import * as messaging from './service.ts';
 
@@ -13,7 +14,7 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
 }
 
 /** Message templates, test messages and the WhatsApp webhook (T-024). */
-export function messagingRoutes(deps: messaging.MessagingDeps): Router {
+export function messagingRoutes(deps: messaging.MessagingDeps & DraftDeps): Router {
   const router = express.Router();
   const r = MESSAGE_ROUTES;
 
@@ -50,6 +51,9 @@ export function messagingRoutes(deps: messaging.MessagingDeps): Router {
   mountRoute(router, t.getMessageThread, ({ params }) => inbox.getThread(deps, params.threadId));
   mountRoute(router, t.setThreadAssistant, ({ params, body }) =>
     inbox.setAssistant(deps, params.threadId, body.active),
+  );
+  mountRoute(router, t.draftThreadReply, ({ params }, { tenant }) =>
+    draftReply(deps, tenantFrom(tenant), params.threadId),
   );
   mountRoute(router, t.markThreadRead, ({ params }) => inbox.markRead(deps, params.threadId));
   mountRoute(router, t.sendThreadMessage, ({ params, body }, { tenant }) =>

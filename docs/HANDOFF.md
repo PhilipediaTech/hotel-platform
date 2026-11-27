@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-176 (AI task classification) is pushed on `feat/T-176-task-classification`; no migration. Next: T-177 AI reply drafts in the inbox.
+T-177 (AI reply drafts in the inbox) is pushed on `feat/T-177-inbox-reply-drafts`; no migration. Next: T-178 AI search.

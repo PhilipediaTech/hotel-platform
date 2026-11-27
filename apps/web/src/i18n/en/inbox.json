@@ -18,6 +18,9 @@
     "template": "Sent as an approved template",
     "reply": "Your reply",
     "send": "Send",
+    "draft": "Draft a reply",
+    "drafting": "Drafting…",
+    "drafted": "Drafted by AI from the hotel’s facts and this booking: check and change it before you send.",
     "windowClosed": "This guest last wrote more than 24 hours ago, so WhatsApp only allows an approved message.",
     "followUp": "Send follow-up message",
     "followUpSent": "Follow-up sent. You can reply freely once the guest answers."

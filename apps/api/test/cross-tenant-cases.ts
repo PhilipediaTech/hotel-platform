@@ -3346,6 +3346,7 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   getMessageThread: { seed: bThread },
   sendThreadMessage: { seed: bThread, body: () => ({ body: 'Leak' }), untouched: bThreadUnchanged },
+  draftThreadReply: { seed: bThread, body: () => ({}), untouched: bThreadUnchanged },
   sendThreadFollowUp: { seed: bThread, body: () => ({}), untouched: bThreadUnchanged },
   setThreadAssistant: {
     seed: bThread,

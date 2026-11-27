@@ -59,6 +59,8 @@ beforeEach(() => {
     [`POST /message-threads/${THREAD_ID}/read`]: () => json(200, { unreadCount: 0 }),
     [`POST /message-threads/${THREAD_ID}/messages`]: () =>
       json(201, { ...MESSAGE, direction: 'OUT', body: 'Yes', status: 'SENT' }),
+    [`POST /message-threads/${THREAD_ID}/draft`]: () =>
+      json(200, { draft: 'Hello Ada, late check-out is possible until [time].' }),
     [`POST /message-threads/${THREAD_ID}/follow-up`]: () =>
       json(201, { ...MESSAGE, direction: 'OUT', kind: 'TEMPLATE', status: 'QUEUED' }),
   };
@@ -101,6 +103,27 @@ describe('WhatsApp inbox (M11-04)', { timeout: 20_000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() =>
       expect(sent(`POST /message-threads/${THREAD_ID}/messages`)).toEqual([{ body: 'Yes' }]),
+    );
+  });
+
+  it('an AI draft fills the reply box, and only Send sends it (T-177)', async () => {
+    const user = userEvent.setup();
+    renderInbox();
+    await user.click(await screen.findByRole('button', { name: /Ada Obi/ }, { timeout: 10_000 }));
+    await user.click(await screen.findByRole('button', { name: 'Draft a reply' }));
+    const box = screen.getByLabelText('Your reply');
+    await waitFor(() =>
+      expect(box).toHaveValue('Hello Ada, late check-out is possible until [time].'),
+    );
+    expect(screen.getByText(/Drafted by AI/)).toBeInTheDocument();
+    expect(sent(`POST /message-threads/${THREAD_ID}/messages`)).toEqual([]);
+    await user.clear(box);
+    await user.type(box, 'Hello Ada, yes until 2pm.');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() =>
+      expect(sent(`POST /message-threads/${THREAD_ID}/messages`)).toEqual([
+        { body: 'Hello Ada, yes until 2pm.' },
+      ]),
     );
   });
 

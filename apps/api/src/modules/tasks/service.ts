@@ -534,9 +534,12 @@ export async function listTasks(
     roomId?: string | undefined;
     assetId?: string | undefined;
     overdue?: 'true' | undefined;
+    /** Search (T-178): the task number, or words in the title. */
+    q?: string | undefined;
   },
 ) {
   const now = deps.clock();
+  const text = query.q?.trim().replace(/^#/, '');
   const before = query.cursor ? Number(query.cursor) : null;
   if (before !== null && !Number.isInteger(before)) {
     throw new AppError('VALIDATION_ERROR', 'Invalid cursor.', {
@@ -558,6 +561,11 @@ export async function listTasks(
       query.assetId ? { assetId: query.assetId } : {},
       query.overdue ? { status: { in: [...OPEN_TASK_STATUSES] }, dueAt: { lte: now } } : {},
       before !== null ? { number: { lt: before } } : {},
+      text
+        ? /^\d{1,9}$/.test(text)
+          ? { number: Number(text) }
+          : { title: { contains: text, mode: 'insensitive' as const } }
+        : {},
     ],
   };
   const rows = await deps.tenantDb.task.findMany({

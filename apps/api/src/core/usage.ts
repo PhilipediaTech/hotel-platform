@@ -21,6 +21,8 @@ const AI_METRICS = [
   'AI_TASK_SUGGEST',
   // T-177: drafting a WhatsApp reply for staff to edit.
   'AI_REPLY_DRAFT',
+  // T-178: searching in your own words.
+  'AI_SEARCH',
 ] as const;
 const WHATSAPP_METRIC = 'WHATSAPP';
 

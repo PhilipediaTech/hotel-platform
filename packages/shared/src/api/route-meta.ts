@@ -18,6 +18,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   draftThreadReply: {"operationId":"draftThreadReply","method":"post","path":"/message-threads/{threadId}/draft","body":true,"propertyScoped":true},
   sendThreadFollowUp: {"operationId":"sendThreadFollowUp","method":"post","path":"/message-threads/{threadId}/follow-up","body":true,"propertyScoped":true,"idempotent":true},
   markThreadRead: {"operationId":"markThreadRead","method":"post","path":"/message-threads/{threadId}/read","body":true,"propertyScoped":true},
+  search: {"operationId":"search","method":"get","path":"/search","propertyScoped":true},
+  askSearch: {"operationId":"askSearch","method":"post","path":"/search/ask","body":true,"propertyScoped":true},
   listSpaces: {"operationId":"listSpaces","method":"get","path":"/spaces","propertyScoped":true},
   createSpace: {"operationId":"createSpace","method":"post","path":"/spaces","body":true,"propertyScoped":true},
   updateSpace: {"operationId":"updateSpace","method":"put","path":"/spaces/{spaceId}","body":true,"propertyScoped":true},

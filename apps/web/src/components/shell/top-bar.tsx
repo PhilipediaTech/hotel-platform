@@ -158,8 +158,17 @@ export function TopBar() {
           On phones the shell shows the same chip as a strip under the bar. */}
       <PropertyContext className="hidden rounded-full bg-surface-muted px-3 py-1 sm:inline-flex" />
 
-      {/* Global search: no search API exists yet (spec issue 31) */}
-      <div className="mx-2 hidden flex-1 md:block">
+      {/* Global search (spec issue 31; T-178): opens the search page, with Ask AI there. */}
+      <form
+        role="search"
+        className="mx-2 hidden flex-1 md:block"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const value = new FormData(e.currentTarget).get('q');
+          const q = typeof value === 'string' ? value.trim() : '';
+          if (q) void navigate(`/search?q=${encodeURIComponent(q)}`);
+        }}
+      >
         <label className="relative block">
           <span className="sr-only">{t('shell.search')}</span>
           <Search
@@ -168,12 +177,13 @@ export function TopBar() {
           />
           <input
             type="search"
-            disabled
-            placeholder={t('shell.searchUnavailable')}
-            className="h-10 w-full max-w-md rounded-md border border-border bg-surface-muted pl-9 pr-3 text-sm"
+            name="q"
+            maxLength={300}
+            placeholder={t('shell.search')}
+            className="h-10 w-full max-w-md rounded-md border border-border bg-surface pl-9 pr-3 text-sm"
           />
         </label>
-      </div>
+      </form>
 
       <div className="ml-auto flex items-center gap-1">
         {session.permissions.includes('frontdesk.read') && (

@@ -46,6 +46,7 @@ import { taskRoutes } from './modules/tasks/routes.ts';
 import { handoverRoutes } from './modules/handovers/routes.ts';
 import { leakageRoutes } from './modules/leakage/routes.ts';
 import { messagingRoutes } from './modules/notifications/routes.ts';
+import { searchRoutes } from './modules/search/routes.ts';
 import { eventRoutes } from './modules/events/routes.ts';
 import { serviceRoutes } from './modules/services/routes.ts';
 import { groupRoutes } from './modules/groups/routes.ts';
@@ -229,6 +230,7 @@ export function createApp({
   api.use(handoverRoutes({ db, tenantDb, clock, ai }));
   api.use(leakageRoutes({ db, tenantDb, clock }));
   api.use(messagingRoutes({ db, tenantDb, clock, messages, ai }));
+  api.use(searchRoutes({ db, tenantDb, clock, ai }));
   api.use(eventRoutes({ db, tenantDb, clock, provider: payments, email }));
   api.use(serviceRoutes({ db, tenantDb, clock }));
   api.use(groupRoutes({ db, tenantDb, clock }));

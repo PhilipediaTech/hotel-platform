@@ -184,6 +184,9 @@ const MessagesPage = lazy(() =>
 const CheckOutPage = lazy(() =>
   import('../routes/check-out.tsx').then((m) => ({ default: m.CheckOutPage })),
 );
+const SearchPage = lazy(() =>
+  import('../routes/search.tsx').then((m) => ({ default: m.SearchPage })),
+);
 const SupportPage = lazy(() =>
   import('../routes/support.tsx').then((m) => ({ default: m.SupportPage })),
 );
@@ -321,6 +324,15 @@ export function buildRoutes(
               element: (
                 <Suspense fallback={<Loading />}>
                   <AccountPhonePage />
+                </Suspense>
+              ),
+            },
+            // Search for every member (T-178): from the top bar, not the navigation.
+            {
+              path: 'search',
+              element: (
+                <Suspense fallback={<Loading />}>
+                  <SearchPage />
                 </Suspense>
               ),
             },

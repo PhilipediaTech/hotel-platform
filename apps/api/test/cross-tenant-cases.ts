@@ -3355,6 +3355,19 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   markThreadRead: { seed: bThread, body: () => ({}), untouched: bThreadUnchanged },
   // Reads only, from the caller's own hotel: nothing of B's can be named in the request.
+  // T-178: a search from A finds none of B's records, plain or with AI.
+  search: {
+    seed: bGuest,
+    query: () => ({ q: 'Leak' }),
+    listIds: (body) => (body as { hits: { id: string }[] }).hits.map((h) => h.id),
+    untouched: bGuestUnchanged,
+  },
+  askSearch: {
+    seed: bGuest,
+    body: () => ({ question: 'Find the guest called Leak' }),
+    listIds: (body) => (body as { hits: { id: string }[] }).hits.map((h) => h.id),
+    untouched: bGuestUnchanged,
+  },
   askFigures: {
     seed: (_db, _world, propertyId) => Promise.resolve({ propertyId }),
     creates: true,

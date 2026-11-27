@@ -1,0 +1,23 @@
+{
+  "search": {
+    "title": "Search",
+    "label": "Name, phone, booking number, room or task number",
+    "submit": "Search",
+    "none": "Nothing matches. Try part of a name, a phone number, a booking or room number, or ask AI below.",
+    "tooLong": "That’s a sentence: ask AI below to search it.",
+    "kind": {
+      "GUEST": "Guests",
+      "RESERVATION": "Bookings",
+      "ROOM": "Rooms",
+      "TASK": "Tasks"
+    },
+    "ask": {
+      "title": "Ask AI",
+      "hint": "Search in your own words, like “guests arriving tomorrow” or “open tasks in room 204”. Only records you can open here are shown. Uses your AI allowance.",
+      "submit": "Ask AI",
+      "thinking": "Searching…",
+      "byAi": "AI searched for:",
+      "none": "No records matched."
+    }
+  }
+}

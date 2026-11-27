@@ -67,7 +67,7 @@ const RegionForm = z.object({
 });
 
 /** Currencies offered first; the property's own is always in the list. */
-const CURRENCIES = ['NGN', 'GHS', 'KES', 'ZAR', 'USD', 'GBP', 'EUR'];
+const CURRENCIES = ['NGN', 'GHS', 'KES', 'ZAR', 'UGX', 'USD', 'GBP', 'EUR'];
 
 function propertyKey(propertyId: string | null) {
   return ['setup', propertyId ?? '', 'property'];

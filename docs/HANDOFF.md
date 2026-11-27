@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-173 (help centre) is pushed on `feat/T-173-help-centre`, with migration `20270111090000_help_articles` (starter articles inside). Next: second country pack (ask first) or the V2 AI and IoT items.
+T-174 (second country pack: UK, Kenya, Uganda with suggested taxes) is pushed on `feat/T-174-country-packs`; no migration. Next: the V2 AI and IoT items.

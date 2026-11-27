@@ -27,6 +27,9 @@ export function taxRoutes(deps: tax.TaxDeps): Router {
   mountRoute(router, r.confirmTaxes, (_input, { tenant }) =>
     tax.confirmTaxes(deps, tenantFrom(tenant)),
   );
+  mountRoute(router, r.addSuggestedTaxes, (_input, { tenant }) =>
+    tax.addSuggestedTaxes(deps, tenantFrom(tenant)),
+  );
   mountRoute(router, r.listTaxRules, (_input, { tenant }) =>
     tax.listTaxRules(deps, tenantFrom(tenant)),
   );

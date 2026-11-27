@@ -167,6 +167,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   createTaxRule: {"operationId":"createTaxRule","method":"post","path":"/tax-rules","body":true,"propertyScoped":true},
   addTaxRuleVersion: {"operationId":"addTaxRuleVersion","method":"post","path":"/tax-rules/{taxRuleId}/versions","body":true,"propertyScoped":true},
   confirmTaxes: {"operationId":"confirmTaxes","method":"post","path":"/tax-rules/confirm","propertyScoped":true},
+  addSuggestedTaxes: {"operationId":"addSuggestedTaxes","method":"post","path":"/tax-rules/suggested","propertyScoped":true},
   listCancellationPolicies: {"operationId":"listCancellationPolicies","method":"get","path":"/cancellation-policies","propertyScoped":true},
   createCancellationPolicy: {"operationId":"createCancellationPolicy","method":"post","path":"/cancellation-policies","body":true,"propertyScoped":true},
   listRatePlans: {"operationId":"listRatePlans","method":"get","path":"/rate-plans","propertyScoped":true},

@@ -457,6 +457,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   putGroupRates: {"operationId":"putGroupRates","method":"put","path":"/group/rates","body":true,"propertyScoped":true},
   changeGroupRates: {"operationId":"changeGroupRates","method":"post","path":"/group/rate-changes","body":true,"propertyScoped":true,"idempotent":true},
   getPaceReport: {"operationId":"getPaceReport","method":"get","path":"/reports/pace","propertyScoped":true},
+  explainPaceForecast: {"operationId":"explainPaceForecast","method":"post","path":"/reports/pace/explain","body":true,"propertyScoped":true},
   listPartnerInHouse: {"operationId":"listPartnerInHouse","method":"get","path":"/partner/in-house"},
   listPartnerRevenueCodes: {"operationId":"listPartnerRevenueCodes","method":"get","path":"/partner/revenue-codes"},
   createPartnerRoomCharge: {"operationId":"createPartnerRoomCharge","method":"post","path":"/partner/room-charges","body":true},

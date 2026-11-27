@@ -23,6 +23,8 @@ const AI_METRICS = [
   'AI_REPLY_DRAFT',
   // T-178: searching in your own words.
   'AI_SEARCH',
+  // T-179: a plain-words note on the occupancy forecast.
+  'AI_FORECAST_NOTE',
 ] as const;
 const WHATSAPP_METRIC = 'WHATSAPP';
 

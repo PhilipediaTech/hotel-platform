@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSession } from '../app/session.ts';
 import { Alert } from '../components/ui/alert.tsx';
+import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { Label } from '../components/ui/label.tsx';
 import { api } from '../lib/api.ts';
@@ -15,6 +16,7 @@ registerStrings(paceStrings);
 
 // Pickup and pace (Versions V2 "revenue-management support"; T-165), a tab of S28 Reports:
 // the coming nights on the books, what was picked up lately, and the same nights last year.
+// The forecast (V3; T-179) is worked out by rules; "Explain with AI" only puts it in words.
 
 const pct = (bps: number) => `${(bps / 100).toFixed(1)}%`;
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
@@ -33,6 +35,12 @@ export function Pace() {
       }),
   });
   const r = q.data;
+  const explain = useMutation({
+    mutationFn: () =>
+      api.call('explainPaceForecast', {
+        body: { ...(from ? { from } : {}), days: Number(days) || 30 },
+      }),
+  });
   return (
     <div>
       <div className="flex flex-wrap gap-3">
@@ -80,6 +88,34 @@ export function Pace() {
               final: r.totals.lastYear.final,
             })}
           </p>
+          <p className="mt-1 text-sm font-medium">
+            {t('pace.forecast.summary', {
+              rooms: r.totals.forecast.rooms,
+              occupancy: pct(r.totals.forecast.occupancyBps),
+              low: r.totals.forecast.low,
+              high: r.totals.forecast.high,
+            })}
+          </p>
+          <div className="mt-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={explain.isPending}
+              onClick={() => explain.mutate()}
+            >
+              {explain.isPending ? t('pace.forecast.explaining') : t('pace.forecast.explain')}
+            </Button>
+          </div>
+          {explain.error && (
+            <Alert tone="critical" className="mt-2">
+              {errorMessage(explain.error)}
+            </Alert>
+          )}
+          {explain.data && (
+            <p className="mt-2 max-w-2xl text-sm">
+              <span className="font-medium">{t('pace.forecast.byAi')}</span> {explain.data.note}
+            </p>
+          )}
           <div className="mt-3 overflow-x-auto">
             <table className="text-sm" aria-label={t('pace.table')}>
               <thead>
@@ -88,6 +124,8 @@ export function Pace() {
                   <th className="px-2 text-right">{t('pace.available')}</th>
                   <th className="px-2 text-right">{t('pace.rooms')}</th>
                   <th className="px-2 text-right">{t('pace.occupancy')}</th>
+                  <th className="px-2 text-right">{t('pace.forecast.column')}</th>
+                  <th className="px-2 text-left">{t('pace.forecast.why')}</th>
                   <th className="px-2 text-right">{t('pace.revenue')}</th>
                   <th className="px-2 text-right">
                     {t('pace.pickup')} {t('pace.d1')}
@@ -107,6 +145,18 @@ export function Pace() {
                     <td className="px-2 text-right">{n.roomsAvailable}</td>
                     <td className="px-2 text-right">{n.rooms}</td>
                     <td className="px-2 text-right">{pct(n.occupancyBps)}</td>
+                    <td className="px-2 text-right">
+                      {n.forecast.rooms}{' '}
+                      <span className="text-xs text-text-muted">
+                        ({t('pace.forecast.range', { low: n.forecast.low, high: n.forecast.high })})
+                      </span>
+                    </td>
+                    <td className="px-2 text-xs text-text-muted">
+                      {t(`pace.forecast.${n.forecast.method}`, {
+                        pickup: signed(n.forecast.usualPickup),
+                        compared: n.forecast.compared,
+                      })}
+                    </td>
                     <td className="px-2 text-right">{f.money(n.revenueMinor)}</td>
                     <td className="px-2 text-right">{signed(n.pickup.d1)}</td>
                     <td className="px-2 text-right">{signed(n.pickup.d7)}</td>

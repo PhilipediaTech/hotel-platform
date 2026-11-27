@@ -4,6 +4,7 @@ import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as group from './group.ts';
 import { operations } from './operations.ts';
+import { explainPaceForecast, type PaceNoteDeps } from './pace-note.ts';
 import { paceReport } from './pace.ts';
 import * as reports from './service.ts';
 
@@ -14,12 +15,16 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
 }
 
 /** Reports (tab 4 row "Reports"; T-092). */
-export function reportRoutes(deps: reports.ReportDeps): Router {
+export function reportRoutes(deps: PaceNoteDeps): Router {
   const router = express.Router();
   const r = REPORT_ROUTES;
   // Pickup and pace (T-165).
   mountRoute(router, PACE_ROUTES.getPaceReport, ({ query }, { tenant }) =>
     paceReport(deps, tenantFrom(tenant), query),
+  );
+  // The forecast's AI note (T-179).
+  mountRoute(router, PACE_ROUTES.explainPaceForecast, ({ body }, { tenant }) =>
+    explainPaceForecast(deps, tenantFrom(tenant), body),
   );
   // Group dashboards (S46; T-161).
   const g = GROUP_ROUTES;

@@ -228,7 +228,7 @@ export function createApp({
   api.use(taskRoutes({ db, tenantDb, clock, ai }));
   api.use(handoverRoutes({ db, tenantDb, clock, ai }));
   api.use(leakageRoutes({ db, tenantDb, clock }));
-  api.use(messagingRoutes({ db, tenantDb, clock, messages }));
+  api.use(messagingRoutes({ db, tenantDb, clock, messages, ai }));
   api.use(eventRoutes({ db, tenantDb, clock, provider: payments, email }));
   api.use(serviceRoutes({ db, tenantDb, clock }));
   api.use(groupRoutes({ db, tenantDb, clock }));

@@ -133,16 +133,21 @@ async function loadContext(deps: AssistantDeps, threadId: string) {
 }
 type Context = NonNullable<Awaited<ReturnType<typeof loadContext>>>;
 
-function factsOf({ thread, page }: Context) {
-  const p = thread.property;
+type FactsProperty = Context['thread']['property'];
+
+/** What the hotel says about itself, for the assistant and for staff reply drafts (T-177). */
+export function hotelFacts(
+  p: Pick<FactsProperty, 'name' | 'checkInTime' | 'checkOutTime' | 'phone' | 'roomTypes'>,
+  page: FactsProperty['bookingEngineSettings'],
+) {
   return [
     `Hotel: ${p.name}`,
-    page.headline && `Headline: ${page.headline}`,
-    page.description && `About: ${page.description}`,
+    page?.headline && `Headline: ${page.headline}`,
+    page?.description && `About: ${page.description}`,
     `Check-in from ${p.checkInTime}. Check-out by ${p.checkOutTime}.`,
     p.phone && `Phone: ${p.phone}`,
-    page.policies && `Policies: ${page.policies}`,
-    page.assistantNotes && `More from the hotel: ${page.assistantNotes}`,
+    page?.policies && `Policies: ${page.policies}`,
+    page?.assistantNotes && `More from the hotel: ${page.assistantNotes}`,
     'Room types:',
     ...p.roomTypes
       .filter((t) => t.active)
@@ -155,7 +160,9 @@ function factsOf({ thread, page }: Context) {
     .join('\n');
 }
 
-const transcriptOf = (messages: Context['messages']) =>
+const factsOf = ({ thread, page }: Context) => hotelFacts(thread.property, page);
+
+export const transcriptOf = (messages: Context['messages']) =>
   messages
     .map((m) => `${m.direction === 'IN' ? 'Guest' : 'Hotel'}: ${m.body.replace(/\n/g, ' ')}`)
     .join('\n');

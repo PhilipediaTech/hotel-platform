@@ -65,6 +65,7 @@ function Conversation({ id, keyBase }: { id: string; keyBase: unknown[] }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [text, setText] = useState('');
+  const [drafted, setDrafted] = useState(false);
   const key = [...keyBase, id];
   const q = useQuery({
     queryKey: key,
@@ -86,7 +87,16 @@ function Conversation({ id, keyBase }: { id: string; keyBase: unknown[] }) {
       api.call('sendThreadMessage', { params: { threadId: id }, body: { body: text } }),
     onSuccess: () => {
       setText('');
+      setDrafted(false);
       refresh();
+    },
+  });
+  // T-177: an AI draft only fills the box; staff read it and press Send themselves.
+  const draft = useMutation({
+    mutationFn: () => api.call('draftThreadReply', { params: { threadId: id }, body: {} }),
+    onSuccess: (r) => {
+      setText(r.draft);
+      setDrafted(true);
     },
   });
   const followUp = useMutation({
@@ -146,9 +156,18 @@ function Conversation({ id, keyBase }: { id: string; keyBase: unknown[] }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
-          <div>
+          {drafted && <p className="text-xs text-text-muted">{t('inbox.drafted')}</p>}
+          <div className="flex flex-wrap gap-2">
             <Button type="submit" disabled={send.isPending || !text.trim()}>
               {t('inbox.send')}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={draft.isPending}
+              onClick={() => draft.mutate()}
+            >
+              {draft.isPending ? t('inbox.drafting') : t('inbox.draft')}
             </Button>
           </div>
         </form>
@@ -163,8 +182,8 @@ function Conversation({ id, keyBase }: { id: string; keyBase: unknown[] }) {
           {followUp.isSuccess && <Alert tone="success">{t('inbox.followUpSent')}</Alert>}
         </div>
       )}
-      {(send.error ?? followUp.error) && (
-        <Alert tone="critical">{errorMessage(send.error ?? followUp.error)}</Alert>
+      {(send.error ?? draft.error ?? followUp.error) && (
+        <Alert tone="critical">{errorMessage(send.error ?? draft.error ?? followUp.error)}</Alert>
       )}
     </article>
   );

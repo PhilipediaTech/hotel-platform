@@ -181,7 +181,7 @@ async function vips(db: Client, date: string) {
   };
 }
 
-async function snapshotOf(
+export async function snapshotOf(
   db: Client,
   departmentId: string,
   date: string,
@@ -241,22 +241,29 @@ async function departmentOf(db: Client, departmentId: string) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────────────────
 
+/** The department asked for (refused if not here), else the caller's own. */
+export async function resolveDepartment(
+  deps: HandoverDeps,
+  tenant: TenantContext,
+  departmentId: string | undefined,
+) {
+  const departments = await deps.tenantDb.department.findMany({ orderBy: { name: 'asc' } });
+  if (departmentId) {
+    if (!departments.some((d) => d.id === departmentId)) {
+      throw new AppError('NOT_FOUND', 'Department not found.');
+    }
+    return { departments, departmentId };
+  }
+  return { departments, departmentId: await defaultDepartment(deps, tenant, departments) };
+}
+
 export async function getDraft(
   deps: HandoverDeps,
   tenant: TenantContext,
   query: { departmentId?: string | undefined },
 ) {
   const db = deps.tenantDb;
-  const departments = await db.department.findMany({ orderBy: { name: 'asc' } });
-  let departmentId: string;
-  if (query.departmentId) {
-    if (!departments.some((d) => d.id === query.departmentId)) {
-      throw new AppError('NOT_FOUND', 'Department not found.');
-    }
-    departmentId = query.departmentId;
-  } else {
-    departmentId = await defaultDepartment(deps, tenant, departments);
-  }
+  const { departments, departmentId } = await resolveDepartment(deps, tenant, query.departmentId);
   const date = await businessDate(db, tenant.propertyId, deps.clock);
   return {
     businessDate: date,

@@ -15,6 +15,8 @@ const AI_METRICS = [
   'AI_ID_SCAN',
   // T-155: drafting a reply to a guest's review.
   'AI_REVIEW_REPLY',
+  // T-175: summarising handovers for the next shift.
+  'AI_HANDOVER_SUMMARY',
 ] as const;
 const WHATSAPP_METRIC = 'WHATSAPP';
 

@@ -176,6 +176,50 @@ function SnapshotView({ snapshot }: { snapshot: Snapshot }) {
 
 // ── Writing ──────────────────────────────────────────────────────────────────────────────
 
+/**
+ * The AI summary (Versions V3 "handover summaries"; T-175): on request, for the caller's own
+ * department, never stored. Labelled so the supervisor still reads the handovers below.
+ */
+function HandoverSummary() {
+  const { t } = useTranslation();
+  const summary = useMutation({ mutationFn: () => api.call('summariseHandovers', { body: {} }) });
+  return (
+    <section
+      aria-label={t('handovers.summary.title')}
+      className="mt-4 rounded-md border border-border bg-surface p-3"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold">{t('handovers.summary.title')}</h2>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={summary.isPending}
+          onClick={() => summary.mutate()}
+        >
+          {summary.data ? t('handovers.summary.again') : t('handovers.summary.ask')}
+        </Button>
+      </div>
+      {!summary.data && !summary.error && (
+        <p className="mt-1 text-sm text-text-muted">{t('handovers.summary.hint')}</p>
+      )}
+      {summary.isPending && <p className="mt-2 text-sm">{t('handovers.summary.working')}</p>}
+      {summary.error && (
+        <Alert tone="critical" className="mt-2">
+          {errorMessage(summary.error)}
+        </Alert>
+      )}
+      {summary.data && !summary.isPending && (
+        <div className="mt-2 text-sm">
+          <p className="text-xs text-text-muted">
+            {t('handovers.summary.label', { count: summary.data.handovers })}
+          </p>
+          <p className="mt-1 whitespace-pre-line">{summary.data.summary}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function WriteHandover() {
   const { t } = useTranslation();
   const f = useFormats();
@@ -348,6 +392,7 @@ export function HandoversPage() {
   return (
     <section className="max-w-4xl">
       <h1 className="text-xl font-semibold">{t('handovers.title')}</h1>
+      <HandoverSummary />
       <WriteHandover />
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{t('handovers.list.title')}</h2>

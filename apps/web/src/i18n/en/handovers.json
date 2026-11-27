@@ -50,6 +50,15 @@
       "inHouse": "In house, leaves {{date}}",
       "arriving": "Arriving today",
       "more": "and {{n}} more"
+    },
+    "summary": {
+      "title": "Summary for your shift",
+      "hint": "A few lines from the handovers waiting for you and what is open now, written by AI.",
+      "ask": "Summarise",
+      "again": "Summarise again",
+      "working": "Summarising…",
+      "label_one": "AI summary of 1 waiting handover and what is open now: check the notes below.",
+      "label_other": "AI summary of {{count}} waiting handovers and what is open now: check the notes below."
     }
   }
 }

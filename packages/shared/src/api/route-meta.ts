@@ -516,6 +516,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   getHandoverDraft: {"operationId":"getHandoverDraft","method":"get","path":"/handovers/draft","propertyScoped":true},
   writeHandoverNote: {"operationId":"writeHandoverNote","method":"post","path":"/handovers","body":true,"propertyScoped":true,"idempotent":true},
   acknowledgeHandoverNote: {"operationId":"acknowledgeHandoverNote","method":"post","path":"/handovers/{handoverId}/acknowledge","propertyScoped":true},
+  summariseHandovers: {"operationId":"summariseHandovers","method":"post","path":"/handovers/summary","body":true,"propertyScoped":true},
   listLeakageAlerts: {"operationId":"listLeakageAlerts","method":"get","path":"/leakage/alerts","propertyScoped":true},
   getLeakageAlert: {"operationId":"getLeakageAlert","method":"get","path":"/leakage/alerts/{alertId}","propertyScoped":true},
   addLeakageAlertOutcome: {"operationId":"addLeakageAlertOutcome","method":"post","path":"/leakage/alerts/{alertId}/outcomes","body":true,"propertyScoped":true,"idempotent":true},

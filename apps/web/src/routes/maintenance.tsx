@@ -14,6 +14,7 @@ import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
 import maintenanceStrings from '../i18n/en/maintenance.json';
 import { registerStrings } from '../i18n/index.ts';
+import { InsightsView } from './maintenance-insights.tsx';
 import { PlansView } from './preventive.tsx';
 import { useFormats } from './reservations.tsx';
 import { amountToMinor, hoursAndMinutes } from './work-order.tsx';
@@ -23,7 +24,8 @@ registerStrings(maintenanceStrings);
 // S34 Assets, work orders, PM (PRD M5-08, M5-09, M5-10; T-130, T-131). Jobs: the open
 // maintenance tasks (each opens on the task page, where parts, time and cost are logged).
 // Assets: the register with location, serial, warranty and vendor, and each asset's service
-// history. Plans (pm.manage): the PM calendar and run-hours plans (preventive.tsx).
+// history. Plans (pm.manage): the PM calendar and run-hours plans (preventive.tsx). Insights
+// (asset.manage; T-180): what is out of pattern (maintenance-insights.tsx).
 
 type Asset = z.output<typeof AssetItem>;
 type Detail = z.output<typeof AssetDetail>;
@@ -44,9 +46,13 @@ export function MaintenancePage() {
   const { t } = useTranslation();
   const { permissions } = useSession();
   const [params, setParams] = useSearchParams();
-  const canPlan = permissions.includes('pm.manage');
-  const views = canPlan ? (['jobs', 'assets', 'plans'] as const) : (['jobs', 'assets'] as const);
-  type View = (typeof views)[number];
+  type View = 'jobs' | 'assets' | 'insights' | 'plans';
+  const views: View[] = [
+    'jobs',
+    'assets',
+    ...(permissions.includes('asset.manage') ? (['insights'] as const) : []),
+    ...(permissions.includes('pm.manage') ? (['plans'] as const) : []),
+  ];
   const asked = params.get('view');
   const view: View = params.get('asset')
     ? 'assets'
@@ -71,7 +77,15 @@ export function MaintenancePage() {
           </Button>
         ))}
       </div>
-      {view === 'jobs' ? <Jobs /> : view === 'assets' ? <Assets /> : <PlansView />}
+      {view === 'jobs' ? (
+        <Jobs />
+      ) : view === 'assets' ? (
+        <Assets />
+      ) : view === 'insights' ? (
+        <InsightsView />
+      ) : (
+        <PlansView />
+      )}
     </section>
   );
 }

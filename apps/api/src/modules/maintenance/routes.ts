@@ -1,7 +1,8 @@
-import { MAINTENANCE_ROUTES } from '@hotel/shared';
+import { INSIGHT_ROUTES, MAINTENANCE_ROUTES } from '@hotel/shared';
 import express, { type Router } from 'express';
 import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
+import { dismissInsight, listInsights } from './insights.ts';
 import * as preventive from './preventive.ts';
 import * as maintenance from './service.ts';
 
@@ -15,6 +16,13 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
 export function maintenanceRoutes(deps: maintenance.MaintenanceDeps): Router {
   const router = express.Router();
   const r = MAINTENANCE_ROUTES;
+  // Insights (T-180).
+  mountRoute(router, INSIGHT_ROUTES.listMaintenanceInsights, (_input, { tenant }) =>
+    listInsights(deps, tenantFrom(tenant)),
+  );
+  mountRoute(router, INSIGHT_ROUTES.dismissMaintenanceInsight, ({ body }, { tenant }) =>
+    dismissInsight(deps, tenantFrom(tenant), body),
+  );
   mountRoute(router, r.listAssets, ({ query }, { tenant }) =>
     maintenance.listAssets(deps, tenantFrom(tenant), query),
   );

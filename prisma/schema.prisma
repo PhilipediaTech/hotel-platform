@@ -155,6 +155,7 @@ model Property {
   preventivePlans      PreventivePlan[]
   generators           Generator[]
   meterReadings        MeterReading[]
+  insightDismissals    InsightDismissal[]
   lostFoundItems       LostFoundItem[]
   checklists           Checklist[]
   staffProfiles        StaffProfile[]
@@ -390,6 +391,7 @@ model User {
   generatorRunsStopped   GeneratorRun[]       @relation("RunStoppedBy")
   fuelMovements          FuelMovement[]
   meterReadings          MeterReading[]
+  insightDismissals      InsightDismissal[]
   lostItemsFound         LostFoundItem[]      @relation("LostFoundBy")
   lostItemsHeld          LostFoundItem[]      @relation("LostCustodian")
   lostItemsClosed        LostFoundItem[]      @relation("LostClosedBy")
@@ -2584,6 +2586,26 @@ model FuelMovement {
 }
 
 /// Meter readings (M5-12; tab 3; T-132): GRID, WATER, GAS or a meter the hotel names.
+/// An insight someone dismissed, and why (Versions V3 "maintenance anomaly insights"; T-180;
+/// Philip chose a table, 2026-11-27). `key` names the insight (kind and subject), `fingerprint`
+/// its evidence (the latest fault, reading or level check): the insight stays hidden until the
+/// evidence changes.
+model InsightDismissal {
+  id          String   @id @default(uuid()) @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  key         String
+  fingerprint String
+  reason      String
+  byUserId    String   @map("by_user_id") @db.Uuid
+  at          DateTime @default(now()) @db.Timestamptz(6)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  byUser   User     @relation(fields: [byUserId], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, key, fingerprint])
+  @@map("insight_dismissals")
+}
+
 model MeterReading {
   id         String   @id @default(uuid()) @db.Uuid
   propertyId String   @map("property_id") @db.Uuid

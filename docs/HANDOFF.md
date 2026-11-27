@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-179 (occupancy forecast) is pushed on `feat/T-179-occupancy-forecast`; no migration. Next: T-180 maintenance insights.
+T-180 (maintenance insights) is pushed on `feat/T-180-maintenance-insights`; migration `20270112090000_insight_dismissals`. Next: T-181 staffing suggestions.

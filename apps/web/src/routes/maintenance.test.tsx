@@ -361,3 +361,80 @@ describe('Maintenance plans (S34, M5-10)', () => {
     });
   }, 15_000);
 });
+
+describe('Maintenance insights (S34; T-180)', () => {
+  it('shows what is out of pattern, opens a filled-in task, and dismisses with a reason', async () => {
+    handlers['GET /maintenance/insights'] = () =>
+      json(200, {
+        data: [
+          {
+            key: `REPEAT_FAULTS:ROOM:${id(9)}`,
+            fingerprint: id(12),
+            kind: 'REPEAT_FAULTS',
+            severity: 'NORMAL',
+            subject: { type: 'ROOM', id: id(9), label: 'Room 101' },
+            roomId: id(9),
+            value: 3,
+            usual: null,
+            taskIds: [id(10), id(11), id(12)],
+            overduePlans: 1,
+            since: '2026-11-01T08:00:00Z',
+          },
+          {
+            key: 'GENERATOR_FUEL:GENERATOR:x',
+            fingerprint: id(13),
+            kind: 'GENERATOR_FUEL',
+            severity: 'HIGH',
+            subject: { type: 'GENERATOR', id: id(14), label: 'Main generator' },
+            roomId: null,
+            value: 25_000,
+            usual: 10_000,
+            taskIds: [],
+            overduePlans: 0,
+            since: '2026-11-09T08:00:00Z',
+          },
+        ],
+        dismissed: 0,
+      });
+    handlers['POST /maintenance/insights/dismiss'] = () => json(201, { dismissed: true });
+    const user = userEvent.setup();
+    renderAt('/maintenance?view=insights');
+    const list = await screen.findByRole('list', { name: 'Maintenance insights' });
+    const [faults, fuel] = await within(list).findAllByRole<HTMLElement>('listitem');
+    expect(
+      within(faults as HTMLElement).getByText('3 faults in the last 30 days.'),
+    ).toBeInTheDocument();
+    expect(
+      within(faults as HTMLElement).getByText('1 preventive job on it is overdue.'),
+    ).toBeInTheDocument();
+    const create = within(faults as HTMLElement).getByRole('link', { name: 'Create task' });
+    const href = new URL(create.getAttribute('href') ?? '', 'http://app.test');
+    expect(href.pathname).toBe('/tasks/new');
+    expect(Object.fromEntries(href.searchParams)).toEqual({
+      type: 'FAULT',
+      roomId: id(9),
+      description: 'Room 101: 3 faults in the last 30 days.',
+    });
+    expect(
+      within(fuel as HTMLElement).getByText(
+        '25 litres per run-hour since the last check before; usually 10.',
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(within(faults as HTMLElement).getByRole('button', { name: 'Dismiss' }));
+    await user.type(
+      within(faults as HTMLElement).getByLabelText('Why are you dismissing it?'),
+      'Compressor replaced',
+    );
+    await user.click(
+      within(faults as HTMLElement).getByRole('button', { name: 'Dismiss with this reason' }),
+    );
+    await waitFor(() =>
+      expect(
+        calls.filter((c) => c.key === 'POST /maintenance/insights/dismiss').map((c) => c.body),
+      ).toEqual([
+        { key: `REPEAT_FAULTS:ROOM:${id(9)}`, fingerprint: id(12), reason: 'Compressor replaced' },
+      ]),
+    );
+  }, 15_000);
+});

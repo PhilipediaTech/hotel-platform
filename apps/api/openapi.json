@@ -773,6 +773,115 @@
           "detail"
         ]
       },
+      "MaintenanceInsight": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "REPEAT_FAULTS",
+              "REOPENED_FAULT",
+              "METER_USE",
+              "GENERATOR_FUEL"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "HIGH",
+              "NORMAL"
+            ]
+          },
+          "subject": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ROOM",
+                  "ASSET",
+                  "METER",
+                  "GENERATOR"
+                ]
+              },
+              "id": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Uuid"
+                  },
+                  {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                ]
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "id",
+              "label"
+            ]
+          },
+          "roomId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "value": {
+            "type": "integer"
+          },
+          "usual": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "taskIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          "overduePlans": {
+            "type": "integer"
+          },
+          "since": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "required": [
+          "key",
+          "fingerprint",
+          "kind",
+          "severity",
+          "subject",
+          "roomId",
+          "value",
+          "usual",
+          "taskIds",
+          "overduePlans",
+          "since"
+        ]
+      },
       "Space": {
         "type": "object",
         "properties": {
@@ -27288,6 +27397,236 @@
           },
           "503": {
             "description": "Error: `AI_UNAVAILABLE`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/maintenance/insights": {
+      "get": {
+        "operationId": "listMaintenanceInsights",
+        "summary": "What is out of pattern: repeat faults, meter use, generator fuel (T-180)",
+        "tags": [
+          "Maintenance"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Worked out each time from the records, by rules (no AI). Overdue preventive jobs on the same equipment put an insight first. Dismissed insights are left out until their evidence changes.",
+        "x-permission": "asset.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MaintenanceInsight"
+                      }
+                    },
+                    "dismissed": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "dismissed"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/maintenance/insights/dismiss": {
+      "post": {
+        "operationId": "dismissMaintenanceInsight",
+        "summary": "Dismiss an insight, with the reason (kept and audited)",
+        "tags": [
+          "Maintenance"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "404 NOT_FOUND when no current insight has this key and fingerprint (it changed or was already dismissed).",
+        "x-permission": "asset.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "fingerprint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "key",
+                  "fingerprint",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dismissed": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "dismissed"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
             "content": {
               "application/json": {
                 "schema": {

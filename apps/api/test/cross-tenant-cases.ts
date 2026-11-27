@@ -3739,6 +3739,25 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: () => ({ text: 'Leak test in their room' }),
     untouched: bTaskUnchanged,
   },
+  // T-180: A's insights never name B's rooms, assets or tasks, and B's can't be dismissed.
+  listMaintenanceInsights: {
+    seed: bTask,
+    listIds: (body) =>
+      (body as { data: { subject: { id: string | null }; taskIds: string[] }[] }).data.flatMap(
+        (i) => [...(i.subject.id ? [i.subject.id] : []), ...i.taskIds],
+      ),
+  },
+  dismissMaintenanceInsight: {
+    seed: bTask,
+    body: (theirs) => ({
+      key: `REPEAT_FAULTS:ROOM:${theirs['roomId'] ?? ''}`,
+      fingerprint: theirs['taskId'] ?? '',
+      reason: 'Leak test',
+    }),
+    untouched: async (db) => {
+      expect(await db.insightDismissal.count()).toBe(0);
+    },
+  },
   listAssets: {
     seed: bAsset,
     listIds: (body) => (body as { data: { id: string }[] }).data.map((a) => a.id),

@@ -312,8 +312,9 @@ export function NewTaskPage() {
   const wanted = params.get('type');
   const [templateId, setTemplateId] = useState('');
   const chosen = templateId || active.find((x) => x.type === wanted)?.id || '';
-  const [roomId, setRoomId] = useState('');
-  const [description, setDescription] = useState('');
+  // A link can fill the room and details in (maintenance insights, T-180); staff check them.
+  const [roomId, setRoomId] = useState(params.get('roomId') ?? '');
+  const [description, setDescription] = useState(params.get('description') ?? '');
   const [files, setFiles] = useState<File[]>([]);
   const [priority, setPriority] = useState<Priority | ''>('');
   const [assigneeId, setAssigneeId] = useState('');

@@ -91052,6 +91052,196 @@
         }
       }
     },
+    "/tasks/suggest": {
+      "post": {
+        "operationId": "suggestTask",
+        "summary": "AI suggestion of type, department, priority, title and room for a new task",
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Needs task.create or task.report. Suggests only (nothing is saved); a field the model could not place is null. Uses one of the plan’s AI allowance.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "GUEST_REQUEST",
+                        "COMPLAINT",
+                        "FAULT",
+                        "INCIDENT",
+                        "CHECKLIST",
+                        "DISCREPANCY",
+                        "GENERAL",
+                        null
+                      ]
+                    },
+                    "departmentId": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "priority": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "LOW",
+                        "NORMAL",
+                        "HIGH",
+                        "CRITICAL",
+                        null
+                      ]
+                    },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "roomId": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Uuid"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "departmentId",
+                    "priority",
+                    "title",
+                    "roomId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`, `ALLOWANCE_USED_UP`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error: `AI_UNAVAILABLE`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/form-options": {
       "get": {
         "operationId": "getTaskFormOptions",

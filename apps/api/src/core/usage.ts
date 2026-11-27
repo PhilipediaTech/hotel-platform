@@ -17,6 +17,8 @@ const AI_METRICS = [
   'AI_REVIEW_REPLY',
   // T-175: summarising handovers for the next shift.
   'AI_HANDOVER_SUMMARY',
+  // T-176: suggesting how to file a new task.
+  'AI_TASK_SUGGEST',
 ] as const;
 const WHATSAPP_METRIC = 'WHATSAPP';
 

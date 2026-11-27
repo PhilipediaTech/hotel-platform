@@ -230,6 +230,43 @@ describe('New task (S18, M6-01)', () => {
   });
 });
 
+describe('AI suggestion on the new-task form (T-176)', () => {
+  it('fills template, room, priority and title from the description, then creates as usual', async () => {
+    permissions = ['task.create', 'task.assign'];
+    handlers['POST /tasks/suggest'] = () =>
+      json(200, {
+        type: 'FAULT',
+        departmentId: MNT.id,
+        priority: 'HIGH',
+        title: 'AC dripping on the bed',
+        roomId: id(60),
+      });
+    handlers['POST /tasks'] = () => json(201, detail(7));
+    handlers[`GET /tasks/${id(7)}`] = () => json(200, detail(7));
+    const user = userEvent.setup();
+    renderAt('/tasks/new');
+    const suggest = await screen.findByRole('button', { name: 'Suggest from description' });
+    expect(suggest).toBeDisabled();
+    await user.type(screen.getByLabelText('Details'), 'AC drips on the bed in 102');
+    await user.click(suggest);
+    expect(await screen.findByText(/Filled in by AI/)).toBeInTheDocument();
+    expect(sent('POST /tasks/suggest')[0]?.body).toEqual({ text: 'AC drips on the bed in 102' });
+    expect(screen.getByRole('radio', { name: /Fault/ })).toBeChecked();
+    expect(screen.getByLabelText('Room')).toHaveValue(id(60));
+    expect(screen.getByLabelText('Priority')).toHaveValue('HIGH');
+    expect(screen.getByLabelText('Title')).toHaveValue('AC dripping on the bed');
+    await user.click(screen.getByRole('button', { name: 'Create task' }));
+    await waitFor(() => expect(sent('POST /tasks')).toHaveLength(1));
+    expect(sent('POST /tasks')[0]?.body).toEqual({
+      templateId: id(70),
+      roomId: id(60),
+      title: 'AC dripping on the bed',
+      description: 'AC drips on the bed in 102',
+      priority: 'HIGH',
+    });
+  });
+});
+
 describe('Task detail (S18, M6-02–M6-04)', () => {
   it('offers only the allowed actions and shows the timeline', async () => {
     handlers[`GET /tasks/${id(7)}`] = () => json(200, detail(7));

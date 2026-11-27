@@ -428,9 +428,40 @@ export const reportQrFault = defineRoute({
   }),
 });
 
+// AI task classification (Versions V3 "task classification"; T-176, Philip 2026-11-27): staff
+// describe the problem in their own words and the form is filled in for them to check. It
+// suggests only: nothing is saved until they create the task. Counted against the AI allowance.
+
+export const SuggestTaskBody = z.object({
+  /** What happened, in the staff member's own words. */
+  text: z.string().trim().min(3).max(1000),
+});
+
+export const suggestTask = defineRoute({
+  operationId: 'suggestTask',
+  method: 'post',
+  path: '/tasks/suggest',
+  summary: 'AI suggestion of type, department, priority, title and room for a new task',
+  description:
+    'Needs task.create or task.report. Suggests only (nothing is saved); a field the model ' +
+    'could not place is null. Uses one of the plan’s AI allowance.',
+  tags: ['Tasks'],
+  propertyScoped: true,
+  body: SuggestTaskBody,
+  response: z.object({
+    type: z.enum(TASK_TYPES).nullable(),
+    departmentId: Uuid.nullable(),
+    priority: z.enum(PRIORITIES).nullable(),
+    title: z.string().nullable(),
+    roomId: Uuid.nullable(),
+  }),
+  errors: ['AI_UNAVAILABLE', 'ALLOWANCE_USED_UP'],
+});
+
 export const TASK_ROUTES = {
   listTasks,
   createTask,
+  suggestTask,
   getTaskFormOptions,
   getTask,
   assignTask,

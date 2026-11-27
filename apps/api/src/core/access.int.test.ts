@@ -114,6 +114,7 @@ const MEMBER_ROUTES: Record<string, string> = {
   submitStatusReport: 'mayReport (housekeeping/status-reports.ts)',
   listTasks: 'only tasks the caller may see (loadVisible)',
   createTask: 'task.create or task.report (tasks/service.ts)',
+  suggestTask: 'task.create or task.report (tasks/suggest.ts)',
   getTaskFormOptions: 'reference list',
   getTask: 'only a task the caller may see (loadVisible)',
   addTaskComment: 'only a task the caller may see (loadVisible)',

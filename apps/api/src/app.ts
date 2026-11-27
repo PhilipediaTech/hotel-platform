@@ -225,7 +225,7 @@ export function createApp({
   api.use(fxRoutes({ db, tenantDb, clock }));
   api.use(nightAuditRoutes({ db, tenantDb, clock, logger }));
   api.use(housekeepingRoutes({ db, tenantDb, clock }));
-  api.use(taskRoutes({ db, tenantDb, clock }));
+  api.use(taskRoutes({ db, tenantDb, clock, ai }));
   api.use(handoverRoutes({ db, tenantDb, clock, ai }));
   api.use(leakageRoutes({ db, tenantDb, clock }));
   api.use(messagingRoutes({ db, tenantDb, clock, messages }));

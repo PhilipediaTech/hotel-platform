@@ -65,7 +65,12 @@
       "deadline": "Deadline",
       "templateDeadline": "The template's SLA",
       "create": "Create task",
-      "chooseTemplate": "Choose what the task is."
+      "chooseTemplate": "Choose what the task is.",
+      "suggest": "Suggest from description",
+      "suggesting": "Suggesting…",
+      "suggestHint": "Describe it in your own words and AI fills in the form for you to check.",
+      "suggested": "Filled in by AI: check the template, room and title before you create it.",
+      "taskTitle": "Title"
     },
     "deadlineIn": {
       "30": "In 30 minutes",

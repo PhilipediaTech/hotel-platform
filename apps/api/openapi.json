@@ -20161,6 +20161,46 @@
                     "sameTime",
                     "final"
                   ]
+                },
+                "forecast": {
+                  "type": "object",
+                  "properties": {
+                    "rooms": {
+                      "type": "integer"
+                    },
+                    "low": {
+                      "type": "integer"
+                    },
+                    "high": {
+                      "type": "integer"
+                    },
+                    "occupancyBps": {
+                      "type": "integer"
+                    },
+                    "method": {
+                      "type": "string",
+                      "enum": [
+                        "LAST_YEAR",
+                        "RECENT_WEEKS",
+                        "ON_THE_BOOKS"
+                      ]
+                    },
+                    "usualPickup": {
+                      "type": "integer"
+                    },
+                    "compared": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "rooms",
+                    "low",
+                    "high",
+                    "occupancyBps",
+                    "method",
+                    "usualPickup",
+                    "compared"
+                  ]
                 }
               },
               "required": [
@@ -20170,7 +20210,8 @@
                 "revenueMinor",
                 "occupancyBps",
                 "pickup",
-                "lastYear"
+                "lastYear",
+                "forecast"
               ]
             }
           },
@@ -20222,6 +20263,29 @@
                   "sameTime",
                   "final"
                 ]
+              },
+              "forecast": {
+                "type": "object",
+                "properties": {
+                  "rooms": {
+                    "type": "integer"
+                  },
+                  "low": {
+                    "type": "integer"
+                  },
+                  "high": {
+                    "type": "integer"
+                  },
+                  "occupancyBps": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "rooms",
+                  "low",
+                  "high",
+                  "occupancyBps"
+                ]
               }
             },
             "required": [
@@ -20230,7 +20294,8 @@
               "revenueMinor",
               "occupancyBps",
               "pickup",
-              "lastYear"
+              "lastYear",
+              "forecast"
             ]
           },
           "definitions": {
@@ -86463,6 +86528,136 @@
           },
           "500": {
             "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/pace/explain": {
+      "post": {
+        "operationId": "explainPaceForecast",
+        "summary": "A short AI note on the forecast, in plain words (T-179)",
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Written only from the same figures as GET /reports/pace for these nights; a note with a number not among them is refused (503 AI_UNAVAILABLE). Reads only. 403 ALLOWANCE_USED_UP when the month’s AI allowance is gone.",
+        "x-permission": "report.dashboard",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/components/schemas/IsoDate"
+                  },
+                  "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120,
+                    "default": 30
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "note": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "note"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: `VALIDATION_ERROR`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`, `ALLOWANCE_USED_UP`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error: `AI_UNAVAILABLE`",
             "content": {
               "application/json": {
                 "schema": {

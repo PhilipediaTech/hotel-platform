@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-178 (AI search) is pushed on `feat/T-178-ai-search`; no migration. The V3 AI row is done. Next: V3 forecasting and insights, which need stories written for Philip first.
+T-179 (occupancy forecast) is pushed on `feat/T-179-occupancy-forecast`; no migration. Next: T-180 maintenance insights.

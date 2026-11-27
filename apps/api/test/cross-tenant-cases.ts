@@ -4186,6 +4186,8 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
   },
   // Pickup and pace (T-165): B's booking never counts in A's nights.
   getPaceReport: { seed: bReservation, listIds: () => [] },
+  // T-179: the forecast's AI note reads only the caller's own hotel (as the report does).
+  explainPaceForecast: { seed: bReservation, creates: true, body: () => ({ days: 7 }) },
   // Group dashboards (T-161)
   getGroupDashboard: {
     seed: bGroup,

@@ -1,4 +1,4 @@
-import { addDays, localDate, type PaceReport } from '@hotel/shared';
+import { addDays, FORECAST_RECENT_WEEKS, localDate, type PaceReport } from '@hotel/shared';
 import type { z } from 'zod';
 import { AppError } from '../../core/errors.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
@@ -10,15 +10,27 @@ import type { ReportDeps } from './service.ts';
 // that night and as it finished. "On the books at a moment" is rebuilt from what is kept: a
 // stay counts from when its reservation was made, until it was cancelled or became a no-show
 // (the status history says when). Holds not yet confirmed and day-use are left out.
+//
+// The forecast (T-179) is rules only, so it is the same every time and costs nothing to run.
+// For each night it compares the same weekday before, at the same number of days out: how many
+// rooms those nights picked up from that point to the finish (net of cancellations). With a
+// year of history: last year's same weekday and the weeks either side of it; otherwise the last
+// 8 same weekdays that have passed. Only nights the hotel was already using the system for at
+// that point count, so a new hotel's empty past doesn't read as "nobody books late".
 
 type Out = z.input<typeof PaceReport>;
 
 const DEFINITIONS =
-  'Rooms: overnight stays on the books for the night, confirmed, in house or checked out; holds not yet confirmed and day-use are left out. Revenue: those nights at their booked rate, before tax. Pickup: rooms on the books now less rooms on the books 1, 7 or 30 days ago (a cancellation counts against it). Last year: the same weekday 52 weeks earlier, as it stood the same number of days before that night, and as it finished. Rooms available: active rooms less those blocked for the night (and, tonight, those out of order or service).';
+  'Rooms: overnight stays on the books for the night, confirmed, in house or checked out; holds not yet confirmed and day-use are left out. Revenue: those nights at their booked rate, before tax. Pickup: rooms on the books now less rooms on the books 1, 7 or 30 days ago (a cancellation counts against it). Last year: the same weekday 52 weeks earlier, as it stood the same number of days before that night, and as it finished. Rooms available: active rooms less those blocked for the night (and, tonight, those out of order or service). Forecast: rooms on the books now plus the usual pickup from this many days out, on the same weekday last year and the weeks either side (with a year of history) or the last 8 same weekdays; low and high are the lower and upper quarter of those pickups; never below 0 or above rooms available; pickup is net of cancellations, so cancellations are already allowed for.';
 
 const DAY = 86_400_000;
 const day = (d: Date) => d.toISOString().slice(0, 10);
 const LOST = ['CANCELLED', 'NO_SHOW'] as const;
+
+/** The value at this fraction through the sorted list (nearest rank). */
+function at(sorted: number[], fraction: number, round: (n: number) => number) {
+  return sorted[round((sorted.length - 1) * fraction)] ?? 0;
+}
 
 export async function paceReport(
   deps: ReportDeps,
@@ -39,12 +51,15 @@ export async function paceReport(
   const to = addDays(from, q.days); // excluded
   const lyFrom = addDays(from, -364);
   const lyTo = addDays(to, -364);
+  const recentFrom = addDays(today, -7 * FORECAST_RECENT_WEEKS);
 
   // Stays are the property's (stay nights and status history have no property of their own).
   const inRange = {
     OR: [
       { date: { gte: new Date(from), lt: new Date(to) } },
-      { date: { gte: new Date(lyFrom), lt: new Date(lyTo) } },
+      // Last year with a week either side, and the recent weeks, for the forecast.
+      { date: { gte: new Date(addDays(lyFrom, -7)), lt: new Date(addDays(lyTo, 7)) } },
+      { date: { gte: new Date(recentFrom), lt: new Date(today) } },
     ],
   };
   const stays = await db.stay.findMany({
@@ -95,6 +110,49 @@ export async function paceReport(
     return { rooms, revenue };
   };
 
+  /** Since when the hotel has been taking bookings here: earlier nights tell us nothing. */
+  const first = await db.reservation.findFirst({
+    orderBy: { createdAt: 'asc' },
+    select: { createdAt: true },
+  });
+  const between = (a: string, b: string) =>
+    Math.round((new Date(b).getTime() - new Date(a).getTime()) / DAY);
+  /**
+   * Rooms the past night `n` picked up to its finish from the point that was as far before it
+   * as now is before `date` (as last year's "same time" is). Null when the hotel wasn't taking
+   * bookings here yet at that point.
+   */
+  const pickupFrom = (n: string, date: string): number | null => {
+    const point = new Date(now.getTime() - between(n, date) * DAY);
+    if (!first || point < first.createdAt || n >= today) return null;
+    return booked(n, now).rooms - booked(n, point).rooms;
+  };
+  const forecastFor = (date: string, onBooks: number, available: number) => {
+    const ly = [-7, 0, 7]
+      .map((w) => pickupFrom(addDays(date, -364 + w), date))
+      .filter((v): v is number => v !== null);
+    const recent = Array.from({ length: FORECAST_RECENT_WEEKS + 20 }, (_, k) =>
+      addDays(date, -7 * (k + 1)),
+    )
+      .filter((n) => n < today && n >= recentFrom)
+      .map((n) => pickupFrom(n, date))
+      .filter((v): v is number => v !== null);
+    const method = ly.length ? 'LAST_YEAR' : recent.length ? 'RECENT_WEEKS' : 'ON_THE_BOOKS';
+    const samples = (ly.length ? ly : recent).sort((a, b) => a - b);
+    const clamp = (n: number) => Math.max(0, Math.min(available, onBooks + n));
+    const usual = samples.length ? at(samples, 0.5, Math.floor) : 0;
+    const rooms = clamp(usual);
+    return {
+      rooms,
+      low: samples.length ? clamp(at(samples, 0.25, Math.floor)) : rooms,
+      high: samples.length ? clamp(at(samples, 0.75, Math.ceil)) : rooms,
+      occupancyBps: available > 0 ? Math.round((rooms * 10_000) / available) : 0,
+      method,
+      usualPickup: usual,
+      compared: samples.length,
+    } as const;
+  };
+
   // Rooms that can be sold each night: active rooms less blocks (and tonight, out of order).
   const [rooms, blocks] = await Promise.all([
     db.room.findMany({ where: { active: true }, select: { id: true, hkStatus: true } }),
@@ -129,6 +187,9 @@ export async function paceReport(
     d30: 0,
     sameTime: 0,
     final: 0,
+    forecast: 0,
+    low: 0,
+    high: 0,
   };
   const out = dates.map((date) => {
     const current = booked(date, now);
@@ -152,6 +213,10 @@ export async function paceReport(
     totals.d30 += pickup.d30;
     totals.sameTime += lastYear.sameTime;
     totals.final += lastYear.final;
+    const forecast = forecastFor(date, current.rooms, available);
+    totals.forecast += forecast.rooms;
+    totals.low += forecast.low;
+    totals.high += forecast.high;
     return {
       date,
       roomsAvailable: available,
@@ -160,6 +225,7 @@ export async function paceReport(
       occupancyBps: available > 0 ? Math.round((current.rooms * 10_000) / available) : 0,
       pickup,
       lastYear,
+      forecast,
     };
   });
   return {
@@ -176,6 +242,15 @@ export async function paceReport(
         totals.roomsAvailable > 0 ? Math.round((totals.rooms * 10_000) / totals.roomsAvailable) : 0,
       pickup: { d1: totals.d1, d7: totals.d7, d30: totals.d30 },
       lastYear: { sameTime: totals.sameTime, final: totals.final },
+      forecast: {
+        rooms: totals.forecast,
+        low: totals.low,
+        high: totals.high,
+        occupancyBps:
+          totals.roomsAvailable > 0
+            ? Math.round((totals.forecast * 10_000) / totals.roomsAvailable)
+            : 0,
+      },
     },
     definitions: DEFINITIONS,
   };

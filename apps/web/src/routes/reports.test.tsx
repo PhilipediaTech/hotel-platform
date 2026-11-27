@@ -195,6 +195,15 @@ const PACE = {
       occupancyBps: 6000,
       pickup: { d1: 1, d7: 3, d30: -1 },
       lastYear: { date: '2025-11-21', sameTime: 4, final: 8 },
+      forecast: {
+        rooms: 9,
+        low: 8,
+        high: 10,
+        occupancyBps: 9000,
+        method: 'LAST_YEAR',
+        usualPickup: 3,
+        compared: 3,
+      },
     },
     {
       date: '2026-11-21',
@@ -204,6 +213,15 @@ const PACE = {
       occupancyBps: 2000,
       pickup: { d1: 0, d7: 0, d30: 2 },
       lastYear: { date: '2025-11-22', sameTime: 1, final: 5 },
+      forecast: {
+        rooms: 2,
+        low: 2,
+        high: 2,
+        occupancyBps: 2000,
+        method: 'ON_THE_BOOKS',
+        usualPickup: 0,
+        compared: 0,
+      },
     },
   ],
   totals: {
@@ -213,6 +231,7 @@ const PACE = {
     occupancyBps: 4000,
     pickup: { d1: 1, d7: 3, d30: 1 },
     lastYear: { sameTime: 5, final: 13 },
+    forecast: { rooms: 11, low: 10, high: 12, occupancyBps: 5500 },
   },
   definitions: 'Rooms: overnight stays on the books.',
 };
@@ -230,6 +249,8 @@ beforeEach(() => {
     'GET /reports/dashboard': () => json(200, DASHBOARD),
     'GET /reports/operations': () => json(200, OPERATIONS),
     'GET /reports/pace': () => json(200, PACE),
+    'POST /reports/pace/explain': () =>
+      json(200, { note: 'Expect 55% over the 2 nights; 2026-11-20 is the strongest.' }),
   };
   vi.stubGlobal(
     'fetch',
@@ -372,6 +393,23 @@ describe('Pickup and pace (T-165)', () => {
     const table = screen.getByRole('table', { name: 'Nights on the books' });
     const first = within(table).getAllByRole('row')[1] as HTMLElement;
     expect(within(first).getByText('-1')).toBeInTheDocument();
+    // The forecast (T-179): the likely finish, its range and why.
+    expect(
+      screen.getByText('Forecast: 11 room nights (55.0%), likely between 10 and 12.'),
+    ).toBeInTheDocument();
+    expect(within(first).getByText('(8–10)')).toBeInTheDocument();
+    expect(
+      within(first).getByText('Last year this weekday picked up +3 from this point'),
+    ).toBeInTheDocument();
+    const second = within(table).getAllByRole('row')[2] as HTMLElement;
+    expect(
+      within(second).getByText('No nights to compare yet: on the books only'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Explain with AI' }));
+    expect(
+      await screen.findByText('Expect 55% over the 2 nights; 2026-11-20 is the strongest.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('AI note, from the figures above:')).toBeInTheDocument();
     expect(
       calls.some(
         (u) => u.pathname.endsWith('/reports/pace') && u.searchParams.get('days') === '30',

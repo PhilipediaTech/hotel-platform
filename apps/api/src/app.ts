@@ -264,7 +264,7 @@ export function createApp({
   api.use(integrationRoutes({ db, tenantDb, clock, config, webhooks }));
   api.use(supportRoutes({ db, tenantDb, clock, config }));
   api.use(onboardingRoutes({ db, tenantDb, clock, config }));
-  api.use(reportRoutes({ db, tenantDb, clock }));
+  api.use(reportRoutes({ db, tenantDb, clock, ai }));
   api.use(platformRoutes({ db, clock, config, provider: payments, email }));
   api.use(partnerRoutes({ db, clock, config, email }));
   api.use(

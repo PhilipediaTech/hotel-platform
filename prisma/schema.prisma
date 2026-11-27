@@ -343,6 +343,7 @@ model User {
   supportTicketsAssigned SupportTicket[]      @relation("SupportTicketAssignee")
   supportMessages        SupportMessage[]
   trainingsGiven         TrainingSession[]
+  helpArticlesEdited     HelpArticle[]
   memberships            Membership[]
   authTokens             AuthToken[]
   mfaRecoveryCodes       MfaRecoveryCode[]
@@ -5263,4 +5264,23 @@ model TrainingSession {
 
   @@index([organisationId, scheduledAt])
   @@map("training_sessions")
+}
+
+/// A help-centre article for every hotel, written by the platform team (T-173). Plain text:
+/// paragraphs, and lines starting "- " or "1. " shown as lists. Not a tenant table.
+model HelpArticle {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug        String   @unique
+  title       String
+  body        String
+  /// App pages it explains, e.g. /front-desk.
+  pages       String[] @default([])
+  published   Boolean  @default(false)
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("help_articles")
 }

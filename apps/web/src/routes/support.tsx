@@ -18,6 +18,7 @@ import { api } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
 import { GettingStartedCard, TeamProgress } from './getting-started.tsx';
+import { HelpArticles } from './help-articles.tsx';
 import { MyTraining } from './platform-onboarding.tsx';
 
 registerStrings(helpdeskStrings);
@@ -262,7 +263,10 @@ export function SupportPage() {
             : t('helpdesk.noContact')}
         </p>
       )}
-      <div className="mt-4">{!open && <GettingStartedCard />}</div>
+      <div className="mt-4">
+        {!open && <GettingStartedCard />}
+        {!open && <HelpArticles page={page} />}
+      </div>
       {list.error && (
         <Alert tone="critical" className="mt-3">
           {errorMessage(list.error)}

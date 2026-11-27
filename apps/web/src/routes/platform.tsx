@@ -22,6 +22,7 @@ import { cn } from '../lib/cn.ts';
 import { errorMessage } from '../lib/form.ts';
 import { toMinor } from '../lib/money.ts';
 import { PartnersPanel, TenantPartnerForm } from './platform-partners.tsx';
+import { HelpCentreAdmin } from './platform-help.tsx';
 import { OnboardingTracker, TrainingPanel } from './platform-onboarding.tsx';
 import { OnboardingContactForm, SupportQueue } from './platform-support.tsx';
 
@@ -614,6 +615,7 @@ export function PlatformPage() {
       </div>
       <OnboardingTracker />
       <SupportQueue />
+      <HelpCentreAdmin />
       <PartnersPanel />
     </section>
   );

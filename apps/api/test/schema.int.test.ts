@@ -83,6 +83,7 @@ describe('migrations', () => {
       'guest_reviews',
       'guests',
       'handover_notes',
+      'help_articles',
       'hk_assignments',
       'id_documents',
       'idempotency_keys',

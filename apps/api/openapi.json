@@ -5714,6 +5714,69 @@
           "confirmedBy"
         ]
       },
+      "TaxSuggestion": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "country": {
+            "type": "string"
+          },
+          "taxes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "authority": {
+                  "type": "string"
+                },
+                "rateBps": {
+                  "type": "integer"
+                },
+                "inclusive": {
+                  "type": "boolean"
+                },
+                "appliesTo": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "code",
+                "name",
+                "authority",
+                "rateBps",
+                "inclusive",
+                "appliesTo"
+              ]
+            }
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "added": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "country",
+          "taxes",
+          "notes",
+          "added"
+        ]
+      },
       "CancellationPolicy": {
         "type": "object",
         "properties": {
@@ -25081,7 +25144,9 @@
                       "NG",
                       "GH",
                       "KE",
-                      "ZA"
+                      "ZA",
+                      "UG",
+                      "GB"
                     ]
                   },
                   "contactName": {
@@ -39158,7 +39223,9 @@
                       "NG",
                       "GH",
                       "KE",
-                      "ZA"
+                      "ZA",
+                      "UG",
+                      "GB"
                     ]
                   },
                   "propertyName": {
@@ -45936,11 +46003,15 @@
                     },
                     "confirmation": {
                       "$ref": "#/components/schemas/TaxConfirmation"
+                    },
+                    "suggestion": {
+                      "$ref": "#/components/schemas/TaxSuggestion"
                     }
                   },
                   "required": [
                     "data",
-                    "confirmation"
+                    "confirmation",
+                    "suggestion"
                   ]
                 }
               }
@@ -46327,6 +46398,102 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TaxConfirmation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in: `UNAUTHENTICATED`, `SESSION_EXPIRED`, `MFA_REQUIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: `FORBIDDEN`, `MODULE_DISABLED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: `RATE_LIMITED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error: `INTERNAL`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tax-rules/suggested": {
+      "post": {
+        "operationId": "addSuggestedTaxes",
+        "summary": "Add the country pack's suggested taxes from today",
+        "tags": [
+          "Tax"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Creates a tax line code and a tax rule for each suggestion and puts it on the income codes it applies to. The taxes then need confirming again.",
+        "x-permission": "tax.manage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Property the call acts on."
+            },
+            "required": true,
+            "description": "Property the call acts on.",
+            "name": "X-Property-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TaxRule"
+                      }
+                    },
+                    "confirmation": {
+                      "$ref": "#/components/schemas/TaxConfirmation"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "confirmation"
+                  ]
                 }
               }
             }
@@ -96062,7 +96229,9 @@
                       "NG",
                       "GH",
                       "KE",
-                      "ZA"
+                      "ZA",
+                      "UG",
+                      "GB"
                     ]
                   }
                 },
@@ -96087,7 +96256,9 @@
                         "NG",
                         "GH",
                         "KE",
-                        "ZA"
+                        "ZA",
+                        "UG",
+                        "GB"
                       ]
                     },
                     "applied": {

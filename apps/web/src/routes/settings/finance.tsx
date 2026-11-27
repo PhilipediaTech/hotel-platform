@@ -12,6 +12,7 @@ import {
   versionsOn,
   type RevenueCodeItem,
   type TaxRuleItem,
+  type TaxSuggestion,
 } from '@hotel/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
@@ -125,12 +126,13 @@ function TaxesTab() {
   if (!f.rules.data || !f.codes.data) {
     return <p className="text-sm text-text-muted">{t('shell.loading')}</p>;
   }
-  const { data: rules, confirmation } = f.rules.data;
+  const { data: rules, confirmation, suggestion } = f.rules.data;
   const codeName = new Map(f.codes.data.map((c) => [c.id, c.name]));
 
   return (
     <div>
       <ConfirmBanner confirmation={confirmation} canEdit={f.canEdit} locale={f.locale} />
+      {suggestion && <SuggestedTaxes suggestion={suggestion} canEdit={f.canEdit} />}
       {rules.length === 0 ? (
         <p className="mb-4 text-sm text-text-muted">{t('finance.taxes.none')}</p>
       ) : (
@@ -224,6 +226,65 @@ function TaxesTab() {
   function current(rule: Rule) {
     return rule.versions.find((v) => v.id === rule.currentVersionId);
   }
+}
+
+/** The country pack's suggested taxes (T-174): one click adds them, then they are confirmed. */
+function SuggestedTaxes({
+  suggestion,
+  canEdit,
+}: {
+  suggestion: z.output<typeof TaxSuggestion>;
+  canEdit: boolean;
+}) {
+  const { t } = useTranslation();
+  const invalidate = useInvalidate();
+  const add = useMutation({
+    mutationFn: () => api.call('addSuggestedTaxes'),
+    onSuccess: invalidate,
+  });
+  return (
+    <section
+      aria-label={t('finance.suggested.title', { country: suggestion.country })}
+      className="mb-4 rounded-md border border-border bg-surface p-3 text-sm"
+    >
+      <h2 className="font-medium">
+        {t('finance.suggested.title', { country: suggestion.country })}
+      </h2>
+      {!suggestion.added && (
+        <>
+          <ul className="mt-1 list-disc pl-5">
+            {suggestion.taxes.map((tax) => (
+              <li key={tax.code}>
+                {t(tax.inclusive ? 'finance.suggested.lineIncluded' : 'finance.suggested.line', {
+                  name: tax.name,
+                  rate: formatRate(tax.rateBps),
+                  authority: tax.authority,
+                  on: tax.appliesTo.map((c) => t(`finance.suggested.on.${c}`)).join(', '),
+                })}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-text-muted">{t('finance.suggested.check')}</p>
+          {canEdit && (
+            <Button
+              size="sm"
+              className="mt-2"
+              disabled={add.isPending}
+              onClick={() => add.mutate()}
+            >
+              {t('finance.suggested.add')}
+            </Button>
+          )}
+          {add.error && (
+            <Alert tone="critical" className="mt-2">
+              {errorMessage(add.error)}
+            </Alert>
+          )}
+        </>
+      )}
+      {suggestion.notes && <p className="mt-2 text-text-muted">{suggestion.notes}</p>}
+    </section>
+  );
 }
 
 function ConfirmBanner({

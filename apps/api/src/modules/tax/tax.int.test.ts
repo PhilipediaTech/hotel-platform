@@ -307,3 +307,75 @@ describe('database guards', () => {
     );
   });
 });
+
+describe('suggested taxes from the country pack (T-174)', () => {
+  it('Kenya: adds VAT and the tourism levy in one click, on the right income codes, then reopens confirmation', async () => {
+    const h = await makeHotel(db, now);
+    await db.organisation.update({ where: { id: h.org.id }, data: { country: 'KE' } });
+    await createDefaultTaxes(db, { id: h.p1.id, country: 'KE', settings: {} }, TODAY);
+    const c = hotelClient(db, clock, h.p1.id);
+    const gm = c.as(await sessionCookie(db, h.gm.id, clock));
+    const fd = c.as(await sessionCookie(db, h.fd.id, clock));
+
+    await gm.post('/tax-rules/confirm');
+    const before = (await gm.get('/tax-rules')).body as {
+      data: Rule[];
+      suggestion: { country: string; added: boolean; taxes: { code: string; rateBps: number }[] };
+    };
+    expect(before.data).toEqual([]);
+    expect(before.suggestion).toMatchObject({
+      country: 'Kenya',
+      added: false,
+      taxes: [
+        { code: 'VAT', rateBps: 1600 },
+        { code: 'TL', rateBps: 200 },
+      ],
+    });
+
+    expect((await fd.post('/tax-rules/suggested')).status).toBe(403);
+    const res = await gm.post('/tax-rules/suggested');
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    const body = res.body as { data: Rule[]; confirmation: { confirmedAt: string | null } };
+    expect(body.confirmation.confirmedAt).toBeNull();
+    expect(
+      body.data.map((r) => [r.name, r.versions[0]?.rateBps, r.versions[0]?.effectiveFrom]),
+    ).toEqual([
+      ['Tourism levy', 200, TODAY],
+      ['VAT', 1600, TODAY],
+    ]);
+
+    const codes = await db.revenueCode.findMany({ where: { propertyId: h.p1.id } });
+    const ids = (code: string) =>
+      (codes.find((x) => x.code === code)?.taxRuleIds ?? [])
+        .map((id) => body.data.find((r) => r.id === id)?.name)
+        .sort();
+    expect(ids('ROOM')).toEqual(['Tourism levy', 'VAT']);
+    expect(ids('FNB')).toEqual(['Tourism levy', 'VAT']);
+    expect(ids('MISC')).toEqual(['VAT']);
+    expect(codes.find((x) => x.code === 'TL')?.group).toBe('TAX');
+
+    // A 10,000.00 room: 16% VAT and 2% levy, both on the net (the Tourism Fund's 2/118).
+    const room = codes.find((x) => x.code === 'ROOM');
+    const versions = body.data
+      .filter((r) => room?.taxRuleIds.includes(r.id))
+      .flatMap((r) => r.versions.map((v) => ({ ...v, taxRuleId: r.name })));
+    const result = calculateTaxes(1_000_000n, versionsOn(versions, TODAY));
+    expect(Object.fromEntries(result.taxes.map((t) => [t.taxRuleId, t.amountMinor]))).toEqual({
+      VAT: 160_000n,
+      'Tourism levy': 20_000n,
+    });
+
+    // Once added, never twice.
+    const after = (await gm.get('/tax-rules')).body as { suggestion: { added: boolean } };
+    expect(after.suggestion.added).toBe(true);
+    expect((await gm.post('/tax-rules/suggested')).status).toBe(409);
+    expect(await audit('taxrule.created')).toHaveLength(2);
+  });
+
+  it('Nigeria has no suggestions (its example taxes come with the property)', async () => {
+    const h = await hotel();
+    const res = await h.gmc.get('/tax-rules');
+    expect((res.body as { suggestion: unknown }).suggestion).toBeNull();
+    expect((await h.gmc.post('/tax-rules/suggested')).status).toBe(404);
+  });
+});

@@ -8,6 +8,8 @@ export const SIGN_UP_COUNTRIES = {
   GH: { name: 'Ghana', timeZone: 'Africa/Accra', currency: 'GHS', locale: 'en-GH' },
   KE: { name: 'Kenya', timeZone: 'Africa/Nairobi', currency: 'KES', locale: 'en-KE' },
   ZA: { name: 'South Africa', timeZone: 'Africa/Johannesburg', currency: 'ZAR', locale: 'en-ZA' },
+  UG: { name: 'Uganda', timeZone: 'Africa/Kampala', currency: 'UGX', locale: 'en-UG' },
+  GB: { name: 'United Kingdom', timeZone: 'Europe/London', currency: 'GBP', locale: 'en-GB' },
 } as const;
 
 export type SignUpCountry = keyof typeof SIGN_UP_COUNTRIES;

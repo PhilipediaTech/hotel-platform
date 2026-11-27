@@ -58,6 +58,7 @@ const code = (
 });
 
 let confirmation: object;
+let suggestion: object | null;
 let handlers: Record<string, (body: unknown) => Response>;
 const calls: { key: string; body: unknown }[] = [];
 const sent = (key: string) => calls.filter((c) => c.key === key);
@@ -65,6 +66,7 @@ const sent = (key: string) => calls.filter((c) => c.key === key);
 beforeEach(() => {
   calls.length = 0;
   confirmation = { examples: true, confirmedAt: null, confirmedBy: null };
+  suggestion = null;
   handlers = {
     'GET /me': () =>
       json(200, makeMe({ memberships: [membership(LAGOS, ['tax.manage', 'frontdesk.read'])] })),
@@ -77,6 +79,7 @@ beforeEach(() => {
           rule(VAT as string, 'VAT', VAT_CODE as string, 750, 2),
         ],
         confirmation,
+        suggestion,
       }),
     'GET /revenue-codes': () =>
       json(200, {
@@ -126,6 +129,43 @@ function renderAt(path: string) {
 }
 
 describe('Taxes tab', () => {
+  it("offers the country pack's suggested taxes in one click (T-174)", async () => {
+    const user = userEvent.setup();
+    suggestion = {
+      country: 'Kenya',
+      taxes: [
+        {
+          code: 'VAT',
+          name: 'VAT',
+          authority: 'KRA',
+          rateBps: 1600,
+          inclusive: false,
+          appliesTo: ['ROOM', 'FNB', 'MISC'],
+        },
+        {
+          code: 'TL',
+          name: 'Tourism levy',
+          authority: 'Tourism Fund',
+          rateBps: 200,
+          inclusive: false,
+          appliesTo: ['ROOM', 'FNB'],
+        },
+      ],
+      notes: 'A service charge, if your hotel adds one, is yours to set.',
+      added: false,
+    };
+    handlers['POST /tax-rules/suggested'] = () => json(201, { data: [], confirmation });
+    renderAt('/settings/finance');
+    const panel = await screen.findByRole('region', { name: 'Suggested taxes for Kenya' });
+    expect(panel).toHaveTextContent(
+      'VAT 16% on rooms, food and drink, other charges, added to the price (paid to KRA)',
+    );
+    expect(panel).toHaveTextContent('Tourism levy 2% on rooms, food and drink');
+    expect(panel).toHaveTextContent('yours to set');
+    await user.click(within(panel).getByRole('button', { name: 'Add these taxes' }));
+    await waitFor(() => expect(sent('POST /tax-rules/suggested')).toHaveLength(1));
+  });
+
   it('marks example rates and records the confirmation', async () => {
     const user = userEvent.setup();
     renderAt('/settings/finance');

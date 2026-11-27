@@ -1,6 +1,9 @@
 import {
   localDate,
+  packFor,
+  SUGGESTED_TAX_INCOME_CODES,
   TAX_LINE_GROUPS,
+  type TaxSuggestion,
   type RevenueCodeBody,
   type RevenueCodeItem,
   type RevenueCodePatchBody,
@@ -207,7 +210,121 @@ export async function listTaxRules(deps: TaxDeps, tenant: TenantContext) {
   return {
     data: rules.map((r) => ruleItem(r, today)),
     confirmation: await confirmation(deps, property.settings),
+    suggestion: await suggestionFor(deps, tenant),
   };
+}
+
+// ── Suggested taxes (Versions V2 second country pack; T-174) ──────────────────────────
+
+async function packOf(deps: TaxDeps, tenant: TenantContext) {
+  const organisation = await deps.db.organisation.findUniqueOrThrow({
+    where: { id: tenant.organisationId },
+    select: { country: true, countryPack: true },
+  });
+  const pack = packFor(organisation);
+  return pack && pack.suggestedTaxes.length > 0 ? pack : null;
+}
+
+async function suggestionFor(
+  deps: TaxDeps,
+  tenant: TenantContext,
+): Promise<z.input<typeof TaxSuggestion> | null> {
+  const pack = await packOf(deps, tenant);
+  if (!pack) return null;
+  const codes = await deps.tenantDb.revenueCode.findMany({
+    where: { code: { in: pack.suggestedTaxes.map((t) => t.code) } },
+    select: { code: true },
+  });
+  return {
+    country: pack.name,
+    taxes: pack.suggestedTaxes.map((t) => ({
+      code: t.code,
+      name: t.name,
+      authority: t.authority,
+      rateBps: t.rateBps,
+      inclusive: t.inclusive,
+      appliesTo: [...t.appliesTo],
+    })),
+    notes: pack.taxNotes,
+    added: codes.length === pack.suggestedTaxes.length,
+  };
+}
+
+/**
+ * Adds the pack's suggested taxes from today: a tax line code and a rule for each, put on the
+ * income codes it applies to. Refused if any of their codes is already taken, so a hotel's own
+ * set-up is never mixed with a second VAT. The taxes need confirming again afterwards.
+ */
+export async function addSuggestedTaxes(deps: TaxDeps, tenant: TenantContext) {
+  const pack = await packOf(deps, tenant);
+  if (!pack) throw new AppError('NOT_FOUND', 'Your country pack has no suggested taxes');
+  const property = await propertyOf(deps, tenant);
+  const today = localDate(deps.clock(), property.timeZone);
+  await deps.tenantDb.$transaction(async (tx) => {
+    const taken = await tx.revenueCode.findMany({
+      where: { code: { in: pack.suggestedTaxes.map((t) => t.code) } },
+      select: { code: true },
+    });
+    if (taken.length > 0) {
+      throw new AppError(
+        'STATE_TRANSITION_INVALID',
+        `You already have a ${taken.map((c) => c.code).join(', ')} code: add the taxes by hand`,
+      );
+    }
+    const income = await tx.revenueCode.findMany({
+      where: { code: { in: [...SUGGESTED_TAX_INCOME_CODES] } },
+    });
+    const added = new Map<string, string[]>();
+    for (const t of pack.suggestedTaxes) {
+      const code = await tx.revenueCode.create({
+        data: {
+          code: t.code,
+          name: t.name,
+          group: 'TAX',
+        } as Prisma.RevenueCodeUncheckedCreateInput,
+      });
+      const version = {
+        effectiveFrom: today,
+        rateBps: t.rateBps,
+        basis: 'NET' as const,
+        sequence: t.sequence,
+        inclusive: t.inclusive,
+      };
+      const rule = await tx.taxRule.create({
+        data: {
+          name: t.name,
+          authority: t.authority,
+          revenueCodeId: code.id,
+          versions: { create: { ...version, effectiveFrom: dbDate(today) } },
+        } as Prisma.TaxRuleUncheckedCreateInput,
+      });
+      for (const c of t.appliesTo) added.set(c, [...(added.get(c) ?? []), rule.id]);
+      await recordAudit(tx, {
+        action: 'taxrule.created',
+        entityType: 'tax_rule',
+        entityId: rule.id,
+        after: { name: t.name, authority: t.authority, suggested: true, ...version },
+      });
+    }
+    for (const c of income) {
+      const ids = added.get(c.code) ?? [];
+      if (ids.length === 0) continue;
+      await tx.revenueCode.update({
+        where: { id: c.id },
+        data: { taxRuleIds: [...new Set([...c.taxRuleIds, ...ids])] },
+      });
+    }
+  });
+  // New rates are unchecked: the setup checklist's tax step opens again.
+  await deps.db.$transaction(async (tx) => {
+    const p = await tx.property.findUniqueOrThrow({ where: { id: tenant.propertyId } });
+    const settings =
+      p.settings && typeof p.settings === 'object' && !Array.isArray(p.settings) ? p.settings : {};
+    const { confirmedAt: _at, confirmedById: _by, ...taxes } = taxSettingsOf(p.settings);
+    await tx.property.update({ where: { id: p.id }, data: { settings: { ...settings, taxes } } });
+  });
+  const { data, confirmation: c } = await listTaxRules(deps, tenant);
+  return { data, confirmation: c };
 }
 
 const auditVersion = (v: z.output<typeof TaxVersionBody>) => ({

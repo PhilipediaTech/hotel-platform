@@ -136,6 +136,28 @@ export const TaxConfirmation = z
   })
   .meta({ id: 'TaxConfirmation' });
 
+/** The country pack's suggested taxes (T-174): added in one click, then confirmed as usual. */
+export const TaxSuggestion = z
+  .object({
+    country: z.string(),
+    taxes: z.array(
+      z.object({
+        code: z.string(),
+        name: z.string(),
+        authority: z.string(),
+        rateBps: z.number().int(),
+        inclusive: z.boolean(),
+        /** Income codes (ROOM, FNB, MISC) that carry it. */
+        appliesTo: z.array(z.string()),
+      }),
+    ),
+    /** Local charges the suggestions leave out. */
+    notes: z.string().nullable(),
+    /** Every suggested tax already has its code here. */
+    added: z.boolean(),
+  })
+  .meta({ id: 'TaxSuggestion' });
+
 export const TaxVersionBody = z.object({
   /** Today (property date) or later; versions never reach back. */
   effectiveFrom: IsoDate,
@@ -159,6 +181,25 @@ export const listTaxRules = defineRoute({
   summary: 'Tax rules with their versions, and whether the rates were confirmed',
   tags: ['Tax'],
   propertyScoped: true,
+  response: z.object({
+    data: z.array(TaxRuleItem),
+    confirmation: TaxConfirmation,
+    /** Null where the group's country pack suggests none. */
+    suggestion: TaxSuggestion.nullable(),
+  }),
+});
+
+export const addSuggestedTaxes = defineRoute({
+  operationId: 'addSuggestedTaxes',
+  method: 'post',
+  path: '/tax-rules/suggested',
+  summary: "Add the country pack's suggested taxes from today",
+  description:
+    'Creates a tax line code and a tax rule for each suggestion and puts it on the income codes it applies to. The taxes then need confirming again.',
+  tags: ['Tax'],
+  propertyScoped: true,
+  permission: TAX,
+  status: 201,
   response: z.object({ data: z.array(TaxRuleItem), confirmation: TaxConfirmation }),
 });
 
@@ -210,4 +251,5 @@ export const TAX_ROUTES = {
   createTaxRule,
   addTaxRuleVersion,
   confirmTaxes,
+  addSuggestedTaxes,
 } as const;

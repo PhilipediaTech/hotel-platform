@@ -69,6 +69,18 @@
       "net": "Price before tax",
       "on": "on {{base}}",
       "total": "Guest pays"
+    },
+    "suggested": {
+      "title": "Suggested taxes for {{country}}",
+      "line": "{{name}} {{rate}} on {{on}}, added to the price (paid to {{authority}})",
+      "lineIncluded": "{{name}} {{rate}} on {{on}}, included in the price (paid to {{authority}})",
+      "on": {
+        "ROOM": "rooms",
+        "FNB": "food and drink",
+        "MISC": "other charges"
+      },
+      "check": "Researched in November 2026. Check them with your accountant: you confirm them like any other tax.",
+      "add": "Add these taxes"
     }
   },
   "fx": {

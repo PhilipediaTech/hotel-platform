@@ -2652,6 +2652,7 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
       expect(b1.settings).toEqual({});
     },
   },
+  addSuggestedTaxes: { seed: bTaxRule, creates: true, untouched: bTaxesUnchanged },
   listCancellationPolicies: { seed: bPolicy, listIds: ids },
   createCancellationPolicy: {
     seed: bPlan,

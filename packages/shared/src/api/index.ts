@@ -12,6 +12,7 @@ export * from './visitors.ts';
 export * from './partners.ts';
 export * from './booking-engine.ts';
 export * from './inbox.ts';
+export * from './search.ts';
 export * from './events.ts';
 export * from './event-sales.ts';
 export * from './event-closeout.ts';

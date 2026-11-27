@@ -214,4 +214,4 @@ Root scripts (`dev` runs api :4000, the worker and web :5173 via `scripts/dev.mj
 
 ## Next step
 
-T-177 (AI reply drafts in the inbox) is pushed on `feat/T-177-inbox-reply-drafts`; no migration. Next: T-178 AI search.
+T-178 (AI search) is pushed on `feat/T-178-ai-search`; no migration. The V3 AI row is done. Next: V3 forecasting and insights, which need stories written for Philip first.

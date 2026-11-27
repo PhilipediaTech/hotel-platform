@@ -498,6 +498,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   updateHelpArticle: {"operationId":"updateHelpArticle","method":"put","path":"/platform/help/articles/{articleId}","body":true},
   listTasks: {"operationId":"listTasks","method":"get","path":"/tasks","propertyScoped":true},
   createTask: {"operationId":"createTask","method":"post","path":"/tasks","body":true,"propertyScoped":true,"idempotent":true},
+  suggestTask: {"operationId":"suggestTask","method":"post","path":"/tasks/suggest","body":true,"propertyScoped":true},
   getTaskFormOptions: {"operationId":"getTaskFormOptions","method":"get","path":"/tasks/form-options","propertyScoped":true},
   getTask: {"operationId":"getTask","method":"get","path":"/tasks/{taskId}","propertyScoped":true},
   assignTask: {"operationId":"assignTask","method":"post","path":"/tasks/{taskId}/assign","body":true,"propertyScoped":true,"idempotent":true},

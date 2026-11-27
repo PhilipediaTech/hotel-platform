@@ -4,6 +4,7 @@ import { mountRoute } from '../../core/route.ts';
 import type { TenantContext } from '../../core/tenancy.ts';
 import * as qr from './qr.ts';
 import * as tasks from './service.ts';
+import { suggestTask, type SuggestDeps } from './suggest.ts';
 
 /** Property-scoped routes always have a tenant (mountRoute answers 404 otherwise). */
 function tenantFrom(tenant: TenantContext | null): TenantContext {
@@ -12,7 +13,7 @@ function tenantFrom(tenant: TenantContext | null): TenantContext {
 }
 
 /** Tasks, templates and QR fault reports (tab 4 row "Tasks"; T-082). */
-export function taskRoutes(deps: tasks.TaskDeps): Router {
+export function taskRoutes(deps: SuggestDeps): Router {
   const router = express.Router();
   const r = TASK_ROUTES;
 
@@ -21,6 +22,9 @@ export function taskRoutes(deps: tasks.TaskDeps): Router {
   );
   mountRoute(router, r.createTask, ({ body }, { tenant }) =>
     tasks.createTask(deps, tenantFrom(tenant), body),
+  );
+  mountRoute(router, r.suggestTask, ({ body }, { tenant }) =>
+    suggestTask(deps, tenantFrom(tenant), body),
   );
   // Before /tasks/{taskId}, which would read "form-options" as an ID.
   mountRoute(router, r.getTaskFormOptions, (_input, { tenant }) =>

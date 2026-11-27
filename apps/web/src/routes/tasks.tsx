@@ -319,7 +319,26 @@ export function NewTaskPage() {
   const [assigneeId, setAssigneeId] = useState('');
   const [deadline, setDeadline] = useState('');
   const [missing, setMissing] = useState(false);
+  const [title, setTitle] = useState('');
   const manager = permissions.includes('task.assign');
+  // AI suggestion (T-176): fills the form from the description; staff check it and create.
+  const suggest = useMutation({
+    mutationFn: () => api.call('suggestTask', { body: { text: description.trim() } }),
+    onSuccess: (s) => {
+      const byType = active.filter((x) => x.type === s.type);
+      const template =
+        byType.find((x) => x.department.id === s.departmentId) ??
+        byType[0] ??
+        active.find((x) => x.department.id === s.departmentId);
+      if (template) {
+        setTemplateId(template.id);
+        setMissing(false);
+      }
+      if (s.roomId) setRoomId(s.roomId);
+      if (s.priority && manager) setPriority(s.priority);
+      if (s.title) setTitle(s.title);
+    },
+  });
   const create = useMutation({
     mutationFn: async () => {
       const fileIds = await uploadAll(files);
@@ -327,6 +346,7 @@ export function NewTaskPage() {
         body: {
           templateId: chosen,
           ...(roomId ? { roomId } : {}),
+          ...(title.trim() ? { title: title.trim() } : {}),
           ...(description.trim() ? { description: description.trim() } : {}),
           ...(fileIds.length ? { fileIds } : {}),
           ...(priority ? { priority } : {}),
@@ -412,7 +432,34 @@ export function NewTaskPage() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={description.trim().length < 3 || suggest.isPending}
+              onClick={() => suggest.mutate()}
+            >
+              {suggest.isPending ? t('tasks.new.suggesting') : t('tasks.new.suggest')}
+            </Button>
+            <span className="text-xs text-text-muted">
+              {suggest.isSuccess ? t('tasks.new.suggested') : t('tasks.new.suggestHint')}
+            </span>
+          </div>
+          {suggest.error && <Alert tone="critical">{errorMessage(suggest.error)}</Alert>}
         </div>
+        {(title || suggest.isSuccess) && (
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="task-title">{t('tasks.new.taskTitle')}</Label>
+            <input
+              id="task-title"
+              className={selectClass}
+              maxLength={160}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+        )}
         <PhotoInput id="task-photos" files={files} onChange={setFiles} />
         {manager && (
           <div className="grid gap-3 sm:grid-cols-3">

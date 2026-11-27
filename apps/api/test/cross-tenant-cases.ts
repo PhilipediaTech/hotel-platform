@@ -3718,6 +3718,13 @@ export const CROSS_TENANT_CASES: Partial<Record<OperationId, CrossTenantCase>> =
     body: (theirs) => ({ templateId: theirs['templateId'], roomId: theirs['roomId'] }),
     untouched: bTaskUnchanged,
   },
+  suggestTask: {
+    // Only A1's departments and rooms are offered or matched; nothing of B's is touched.
+    seed: bTask,
+    creates: true,
+    body: () => ({ text: 'Leak test in their room' }),
+    untouched: bTaskUnchanged,
+  },
   listAssets: {
     seed: bAsset,
     listIds: (body) => (body as { data: { id: string }[] }).data.map((a) => a.id),

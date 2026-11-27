@@ -88,6 +88,7 @@ describe('migrations', () => {
       'id_documents',
       'idempotency_keys',
       'import_jobs',
+      'insight_dismissals',
       'inspections',
       'invitations',
       'key_issues',

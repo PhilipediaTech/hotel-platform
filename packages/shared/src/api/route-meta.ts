@@ -20,6 +20,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   markThreadRead: {"operationId":"markThreadRead","method":"post","path":"/message-threads/{threadId}/read","body":true,"propertyScoped":true},
   search: {"operationId":"search","method":"get","path":"/search","propertyScoped":true},
   askSearch: {"operationId":"askSearch","method":"post","path":"/search/ask","body":true,"propertyScoped":true},
+  listMaintenanceInsights: {"operationId":"listMaintenanceInsights","method":"get","path":"/maintenance/insights","propertyScoped":true},
+  dismissMaintenanceInsight: {"operationId":"dismissMaintenanceInsight","method":"post","path":"/maintenance/insights/dismiss","body":true,"propertyScoped":true},
   listSpaces: {"operationId":"listSpaces","method":"get","path":"/spaces","propertyScoped":true},
   createSpace: {"operationId":"createSpace","method":"post","path":"/spaces","body":true,"propertyScoped":true},
   updateSpace: {"operationId":"updateSpace","method":"put","path":"/spaces/{spaceId}","body":true,"propertyScoped":true},
